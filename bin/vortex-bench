@@ -26,6 +26,7 @@ ESCRITORIO = {
     "gnome-shell", "Xwayland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland",
     "xdg-desktop-portal-gtk", "xdg-desktop-portal-kde", "pipewire", "wireplumber",
     "pipewire-pulse", "sddm", "greetd", "kded6", "ksmserver", "polkit-gnome-au",
+    "polkit-gnome-authentication-agent-1", "kwin_wayland_wrapper",
 }
 
 # Qué es mejor en cada medida: "menos" o "mas".
@@ -36,7 +37,7 @@ MEDIDAS = {
     "servicios_sistema": ("Servicios del sistema activos", "", "menos"),
     "servicios_usuario": ("Servicios de usuario activos", "", "menos"),
     "paquetes": ("Paquetes instalados", "", "menos"),
-    "arranque_s": ("Arranque total", "s", "menos"),
+    "arranque_s": ("Arranque (kernel+initrd+usuario)", "s", "menos"),
     "disco_usado_gb": ("Disco usado en /", "GB", "menos"),
 }
 
@@ -56,12 +57,27 @@ def meminfo() -> dict[str, int]:
     return datos
 
 
+def nombre_proceso(pid: str) -> str:
+    """Nombre del proceso. /proc/PID/comm se corta a 15 caracteres (p. ej. «xdg-desktop-por»),
+    así que si parece cortado se usa el nombre del ejecutable en cmdline."""
+    nombre = Path(f"/proc/{pid}/comm").read_text().strip()
+    if len(nombre) >= 15:
+        try:
+            primero = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0", 1)[0]
+            completo = os.path.basename(primero.decode(errors="replace"))
+            if completo.startswith(nombre):
+                return completo
+        except OSError:
+            pass
+    return nombre
+
+
 def ram_escritorio_mb() -> tuple[float, dict[str, float]]:
     """Suma la memoria propia (PSS si se puede, si no RSS) de los procesos del escritorio."""
     por_proceso: dict[str, float] = {}
     for pid in filter(str.isdigit, os.listdir("/proc")):
         try:
-            nombre = Path(f"/proc/{pid}/comm").read_text().strip()
+            nombre = nombre_proceso(pid)
         except OSError:
             continue
         if nombre not in ESCRITORIO:
@@ -85,15 +101,26 @@ def contar_unidades(*extra: str) -> int:
     return len([l for l in salida.splitlines() if l.strip()])
 
 
-def arranque_s() -> float | None:
-    salida = sh("systemd-analyze", "time")
-    m = re.search(r"=\s*((?:\d+min\s*)?[\d.]+m?s)", salida)
-    if not m:
-        return None
+def a_segundos(texto: str) -> float:
+    """Convierte «1min 2.5s», «734ms» o «7.8s» a segundos."""
     total = 0.0
-    for numero, unidad in re.findall(r"([\d.]+)(min|ms|s)", m.group(1)):
+    for numero, unidad in re.findall(r"([\d.]+)(min|ms|s)", texto):
         total += float(numero) * {"min": 60, "s": 1, "ms": 0.001}[unidad]
-    return round(total, 2)
+    return total
+
+
+def arranque() -> tuple[float | None, float | None]:
+    """(kernel + initrd + userspace, firmware + gestor de arranque), en segundos.
+
+    El firmware y el gestor (loader) dependen de la placa y de la espera del menú, no de la
+    distro, así que no entran en la medida comparable; se guardan aparte."""
+    salida = sh("systemd-analyze", "time")
+    partes = {fase: a_segundos(t) for t, fase in
+              re.findall(r"([\d.]+(?:min|ms|s)(?:\s+[\d.]+(?:ms|s))?)\s+\((\w+)\)", salida)}
+    propio = [partes[f] for f in ("kernel", "initrd", "userspace") if f in partes]
+    ajeno = [partes[f] for f in ("firmware", "loader") if f in partes]
+    return (round(sum(propio), 2) if propio else None,
+            round(sum(ajeno), 2) if ajeno else None)
 
 
 def distro() -> str:
@@ -107,6 +134,7 @@ def distro() -> str:
 def medir() -> dict:
     mem = meminfo()
     escritorio, detalle = ram_escritorio_mb()
+    arranque_propio, arranque_ajeno = arranque()
     st = os.statvfs("/")
     sched = ""
     try:
@@ -127,7 +155,8 @@ def medir() -> dict:
         "servicios_sistema": contar_unidades(),
         "servicios_usuario": contar_unidades("--user"),
         "paquetes": len(sh("pacman", "-Qq").splitlines()),
-        "arranque_s": arranque_s(),
+        "arranque_s": arranque_propio,
+        "firmware_loader_s": arranque_ajeno,  # informativo: no entra en MEDIDAS ni en --comparar
         "disco_usado_gb": round((st.f_blocks - st.f_bfree) * st.f_frsize / 1024**3, 1),
     }
 
@@ -139,6 +168,8 @@ def mostrar(d: dict) -> None:
         valor = d.get(clave)
         texto = "?" if valor is None else f"{valor} {unidad}".strip()
         print(f"  {nombre:<32} {texto}")
+    if d.get("firmware_loader_s") is not None:
+        print(f"  {'(firmware+gestor, ajenos)':<32} {d['firmware_loader_s']} s")
     if d["ram_escritorio_detalle"]:
         print("\n  RAM del escritorio por proceso:")
         for nombre, mb in d["ram_escritorio_detalle"].items():
@@ -177,15 +208,17 @@ def main() -> int:
         return 0
 
     datos = medir()
-    mostrar(datos)
     if "--json" in args:
+        # Solo JSON en stdout, para poder redirigirlo o pasarlo a jq.
         print(json.dumps(datos, ensure_ascii=False, indent=2))
+    else:
+        mostrar(datos)
     if "--guardar" in args:
         DIR.mkdir(parents=True, exist_ok=True)
         nombre = re.sub(r"[^a-z0-9]+", "-", datos["distro"].lower()).strip("-")
         archivo = DIR / f"{datetime.now():%Y%m%d-%H%M%S}-{nombre}.json"
         archivo.write_text(json.dumps(datos, ensure_ascii=False, indent=2))
-        print(f"\nGuardado en {archivo}")
+        print(f"\nGuardado en {archivo}", file=sys.stderr if "--json" in args else sys.stdout)
     return 0
 
 

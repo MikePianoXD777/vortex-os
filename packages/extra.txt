@@ -5,3 +5,4 @@ wl-clipboard
 libnotify
 python
 pciutils
+python-gobject          # powerprofilesctl lo necesita (el modo juego cambia el perfil de energía)

@@ -4,7 +4,9 @@ Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hypr
 [Caelestia](https://github.com/caelestia-dots/shell) afinado, y **Claude integrado** para que pueda ver
 lo que haces (con tu permiso) y ayudarte.
 
-> Estado: **0.1.0, en desarrollo**. El instalador corre completo en modo prueba; falta probarlo en una VM limpia.
+> Estado: **0.1.0, en desarrollo**. El instalador ya corrió completo en una VM (QEMU/KVM, UEFI, Arch limpio):
+> arranca con `linux-cachyos` y `scx_lavd`, y Hyprland + Caelestia corren. Falta probarlo en hardware real
+> (BIOS, NVIDIA/AMD/Intel, laptops) y construir y probar la ISO.
 
 ## Instalar
 
@@ -60,8 +62,8 @@ Tus propios ajustes van en `~/.config/vortex/` y siempre ganan sobre el perfil:
 el portapapeles, tus últimos comandos y el estado del sistema.
 
 - Solo mira cuando usa una herramienta; no hay nada corriendo en segundo plano.
-- Cada vez que ve la pantalla, el portapapeles o el historial, te sale una notificación.
-- `vortex claude pausa` le corta todo; `vortex claude reanudar` lo devuelve.
+- Cada vez que ve la pantalla, las ventanas, el portapapeles o el historial, te sale una notificación.
+- `vortex claude pausa` le corta todo, también el estado del sistema (la lista de procesos delata lo que haces); `vortex claude reanudar` lo devuelve.
 
 ## ¿Cuánto más ligero?
 
@@ -78,9 +80,15 @@ Medida en la PC de Mike (CachyOS + Hyprland + Caelestia, 21/10/2026), como punto
 | Medida | CachyOS actual | Meta Vortex |
 |---|---|---|
 | RAM del escritorio | 840 MB (de ellos, `qs`/Caelestia: 572 MB) | < 400 MB |
-| Servicios del sistema activos | 23 | ≤ 12 |
+| Servicios del sistema activos | 23 | ≤ 15 |
 | Paquetes | 1708 | < 900 |
 | Arranque | 26 s | < 10 s |
+
+Sobre los servicios: `systemd-resolved` queda activo a propósito (NetworkManager lo usa a través de
+`cachyos-settings`), así que cuenta como esperado. Una instalación normal queda en ~15 servicios contando
+`systemd-resolved` (14 con ≥ 8 GB de RAM, porque ahí se apaga `systemd-oomd`); `ananicy-cpp` ya no
+cuenta porque se desactiva, y `sshd` solo corre en la VM de pruebas. Si el equipo tiene bluetooth
+(lo normal en una laptop) se suma `bluetooth.service`: +1, así que la meta de «≤ 15» es sin bluetooth.
 
 **Sobre los FPS:** en un juego que depende de la GPU, ninguna distro da 5 veces más FPS que CachyOS,
 porque CachyOS ya usa el mismo kernel y los mismos drivers. Lo que sí se gana es menos RAM, menos
@@ -90,9 +98,11 @@ La meta de «5x» se aplica a lo que el sistema gasta en reposo, no a los FPS.
 ## Hoja de ruta
 
 - [x] **0.1** Instalador por pasos con modo prueba, perfiles, modo juego, `vortex-bench` y `vortex-mcp`
-- [ ] Probar la instalación completa en una VM con Arch limpio (QEMU)
+- [x] Probar la instalación completa en una VM con Arch limpio (QEMU): corre completo, con ~905 paquetes
+- [ ] Bajar los paquetes por debajo de la meta (< 900); hoy la VM queda en ~905
+- [ ] Probar la instalación en hardware real (BIOS, NVIDIA/AMD/Intel, híbridas, laptops, CPUs sin x86-64-v3)
 - [ ] **vortex-shell**: fork de Caelestia con **barra arriba** (hoy solo existe la barra vertical a la izquierda) y recortes para bajar la RAM de `qs`
-- [ ] ISO propia con archiso que corra el instalador
+- [ ] ISO propia con archiso que corra el instalador: el perfil (`iso/construir.sh`, `vortex-instalar`) está escrito, falta construirla y probarla de punta a punta
 - [ ] Subir el repo a GitHub y probar `boot.sh`
 
 ## Estructura
@@ -118,6 +128,9 @@ vm/vm.sh ssh 'bash -s' < vm/instalar-arch.sh   # Arch mínimo en el disco virtua
 vm/vm.sh apagar && vm/vm.sh disco     # arranca lo instalado
 VORTEX_VM_USUARIO=vortex vm/vm.sh ssh # entra como el usuario de prueba
 ```
+
+`vm/vm.sh apagar` espera hasta 60 s a que QEMU termine (por eso se puede encadenar con `disco`);
+si la VM no se apaga, `vm/vm.sh matar` la corta de golpe.
 
 ## Licencia
 

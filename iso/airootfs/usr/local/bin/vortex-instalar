@@ -22,12 +22,24 @@ ${azul}Paso 1 de 2: instalar Arch con archinstall${fin}
   · Gestor de arranque: systemd-boot (o GRUB si tu PC es BIOS)
   · Red: «NetworkManager»
   · Crea tu usuario y márcalo como administrador (sudo)
-  · Al final, cuando pregunte si quieres entrar con chroot, di que NO
+  · Al terminar, en el menú final elige «Exit archinstall» (NO «Reboot system»:
+    el paso 2 todavía tiene que correr; si eliges reiniciar, se pospone solo)
 
 EOF
 read -r -p "Enter para empezar…" _
 
-archinstall
+# El menú final de archinstall ofrece «Reboot system», que ejecuta `reboot` por su cuenta
+# y se saltaría el paso 2. Un `reboot` falso solo para archinstall lo convierte en un aviso;
+# el reinicio real se hace al final de este script.
+shim="$(mktemp -d)"
+trap 'rm -rf "$shim"' EXIT
+cat >"$shim/reboot" <<'EOS'
+#!/bin/sh
+echo "Aún falta el paso 2 de Vortex OS: se reiniciará al terminar, no ahora." >&2
+EOS
+chmod +x "$shim/reboot"
+
+PATH="$shim:$PATH" archinstall
 
 echo
 echo "${azul}Paso 2 de 2: preparar Vortex OS${fin}"

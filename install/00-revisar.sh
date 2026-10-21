@@ -16,12 +16,27 @@ if [[ "$VORTEX_DRY_RUN" != 1 ]]; then
   while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done 2>/dev/null &
 fi
 
-if ! curl -fsS --max-time 10 -o /dev/null https://archlinux.org; then
-  error "No hay internet. Conéctate (nmtui o iwctl) y vuelve a intentar."
-fi
+# Se prueban varios destinos: basta con que responda uno. Así una caída de
+# archlinux.org (que no es de donde se descarga todo) no da un falso «sin internet».
+hay_internet=0
+for destino in https://geo.mirror.pkgbuild.com https://mirror.cachyos.org \
+  https://aur.archlinux.org https://archlinux.org; do
+  if curl -fsS --max-time 8 -o /dev/null "$destino" 2>/dev/null; then
+    hay_internet=1
+    break
+  fi
+done
+((hay_internet)) || error "No hay internet. Conéctate (nmtui o iwctl) y vuelve a intentar."
 
 libre_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
-((libre_gb >= 10)) || error "Hacen falta al menos 10 GB libres en / (hay ${libre_gb} GB)."
+# La instalación completa ocupa ~11,5 GB y pacman llega a descargar ~3,2 GB de
+# paquetes antes de limpiar la caché; con margen para el uso diario pedimos 20 GB
+# (menos si se omiten juegos o dev) y avisamos si queda justo.
+minimo_gb=20
+((VORTEX_JUEGOS)) || minimo_gb=$((minimo_gb - 4))
+((VORTEX_DEV)) || minimo_gb=$((minimo_gb - 3))
+((libre_gb >= minimo_gb)) || error "Hacen falta al menos ${minimo_gb} GB libres en / (hay ${libre_gb} GB)."
+((libre_gb >= minimo_gb + 5)) || aviso "Poco espacio libre (${libre_gb} GB): la instalación cabe, pero quedará muy justo."
 
 VORTEX_ES_CACHYOS=0
 grep -qi '^ID=cachyos' /etc/os-release && VORTEX_ES_CACHYOS=1

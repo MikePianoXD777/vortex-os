@@ -41,7 +41,35 @@ source "$VORTEX_DIR/install/lib.sh"
 VORTEX_RESPALDO="$HOME/.config/vortex/respaldo-$(date +%Y%m%d-%H%M%S)"
 export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_PERFIL VORTEX_AUTOLOGIN
 
-trap 'error "Falló en la línea $LINENO. Revisa $VORTEX_LOG"' ERR
+# Dónde falló: archivo y línea, y la línea del paso que lo originó, buscándola en
+# la pila de llamadas (el fallo puede estar dentro de una función de lib.sh,
+# como run o instalar_pacman).
+donde() {
+  local i
+  # Si el fallo ya está en el propio paso, el archivo y la línea bastan.
+  [[ -n "${paso_script:-}" && "${1:-}" == "$paso_script" ]] && return 0
+  for ((i = 1; i < ${#BASH_SOURCE[@]}; i++)); do
+    if [[ "${BASH_SOURCE[i]}" == "${paso_script:-}" ]]; then
+      printf ' (%s:%s)' "${paso_script##*/}" "${BASH_LINENO[i-1]}"
+      return
+    fi
+  done
+  [[ -n "${paso_script:-}" ]] && printf ' (paso %s)' "${paso_script##*/}"
+  return 0
+}
+
+# Recibe el código de salida, el comando, la línea y el archivo del fallo (se
+# pasan desde la trampa porque los pasos y lib.sh se cargan con source, así que
+# el número de línea solo no basta). Si el comando es el «"$@"» de run, el
+# comando real está en la última línea «$» del log.
+al_fallar() {
+  local rc="$1" cmd="$2" linea="$3" archivo="$4" nota=""
+  if [[ "$cmd" == *'"$@"'* ]]; then
+    nota=" (el comando completo está en la última línea «\$» del log)"
+  fi
+  error "Falló «$cmd»$nota (código $rc) en ${archivo##*/}:$linea$(donde "$archivo"). Revisa $VORTEX_LOG"
+}
+trap 'al_fallar "$?" "$BASH_COMMAND" "$LINENO" "${BASH_SOURCE[0]}"' ERR
 
 printf '%s' "$C_AZUL"
 cat <<'EOF'

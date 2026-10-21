@@ -13,7 +13,9 @@ if [[ $EUID -eq 0 ]]; then
   exit 1
 fi
 
-sudo pacman -Sy --needed --noconfirm git
+# -Syu y no -Sy: un «pacman -Sy» suelto deja el sistema con bases de datos
+# nuevas y paquetes viejos (actualización parcial, no soportada en Arch).
+sudo pacman -Syu --needed --noconfirm git
 
 if [[ -d "$DESTINO/.git" ]]; then
   git -C "$DESTINO" pull --ff-only
@@ -22,5 +24,11 @@ else
   git clone --depth 1 --branch "$RAMA" "$REPO" "$DESTINO"
 fi
 
-# El instalador lee del teclado, así que se reconecta a la terminal.
-exec "$DESTINO/install.sh" "$@" </dev/tty
+# El instalador lee del teclado, así que se reconecta a la terminal. Sin
+# terminal de control (ssh sin -t, cloud-init, CI) /dev/tty no se puede abrir:
+# en ese caso se corre igual, y preguntar() usa los valores por defecto.
+if { : </dev/tty; } 2>/dev/null; then
+  exec "$DESTINO/install.sh" "$@" </dev/tty
+else
+  exec "$DESTINO/install.sh" "$@"
+fi

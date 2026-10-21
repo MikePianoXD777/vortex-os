@@ -20,6 +20,17 @@ if ! grep -qs 'mise activate' "$fish_usuario"; then
   fi
 fi
 
+# El shell de login sigue siendo bash (Zed y las terminales bash usan $SHELL),
+# así que mise también se activa en ~/.bashrc para que vean las mismas versiones.
+bashrc_usuario="$HOME/.bashrc"
+if ! grep -qs 'mise activate' "$bashrc_usuario"; then
+  if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+    run "echo 'mise activate bash' >> $bashrc_usuario"
+  else
+    printf '\n# Vortex OS\ncommand -v mise >/dev/null && eval "$(mise activate bash)"\n' >>"$bashrc_usuario"
+  fi
+fi
+
 if preguntar "¿Instalar Docker? (arranca solo cuando lo usas)" n; then
   mapfile -t docker < <(leer_paquetes "$VORTEX_DIR/packages/dev.txt" | grep '^docker')
   instalar_pacman "${docker[@]}"

@@ -1,5 +1,5 @@
 # Base del sistema (repos oficiales + CachyOS)
-linux-cachyos          # kernel con planificador BORE y parches de latencia (sin headers: chwd los trae si un driver DKMS los pide)
+linux-cachyos          # kernel con BORE y parches de latencia (sin headers; 20-sistema.sh los instala solo si chwd deja un -dkms, p. ej. NVIDIA Kepler)
 cachyos-settings       # sysctl, zram, udev y límites afinados por CachyOS (solo archivos de config)
 chwd                   # detecta la GPU e instala los drivers correctos
 scx-scheds             # planificadores sched_ext (scx_lavd para juegos)

@@ -6,12 +6,13 @@ Habla JSON-RPC por stdin/stdout, sin dependencias fuera de la biblioteca estánd
 
 Privacidad:
 - Claude solo mira cuando usa una herramienta; nada corre en segundo plano.
-- Cada vez que ve tu pantalla, el portapapeles o el historial, sale una notificación.
+- Cada vez que ve tu pantalla, ventanas, portapapeles o historial, sale una notificación.
 - «vortex claude pausa» le corta el acceso a todo hasta «vortex claude reanudar».
 """
 
 import base64
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -64,6 +65,17 @@ def revisar_permiso() -> None:
         raise ErrorHerramienta("El acceso de Claude está en pausa. El usuario puede reactivarlo con «vortex claude reanudar».")
 
 
+def numero(args: dict, clave: str, defecto: float) -> float:
+    """Lee un número de los argumentos; null o ausente = el valor por defecto."""
+    v = args.get(clave)
+    if v is None:
+        return defecto
+    v = float(v)
+    if not math.isfinite(v):
+        raise ValueError(f"«{clave}» no es un número válido.")
+    return v
+
+
 def texto(t: str) -> dict:
     return {"type": "text", "text": t}
 
@@ -72,17 +84,27 @@ def texto(t: str) -> dict:
 
 def ver_pantalla(args: dict) -> list[dict]:
     revisar_permiso()
-    escala = min(max(float(args.get("escala", 0.5)), 0.2), 1.0)
-    cmd = ["grim", "-t", "jpeg", "-q", "75", "-s", f"{escala:g}"]
-    if args.get("monitor"):
-        cmd += ["-o", str(args["monitor"])]
-    else:
-        # Por defecto, solo el monitor donde está el usuario.
-        try:
-            activo = next(m["name"] for m in hyprctl("monitors") if m.get("focused"))
-            cmd += ["-o", activo]
-        except (ErrorHerramienta, StopIteration, json.JSONDecodeError):
-            pass
+    escala = min(max(numero(args, "escala", 0.5), 0.2), 1.0)
+    cmd = ["grim", "-t", "jpeg", "-q", "75"]
+    monitor = str(args["monitor"]) if args.get("monitor") else None
+    factor = 1.0  # escala del monitor en Hyprland (grim -s es relativo al tamaño lógico)
+    try:
+        monitores = hyprctl("monitors")
+        if monitor:
+            m = next((m for m in monitores if m.get("name") == monitor), None)
+        else:
+            # Por defecto, solo el monitor donde está el usuario.
+            m = next((m for m in monitores if m.get("focused")), None)
+            if m:
+                monitor = m["name"]
+        if m:
+            factor = float(m.get("scale") or 1.0)
+    except (ErrorHerramienta, json.JSONDecodeError, subprocess.TimeoutExpired, OSError, ValueError, TypeError):
+        pass
+    # Con escala 1 la captura sale a la resolución real del monitor, también en pantallas HiDPI.
+    cmd += ["-s", f"{round(escala * factor, 4):g}"]
+    if monitor:
+        cmd += ["-o", monitor]
     imagen = ejecutar(*cmd, "-", binario=True)
     avisar("Claude miró tu pantalla")
     return [
@@ -103,6 +125,7 @@ def ventana_enfocada(clientes: list[dict] | None = None) -> dict:
 def ventana_activa(_: dict) -> list[dict]:
     revisar_permiso()
     v = ventana_enfocada()
+    avisar("Claude vio tu ventana activa")
     if not v:
         return [texto("No hay ninguna ventana enfocada.")]
     datos = {k: v.get(k) for k in ("class", "title", "pid", "floating", "fullscreen", "size", "xwayland")}
@@ -114,6 +137,7 @@ def ventanas(_: dict) -> list[dict]:
     revisar_permiso()
     clientes = hyprctl("clients")
     activa = ventana_enfocada(clientes).get("address")
+    avisar("Claude vio tus ventanas")
     lista = [
         {
             "workspace": (c.get("workspace") or {}).get("name"),
@@ -142,10 +166,11 @@ def portapapeles(_: dict) -> list[dict]:
 
 def historial_terminal(args: dict) -> list[dict]:
     revisar_permiso()
-    n = min(max(int(args.get("cantidad", 20)), 1), 200)
+    n = min(max(int(numero(args, "cantidad", 20)), 1), 200)
     try:
-        salida = ejecutar("fish", "-c", f"history --max {n}")
-        lineas = list(reversed(salida.splitlines()))
+        # --reverse deja lo más reciente al final sin invertir las líneas de un comando multilínea.
+        salida = ejecutar("fish", "-c", f"history --max {n} --reverse")
+        lineas = salida.splitlines()
     except ErrorHerramienta:
         archivo = Path.home() / ".bash_history"
         lineas = archivo.read_text(errors="replace").splitlines()[-n:] if archivo.exists() else []
@@ -154,6 +179,7 @@ def historial_terminal(args: dict) -> list[dict]:
 
 
 def estado_sistema(_: dict) -> list[dict]:
+    revisar_permiso()  # los nombres de proceso delatan lo que hace el usuario: también se cortan en pausa
     mem = {}
     for linea in Path("/proc/meminfo").read_text().splitlines():
         k, v = linea.split(":", 1)
@@ -207,9 +233,17 @@ def responder(id_, resultado=None, error=None) -> None:
 
 
 def manejar(msg: dict) -> None:
-    metodo, id_, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+    if not isinstance(msg, dict):
+        responder(None, error={"code": -32600, "message": "Solicitud inválida"})
+        return
+    metodo, id_, params = msg.get("method"), msg.get("id"), msg.get("params")
     if id_ is None:
         return  # notificación (p. ej. notifications/initialized): no lleva respuesta
+    if params is None:
+        params = {}
+    elif not isinstance(params, dict):
+        responder(id_, error={"code": -32602, "message": "«params» debe ser un objeto"})
+        return
 
     if metodo == "initialize":
         pedida = params.get("protocolVersion")
@@ -236,11 +270,17 @@ def manejar(msg: dict) -> None:
         if nombre not in HERRAMIENTAS:
             responder(id_, error={"code": -32602, "message": f"Herramienta desconocida: {nombre}"})
             return
+        argumentos = params.get("arguments")
+        if argumentos is None:
+            argumentos = {}
+        elif not isinstance(argumentos, dict):
+            responder(id_, error={"code": -32602, "message": "«arguments» debe ser un objeto"})
+            return
         try:
-            contenido = HERRAMIENTAS[nombre][0](params.get("arguments") or {})
+            contenido = HERRAMIENTAS[nombre][0](argumentos)
             responder(id_, {"content": contenido})
-        except (ErrorHerramienta, subprocess.TimeoutExpired, OSError, ValueError, json.JSONDecodeError) as e:
-            responder(id_, {"content": [texto(str(e))], "isError": True})
+        except Exception as e:  # una herramienta que falla no debe tumbar el servidor
+            responder(id_, {"content": [texto(str(e) or type(e).__name__)], "isError": True})
     else:
         responder(id_, error={"code": -32601, "message": f"Método no soportado: {metodo}"})
 
@@ -255,7 +295,12 @@ def main() -> None:
         except json.JSONDecodeError:
             responder(None, error={"code": -32700, "message": "JSON inválido"})
             continue
-        manejar(msg)
+        try:
+            manejar(msg)
+        except Exception as e:  # red de seguridad: nada debe matar el servidor
+            id_ = msg.get("id") if isinstance(msg, dict) else None
+            if id_ is not None:
+                responder(id_, error={"code": -32603, "message": f"Error interno: {e}"})
 
 
 if __name__ == "__main__":

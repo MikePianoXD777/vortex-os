@@ -18,6 +18,12 @@ cat <<'EOF'
       Super+G                    modo juego a mano
 EOF
 
-if [[ "$VORTEX_DRY_RUN" != 1 ]] && preguntar "¿Reiniciar ahora?" s; then
+# Sin preguntar (--si, curl | bash o sin terminal) no se reinicia solo: el equipo puede
+# estar en uso y perder trabajo abierto. El reinicio automático solo se ofrece con terminal.
+reiniciar_defecto=s
+[[ "$VORTEX_SI" == 1 || ! -t 0 ]] && reiniciar_defecto=n
+if [[ "$VORTEX_DRY_RUN" != 1 ]] && preguntar "¿Reiniciar ahora?" "$reiniciar_defecto"; then
   sudo systemctl reboot
+elif [[ "$reiniciar_defecto" == n ]]; then
+  info "Reinicia cuando puedas para entrar a Vortex OS."
 fi

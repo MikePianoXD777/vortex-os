@@ -5,7 +5,9 @@
 #   vm/vm.sh disco        arranca lo instalado en el disco
 #   vm/vm.sh ssh [cmd]    entra por SSH (root en la ISO, vortex en el disco)
 #   vm/vm.sh captura F    guarda una captura de la pantalla de la VM en F (.png)
-#   vm/vm.sh apagar       apaga la VM
+#   vm/vm.sh copiar O D   copia con rsync (la ruta remota va como :ruta)
+#   vm/vm.sh apagar       apaga la VM y espera (hasta 60 s) a que QEMU termine
+#   vm/vm.sh matar        corta la VM de golpe si no se apaga
 #   vm/vm.sh borrar       borra el disco para empezar de cero
 #
 # Todo vive en ~/.cache/vortex-os-vm (fuera de la bóveda, son varios GB).
@@ -101,7 +103,15 @@ case "${1:-}" in
     echo "$destino"
     ;;
   apagar)
-    corriendo && monitor system_powerdown
+    corriendo || exit 0
+    monitor system_powerdown
+    # Espera a que QEMU termine, para que «apagar && disco» no choque con la VM aún viva.
+    for _ in $(seq 60); do
+      corriendo || exit 0
+      sleep 1
+    done
+    echo "La VM no se apagó; usa vm.sh matar" >&2
+    exit 1
     ;;
   matar)
     corriendo && kill "$(cat "$VM/qemu.pid")"
@@ -112,6 +122,6 @@ case "${1:-}" in
     echo "Disco borrado."
     ;;
   *)
-    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

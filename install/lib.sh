@@ -81,14 +81,30 @@ con_reintentos() {
   return 1
 }
 
+# Marca como instalados «a propósito» los paquetes pedidos. Con --needed, pacman no cambia
+# el motivo de instalación de uno que ya estaba como dependencia (p. ej. uv, que otro
+# paquete AUR pide para compilar), y una limpieza de huérfanos lo borraría. Los grupos o
+# nombres que no son un paquete instalado se ignoran.
+marcar_explicitos() {
+  local p
+  for p in "$@"; do
+    p="${p##*/}"   # quita el prefijo de repo («aur/quickshell-git»)
+    srun pacman -D --asexplicit "$p" >/dev/null 2>&1 || true
+  done
+}
+
 instalar_pacman() {
   (($#)) || return 0
   con_reintentos srun pacman -S --needed --noconfirm "$@"
+  marcar_explicitos "$@"
 }
 
+# --removemake: borra las dependencias de compilación al terminar de construir (cmake, meson,
+# ninja, headers…), para no dejar cientos de MiB de herramientas que ya no hacen falta.
 instalar_aur() {
   (($#)) || return 0
-  con_reintentos run paru -S --needed --noconfirm "$@"
+  con_reintentos run paru -S --needed --noconfirm --removemake "$@"
+  marcar_explicitos "$@"
 }
 
 # Copia un archivo de config del usuario, guardando antes el que hubiera.
