@@ -1,16 +1,16 @@
 # Vortex OS
 
 Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hyprland con el shell
-[Caelestia](https://github.com/caelestia-dots/shell) afinado, y **Claude integrado** para que pueda ver
-lo que haces (con tu permiso) y ayudarte.
+[Serpantinum](https://github.com/ilyamiro/serpantinum) (barra arriba, paneles animados, colores que salen
+de tu fondo) optimizado, y **Claude integrado** para que pueda ver lo que haces (con tu permiso) y ayudarte.
 
-> Estado: **0.1.0, en desarrollo**. El instalador ya corrió completo en una VM (QEMU/KVM, UEFI, Arch limpio):
-> arranca con `linux-cachyos` y `scx_lavd`, y Hyprland + Caelestia corren. Falta probarlo en hardware real
-> (BIOS, NVIDIA/AMD/Intel, laptops) y construir y probar la ISO.
+> Estado: **0.2 en desarrollo**. En una VM (QEMU/KVM, UEFI, Arch limpio) el instalador corre completo, arranca
+> con `linux-cachyos` y `scx_lavd` en ~3 s, y el shell funciona en español con 0 avisos en su registro.
+> Falta: terminar de optimizar la RAM, probar en hardware real y construir la ISO.
 
 ## Instalar
 
-Sobre un Arch recién instalado (con `archinstall`, perfil «minimal») o sobre CachyOS:
+Sobre un Arch recién instalado (con `archinstall`, perfil «minimal») o sobre tu CachyOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MikePianoXD777/vortex-os/main/boot.sh | bash
@@ -21,8 +21,13 @@ O desde el código:
 ```bash
 ./install.sh --prueba     # muestra lo que haría, sin tocar nada
 ./install.sh              # instala
-./install.sh --si --perfil ligero --sin-dev
+./install.sh --si --sin-dev --inicio-automatico
 ```
+
+**No pierdes nada.** Vortex se instala encima de tu sistema, sin formatear: tus juegos de Steam, Minecraft
+y sus mods, tus sesiones y tus archivos se quedan donde están. Si tu disco usa btrfs, antes de cambiar nada
+el instalador toma una foto del sistema (snapper) y una copia instantánea de `/home`, para volver atrás si
+hiciera falta.
 
 O con la ISO de Vortex: arranca, escribe `vortex-instalar`, y `archinstall` te guía. Al reiniciar
 y entrar con tu usuario, Vortex se termina de instalar solo.
@@ -36,25 +41,28 @@ sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archis
 | Parte | Qué usa | Por qué |
 |---|---|---|
 | Kernel | `linux-cachyos` (BORE) + `scx_lavd` | baja latencia en juegos; los repos se eligen solos según tu CPU (genérico, v3, v4 o znver4) |
-| Ajustes | `cachyos-settings` + extras de Vortex | zram, sysctl y límites ya probados por CachyOS |
+| Ajustes | `cachyos-settings` + extras de Vortex | zram, sysctl y límites ya probados por CachyOS; sin `ananicy-cpp` (sobra con `scx_lavd`) |
 | Drivers | `chwd` | detecta NVIDIA, AMD, Intel e híbridas |
-| Escritorio | Hyprland + Caelestia con perfiles | ver más abajo |
+| Escritorio | Hyprland + Serpantinum (`shell/`) | barra arriba, calendario y clima, panel de red, centro de control, música con ecualizador, carrusel de fondos, app de Ajustes |
+| Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
-| Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope | el modo juego apaga los efectos al abrir un juego |
+| Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
 | Claude | Claude Code + servidor MCP `vortex` | Super+A, y puede ver tu pantalla cuando se lo pides |
 
-### Perfiles gráficos
+Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
+el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
+pantalla); en laptops sí.
 
-```bash
-vortex perfil ligero        # sin desenfoque, sombras ni animaciones de ventanas
-vortex perfil equilibrado   # animaciones y desenfoque de 1 pasada, sin sombras
-vortex perfil bonito        # Caelestia tal cual
-```
+### Atajos de Vortex
 
-El instalador elige uno según tu equipo (poca RAM o gráficos integrados → ligero).
-Tus propios ajustes van en `~/.config/vortex/` y siempre ganan sobre el perfil:
-`shell-mio.json` (Caelestia), `hypr-vars-mios.lua` (variables) e `hypr-mio.lua` (config de Hyprland).
+| Atajo | Qué hace |
+|---|---|
+| Super+A | habla con Claude |
+| Super+G | modo juego a mano |
+| Super+Shift+A | esconder/mostrar la barra |
+| Super+E | archivos (Thunar) |
+| Super+S / N / B / M / W / D / H | calendario, red, sistema, música, fondos, lanzador, Ajustes |
 
 ### Claude en el sistema
 
@@ -63,61 +71,51 @@ el portapapeles, tus últimos comandos y el estado del sistema.
 
 - Solo mira cuando usa una herramienta; no hay nada corriendo en segundo plano.
 - Cada vez que ve la pantalla, las ventanas, el portapapeles o el historial, te sale una notificación.
-- `vortex claude pausa` le corta todo, también el estado del sistema (la lista de procesos delata lo que haces); `vortex claude reanudar` lo devuelve.
+- `vortex claude pausa` le corta todo; `vortex claude reanudar` lo devuelve.
 
 ## ¿Cuánto más ligero?
 
-Los objetivos se miden con `vortex bench`, no se prometen a ojo:
+Los objetivos se miden con `vortex bench`, no se prometen a ojo. En la VM se mide con un arranque en frío por
+variante (`vm/medir-frio.sh`), porque reiniciar solo el shell deja memoria acumulada y sesga los resultados.
 
 ```bash
-vortex bench --guardar                       # en CachyOS, antes
+vortex bench --guardar                       # en tu sistema actual, antes
 vortex bench --guardar                       # en Vortex OS, después
 vortex bench --comparar antes.json despues.json
 ```
 
-Medida en la PC de Mike (CachyOS + Hyprland + Caelestia, 21/10/2026), como punto de partida:
+La meta es **hasta 45 % menos RAM que un Linux convencional** (CachyOS + Hyprland + Caelestia). Las cifras
+definitivas se publican cuando termine la optimización del shell.
 
-| Medida | CachyOS actual | Meta Vortex |
-|---|---|---|
-| RAM del escritorio | 840 MB (de ellos, `qs`/Caelestia: 572 MB) | < 400 MB |
-| Servicios del sistema activos | 23 | ≤ 15 |
-| Paquetes | 1708 | < 900 |
-| Arranque | 26 s | < 10 s |
-
-Sobre los servicios: `systemd-resolved` queda activo a propósito (NetworkManager lo usa a través de
-`cachyos-settings`), así que cuenta como esperado. Una instalación normal queda en ~15 servicios contando
-`systemd-resolved` (14 con ≥ 8 GB de RAM, porque ahí se apaga `systemd-oomd`); `ananicy-cpp` ya no
-cuenta porque se desactiva, y `sshd` solo corre en la VM de pruebas. Si el equipo tiene bluetooth
-(lo normal en una laptop) se suma `bluetooth.service`: +1, así que la meta de «≤ 15» es sin bluetooth.
-
-**Sobre los FPS:** en un juego que depende de la GPU, ninguna distro da 5 veces más FPS que CachyOS,
-porque CachyOS ya usa el mismo kernel y los mismos drivers. Lo que sí se gana es menos RAM, menos
-procesos de fondo, *frametimes* más estables y equipos viejos que vuelven a ser usables.
-La meta de «5x» se aplica a lo que el sistema gasta en reposo, no a los FPS.
+**Sobre los FPS:** en un juego que depende de la GPU ninguna distro multiplica los FPS frente a CachyOS,
+porque usa el mismo kernel y los mismos drivers. Lo que se gana es menos RAM y procesos de fondo,
+*frametimes* más estables y equipos viejos que vuelven a ser usables.
 
 ## Hoja de ruta
 
-- [x] **0.1** Instalador por pasos con modo prueba, perfiles, modo juego, `vortex-bench` y `vortex-mcp`
-- [x] Probar la instalación completa en una VM con Arch limpio (QEMU): corre completo, con ~905 paquetes
-- [ ] Bajar los paquetes por debajo de la meta (< 900); hoy la VM queda en ~905
-- [ ] Probar la instalación en hardware real (BIOS, NVIDIA/AMD/Intel, híbridas, laptops, CPUs sin x86-64-v3)
-- [ ] **vortex-shell**: fork de Caelestia con **barra arriba** (hoy solo existe la barra vertical a la izquierda) y recortes para bajar la RAM de `qs`
-- [ ] ISO propia con archiso que corra el instalador: el perfil (`iso/construir.sh`, `vortex-instalar`) está escrito, falta construirla y probarla de punta a punta
-- [ ] Subir el repo a GitHub y probar `boot.sh`
+- [x] **0.1** Instalador por pasos, modo juego, `vortex-bench`, `vortex-mcp`, VM de pruebas
+- [x] Instalación completa probada en una VM con Arch limpio
+- [x] Shell nuevo: Serpantinum en `shell/`, sin telemetría, en español, 0 avisos en su registro
+- [ ] Optimizar la RAM del shell sin cambiar cómo se ve (en curso)
+- [ ] Probar en hardware real (BIOS, NVIDIA/AMD/Intel, híbridas, laptops, CPUs sin x86-64-v3)
+- [ ] Construir y probar la ISO
+- [ ] Publicar la versión estable
 
 ## Estructura
 
 ```
 boot.sh              instalación con un comando (curl | bash)
 install.sh           instalador; corre install/NN-*.sh en orden
-install/             pasos: revisar, repos, sistema, escritorio, juegos, dev, claude, final
+install/             pasos: revisar, restauración, repos, sistema, escritorio, juegos, dev, claude, final
 packages/            listas de paquetes por grupo
-config/              perfiles, Caelestia, gamemode y ajustes del sistema
-bin/vortex           comando principal
+shell/               Serpantinum (git subtree del tag v2.2.14) con los parches de Vortex
+packaging/           PKGBUILD del shell (vortex-shell)
+config/              Hyprland, ajustes iniciales del shell, fondos, gamemode y ajustes del sistema
+bin/vortex           comando principal (fondo, java, modo-juego, claude, bench, actualizar)
 bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
 iso/                 perfil de archiso (releng + Vortex) y «vortex-instalar»
-vm/                  VM de pruebas con QEMU: Arch limpio por SSH, sin tocar tu PC
+vm/                  VM de pruebas con QEMU, mediciones y previews
 ```
 
 ## Probar en una máquina virtual
@@ -127,11 +125,10 @@ vm/vm.sh live                         # arranca la ISO de Arch (en ~/.cache/vort
 vm/vm.sh ssh 'bash -s' < vm/instalar-arch.sh   # Arch mínimo en el disco virtual
 vm/vm.sh apagar && vm/vm.sh disco     # arranca lo instalado
 VORTEX_VM_USUARIO=vortex vm/vm.sh ssh # entra como el usuario de prueba
+vm/preview.sh foto escritorio         # capturas y clips para mostrar Vortex
 ```
-
-`vm/vm.sh apagar` espera hasta 60 s a que QEMU termine (por eso se puede encadenar con `disco`);
-si la VM no se apaga, `vm/vm.sh matar` la corta de golpe.
 
 ## Licencia
 
-MIT. Caelestia, Hyprland y CachyOS tienen sus propias licencias.
+MIT, salvo `shell/`, que es Serpantinum de [@ilyamiro](https://github.com/ilyamiro) con licencia
+**AGPL-3.0** (sus cambios en Vortex siguen bajo la misma licencia). Hyprland y CachyOS tienen las suyas.
