@@ -177,6 +177,7 @@ Item {
     }
 
     FileView {
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: root.active ? root.snapshotPath : ""
         watchChanges: true
         onFileChanged: root.revision++

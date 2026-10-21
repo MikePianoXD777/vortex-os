@@ -210,6 +210,7 @@ Item {
 
     FileView {
         id: weatherWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.cacheDir ? (Caching.getCacheDir("weather") + "/weather.json") : ""
         watchChanges: true
         onLoaded: root.parseJson(typeof weatherWatcher.text === "function" ? weatherWatcher.text() : weatherWatcher.text)

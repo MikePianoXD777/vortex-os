@@ -187,6 +187,7 @@ Item {
 
     FileView {
         id: wallpaperHistoryReader
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.getCacheDir("wallpaper") + "/history.txt"
         onLoaded: {
             let raw = typeof text === "function" ? text() : text;

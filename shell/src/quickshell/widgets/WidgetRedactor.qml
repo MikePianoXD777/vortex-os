@@ -2249,6 +2249,7 @@ Scope {
 
                     FileView {
                         id: layoutFile
+                        printErrors: false // Vortex: archivo opcional, que falte no es un error
                         path: (Caching.getStateDir && redactorWindow.safeMonitorName) ? (Caching.getStateDir("widgets/" + redactorWindow.safeMonitorName) + "/layout.json") : ""
                         watchChanges: false
                         onLoaded: redactorMode.loadLayoutFromText(text())

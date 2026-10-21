@@ -943,6 +943,7 @@ Item {
 
     FileView {
         id: lastTabWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.getCacheDir("guide") + "/last_tab.txt"
         watchChanges: true
         onFileChanged: reload()

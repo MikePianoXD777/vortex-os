@@ -38,6 +38,7 @@ Item {
 
     FileView {
         id: stateFileView
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: root.stateFilePath
         watchChanges: false
         onLoaded: {

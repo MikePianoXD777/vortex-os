@@ -589,6 +589,7 @@ Item {
 
     FileView {
         id: modeFile
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: popupWindowRoot.modeFilePath
         watchChanges: popupWindowRoot.visible
         onFileChanged: reload()

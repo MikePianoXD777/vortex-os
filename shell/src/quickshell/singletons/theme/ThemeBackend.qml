@@ -341,6 +341,7 @@ Item {
 
     FileView {
         id: matugenColorsWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: root.matugenConfigPath
         watchChanges: true
         onFileChanged: reload()
@@ -363,6 +364,7 @@ Item {
 
     FileView {
         id: themeWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: root.configPath.startsWith("~") ? (Quickshell.env("HOME") ?? "") + root.configPath.slice(1) : root.configPath
         watchChanges: false
 

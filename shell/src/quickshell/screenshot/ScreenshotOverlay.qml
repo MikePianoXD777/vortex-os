@@ -374,6 +374,7 @@ PanelWindow {
 
     FileView {
         id: audioPrefsFile
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.getStateDir("screenshot") + "/audio_prefs"
 
         onLoaded: {

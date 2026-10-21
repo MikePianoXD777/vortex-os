@@ -74,6 +74,7 @@ PanelWindow {
 
     FileView {
         id: lastTabWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: (typeof Caching !== "undefined" && typeof Caching.getCacheDir === "function") ? (Caching.getCacheDir("launcher") + "/last_tab.txt") : ""
         watchChanges: true
         onFileChanged: reload()

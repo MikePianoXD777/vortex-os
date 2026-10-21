@@ -308,6 +308,7 @@ Variants {
 
             FileView {
                 id: widgetWatcher
+                printErrors: false // Vortex: archivo opcional, que falte no es un error
                 path: (barWindowRoot.startupFilesReady && Caching.runDir) ? (Caching.runDir + "/current_widget") : ""
                 watchChanges: true
                 onFileChanged: reload()

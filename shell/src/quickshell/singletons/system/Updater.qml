@@ -135,6 +135,7 @@ Item {
 
     FileView {
         id: versionFileView
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: (typeof Caching !== "undefined" ? Caching.getStateDir() : "") + "/version"
         onFileChanged: {
             versionFileView.reload();

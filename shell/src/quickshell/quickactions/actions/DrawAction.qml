@@ -112,6 +112,7 @@ Item {
 
     FileView {
         id: palettesFile
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.getStateDir("quickactions") + "/palettes.json"
         onDataChanged: {
             if (data) {

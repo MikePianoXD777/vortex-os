@@ -206,6 +206,7 @@ GuideTab {
 
     FileView {
         id: wpStateWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: themeTabRoot.activeScreenName !== "" ? (Caching.getCacheDir("wallpaper") + "/current_" + themeTabRoot.activeScreenName) : ""
         watchChanges: true
         onFileChanged: reload()
@@ -220,6 +221,7 @@ GuideTab {
 
     FileView {
         id: wpSnapshotWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: Caching.getCacheDir("wallpaper") + "/current_wallpaper.png"
         watchChanges: true
         onFileChanged: snapshotDebounceTimer.restart()
@@ -399,6 +401,7 @@ GuideTab {
 
     FileView {
         id: matugenColorsWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: (typeof Caching !== "undefined" && Caching.stateDir ? Caching.stateDir : ((Quickshell.env("HOME") ?? "") + "/.local/state/serpantinum")) + "/qs_matugen_colors.json"
         watchChanges: true
         onFileChanged: reload()

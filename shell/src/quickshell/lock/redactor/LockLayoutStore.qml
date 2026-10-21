@@ -442,6 +442,7 @@ QtObject {
     }
 
     property FileView fileView: FileView {
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: root.filePath
         watchChanges: true
         onLoaded: {

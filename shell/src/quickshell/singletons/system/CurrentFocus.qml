@@ -37,6 +37,7 @@ Item {
 
     FileView {
         id: focusWatcher
+        printErrors: false // Vortex: archivo opcional, que falte no es un error
         path: (typeof Caching !== "undefined" && Caching.getRunDir && Caching.getRunDir("focustime")) ? (Caching.getRunDir("focustime") + "/focus_state.json") : ""
         watchChanges: true
         onFileChanged: reload()
