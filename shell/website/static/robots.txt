@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://serpantinum.dev/sitemap.xml
