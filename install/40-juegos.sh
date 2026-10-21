@@ -9,6 +9,11 @@ paso "Juegos"
 mapfile -t pkgs < <(leer_paquetes "$VORTEX_DIR/packages/juegos.txt")
 instalar_pacman "${pkgs[@]}"
 
+# Java más reciente como predeterminado, y ZGC en los launchers de Minecraft que haya.
+jdk="$(archlinux-java status 2>/dev/null | awk '/java-[0-9]+-openjdk/ {print $1}' | sort -V | tail -n1)"
+[[ -n "$jdk" ]] && srun archlinux-java set "$jdk"
+run "$VORTEX_DIR/bin/vortex" java aplicar
+
 # gamemode necesita que el usuario esté en su grupo para subir prioridades.
 srun usermod -aG gamemode "$USER"
 
