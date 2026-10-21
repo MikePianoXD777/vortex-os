@@ -18,7 +18,7 @@ mkdir -p "$SALIDA/fotos" "$SALIDA/clips" "$SALIDA/vertical"
 # Corre un comando dentro de la sesión gráfica de la VM (usuario vortex).
 en_sesion() {
   VORTEX_VM_USUARIO=vortex "$AQUI/vm.sh" ssh "export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 \
-    HYPRLAND_INSTANCE_SIGNATURE=\$(ls /run/user/1000/hypr | head -1); $1"
+    HYPRLAND_INSTANCE_SIGNATURE=\$(ls -t /run/user/1000/hypr | head -1); $1"
 }
 
 traer() { VORTEX_VM_USUARIO=vortex "$AQUI/vm.sh" copiar ":$1" "$2"; }
