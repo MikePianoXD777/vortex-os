@@ -4,7 +4,6 @@
 #   ./install.sh                  instalación normal (pregunta lo opcional)
 #   ./install.sh --prueba         muestra lo que haría, sin tocar nada
 #   ./install.sh --si             acepta todo lo que viene por defecto
-#   ./install.sh --perfil ligero  ligero | equilibrado | bonito
 #   ./install.sh --sin-juegos --sin-dev --sin-claude
 #   ./install.sh --inicio-automatico   entra al escritorio sin pedir contraseña
 set -Eeuo pipefail
@@ -15,7 +14,6 @@ export VORTEX_DIR
 VORTEX_JUEGOS=1
 VORTEX_DEV=1
 VORTEX_CLAUDE=1
-VORTEX_PERFIL=""
 VORTEX_AUTOLOGIN=0
 
 uso() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -24,7 +22,6 @@ while (($#)); do
   case "$1" in
     --prueba | --dry-run) export VORTEX_DRY_RUN=1 ;;
     --si | -y) export VORTEX_SI=1 ;;
-    --perfil) VORTEX_PERFIL="${2:?falta el perfil}"; shift ;;
     --sin-juegos) VORTEX_JUEGOS=0 ;;
     --sin-dev) VORTEX_DEV=0 ;;
     --sin-claude) VORTEX_CLAUDE=0 ;;
@@ -39,7 +36,7 @@ done
 source "$VORTEX_DIR/install/lib.sh"
 
 VORTEX_RESPALDO="$HOME/.config/vortex/respaldo-$(date +%Y%m%d-%H%M%S)"
-export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_PERFIL VORTEX_AUTOLOGIN
+export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_AUTOLOGIN
 
 # Dónde falló: archivo y línea, y la línea del paso que lo originó, buscándola en
 # la pila de llamadas (el fallo puede estar dentro de una función de lib.sh,

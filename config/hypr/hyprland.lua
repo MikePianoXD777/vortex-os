@@ -23,7 +23,15 @@ require("config/env")
 hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    hl.exec_cmd("serpantinumd start")
+    -- Avisos del shell que no son errores: Qt avisa que la app ya estaba registrada
+    -- con el portal (el primer registro sí funcionó) y, sin adaptador Bluetooth, que
+    -- no existe org.bluez. Se silencian solo esas categorías y solo para el shell.
+    local reglas = "qt.qpa.services.warning=false"
+    local bt = io.open("/sys/class/bluetooth/hci0/address")
+    if bt then bt:close() else reglas = reglas .. ";quickshell.dbus.objectmanager.warning=false" end
+    hl.exec_cmd("QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start")
+    -- Primer inicio: pone el primer fondo de Vortex si todavía no hay ninguno.
+    hl.exec_cmd("vortex primer-inicio")
 end)
 require("config/monitors")
 require("config/settings")

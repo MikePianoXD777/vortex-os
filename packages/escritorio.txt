@@ -1,0 +1,10 @@
+# Escritorio (el shell trae el resto como dependencias de su paquete)
+hyprland
+xdg-desktop-portal-hyprland
+gnome-keyring          # contraseñas guardadas de apps y navegador
+adwaita-fonts          # fuente de la interfaz del shell
+noto-fonts
+noto-fonts-emoji
+xdg-user-dirs
+firefox
+thunar                 # archivos (SUPER+E), mucho más liviano que Nautilus

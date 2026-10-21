@@ -52,8 +52,10 @@ qemu_comun() {
     -drive "if=pflash,format=raw,file=$VM/OVMF_VARS.fd"
     -drive "file=$DISCO,if=virtio,cache=unsafe"
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$PUERTO-:22"
-    -device virtio-vga-gl -display egl-headless
+    -device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless
     -device virtio-keyboard -device virtio-tablet
+    # Tarjeta de sonido como en una PC real (sin salida al host, para no sonar en tus parlantes).
+    -audiodev none,id=sonido -device ich9-intel-hda -device hda-output,audiodev=sonido
     -monitor "unix:$VM/monitor.sock,server,nowait"
     -serial "file:$VM/serial.log"
     -pidfile "$VM/qemu.pid" -daemonize

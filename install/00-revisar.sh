@@ -44,12 +44,5 @@ export VORTEX_ES_CACHYOS
 
 info "RAM: $(ram_mb) MB · núcleos: $(nproc) · libre en /: ${libre_gb} GB"
 gpus | sed 's/^/    GPU: /' || true
-es_laptop && info "Equipo portátil (batería detectada)"
-((VORTEX_ES_CACHYOS)) && info "Ya estás en CachyOS: se reutilizan sus repos y su kernel."
-
-[[ -n "$VORTEX_PERFIL" ]] || VORTEX_PERFIL="$(perfil_sugerido)"
-case "$VORTEX_PERFIL" in
-  ligero | equilibrado | bonito) ;;
-  *) error "Perfil desconocido: $VORTEX_PERFIL (usa ligero, equilibrado o bonito)" ;;
-esac
-bien "Perfil gráfico: $VORTEX_PERFIL"
+if es_laptop; then info "Equipo portátil (batería detectada)"; fi
+if ((VORTEX_ES_CACHYOS)); then info "Ya estás en CachyOS: se reutilizan sus repos y su kernel."; fi

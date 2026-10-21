@@ -1,13 +1,14 @@
 # shellcheck shell=bash
-paso "Escritorio: Hyprland + Caelestia"
+paso "Escritorio: Hyprland + el shell de Vortex (Serpantinum)"
 
-# Comandos de Vortex disponibles para todos (también para los atajos de Hyprland).
-srun ln -sf "$VORTEX_DIR/bin/vortex" /usr/local/bin/vortex
-srun ln -sf "$VORTEX_DIR/bin/vortex-bench" /usr/local/bin/vortex-bench
-srun ln -sf "$VORTEX_DIR/bin/vortex-mcp" /usr/local/bin/vortex-mcp
+# Comandos de Vortex para todos (también para los atajos de Hyprland). Son copias y no
+# enlaces: lo que está en /usr/local/bin no debe poder cambiarlo el usuario sin sudo.
+for comando in vortex vortex-bench vortex-mcp; do
+  srun install -Dm755 "$VORTEX_DIR/bin/$comando" "/usr/local/bin/$comando"
+done
 
-# Audio con PipeWire antes que Caelestia: si otro paquete trae jack2 primero, choca con
-# pipewire-jack y pacman no lo resuelve solo con --noconfirm.
+# Audio con PipeWire: si otro paquete trae jack2 primero, choca con pipewire-jack y pacman
+# no lo resuelve solo con --noconfirm.
 if pacman -Qq jack2 >/dev/null 2>&1; then
   srun pacman -Rdd --noconfirm jack2
 fi
@@ -21,71 +22,46 @@ if ((${#pulse[@]})); then
 fi
 instalar_pacman pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber
 
-# Caelestia pide quickshell-git. El repo de CachyOS trae noctalia-qs, un fork que dice
-# «proveer» quickshell-git, y paru lo prefiere por venir de un repo; pero se compila contra
-# otra versión de Qt y el shell no arranca. Por eso se pide el del AUR por nombre completo.
-if pacman -Qq noctalia-qs >/dev/null 2>&1; then
-  srun pacman -Rdd --noconfirm noctalia-qs
+# Vortex 0.1 usaba Caelestia: se quita (y su quickshell-git o noctalia-qs) para que
+# entre el quickshell de los repos que usa Serpantinum.
+mapfile -t viejos < <(pacman -Qq caelestia-shell caelestia-cli quickshell-git noctalia-qs 2>/dev/null || true)
+if ((${#viejos[@]})); then
+  info "Se quita el shell anterior: ${viejos[*]}"
+  srun pacman -Rdd --noconfirm "${viejos[@]}"
 fi
-instalar_aur aur/quickshell-git
-instalar_aur caelestia-shell caelestia-cli
+
+mapfile -t pkgs < <(leer_paquetes "$VORTEX_DIR/packages/escritorio.txt")
+instalar_pacman "${pkgs[@]}"
+
+# El shell: Serpantinum con los parches de Vortex, empaquetado desde shell/ de este repo.
+# makepkg instala solo las dependencias (todas de los repos oficiales).
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-shell)"
+else
+  (cd "$VORTEX_DIR/packaging/vortex-shell" && con_reintentos makepkg -sif --noconfirm) \
+    || error "No se pudo construir el shell de Vortex (packaging/vortex-shell)"
+  rm -rf "$VORTEX_DIR/packaging/vortex-shell/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shell/"*.pkg.tar.*
+fi
+bien "Shell de Vortex instalado"
+# Luz nocturna (el único paquete del AUR que pide el shell).
+instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 
 run mkdir -p "$HOME/.config/vortex"
+run xdg-user-dirs-update
 
-# Si ya había una Caelestia configurada (monitores, variables, ajustes del shell), Vortex
-# solo carga lo que esté en ~/.config/vortex; se migra antes de que algo lo reemplace.
-# Los archivos de serie de Caelestia no cuentan: hypr-user.lua trae solo comentarios y
-# hypr-vars.lua se crea con «return {}» al arrancar Hyprland.
-migrar_config() {
-  local origen="$1" destino="$2" nuevo="$3" util
-  [[ -f "$origen" && ! -e "$destino" ]] || return 0
-  util=$(grep -vE '^[[:space:]]*(--.*)?$' "$origen" || true)
-  [[ -n "$util" ]] || return 0
-  if ! grep -qvE '^[[:space:]]*return[[:space:]]*\{[[:space:]]*\}[[:space:]]*;?[[:space:]]*$' <<<"$util"; then
-    return 0
-  fi
-  if [[ -n "${4:-}" ]] && cmp -s "$origen" "$4"; then return 0; fi
-  run cp -a "$origen" "$destino"
-  info "se conservó tu ${origen##*/} como ~/.config/vortex/$nuevo"
-}
-if [[ ! -e "$HOME/.config/vortex/perfil" ]]; then
-  migrar_config "$HOME/.config/caelestia/hypr-user.lua" "$HOME/.config/vortex/hypr-mio.lua" hypr-mio.lua \
-    "$VORTEX_DIR/config/caelestia/hypr-user.lua"
-  migrar_config "$HOME/.config/caelestia/hypr-vars.lua" "$HOME/.config/vortex/hypr-vars-mios.lua" hypr-vars-mios.lua \
-    "$VORTEX_DIR/config/caelestia/hypr-vars.lua"
-  migrar_config "$HOME/.config/caelestia/shell.json" "$HOME/.config/vortex/shell-mio.json" shell-mio.json
+# --- Config de Hyprland ---
+# Caelestia dejaba ~/.config/hypr como enlace a sus dots: se guarda en el respaldo.
+if [[ -L "$HOME/.config/hypr" ]]; then
+  run mkdir -p "$VORTEX_RESPALDO/.config"
+  run mv "$HOME/.config/hypr" "$VORTEX_RESPALDO/.config/hypr"
+  info "respaldo: tu ~/.config/hypr anterior (enlace) quedó en el respaldo"
 fi
+copiar_config "$VORTEX_DIR/config/hypr/hyprland.lua" "$HOME/.config/hypr/hyprland.lua"
 
-# «caelestia install --noconfirm» copia TODO ~/.config a ~/.config.bak y se cae si hay un
-# socket o un archivo ilegible. Se hace un respaldo propio de lo que Caelestia despliega y se
-# deja un ~/.config.bak vacío para que el suyo se omita («ya existe, ¿sobrescribir?» = no).
-run mkdir -p "$VORTEX_RESPALDO/.config"
-for d in hypr fish foot fastfetch btop Thunar starship.toml caelestia; do
-  if [[ -e "$HOME/.config/$d" ]]; then
-    run cp -a "$HOME/.config/$d" "$VORTEX_RESPALDO/.config/" || aviso "No se pudo respaldar ~/.config/$d por completo"
-  fi
-done
-respaldo_vacio=0
-if [[ ! -e "$HOME/.config.bak" ]]; then
-  run mkdir "$HOME/.config.bak"
-  respaldo_vacio=1
-fi
-
-# El CLI de Caelestia instala Hyprland, foot, fish, PipeWire, NetworkManager, temas, etc.
-# Se quita «micro» porque Vortex ya trae editores. Es repetible (--needed), así que se reintenta.
-if ! con_reintentos run caelestia install --aur-helper paru --disable-components micro --noconfirm; then
-  if ((respaldo_vacio)); then rmdir "$HOME/.config.bak" 2>/dev/null || true; fi
-  error "«caelestia install» falló tras 3 intentos (red o espejos); vuelve a ejecutar el instalador"
-fi
-if ((respaldo_vacio)); then run rmdir "$HOME/.config.bak" 2>/dev/null || true; fi
-bien "Caelestia instalado"
-
-copiar_config "$VORTEX_DIR/config/caelestia/hypr-vars.lua" "$HOME/.config/caelestia/hypr-vars.lua"
-copiar_config "$VORTEX_DIR/config/caelestia/hypr-user.lua" "$HOME/.config/caelestia/hypr-user.lua"
-# Teclado: Caelestia fija «us» en Hyprland, así que se guarda la distribución del sistema
-# (formato XKB) en ~/.config/vortex/teclado.lua; hypr-user.lua la carga. Se toma el «X11
+# Teclado: la config de Serpantinum fija «us» en Hyprland, así que se guarda la distribución del sistema
+# (formato XKB) en ~/.config/vortex/teclado.lua; ~/.config/hypr/hyprland.lua la carga. Se toma el «X11
 # Layout» de localectl y, si no hay, el KEYMAP de la consola traducido a XKB. Si no hay
-# equivalencia no se escribe nada y queda el «us» de Caelestia. Un teclado.lua que ya
+# equivalencia no se escribe nada y queda el «us» de Serpantinum. Un teclado.lua que ya
 # exista (p. ej. cambiado a mano) no se toca.
 teclado_xkb() {
   local layout="" variant="" keymap=""
@@ -154,19 +130,46 @@ else
   info "no se reconoció la distribución del teclado; Hyprland queda con «us» (cámbiala en ~/.config/vortex/teclado.lua)"
 fi
 
-# «vortex perfil» reescribe shell.json; el que hubiera se guarda en el respaldo.
-if [[ -f "$HOME/.config/caelestia/shell.json" && ! -f "$HOME/.config/vortex/shell-mio.json" ]]; then
-  run mkdir -p "$VORTEX_RESPALDO/.config/caelestia"
-  run cp -a "$HOME/.config/caelestia/shell.json" "$VORTEX_RESPALDO/.config/caelestia/shell.json"
-fi
-run "$VORTEX_DIR/bin/vortex" perfil "$VORTEX_PERFIL" --sin-recargar
-bien "Perfil «$VORTEX_PERFIL» aplicado (cámbialo con: vortex perfil ligero|equilibrado|bonito)"
+# --- Fondos y ajustes del shell ---
+fondos="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
+run mkdir -p "$fondos"
+for f in "$VORTEX_DIR"/config/fondos/*.jpg; do
+  [[ -e "$fondos/${f##*/}" ]] || run cp "$f" "$fondos/"
+done
 
-if es_laptop; then
-  # Con «tuned» (archinstall) el perfil de energía lo da tuned-ppd y no existe esa unidad.
-  if systemctl list-unit-files power-profiles-daemon.service 2>/dev/null | grep -q '^power-profiles-daemon'; then
-    srun systemctl enable power-profiles-daemon.service
+# Ajustes: los de Serpantinum + la semilla de Vortex (español, carpeta de fondos). Solo si
+# no existen: después se cambian desde la app de Ajustes y Vortex no los vuelve a tocar.
+ajustes="$HOME/.config/serpantinum/settings.json"
+if [[ -f "$ajustes" ]]; then
+  info "se conservan tus ajustes del shell (~/.config/serpantinum/settings.json)"
+else
+  # PC de escritorio: se bloquea y apaga la pantalla, pero nunca se suspende.
+  suspender=true
+  es_laptop || suspender=false
+  if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+    run "crear $ajustes (semilla de Vortex, suspender=$suspender)"
   else
-    info "power-profiles-daemon no está instalado (¿tuned-ppd?); se deja el control de energía como esté"
+    mkdir -p "$(dirname "$ajustes")"
+    jq -s --arg fondos "$fondos" --argjson suspender "$suspender" \
+      '(.[0] * .[1]) | .wallpaperDir = $fondos | .idle.actions.suspend.enabled = $suspender' \
+      /usr/share/serpantinum/config/serpantinum/settings.json "$VORTEX_DIR/config/serpantinum/semilla.json" \
+      >"$ajustes"
   fi
+  bien "Ajustes del shell creados (español; suspender en inactividad: $suspender)"
+fi
+
+# Sin la bienvenida de Serpantinum (reproduce un audio de 44 MB); el primer fondo lo pone
+# «vortex primer-inicio» al entrar por primera vez.
+run mkdir -p "$HOME/.local/state/serpantinum"
+run touch "$HOME/.local/state/serpantinum/first_launch.done"
+
+# Terminal (kitty) con los colores que genera matugen a partir del fondo.
+[[ -e "$HOME/.config/kitty/kitty.conf" ]] || copiar_config /usr/share/serpantinum/config/kitty/kitty.conf "$HOME/.config/kitty/kitty.conf"
+
+# El panel del sistema cambia el perfil de energía (rendimiento/equilibrado/ahorro).
+# Con «tuned» (archinstall) el perfil lo da tuned-ppd y no existe esa unidad.
+if systemctl list-unit-files power-profiles-daemon.service 2>/dev/null | grep -q '^power-profiles-daemon'; then
+  srun systemctl enable power-profiles-daemon.service
+else
+  info "power-profiles-daemon no está instalado (¿tuned-ppd?); se deja el control de energía como esté"
 fi

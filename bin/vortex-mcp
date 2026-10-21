@@ -26,7 +26,7 @@ PAUSA = CONF / "claude-pausa"
 MAX_TEXTO = 20_000
 
 INSTRUCCIONES = (
-    "Estás en Vortex OS (Arch + kernel CachyOS + Hyprland + shell Caelestia). "
+    "Estás en Vortex OS (Arch + kernel CachyOS + Hyprland + shell Serpantinum). "
     "Usa estas herramientas para ver lo que el usuario está haciendo cuando te pregunte por algo "
     "que tiene en pantalla («¿qué es este error?», «mira esto»). No mires sin motivo: "
     "cada uso le muestra una notificación. Si una herramienta responde que el acceso está en pausa, "
@@ -186,12 +186,11 @@ def estado_sistema(_: dict) -> list[dict]:
         mem[k] = int(v.split()[0]) // 1024
     carga = Path("/proc/loadavg").read_text().split()[:3]
     top = ejecutar("ps", "-eo", "comm,pid,%cpu,rss", "--sort=-%cpu", "--no-headers").splitlines()[:8]
-    perfil = (CONF / "perfil").read_text().strip() if (CONF / "perfil").exists() else "?"
     estado_dir = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "vortex"
     lineas = [
         f"RAM: {mem['MemTotal'] - mem['MemAvailable']} MB usados de {mem['MemTotal']} MB",
         f"Carga (1/5/15 min): {' '.join(carga)} · núcleos: {os.cpu_count()}",
-        f"Perfil gráfico: {perfil} · modo juego: {'sí' if (estado_dir / 'modo-juego').exists() else 'no'}",
+        f"Modo juego: {'sí' if (estado_dir / 'modo-juego').exists() else 'no'}",
         "Procesos con más CPU (nombre, pid, %cpu, RSS en KB):",
         *("  " + " ".join(l.split()) for l in top),
     ]
@@ -216,7 +215,7 @@ HERRAMIENTAS = {
         "Muestra los últimos comandos que el usuario corrió en su terminal (fish).",
         {"cantidad": {"type": "integer", "description": "Cuántos comandos (1-200, por defecto 20)."}},
     ),
-    "estado_sistema": (estado_sistema, "RAM, carga de CPU, procesos más pesados y perfil gráfico de Vortex OS.", {}),
+    "estado_sistema": (estado_sistema, "RAM, carga de CPU, procesos más pesados y si el modo juego está activo.", {}),
 }
 
 

@@ -13,7 +13,7 @@ printf '\n%s¡Vortex OS instalado!%s\n' "$C_VERDE" "$C_FIN"
 cat <<'EOF'
     Después de reiniciar:
       vortex bench               mide RAM, servicios y arranque
-      vortex perfil equilibrado  cambia el perfil gráfico
+      vortex fondo ARCHIVO       cambia el fondo (y los colores)
       Super+A                    habla con Claude
       Super+G                    modo juego a mano
 EOF

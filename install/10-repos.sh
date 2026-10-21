@@ -58,7 +58,7 @@ con_reintentos srun pacman -Syu --noconfirm
 tiene paru || instalar_pacman paru
 bien "paru listo para el AUR"
 
-# paru debe borrar las dependencias de compilación: caelestia install y «vortex actualizar»
-# lo llaman sin el flag --removemake de lib.sh y, sin esto, dejarían makedeps instalados.
+# paru debe borrar las dependencias de compilación: «vortex actualizar» y quien use paru
+# a mano lo llaman sin el flag --removemake de lib.sh y, sin esto, dejarían makedeps instalados.
 # Si la línea ya está activa o no existe, sed no cambia nada y no falla.
 srun sed -i 's/^#RemoveMake$/RemoveMake/' /etc/paru.conf || aviso "No se pudo activar RemoveMake en /etc/paru.conf"

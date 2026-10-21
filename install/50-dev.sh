@@ -10,18 +10,7 @@ mapfile -t pkgs < <(leer_paquetes "$VORTEX_DIR/packages/dev.txt" | grep -v '^doc
 instalar_pacman "${pkgs[@]}"
 
 # mise activa la versión correcta de node/python/go… al entrar a cada proyecto.
-fish_usuario="$HOME/.config/caelestia/user-config.fish"
-if ! grep -qs 'mise activate' "$fish_usuario"; then
-  run mkdir -p "$(dirname "$fish_usuario")"
-  if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
-    run "echo 'mise activate fish | source' >> $fish_usuario"
-  else
-    printf '\n# Vortex OS\ncommand -q mise; and mise activate fish | source\n' >>"$fish_usuario"
-  fi
-fi
-
-# El shell de login sigue siendo bash (Zed y las terminales bash usan $SHELL),
-# así que mise también se activa en ~/.bashrc para que vean las mismas versiones.
+# Se activa en ~/.bashrc (bash es el shell de las terminales y de Zed).
 bashrc_usuario="$HOME/.bashrc"
 if ! grep -qs 'mise activate' "$bashrc_usuario"; then
   if [[ "$VORTEX_DRY_RUN" == 1 ]]; then

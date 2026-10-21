@@ -5,18 +5,18 @@ set -euo pipefail
 VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex"
 ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
-CAELESTIA="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia"
+SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
 
 ayuda() {
   cat <<'EOF'
 Uso: vortex <comando>
 
-  perfil [ligero|equilibrado|bonito]   muestra o cambia el perfil gráfico
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
   claude                               abre Claude en una terminal
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
-  actualizar                           actualiza Vortex, el sistema y Caelestia
+  actualizar                           actualiza Vortex, su shell y el sistema
+  fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   version
 EOF
 }
@@ -35,78 +35,46 @@ hypr() {
 
 hypr_corriendo() { command -v hyprctl >/dev/null && hypr version >/dev/null 2>&1; }
 
-# Compara shell.json con el último generado por Vortex y pasa a shell-mio.json los
-# valores que el usuario cambió desde los ajustes de Caelestia. Las listas se tratan
-# como un solo valor. Caelestia guarda las listas con cada elemento expandido (enabled,
-# inhibitWhenAudio... con sus valores por defecto), así que antes de comparar se
-# normalizan los dos lados para no tomar esa expansión por un cambio del usuario.
-rescatar_cambios_shell() {
-  local actual="$CAELESTIA/shell.json" generado="$ESTADO/shell-generado.json"
-  [[ -f "$actual" && -f "$generado" ]] || return 0
-  cmp -s "$actual" "$generado" && return 0
-  local cambios
-  cambios="$(jq -n --slurpfile a "$generado" --slurpfile b "$actual" '
-    def norm: if type == "array" then map(
-        if type == "object" then with_entries(select(.value != null and
-          ({enabled: true, inhibitWhenAudio: false, inhibitWhenCharging: false, respectInhibitors: true}[.key] != .value)))
-        else . end)
-      else . end;
-    def hojas(p): if type == "object" and length > 0
-      then to_entries[] | .key as $k | .value | hojas(p + [$k])
-      else {p: p, v: .} end;
-    reduce ($b[0] | hojas([])) as $h ({};
-      if ((try ($a[0] | getpath($h.p)) catch null) | norm) != ($h.v | norm) then setpath($h.p; $h.v) else . end)
-  ' 2>/dev/null)" || { aviso "no pude leer los cambios de shell.json; se regenera sin ellos"; return 0; }
-  [[ -n "$cambios" && "$cambios" != '{}' ]] || return 0
-  if jq -s '.[0] * .[1]' "$CONF/shell-mio.json" <(echo "$cambios") >"$CONF/shell-mio.json.tmp"; then
-    mv "$CONF/shell-mio.json.tmp" "$CONF/shell-mio.json"
-    aviso "tus cambios en los ajustes de Caelestia se guardaron en $CONF/shell-mio.json"
-  else
-    rm -f "$CONF/shell-mio.json.tmp"
-    aviso "no pude guardar tus cambios de los ajustes de Caelestia en $CONF/shell-mio.json"
-  fi
+# Llama a la IPC del shell (Serpantinum). Falla si el shell no está corriendo.
+shell_ipc() { quickshell ipc -p "$SHELL_QML" call "$@"; }
+
+# Monitores conectados (nombres de Hyprland).
+monitores() { hypr -j monitors 2>/dev/null | jq -r '.[].name'; }
+
+# Carpeta de fondos: la de los ajustes del shell o la de Vortex.
+carpeta_fondos() {
+  local dir
+  dir="$(jq -r '.wallpaperDir // empty' "${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" 2>/dev/null)"
+  printf '%s\n' "${dir:-$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos}"
 }
 
-cmd_perfil() {
-  local nombre="${1:-}" recargar=1
-  [[ "${2:-}" == --sin-recargar ]] && recargar=0
-
-  if [[ -z "$nombre" ]]; then
-    cat "$CONF/perfil" 2>/dev/null || echo "(sin perfil)"
-    return
+cmd_fondo() {
+  local archivo="${1:-}"
+  if [[ -z "$archivo" ]]; then
+    # El de Vortex primero; si no está, el primero de la carpeta.
+    archivo="$(carpeta_fondos)/vortex-azul.jpg"
+    [[ -f "$archivo" ]] || archivo="$(find "$(carpeta_fondos)" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null | sort | head -n1)"
+    [[ -n "$archivo" ]] || { aviso "no hay fondos en $(carpeta_fondos)"; exit 1; }
   fi
-  local lua="$VORTEX_DIR/config/perfiles/$nombre.lua"
-  local json="$VORTEX_DIR/config/perfiles/$nombre.json"
-  [[ -f "$lua" && -f "$json" ]] || { aviso "no existe el perfil «$nombre» (ligero, equilibrado, bonito)"; exit 1; }
+  [[ -f "$archivo" ]] || { aviso "no existe: $archivo"; exit 1; }
+  archivo="$(readlink -f "$archivo")"
+  local m
+  for m in $(monitores); do
+    shell_ipc wallpaper setWallpaper "$m" "$archivo" fade >/dev/null
+  done
+}
 
-  mkdir -p "$CONF" "$CAELESTIA"
-  install -m644 "$lua" "$CONF/perfil.lua"
-  # Tus ajustes del shell van en shell-mio.json y siempre ganan sobre el perfil.
-  [[ -f "$CONF/shell-mio.json" ]] || echo '{}' >"$CONF/shell-mio.json"
-  jq empty "$CONF/shell-mio.json" 2>/dev/null \
-    || { aviso "$CONF/shell-mio.json no es JSON válido: corrígelo y vuelve a intentar"; exit 1; }
-  # Los cambios hechos desde los ajustes de Caelestia (Nexus) se guardan en
-  # shell.json: antes de regenerarlo se pasan a shell-mio.json para no perderlos.
-  rescatar_cambios_shell
-  # En equipos sin batería (PC de escritorio, VM) Caelestia no debe suspender a los
-  # 10 minutos: se deja solo bloquear y apagar pantalla. El perfil y shell-mio.json
-  # pueden pisarlo.
-  local idle='{}'
-  if ! compgen -G '/sys/class/power_supply/BAT*' >/dev/null; then
-    idle='{"general":{"idle":{"timeouts":[
-      {"timeout":180,"idleAction":"lock"},
-      {"timeout":300,"idleAction":"dpms off","returnAction":"dpms on"}]}}}'
-  fi
-  mkdir -p "$ESTADO"
-  jq -s '.[0] * .[1] * .[2]' <(echo "$idle") "$json" "$CONF/shell-mio.json" >"$CAELESTIA/shell.json.tmp"
-  mv "$CAELESTIA/shell.json.tmp" "$CAELESTIA/shell.json"
-  cp "$CAELESTIA/shell.json" "$ESTADO/shell-generado.json"
-  echo "$nombre" >"$CONF/perfil"
-
-  if ((recargar)) && hypr_corriendo; then
-    hypr reload >/dev/null
-  fi
-  echo "Perfil: $nombre"
+# Al iniciar sesión: si todavía no hay fondo, pone el primero de la carpeta de Vortex
+# (así el primer arranque ya tiene fondo y colores). Espera a que el shell responda.
+cmd_primer_inicio() {
+  local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
+  compgen -G "$cache/current_*" >/dev/null && return 0
+  local i
+  for i in $(seq 1 30); do
+    shell_ipc wallpaper getWallpaper "$(monitores | head -n1)" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  cmd_fondo
 }
 
 cmd_modo_juego() {
@@ -131,7 +99,7 @@ cmd_modo_juego() {
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
     off)
-      # Recargar devuelve todo a lo que diga el perfil.
+      # Recargar devuelve todo a como estaba en la config.
       hypr_corriendo && hypr reload >/dev/null
       if command -v powerprofilesctl >/dev/null && [[ -s "$marca.anterior" ]]; then
         local anterior
@@ -164,13 +132,13 @@ cmd_claude() {
       ;;
     "")
       # El instalador de Claude Code lo deja en ~/.local/bin, que no está en el PATH
-      # del escritorio ni de fish: se agrega aquí para que lo vea fish y el fish final.
+      # del escritorio: se agrega aquí para que lo encuentre la terminal que se abre.
       export PATH="$HOME/.local/bin:$PATH"
-      local term="${TERMINAL:-foot}" orden=(fish -c 'cd ~; claude; exec fish')
-      if [[ "$term" == foot ]]; then
-        exec foot --title "Claude · Vortex" "${orden[@]}"
+      local term="${TERMINAL:-kitty}"
+      if [[ "$term" == kitty ]]; then
+        exec kitty --title "Claude · Vortex" --directory "$HOME" bash -lc 'claude; exec bash'
       fi
-      exec "$term" -e "${orden[@]}"
+      exec "$term" -e bash -lc 'cd ~; claude; exec bash'
       ;;
     *) aviso "usa: vortex claude [pausa|reanudar|estado]"; exit 1 ;;
   esac
@@ -186,16 +154,21 @@ cmd_actualizar() {
     aviso "este Vortex no es un repo git; no puedo actualizarlo"
   fi
   paru -Syu
-  command -v caelestia >/dev/null && caelestia update --aur-helper paru
-  cmd_perfil "$(cat "$CONF/perfil" 2>/dev/null || echo equilibrado)"
+  # El shell viene de shell/ de este repo: se reconstruye su paquete si cambió.
+  local instalado
+  instalado="$(pacman -Q vortex-shell 2>/dev/null | awk '{print $2}' | cut -d- -f1)"
+  if [[ "$instalado" != "$(cat "$VORTEX_DIR/shell/version.txt")" ]] || [[ "${1:-}" == --forzar ]]; then
+    (cd "$VORTEX_DIR/packaging/vortex-shell" && makepkg -sif --noconfirm)
+  fi
 }
 
 case "${1:-ayuda}" in
-  perfil) shift; cmd_perfil "$@" ;;
   modo-juego) shift; cmd_modo_juego "$@" ;;
   claude) shift; cmd_claude "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
-  actualizar) cmd_actualizar ;;
+  actualizar) shift; cmd_actualizar "$@" ;;
+  fondo) shift; cmd_fondo "$@" ;;
+  primer-inicio) cmd_primer_inicio ;;
   version) cat "$CONF/version" 2>/dev/null || echo "sin instalar (código en $VORTEX_DIR)" ;;
   ayuda | -h | --help) ayuda ;;
   *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;

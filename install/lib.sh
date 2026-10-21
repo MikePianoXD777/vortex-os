@@ -129,16 +129,3 @@ es_laptop() { compgen -G '/sys/class/power_supply/BAT*' >/dev/null; }
 tiene_bluetooth() { [[ -d /sys/class/bluetooth ]] && [[ -n "$(ls -A /sys/class/bluetooth 2>/dev/null)" ]]; }
 
 gpus() { lspci -mm 2>/dev/null | grep -Ei '"(VGA|3D|Display)' || true; }
-
-# Perfil gráfico por defecto según el equipo.
-perfil_sugerido() {
-  local ram
-  ram="$(ram_mb)"
-  if ((ram < 6000)); then
-    echo ligero
-  elif gpus | grep -qiE 'nvidia|radeon rx|amd.*navi'; then
-    echo equilibrado
-  else
-    echo ligero
-  fi
-}

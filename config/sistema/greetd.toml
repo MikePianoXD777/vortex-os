@@ -1,7 +1,7 @@
 # Vortex OS: pantalla de inicio en texto (tuigreet). Recuerda el último usuario.
 # La sesión arranca con stdin a /dev/null (greetd la lanza con «sh -c»): si heredara
-# /dev/tty1, «trash-empty 30» de Caelestia se quedaría esperando un «Proceed?» para
-# siempre (~24 MB) y la papelera nunca se vaciaría.
+# /dev/tty1, cualquier programa del inicio que pregunte algo se quedaría esperando
+# para siempre una respuesta del teclado.
 [terminal]
 vt = 1
 
