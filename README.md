@@ -1,5 +1,8 @@
 # Vortex OS
 
+Parte de **Vortex Suite**: las funciones de los grandes, pero fáciles de usar.
+La capacidad sí; la complejidad no.
+
 Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hyprland con el shell
 [Serpantinum](https://github.com/ilyamiro/serpantinum) (barra arriba, paneles animados, colores que salen
 de tu fondo) optimizado, y **Claude integrado** para que pueda ver lo que haces (con tu permiso) y ayudarte.
