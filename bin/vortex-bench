@@ -33,6 +33,7 @@ ESCRITORIO = {
 MEDIDAS = {
     "ram_usada_mb": ("RAM usada en reposo", "MB", "menos"),
     "ram_escritorio_mb": ("RAM del escritorio", "MB", "menos"),
+    "ram_sesion_mb": ("RAM de toda la sesión del usuario", "MB", "menos"),
     "procesos": ("Procesos", "", "menos"),
     "servicios_sistema": ("Servicios del sistema activos", "", "menos"),
     "servicios_usuario": ("Servicios de usuario activos", "", "menos"),
@@ -96,6 +97,51 @@ def ram_escritorio_mb() -> tuple[float, dict[str, float]]:
     return round(sum(por_proceso.values()), 1), {k: round(v, 1) for k, v in sorted(por_proceso.items(), key=lambda x: -x[1])}
 
 
+def _pss_kb(pid: str) -> int:
+    try:
+        rollup = Path(f"/proc/{pid}/smaps_rollup").read_text()
+        return int(re.search(r"^Pss:\s+(\d+)", rollup, re.M).group(1))
+    except (OSError, AttributeError):
+        return 0
+
+
+def ram_sesion_mb() -> tuple[float, dict[str, float]]:
+    """Suma la memoria propia (PSS) de TODOS los procesos del usuario: compositor, shell,
+    ayudantes, audio, portales... Así se compara cualquier escritorio sin depender de una
+    lista de nombres. No cuenta lo que cuelga de una sesión SSH (los comandos de medición)."""
+    uid = os.getuid()
+    padre: dict[str, str] = {}
+    nombres: dict[str, str] = {}
+    propios: list[str] = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text()
+            padre[pid] = stat.rsplit(")", 1)[1].split()[1]
+            nombres[pid] = stat[stat.index("(") + 1:stat.rindex(")")]
+            if os.stat(f"/proc/{pid}").st_uid == uid:
+                propios.append(pid)
+        except (OSError, ValueError, IndexError):
+            continue
+
+    def bajo_ssh(pid: str) -> bool:
+        vistos = 0
+        while pid in padre and pid not in ("0", "1") and vistos < 64:
+            if nombres.get(pid) == "sshd" or nombres.get(pid, "").startswith("sshd-"):
+                return True
+            pid, vistos = padre[pid], vistos + 1
+        return False
+
+    por_proceso: dict[str, float] = {}
+    for pid in propios:
+        if bajo_ssh(pid):
+            continue
+        kb = _pss_kb(pid)
+        if kb:
+            n = nombres[pid]
+            por_proceso[n] = por_proceso.get(n, 0) + kb / 1024
+    return round(sum(por_proceso.values()), 1), {k: round(v, 1) for k, v in sorted(por_proceso.items(), key=lambda x: -x[1])}
+
+
 def contar_unidades(*extra: str) -> int:
     salida = sh("systemctl", *extra, "list-units", "--type=service", "--state=running", "--no-legend", "--plain")
     return len([l for l in salida.splitlines() if l.strip()])
@@ -134,6 +180,7 @@ def distro() -> str:
 def medir() -> dict:
     mem = meminfo()
     escritorio, detalle = ram_escritorio_mb()
+    sesion, sesion_detalle = ram_sesion_mb()
     arranque_propio, arranque_ajeno = arranque()
     st = os.statvfs("/")
     sched = ""
@@ -150,6 +197,8 @@ def medir() -> dict:
         "ram_total_mb": round(mem["MemTotal"] / 1024),
         "ram_usada_mb": round((mem["MemTotal"] - mem["MemAvailable"]) / 1024),
         "ram_escritorio_mb": escritorio,
+        "ram_sesion_mb": sesion,
+        "ram_sesion_detalle": sesion_detalle,
         "ram_escritorio_detalle": detalle,
         "procesos": len([p for p in os.listdir("/proc") if p.isdigit()]),
         "servicios_sistema": contar_unidades(),
