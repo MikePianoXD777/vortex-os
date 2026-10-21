@@ -1,5 +1,6 @@
 {
   "general": {
-    "language": "es"
+    "language": "es",
+    "quickactions": false
   }
 }
