@@ -7,6 +7,8 @@ if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
   bien "multilib activado"
 fi
 
+# Sincroniza las bases de datos (multilib recién activado no tiene la suya).
+srun pacman -Sy
 instalar_pacman base-devel git curl jq
 
 if ((VORTEX_ES_CACHYOS)) || grep -q '^\[cachyos' /etc/pacman.conf; then
@@ -26,7 +28,20 @@ else
   bien "Repos de CachyOS agregados"
 fi
 
-srun pacman -Syu --noconfirm
+# Los primeros espejos de la lista de CachyOS a veces van atrasados (404 en paquetes nuevos).
+# Fuera de CachyOS se ponen primero los espejos oficiales, que siempre están al día.
+if ((!VORTEX_ES_CACHYOS)); then
+  for lista in /etc/pacman.d/cachyos*-mirrorlist; do
+    [[ -f "$lista" ]] || continue
+    grep -q '^Server = https://cdn.cachyos.org' "$lista" && continue
+    ruta="$(grep -m1 -oP '^Server = https://[a-z0-9]+\.cachyos\.org\K/.*' "$lista")" || continue
+    nueva="$(awk -v r="$ruta" '/^Server/ && !hecho { print "Server = https://cdn.cachyos.org" r; print "Server = https://mirror.cachyos.org" r; hecho = 1 } { print }' "$lista")"
+    escribir_sistema "$lista" <<<"$nueva"
+  done
+  bien "Espejos oficiales de CachyOS primero"
+fi
+
+con_reintentos srun pacman -Syu --noconfirm
 
 # paru viene ya compilado en el repo de CachyOS.
 tiene paru || instalar_pacman paru

@@ -6,6 +6,20 @@ srun ln -sf "$VORTEX_DIR/bin/vortex" /usr/local/bin/vortex
 srun ln -sf "$VORTEX_DIR/bin/vortex-bench" /usr/local/bin/vortex-bench
 srun ln -sf "$VORTEX_DIR/bin/vortex-mcp" /usr/local/bin/vortex-mcp
 
+# Audio con PipeWire antes que Caelestia: si otro paquete trae jack2 primero, choca con
+# pipewire-jack y pacman no lo resuelve solo con --noconfirm.
+if pacman -Qq jack2 >/dev/null 2>&1; then
+  srun pacman -Rdd --noconfirm jack2
+fi
+instalar_pacman pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber
+
+# Caelestia pide quickshell-git. El repo de CachyOS trae noctalia-qs, un fork que dice
+# «proveer» quickshell-git, y paru lo prefiere por venir de un repo; pero se compila contra
+# otra versión de Qt y el shell no arranca. Por eso se pide el del AUR por nombre completo.
+if pacman -Qq noctalia-qs >/dev/null 2>&1; then
+  srun pacman -Rdd --noconfirm noctalia-qs
+fi
+instalar_aur aur/quickshell-git
 instalar_aur caelestia-shell caelestia-cli
 
 # El CLI de Caelestia instala Hyprland, foot, fish, PipeWire, NetworkManager, temas, etc.

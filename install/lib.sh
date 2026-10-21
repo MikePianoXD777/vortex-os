@@ -68,14 +68,27 @@ leer_paquetes() {
   sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$1" | grep -v '^$'
 }
 
+# Los espejos a veces van atrasados y dan 404: se reintenta refrescando las bases de datos.
+con_reintentos() {
+  local intento
+  for intento in 1 2 3; do
+    "$@" && return 0
+    [[ "$VORTEX_DRY_RUN" == 1 ]] && return 0
+    aviso "Falló la descarga (intento $intento de 3). Reintento en 10 s…"
+    sleep 10
+    sudo pacman -Syy >/dev/null || true
+  done
+  return 1
+}
+
 instalar_pacman() {
   (($#)) || return 0
-  srun pacman -S --needed --noconfirm "$@"
+  con_reintentos srun pacman -S --needed --noconfirm "$@"
 }
 
 instalar_aur() {
   (($#)) || return 0
-  run paru -S --needed --noconfirm "$@"
+  con_reintentos run paru -S --needed --noconfirm "$@"
 }
 
 # Copia un archivo de config del usuario, guardando antes el que hubiera.

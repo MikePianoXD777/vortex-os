@@ -3,3 +3,6 @@ __pycache__/
 iso/work/
 iso/out/
 *.log
+
+# Fork del shell (repo git propio: MikePianoXD777/vortex-shell)
+vortex-shell/

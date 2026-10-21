@@ -47,7 +47,12 @@ escribir_sistema /etc/systemd/journald.conf.d/90-vortex.conf <"$VORTEX_DIR/confi
 escribir_sistema /etc/scx_loader.toml <"$VORTEX_DIR/config/sistema/scx_loader.toml"
 
 # --- Pantalla de inicio: greetd + tuigreet ---
-escribir_sistema /etc/greetd/config.toml <"$VORTEX_DIR/config/sistema/greetd.toml"
+greetd_conf="$(cat "$VORTEX_DIR/config/sistema/greetd.toml")"
+if ((VORTEX_AUTOLOGIN)); then
+  # Primera sesión de cada arranque sin contraseña; al cerrar sesión vuelve tuigreet.
+  printf -v greetd_conf '%s\n\n[initial_session]\ncommand = "start-hyprland"\nuser = "%s"' "$greetd_conf" "$USER"
+fi
+escribir_sistema /etc/greetd/config.toml <<<"$greetd_conf"
 dm_actual="$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null || true)"
 if [[ -z "$dm_actual" || "$dm_actual" == greetd.service || "$dm_actual" == display-manager.service ]]; then
   srun systemctl enable greetd.service

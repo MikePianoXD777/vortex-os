@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# vortex-instalar: instala Vortex OS desde la ISO.
+#   1. archinstall instala Arch (tú eliges disco, usuario, idioma…).
+#   2. vortex-preparar deja Vortex listo para el primer inicio de sesión.
+#   3. Al reiniciar y entrar con tu usuario, el instalador de Vortex corre solo.
+set -euo pipefail
+
+azul=$'\e[1;34m' fin=$'\e[0m'
+
+if ! ping -c1 -W3 archlinux.org >/dev/null 2>&1; then
+  echo "No hay internet. Conéctate primero:"
+  echo "  cable: debería funcionar solo"
+  echo "  wifi:  iwctl station wlan0 connect \"NombreDeTuRed\""
+  exit 1
+fi
+
+cat <<EOF
+
+${azul}Paso 1 de 2: instalar Arch con archinstall${fin}
+  Recomendado:
+  · Perfil: «Minimal» (Vortex pone el escritorio después)
+  · Gestor de arranque: systemd-boot (o GRUB si tu PC es BIOS)
+  · Red: «NetworkManager»
+  · Crea tu usuario y márcalo como administrador (sudo)
+  · Al final, cuando pregunte si quieres entrar con chroot, di que NO
+
+EOF
+read -r -p "Enter para empezar…" _
+
+archinstall
+
+echo
+echo "${azul}Paso 2 de 2: preparar Vortex OS${fin}"
+vortex-preparar /mnt
+
+echo
+echo "Listo. Reinicia, quita la ISO y entra con tu usuario: Vortex se termina de instalar solo."
+read -r -p "¿Reiniciar ahora? [S/n] " r
+[[ "${r,,}" == n* ]] || systemctl reboot

@@ -22,7 +22,12 @@ O desde el código:
 ./install.sh --si --perfil ligero --sin-dev
 ```
 
-Más adelante habrá una ISO propia (ver la hoja de ruta).
+O con la ISO de Vortex: arranca, escribe `vortex-instalar`, y `archinstall` te guía. Al reiniciar
+y entrar con tu usuario, Vortex se termina de instalar solo.
+
+```bash
+sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso)
+```
 
 ## Qué trae
 
@@ -101,6 +106,17 @@ config/              perfiles, Caelestia, gamemode y ajustes del sistema
 bin/vortex           comando principal
 bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
+iso/                 perfil de archiso (releng + Vortex) y «vortex-instalar»
+vm/                  VM de pruebas con QEMU: Arch limpio por SSH, sin tocar tu PC
+```
+
+## Probar en una máquina virtual
+
+```bash
+vm/vm.sh live                         # arranca la ISO de Arch (en ~/.cache/vortex-os-vm/iso)
+vm/vm.sh ssh 'bash -s' < vm/instalar-arch.sh   # Arch mínimo en el disco virtual
+vm/vm.sh apagar && vm/vm.sh disco     # arranca lo instalado
+VORTEX_VM_USUARIO=vortex vm/vm.sh ssh # entra como el usuario de prueba
 ```
 
 ## Licencia

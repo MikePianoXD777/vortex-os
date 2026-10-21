@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# vortex-preparar [raíz]: copia Vortex OS a un Arch recién instalado y deja que su
+# instalador corra solo la primera vez que el usuario entra en la consola (tty1).
+set -euo pipefail
+
+RAIZ="${1:-/mnt}"
+ORIGEN=/root/vortex-os
+
+# Algunas versiones de archinstall montan el sistema en /mnt/archinstall.
+[[ ! -f "$RAIZ/etc/arch-release" && -f "$RAIZ/archinstall/etc/arch-release" ]] && RAIZ="$RAIZ/archinstall"
+
+# Si archinstall ya desmontó el disco, se busca la raíz recién instalada y se monta.
+if [[ ! -f "$RAIZ/etc/arch-release" ]]; then
+  mkdir -p "$RAIZ"
+  while read -r part tipo; do
+    case "$tipo" in
+      btrfs) mount -o subvol=@ "$part" "$RAIZ" 2>/dev/null || mount "$part" "$RAIZ" 2>/dev/null || continue ;;
+      ext4 | xfs | f2fs) mount "$part" "$RAIZ" 2>/dev/null || continue ;;
+      *) continue ;;
+    esac
+    [[ -f "$RAIZ/etc/arch-release" ]] && break
+    umount "$RAIZ"
+  done < <(lsblk -lnpo NAME,FSTYPE | awk 'NF == 2')
+fi
+[[ -f "$RAIZ/etc/arch-release" ]] || { echo "No encontré el Arch instalado." >&2; exit 1; }
+
+# El usuario normal que creó archinstall (el primero con UID ≥ 1000).
+usuario="$(awk -F: '$3 >= 1000 && $3 < 60000 {print $1; exit}' "$RAIZ/etc/passwd")"
+[[ -n "$usuario" ]] || { echo "No hay ningún usuario normal en el sistema instalado." >&2; exit 1; }
+casa="$(awk -F: -v u="$usuario" '$1 == u {print $6}' "$RAIZ/etc/passwd")"
+uid_gid="$(awk -F: -v u="$usuario" '$1 == u {print $3":"$4}' "$RAIZ/etc/passwd")"
+
+destino="$RAIZ$casa/.local/share/vortex-os"
+mkdir -p "$destino"
+cp -a "$ORIGEN/." "$destino/"
+touch "$destino/.pendiente"
+chown -R "$uid_gid" "$RAIZ$casa/.local"
+
+# Primer inicio de sesión en tty1: corre el instalador una vez.
+install -Dm644 /dev/stdin "$RAIZ/etc/profile.d/vortex-primer-inicio.sh" <<'EOF'
+# Vortex OS: termina la instalación la primera vez que entras en la consola.
+if [ "$(tty)" = /dev/tty1 ] && [ -f "$HOME/.local/share/vortex-os/.pendiente" ]; then
+  rm -f "$HOME/.local/share/vortex-os/.pendiente"
+  "$HOME/.local/share/vortex-os/install.sh" || echo "La instalación de Vortex falló. Reintenta con: ~/.local/share/vortex-os/install.sh"
+fi
+EOF
+
+echo "Vortex OS quedará instalado para «$usuario» en su primer inicio de sesión."

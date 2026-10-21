@@ -6,6 +6,7 @@
 #   ./install.sh --si             acepta todo lo que viene por defecto
 #   ./install.sh --perfil ligero  ligero | equilibrado | bonito
 #   ./install.sh --sin-juegos --sin-dev --sin-claude
+#   ./install.sh --inicio-automatico   entra al escritorio sin pedir contraseña
 set -Eeuo pipefail
 
 VORTEX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +16,7 @@ VORTEX_JUEGOS=1
 VORTEX_DEV=1
 VORTEX_CLAUDE=1
 VORTEX_PERFIL=""
+VORTEX_AUTOLOGIN=0
 
 uso() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -26,6 +28,7 @@ while (($#)); do
     --sin-juegos) VORTEX_JUEGOS=0 ;;
     --sin-dev) VORTEX_DEV=0 ;;
     --sin-claude) VORTEX_CLAUDE=0 ;;
+    --inicio-automatico) VORTEX_AUTOLOGIN=1 ;;
     -h | --ayuda | --help) uso; exit 0 ;;
     *) echo "Opción desconocida: $1" >&2; uso; exit 1 ;;
   esac
@@ -36,7 +39,7 @@ done
 source "$VORTEX_DIR/install/lib.sh"
 
 VORTEX_RESPALDO="$HOME/.config/vortex/respaldo-$(date +%Y%m%d-%H%M%S)"
-export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_PERFIL
+export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_PERFIL VORTEX_AUTOLOGIN
 
 trap 'error "Falló en la línea $LINENO. Revisa $VORTEX_LOG"' ERR
 
