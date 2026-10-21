@@ -1,0 +1,12 @@
+# Base del sistema (repos oficiales + CachyOS)
+linux-cachyos          # kernel con planificador BORE y parches de latencia
+linux-cachyos-headers
+cachyos-settings       # sysctl, zram, udev y límites afinados por CachyOS (solo archivos de config)
+chwd                   # detecta la GPU e instala los drivers correctos
+scx-scheds             # planificadores sched_ext (scx_lavd para juegos)
+scx-tools              # scxctl para cambiar de planificador
+zram-generator
+networkmanager
+greetd
+greetd-tuigreet        # pantalla de inicio en modo texto: ~3 MB frente a ~150 MB de SDDM
+fwupd                  # actualizaciones de firmware

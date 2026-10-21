@@ -1,0 +1,14 @@
+{
+    "appearance": {
+        "anim": { "durations": { "scale": 0.8 } },
+        "transparency": { "enabled": false }
+    },
+    "background": {
+        "visualiser": { "enabled": false }
+    },
+    "dashboard": {
+        "mediaUpdateInterval": 1000,
+        "resourceUpdateInterval": 2000
+    },
+    "nexus": { "networkRescanInterval": 30000 }
+}

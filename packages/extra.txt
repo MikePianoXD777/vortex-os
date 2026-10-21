@@ -1,0 +1,7 @@
+# Utilidades que el shell y el CLI de Vortex usan
+grim                   # capturas (también para que Claude vea la pantalla)
+slurp
+wl-clipboard
+libnotify
+python
+pciutils

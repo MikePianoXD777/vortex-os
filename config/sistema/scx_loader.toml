@@ -1,0 +1,5 @@
+# Vortex OS: planificador de CPU sched_ext.
+# scx_lavd está pensado para juegos y equipos interactivos (baja latencia),
+# y en portátiles ahorra batería en modo Auto.
+default_sched = "scx_lavd"
+default_mode = "Auto"

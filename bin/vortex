@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# vortex: comando para manejar Vortex OS.
+set -euo pipefail
+
+VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex"
+ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+CAELESTIA="${XDG_CONFIG_HOME:-$HOME/.config}/caelestia"
+
+ayuda() {
+  cat <<'EOF'
+Uso: vortex <comando>
+
+  perfil [ligero|equilibrado|bonito]   muestra o cambia el perfil gráfico
+  modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  claude                               abre Claude en una terminal
+  claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
+  bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
+  actualizar                           actualiza Vortex, el sistema y Caelestia
+  version
+EOF
+}
+
+aviso() { printf 'vortex: %s\n' "$*" >&2; }
+
+notificar() { command -v notify-send >/dev/null && notify-send -a "Vortex OS" "$@" || true; }
+
+hypr() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl "$@"
+  else
+    hyprctl -i 0 "$@"
+  fi
+}
+
+hypr_corriendo() { command -v hyprctl >/dev/null && hypr version >/dev/null 2>&1; }
+
+cmd_perfil() {
+  local nombre="${1:-}" recargar=1
+  [[ "${2:-}" == --sin-recargar ]] && recargar=0
+
+  if [[ -z "$nombre" ]]; then
+    cat "$CONF/perfil" 2>/dev/null || echo "(sin perfil)"
+    return
+  fi
+  local lua="$VORTEX_DIR/config/perfiles/$nombre.lua"
+  local json="$VORTEX_DIR/config/perfiles/$nombre.json"
+  [[ -f "$lua" && -f "$json" ]] || { aviso "no existe el perfil «$nombre» (ligero, equilibrado, bonito)"; exit 1; }
+
+  mkdir -p "$CONF" "$CAELESTIA"
+  install -m644 "$lua" "$CONF/perfil.lua"
+  # Tus ajustes del shell van en shell-mio.json y siempre ganan sobre el perfil.
+  [[ -f "$CONF/shell-mio.json" ]] || echo '{}' >"$CONF/shell-mio.json"
+  jq -s '.[0] * .[1]' "$json" "$CONF/shell-mio.json" >"$CAELESTIA/shell.json.tmp"
+  mv "$CAELESTIA/shell.json.tmp" "$CAELESTIA/shell.json"
+  echo "$nombre" >"$CONF/perfil"
+
+  if ((recargar)) && hypr_corriendo; then
+    hypr reload >/dev/null
+  fi
+  echo "Perfil: $nombre"
+}
+
+cmd_modo_juego() {
+  local marca="$ESTADO/modo-juego"
+  mkdir -p "$ESTADO"
+  case "${1:-alternar}" in
+    on)
+      hypr_corriendo && hypr eval 'hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false } } })' >/dev/null
+      if command -v powerprofilesctl >/dev/null; then
+        powerprofilesctl get >"$marca.anterior" 2>/dev/null || true
+        powerprofilesctl set performance 2>/dev/null || true
+      fi
+      touch "$marca"
+      notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
+      ;;
+    off)
+      # Recargar devuelve todo a lo que diga el perfil.
+      hypr_corriendo && hypr reload >/dev/null
+      if command -v powerprofilesctl >/dev/null && [[ -f "$marca.anterior" ]]; then
+        powerprofilesctl set "$(cat "$marca.anterior")" 2>/dev/null || true
+      fi
+      rm -f "$marca" "$marca.anterior"
+      notificar -t 2000 "Modo juego desactivado"
+      ;;
+    alternar)
+      if [[ -f "$marca" ]]; then cmd_modo_juego off; else cmd_modo_juego on; fi
+      ;;
+    *) aviso "usa: vortex modo-juego on|off|alternar"; exit 1 ;;
+  esac
+}
+
+cmd_claude() {
+  local pausa="$CONF/claude-pausa"
+  case "${1:-}" in
+    pausa)
+      mkdir -p "$CONF"; touch "$pausa"
+      echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles."
+      ;;
+    reanudar)
+      rm -f "$pausa"
+      echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
+      ;;
+    estado)
+      if [[ -f "$pausa" ]]; then echo "en pausa"; else echo "con acceso (te avisa cada vez que mira)"; fi
+      ;;
+    "")
+      local term="${TERMINAL:-foot}" orden=(fish -c 'cd ~; claude; exec fish')
+      if [[ "$term" == foot ]]; then
+        exec foot --title "Claude · Vortex" "${orden[@]}"
+      fi
+      exec "$term" -e "${orden[@]}"
+      ;;
+    *) aviso "usa: vortex claude [pausa|reanudar|estado]"; exit 1 ;;
+  esac
+}
+
+cmd_actualizar() {
+  if [[ -d "$VORTEX_DIR/.git" ]]; then
+    git -C "$VORTEX_DIR" pull --ff-only
+  fi
+  paru -Syu
+  command -v caelestia >/dev/null && caelestia update --aur-helper paru
+  cmd_perfil "$(cat "$CONF/perfil" 2>/dev/null || echo equilibrado)"
+}
+
+case "${1:-ayuda}" in
+  perfil) shift; cmd_perfil "$@" ;;
+  modo-juego) shift; cmd_modo_juego "$@" ;;
+  claude) shift; cmd_claude "$@" ;;
+  bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
+  actualizar) cmd_actualizar ;;
+  version) cat "$CONF/version" 2>/dev/null || echo "sin instalar (código en $VORTEX_DIR)" ;;
+  ayuda | -h | --help) ayuda ;;
+  *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;
+esac

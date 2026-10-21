@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""vortex-mcp: servidor MCP que deja a Claude ver lo que haces en Vortex OS.
+
+Claude Code lo arranca solo (se registra con «claude mcp add --scope user vortex -- vortex-mcp»).
+Habla JSON-RPC por stdin/stdout, sin dependencias fuera de la biblioteca estándar.
+
+Privacidad:
+- Claude solo mira cuando usa una herramienta; nada corre en segundo plano.
+- Cada vez que ve tu pantalla, el portapapeles o el historial, sale una notificación.
+- «vortex claude pausa» le corta el acceso a todo hasta «vortex claude reanudar».
+"""
+
+import base64
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+VERSION = "0.1.0"
+PROTOCOLOS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
+CONF = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "vortex"
+PAUSA = CONF / "claude-pausa"
+MAX_TEXTO = 20_000
+
+INSTRUCCIONES = (
+    "Estás en Vortex OS (Arch + kernel CachyOS + Hyprland + shell Caelestia). "
+    "Usa estas herramientas para ver lo que el usuario está haciendo cuando te pregunte por algo "
+    "que tiene en pantalla («¿qué es este error?», «mira esto»). No mires sin motivo: "
+    "cada uso le muestra una notificación. Si una herramienta responde que el acceso está en pausa, "
+    "dile que lo reactive con «vortex claude reanudar»."
+)
+
+
+class ErrorHerramienta(Exception):
+    pass
+
+
+def ejecutar(*cmd: str, binario: bool = False, timeout: int = 15):
+    if not shutil.which(cmd[0]):
+        raise ErrorHerramienta(f"Falta el programa «{cmd[0]}».")
+    r = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    if r.returncode != 0:
+        raise ErrorHerramienta(f"{cmd[0]} falló: {r.stderr.decode(errors='replace').strip()[:500]}")
+    return r.stdout if binario else r.stdout.decode(errors="replace")
+
+
+def hyprctl(*args: str):
+    extra = () if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") else ("-i", "0")
+    return json.loads(ejecutar("hyprctl", *extra, "-j", *args))
+
+
+def avisar(texto: str) -> None:
+    if shutil.which("notify-send"):
+        subprocess.Popen(
+            ["notify-send", "-a", "Vortex OS", "-t", "2500", "-i", "dialog-information", "Claude", texto],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+
+
+def revisar_permiso() -> None:
+    if PAUSA.exists():
+        raise ErrorHerramienta("El acceso de Claude está en pausa. El usuario puede reactivarlo con «vortex claude reanudar».")
+
+
+def texto(t: str) -> dict:
+    return {"type": "text", "text": t}
+
+
+# --- Herramientas ---
+
+def ver_pantalla(args: dict) -> list[dict]:
+    revisar_permiso()
+    escala = min(max(float(args.get("escala", 0.5)), 0.2), 1.0)
+    cmd = ["grim", "-t", "jpeg", "-q", "75", "-s", f"{escala:g}"]
+    if args.get("monitor"):
+        cmd += ["-o", str(args["monitor"])]
+    else:
+        # Por defecto, solo el monitor donde está el usuario.
+        try:
+            activo = next(m["name"] for m in hyprctl("monitors") if m.get("focused"))
+            cmd += ["-o", activo]
+        except (ErrorHerramienta, StopIteration, json.JSONDecodeError):
+            pass
+    imagen = ejecutar(*cmd, "-", binario=True)
+    avisar("Claude miró tu pantalla")
+    return [
+        {"type": "image", "data": base64.b64encode(imagen).decode(), "mimeType": "image/jpeg"},
+        texto(f"Captura al {int(escala * 100)} % de resolución."),
+    ]
+
+
+def ventana_enfocada(clientes: list[dict] | None = None) -> dict:
+    v = hyprctl("activewindow")
+    if v:
+        return v
+    # Con el foco en un panel del shell, activewindow sale vacío: se usa la última ventana enfocada.
+    clientes = hyprctl("clients") if clientes is None else clientes
+    return next((c for c in clientes if c.get("focusHistoryID") == 0), {})
+
+
+def ventana_activa(_: dict) -> list[dict]:
+    revisar_permiso()
+    v = ventana_enfocada()
+    if not v:
+        return [texto("No hay ninguna ventana enfocada.")]
+    datos = {k: v.get(k) for k in ("class", "title", "pid", "floating", "fullscreen", "size", "xwayland")}
+    datos["workspace"] = (v.get("workspace") or {}).get("name")
+    return [texto(json.dumps(datos, ensure_ascii=False, indent=1))]
+
+
+def ventanas(_: dict) -> list[dict]:
+    revisar_permiso()
+    clientes = hyprctl("clients")
+    activa = ventana_enfocada(clientes).get("address")
+    lista = [
+        {
+            "workspace": (c.get("workspace") or {}).get("name"),
+            "class": c.get("class"),
+            "title": c.get("title"),
+            "enfocada": c.get("address") == activa,
+        }
+        for c in clientes
+        if c.get("mapped", True)
+    ]
+    lista.sort(key=lambda c: str(c["workspace"]))
+    return [texto(json.dumps(lista, ensure_ascii=False, indent=1))]
+
+
+def portapapeles(_: dict) -> list[dict]:
+    revisar_permiso()
+    try:
+        contenido = ejecutar("wl-paste", "--no-newline", "--type", "text")
+    except ErrorHerramienta:
+        return [texto("El portapapeles está vacío o no tiene texto.")]
+    avisar("Claude leyó tu portapapeles")
+    if len(contenido) > MAX_TEXTO:
+        contenido = contenido[:MAX_TEXTO] + f"\n… (recortado, {len(contenido)} caracteres en total)"
+    return [texto(contenido)]
+
+
+def historial_terminal(args: dict) -> list[dict]:
+    revisar_permiso()
+    n = min(max(int(args.get("cantidad", 20)), 1), 200)
+    try:
+        salida = ejecutar("fish", "-c", f"history --max {n}")
+        lineas = list(reversed(salida.splitlines()))
+    except ErrorHerramienta:
+        archivo = Path.home() / ".bash_history"
+        lineas = archivo.read_text(errors="replace").splitlines()[-n:] if archivo.exists() else []
+    avisar("Claude leyó tus últimos comandos")
+    return [texto("\n".join(lineas) or "Historial vacío.")]
+
+
+def estado_sistema(_: dict) -> list[dict]:
+    mem = {}
+    for linea in Path("/proc/meminfo").read_text().splitlines():
+        k, v = linea.split(":", 1)
+        mem[k] = int(v.split()[0]) // 1024
+    carga = Path("/proc/loadavg").read_text().split()[:3]
+    top = ejecutar("ps", "-eo", "comm,pid,%cpu,rss", "--sort=-%cpu", "--no-headers").splitlines()[:8]
+    perfil = (CONF / "perfil").read_text().strip() if (CONF / "perfil").exists() else "?"
+    estado_dir = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "vortex"
+    lineas = [
+        f"RAM: {mem['MemTotal'] - mem['MemAvailable']} MB usados de {mem['MemTotal']} MB",
+        f"Carga (1/5/15 min): {' '.join(carga)} · núcleos: {os.cpu_count()}",
+        f"Perfil gráfico: {perfil} · modo juego: {'sí' if (estado_dir / 'modo-juego').exists() else 'no'}",
+        "Procesos con más CPU (nombre, pid, %cpu, RSS en KB):",
+        *("  " + " ".join(l.split()) for l in top),
+    ]
+    return [texto("\n".join(lineas))]
+
+
+HERRAMIENTAS = {
+    "ver_pantalla": (
+        ver_pantalla,
+        "Toma una captura de la pantalla del usuario (por defecto, el monitor enfocado). "
+        "Úsala cuando pregunte por algo que está viendo.",
+        {
+            "monitor": {"type": "string", "description": "Nombre del monitor (p. ej. DP-1). Vacío = el enfocado."},
+            "escala": {"type": "number", "description": "Resolución de 0.2 a 1. Por defecto 0.5; sube a 1 para leer texto pequeño."},
+        },
+    ),
+    "ventana_activa": (ventana_activa, "Dice qué programa y qué ventana tiene enfocados el usuario.", {}),
+    "ventanas": (ventanas, "Lista las ventanas abiertas y en qué escritorio está cada una.", {}),
+    "portapapeles": (portapapeles, "Lee el texto que el usuario copió.", {}),
+    "historial_terminal": (
+        historial_terminal,
+        "Muestra los últimos comandos que el usuario corrió en su terminal (fish).",
+        {"cantidad": {"type": "integer", "description": "Cuántos comandos (1-200, por defecto 20)."}},
+    ),
+    "estado_sistema": (estado_sistema, "RAM, carga de CPU, procesos más pesados y perfil gráfico de Vortex OS.", {}),
+}
+
+
+# --- Protocolo MCP (JSON-RPC 2.0 por líneas) ---
+
+def responder(id_, resultado=None, error=None) -> None:
+    msg = {"jsonrpc": "2.0", "id": id_}
+    if error:
+        msg["error"] = error
+    else:
+        msg["result"] = resultado
+    sys.stdout.write(json.dumps(msg, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def manejar(msg: dict) -> None:
+    metodo, id_, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+    if id_ is None:
+        return  # notificación (p. ej. notifications/initialized): no lleva respuesta
+
+    if metodo == "initialize":
+        pedida = params.get("protocolVersion")
+        responder(id_, {
+            "protocolVersion": pedida if pedida in PROTOCOLOS else PROTOCOLOS[0],
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "vortex", "version": VERSION},
+            "instructions": INSTRUCCIONES,
+        })
+    elif metodo == "ping":
+        responder(id_, {})
+    elif metodo == "tools/list":
+        responder(id_, {"tools": [
+            {
+                "name": nombre,
+                "description": desc,
+                "inputSchema": {"type": "object", "properties": props},
+                "annotations": {"readOnlyHint": True},
+            }
+            for nombre, (_, desc, props) in HERRAMIENTAS.items()
+        ]})
+    elif metodo == "tools/call":
+        nombre = params.get("name")
+        if nombre not in HERRAMIENTAS:
+            responder(id_, error={"code": -32602, "message": f"Herramienta desconocida: {nombre}"})
+            return
+        try:
+            contenido = HERRAMIENTAS[nombre][0](params.get("arguments") or {})
+            responder(id_, {"content": contenido})
+        except (ErrorHerramienta, subprocess.TimeoutExpired, OSError, ValueError, json.JSONDecodeError) as e:
+            responder(id_, {"content": [texto(str(e))], "isError": True})
+    else:
+        responder(id_, error={"code": -32601, "message": f"Método no soportado: {metodo}"})
+
+
+def main() -> None:
+    for linea in sys.stdin:
+        linea = linea.strip()
+        if not linea:
+            continue
+        try:
+            msg = json.loads(linea)
+        except json.JSONDecodeError:
+            responder(None, error={"code": -32700, "message": "JSON inválido"})
+            continue
+        manejar(msg)
+
+
+if __name__ == "__main__":
+    main()

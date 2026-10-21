@@ -1,0 +1,7 @@
+# Vortex OS: pantalla de inicio en texto (tuigreet). Recuerda el último usuario.
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --remember --remember-session --asterisks --cmd start-hyprland"
+user = "greeter"

@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""vortex-bench: mide qué tan ligero está el sistema, para comparar con CachyOS u otra distro.
+
+    vortex-bench                    muestra las medidas
+    vortex-bench --guardar          y las guarda en ~/.local/state/vortex/bench/
+    vortex-bench --comparar A B     compara dos mediciones guardadas (A = antes, B = después)
+
+Para que la comparación sea justa: mide recién arrancado, con la sesión abierta,
+sin programas abiertos, y espera un minuto a que todo se asiente.
+"""
+
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "vortex" / "bench"
+
+# Procesos que forman el escritorio (compositor + shell + ayudantes).
+ESCRITORIO = {
+    "Hyprland", "qs", "quickshell", "caelestia", "plasmashell", "kwin_wayland", "kwin_x11",
+    "gnome-shell", "Xwayland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland",
+    "xdg-desktop-portal-gtk", "xdg-desktop-portal-kde", "pipewire", "wireplumber",
+    "pipewire-pulse", "sddm", "greetd", "kded6", "ksmserver", "polkit-gnome-au",
+}
+
+# Qué es mejor en cada medida: "menos" o "mas".
+MEDIDAS = {
+    "ram_usada_mb": ("RAM usada en reposo", "MB", "menos"),
+    "ram_escritorio_mb": ("RAM del escritorio", "MB", "menos"),
+    "procesos": ("Procesos", "", "menos"),
+    "servicios_sistema": ("Servicios del sistema activos", "", "menos"),
+    "servicios_usuario": ("Servicios de usuario activos", "", "menos"),
+    "paquetes": ("Paquetes instalados", "", "menos"),
+    "arranque_s": ("Arranque total", "s", "menos"),
+    "disco_usado_gb": ("Disco usado en /", "GB", "menos"),
+}
+
+
+def sh(*cmd: str) -> str:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def meminfo() -> dict[str, int]:
+    datos = {}
+    for linea in Path("/proc/meminfo").read_text().splitlines():
+        clave, valor = linea.split(":", 1)
+        datos[clave] = int(valor.split()[0])
+    return datos
+
+
+def ram_escritorio_mb() -> tuple[float, dict[str, float]]:
+    """Suma la memoria propia (PSS si se puede, si no RSS) de los procesos del escritorio."""
+    por_proceso: dict[str, float] = {}
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            nombre = Path(f"/proc/{pid}/comm").read_text().strip()
+        except OSError:
+            continue
+        if nombre not in ESCRITORIO:
+            continue
+        kb = 0
+        try:
+            rollup = Path(f"/proc/{pid}/smaps_rollup").read_text()
+            kb = int(re.search(r"^Pss:\s+(\d+)", rollup, re.M).group(1))
+        except (OSError, AttributeError):
+            try:
+                status = Path(f"/proc/{pid}/status").read_text()
+                kb = int(re.search(r"^VmRSS:\s+(\d+)", status, re.M).group(1))
+            except (OSError, AttributeError):
+                continue
+        por_proceso[nombre] = por_proceso.get(nombre, 0) + kb / 1024
+    return round(sum(por_proceso.values()), 1), {k: round(v, 1) for k, v in sorted(por_proceso.items(), key=lambda x: -x[1])}
+
+
+def contar_unidades(*extra: str) -> int:
+    salida = sh("systemctl", *extra, "list-units", "--type=service", "--state=running", "--no-legend", "--plain")
+    return len([l for l in salida.splitlines() if l.strip()])
+
+
+def arranque_s() -> float | None:
+    salida = sh("systemd-analyze", "time")
+    m = re.search(r"=\s*((?:\d+min\s*)?[\d.]+m?s)", salida)
+    if not m:
+        return None
+    total = 0.0
+    for numero, unidad in re.findall(r"([\d.]+)(min|ms|s)", m.group(1)):
+        total += float(numero) * {"min": 60, "s": 1, "ms": 0.001}[unidad]
+    return round(total, 2)
+
+
+def distro() -> str:
+    try:
+        texto = Path("/etc/os-release").read_text()
+        return re.search(r'^PRETTY_NAME="?([^"\n]+)', texto, re.M).group(1)
+    except (OSError, AttributeError):
+        return "?"
+
+
+def medir() -> dict:
+    mem = meminfo()
+    escritorio, detalle = ram_escritorio_mb()
+    st = os.statvfs("/")
+    sched = ""
+    try:
+        sched = Path("/sys/kernel/sched_ext/root/ops").read_text().strip()
+    except OSError:
+        pass
+    return {
+        "fecha": datetime.now().isoformat(timespec="seconds"),
+        "distro": distro(),
+        "kernel": platform.release(),
+        "planificador": sched or "EEVDF/BORE (del kernel)",
+        "escritorio": os.environ.get("XDG_CURRENT_DESKTOP", "?"),
+        "ram_total_mb": round(mem["MemTotal"] / 1024),
+        "ram_usada_mb": round((mem["MemTotal"] - mem["MemAvailable"]) / 1024),
+        "ram_escritorio_mb": escritorio,
+        "ram_escritorio_detalle": detalle,
+        "procesos": len([p for p in os.listdir("/proc") if p.isdigit()]),
+        "servicios_sistema": contar_unidades(),
+        "servicios_usuario": contar_unidades("--user"),
+        "paquetes": len(sh("pacman", "-Qq").splitlines()),
+        "arranque_s": arranque_s(),
+        "disco_usado_gb": round((st.f_blocks - st.f_bfree) * st.f_frsize / 1024**3, 1),
+    }
+
+
+def mostrar(d: dict) -> None:
+    print(f"{d['distro']} · kernel {d['kernel']} · {d['escritorio']} · {d['fecha']}")
+    print(f"Planificador de CPU: {d['planificador']}\n")
+    for clave, (nombre, unidad, _) in MEDIDAS.items():
+        valor = d.get(clave)
+        texto = "?" if valor is None else f"{valor} {unidad}".strip()
+        print(f"  {nombre:<32} {texto}")
+    if d["ram_escritorio_detalle"]:
+        print("\n  RAM del escritorio por proceso:")
+        for nombre, mb in d["ram_escritorio_detalle"].items():
+            print(f"    {nombre:<30} {mb} MB")
+
+
+def comparar(a: dict, b: dict) -> None:
+    print(f"A: {a['distro']} ({a['fecha']})")
+    print(f"B: {b['distro']} ({b['fecha']})\n")
+    print(f"  {'':<32} {'A':>10} {'B':>10}   B frente a A")
+    for clave, (nombre, unidad, mejor) in MEDIDAS.items():
+        va, vb = a.get(clave), b.get(clave)
+        if va is None or vb is None:
+            continue
+        if va == 0 or vb == 0:
+            veredicto = ""
+        elif mejor == "menos":
+            veces = va / vb
+            veredicto = f"{veces:.2f}x {'más ligero' if veces >= 1 else 'más pesado'}"
+        else:
+            veces = vb / va
+            veredicto = f"{veces:.2f}x {'mejor' if veces >= 1 else 'peor'}"
+        print(f"  {nombre:<32} {va:>10} {vb:>10}   {veredicto}")
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if "-h" in args or "--help" in args:
+        print(__doc__)
+        return 0
+    if args[:1] == ["--comparar"]:
+        if len(args) != 3:
+            print("uso: vortex-bench --comparar ANTES.json DESPUES.json", file=sys.stderr)
+            return 1
+        comparar(json.loads(Path(args[1]).read_text()), json.loads(Path(args[2]).read_text()))
+        return 0
+
+    datos = medir()
+    mostrar(datos)
+    if "--json" in args:
+        print(json.dumps(datos, ensure_ascii=False, indent=2))
+    if "--guardar" in args:
+        DIR.mkdir(parents=True, exist_ok=True)
+        nombre = re.sub(r"[^a-z0-9]+", "-", datos["distro"].lower()).strip("-")
+        archivo = DIR / f"{datetime.now():%Y%m%d-%H%M%S}-{nombre}.json"
+        archivo.write_text(json.dumps(datos, ensure_ascii=False, indent=2))
+        print(f"\nGuardado en {archivo}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

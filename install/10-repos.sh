@@ -1,0 +1,33 @@
+# shellcheck shell=bash
+paso "Repositorios: multilib, CachyOS y AUR"
+
+# multilib hace falta para Steam y las bibliotecas de 32 bits.
+if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
+  srun sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+  bien "multilib activado"
+fi
+
+instalar_pacman base-devel git curl jq
+
+if ((VORTEX_ES_CACHYOS)) || grep -q '^\[cachyos' /etc/pacman.conf; then
+  bien "Repos de CachyOS ya presentes"
+else
+  # El script oficial elige solo el repo para tu CPU: znver4, v4, v3 o genérico.
+  # Así el mismo instalador sirve en PCs viejas (genérico) y nuevas (v3/v4).
+  tmp="$(mktemp -d)"
+  run curl -fsSL -o "$tmp/cachyos-repo.tar.xz" https://mirror.cachyos.org/cachyos-repo.tar.xz
+  run tar -xf "$tmp/cachyos-repo.tar.xz" -C "$tmp"
+  if [[ "$VORTEX_SI" == 1 ]]; then
+    run bash -c "cd '$tmp/cachyos-repo' && yes | sudo ./cachyos-repo.sh --install"
+  else
+    run bash -c "cd '$tmp/cachyos-repo' && sudo ./cachyos-repo.sh --install"
+  fi
+  rm -rf "$tmp"
+  bien "Repos de CachyOS agregados"
+fi
+
+srun pacman -Syu --noconfirm
+
+# paru viene ya compilado en el repo de CachyOS.
+tiene paru || instalar_pacman paru
+bien "paru listo para el AUR"

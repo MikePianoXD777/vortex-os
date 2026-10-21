@@ -1,0 +1,8 @@
+# Juegos
+steam
+gamemode
+lib32-gamemode
+mangohud
+lib32-mangohud
+gamescope
+proton-cachyos-slr     # Proton con los parches de CachyOS (build sobre Steam Linux Runtime)
