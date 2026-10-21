@@ -337,14 +337,8 @@ PanelWindow {
     Component.onCompleted: {
         applyConfigSettings();
         reportWidgetState();
-        Qt.callLater(function() {
-            if (masterWindow.currentActive === "hidden") {
-                let t = masterWindow.getLayout("guide");
-                if (t) masterWindow.ensureWidgetItem("guide", t);
-                let w = masterWindow.getLayout("wallpaper");
-                if (w) masterWindow.ensureWidgetItem("wallpaper", w);
-            }
-        });
+        // Vortex: Ajustes y el selector de fondos ya no se precargan al arrancar (quedaban
+        // en memoria aunque nunca se abrieran). Se crean la primera vez que se abren.
     }
 
     Component.onDestruction: {
