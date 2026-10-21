@@ -1,0 +1,64 @@
+# Shell de Vortex OS: Serpantinum (https://github.com/ilyamiro/serpantinum) con los parches
+# de Vortex, empaquetado desde shell/ de este repo. Se instala en /usr/share/serpantinum,
+# igual que el paquete oficial, para que sus scripts y rutas funcionen sin cambios.
+#
+#   cd packaging/vortex-shell && makepkg -si
+pkgname=vortex-shell
+pkgver=2.2.14
+pkgrel=1
+pkgdesc='Shell de Vortex OS (Serpantinum con parches de Vortex)'
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('AGPL-3.0-only')
+# Solo lo que el shell usa de verdad (revisado con grep en src/, bin/ y compositors/).
+# Fuera del paquete oficial: ttf-iosevka-nerd (1,1 GiB; el shell trae sus fuentes),
+# qt5-*, qt5ct/qt6ct, websockets, sddm, fastfetch, git, wget, unzip, fd, ripgrep...
+depends=(
+    'quickshell' 'qt6-multimedia' 'qt6-5compat' 'qt6-wayland'
+    'matugen' 'cava' 'jq' 'socat' 'inotify-tools' 'imagemagick' 'ffmpeg' 'file' 'curl'
+    'wl-clipboard' 'cliphist' 'grim' 'satty' 'zbar' 'brightnessctl' 'ddcutil' 'iw'
+    'networkmanager' 'bluez' 'bluez-utils' 'libnotify'
+    'pipewire' 'pipewire-pulse' 'pipewire-alsa' 'wireplumber' 'libpulse' 'pavucontrol' 'alsa-utils'
+    'lm_sensors' 'python' 'python-jeepney' 'psmisc' 'pciutils'
+    'gpu-screen-recorder' 'wf-recorder' 'power-profiles-daemon' 'pambase'
+    'adwaita-icon-theme' 'kitty' 'playerctl'
+)
+optdepends=(
+    'wl-gammarelay-rs: luz nocturna'
+    'easyeffects: ecualizador'
+    'calf: ecualizador'
+    'lsp-plugins-lv2: ecualizador'
+    'nautilus: abrir carpetas (SUPER+E, capturas)'
+)
+provides=('serpantinum')
+conflicts=('serpantinum' 'serpantinum-git')
+backup=('etc/pam.d/serpantinum')
+
+package() {
+    local origen="$startdir/../../shell"
+    local share="$pkgdir/usr/share/serpantinum"
+
+    install -d "$share"
+    cp -a "$origen"/{bin,src,config,compositors} "$share/"
+    install -Dm644 "$origen/version.txt" "$share/version.txt"
+    # Con este marcador el shell no busca actualizaciones en GitHub: las trae pacman.
+    printf 'pacman\n' | install -Dm644 /dev/stdin "$share/package-managed"
+
+    # El tema de SDDM no se usa: Vortex inicia con greetd.
+    rm -rf "$share/config/sddm"
+
+    chmod 755 "$share"/bin/*
+    find "$share/src" -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod 755 {} +
+
+    install -d "$pkgdir/usr/bin"
+    ln -s ../share/serpantinum/bin/serpantinum "$pkgdir/usr/bin/serpantinum"
+    ln -s ../share/serpantinum/bin/serpantinumd "$pkgdir/usr/bin/serpantinumd"
+
+    # Pantalla de bloqueo: contraseña del sistema (sin lector de huellas).
+    install -Dm644 /dev/stdin "$pkgdir/etc/pam.d/serpantinum" <<'EOF'
+auth        include      system-auth
+account     include      system-auth
+EOF
+
+    install -Dm644 "$origen/LICENSE.md" "$pkgdir/usr/share/licenses/$pkgname/LICENSE.md"
+}

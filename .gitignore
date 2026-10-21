@@ -5,4 +5,9 @@ iso/out/
 *.log
 
 # Fork del shell (repo git propio: MikePianoXD777/vortex-shell)
-vortex-shell/
+/vortex-shell/
+
+# Restos de makepkg
+packaging/*/pkg/
+packaging/*/src/
+packaging/*/*.pkg.tar.*
