@@ -63,6 +63,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 200 } }
             source: preview.wallpaperPath !== "" && !preview.wallpaperIsVideo ? "file://" + preview.wallpaperPath : ""
             fillMode: Image.PreserveAspectCrop
+            // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
+            sourceSize: Qt.size(960, 540)
             asynchronous: true
             smooth: true
             mipmap: true
@@ -76,6 +78,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 200 } }
             source: preview.customPath !== "" && !preview.tab.isVideoPath(preview.customPath) ? "file://" + preview.customPath : ""
             fillMode: Image.PreserveAspectCrop
+            // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
+            sourceSize: Qt.size(960, 540)
             asynchronous: true
             smooth: true
             mipmap: true
