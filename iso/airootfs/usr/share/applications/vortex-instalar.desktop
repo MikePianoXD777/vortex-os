@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Instalar Vortex OS
+Name[en]=Install Vortex OS
+Comment=Instala Vortex OS en tu computadora
+Comment[en]=Install Vortex OS on your computer
+Exec=vortex-instalador
+Icon=vortex-os
+Terminal=false
+Categories=System;
+Keywords=instalar;install;calamares;vortex;

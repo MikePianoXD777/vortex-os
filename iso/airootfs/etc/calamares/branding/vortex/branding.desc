@@ -1,0 +1,35 @@
+# Marca de Vortex OS para Calamares.
+---
+componentName: vortex
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 1100px,720px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+  productName: "Vortex OS"
+  shortProductName: "Vortex"
+  version: "0.1.0"
+  shortVersion: "0.1"
+  versionedName: "Vortex OS 0.1"
+  shortVersionedName: "Vortex 0.1"
+  bootloaderEntryName: "Vortex OS"
+  productUrl: "https://github.com/MikePianoXD777/vortex-os"
+  supportUrl: "https://github.com/MikePianoXD777/vortex-os/issues"
+
+images:
+  productLogo: "vortex-os.svg"
+  productIcon: "vortex-os.svg"
+  productWelcome: "bienvenida.png"
+
+slideshow: "show.qml"
+slideshowAPI: 2
+
+style:
+  SidebarBackground: "#0a0c18"
+  SidebarText: "#e6e9ff"
+  SidebarTextCurrent: "#0a0c18"
+  SidebarBackgroundCurrent: "#9ec5ff"

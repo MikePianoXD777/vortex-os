@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# vortex-live: prepara la sesión del USB (servicio vortex-live.service, antes de greetd).
+# Crea «liveuser» sin contraseña y con sudo, y hace que greetd entre solo a su escritorio.
+# Nada de esto pasa al sistema instalado: vortex-post-instalacion lo borra.
+set -euo pipefail
+usuario=liveuser
+if ! id "$usuario" >/dev/null 2>&1; then
+  useradd -m -G wheel,video,audio,input -s /bin/bash "$usuario"
+  passwd -d "$usuario" >/dev/null
+fi
+install -Dm440 /dev/stdin /etc/sudoers.d/90-vortex-live <<<"$usuario ALL=(ALL:ALL) NOPASSWD: ALL"
+# La sesión entra sola; al cerrarla vuelve tuigreet (por si quieres probar otro usuario).
+if ! grep -q '^\[initial_session\]' /etc/greetd/config.toml; then
+  printf '\n[initial_session]\ncommand = "vortex-sesion"\nuser = "%s"\n' "$usuario" >>/etc/greetd/config.toml
+fi

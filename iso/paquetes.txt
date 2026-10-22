@@ -1,0 +1,104 @@
+# Paquetes de la imagen del live. Lo que se instala con Calamares es una copia de esta imagen,
+# así que es también el sistema base de Vortex OS: lo mismo que deja install.sh (packages/*.txt)
+# más lo que hace falta para arrancar desde el USB e instalar. Steam, Java y las demás apps
+# NO van aquí: se eligen en el instalador (iso/airootfs/etc/calamares/modules/netinstall.yaml).
+
+# --- Base y arranque ---
+base
+base-devel
+linux
+linux-cachyos
+linux-firmware
+amd-ucode
+intel-ucode
+mkinitcpio
+mkinitcpio-archiso
+efibootmgr
+sudo
+nano
+git
+jq
+rsync
+
+# --- Discos (particionar e instalar) ---
+btrfs-progs
+dosfstools
+e2fsprogs
+exfatprogs
+ntfs-3g
+gptfdisk
+
+# --- CachyOS (packages/sistema.txt) ---
+cachyos-keyring
+cachyos-mirrorlist
+cachyos-v3-mirrorlist
+cachyos-v4-mirrorlist
+cachyos-settings
+chwd
+scx-scheds
+scx-tools
+zram-generator
+paru
+
+# --- Red, sonido, inicio de sesión ---
+networkmanager
+bluez
+bluez-utils
+pipewire
+pipewire-pulse
+pipewire-alsa
+pipewire-jack
+wireplumber
+greetd
+greetd-tuigreet
+power-profiles-daemon
+
+# --- Gráficos: Mesa para que el live arranque en cualquier GPU (chwd pone NVIDIA al instalar) ---
+mesa
+lib32-mesa
+vulkan-radeon
+lib32-vulkan-radeon
+vulkan-intel
+lib32-vulkan-intel
+
+# --- Escritorio (packages/escritorio.txt y extra.txt) ---
+hyprland
+xdg-desktop-portal-hyprland
+gnome-keyring
+adwaita-fonts
+noto-fonts
+noto-fonts-emoji
+xdg-user-dirs
+firefox
+thunar
+grim
+slurp
+wl-clipboard
+libnotify
+python
+pciutils
+python-gobject
+flatpak
+sox
+
+# --- Juegos que no se eligen: el modo juego de Vortex (packages/juegos.txt) ---
+gamemode
+lib32-gamemode
+mangohud
+lib32-mangohud
+gamescope
+
+# --- Programación (packages/dev.txt, sin Docker) ---
+github-cli
+mise
+uv
+zed
+neovim
+
+# --- Repo [vortex] (paquetes propios, iso/paquetes.sh) ---
+vortex-shell
+wl-gammarelay-rs
+
+# --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
+cachyos-calamares
+ckbcomp

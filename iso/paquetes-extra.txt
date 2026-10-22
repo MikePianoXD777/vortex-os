@@ -1,5 +1,0 @@
-
-# --- Vortex OS ---
-git
-jq
-rsync

@@ -1,0 +1,70 @@
+# Apps y juegos que se eligen en el instalador. Los de los repos se instalan al momento (con
+# internet); los de Flatpak (Sober, Zoom, el lanzador de Genshin, Heroic, Spotify) se bajan
+# en el primer arranque con red (vortex-flatpaks.service). Ninguno gasta RAM si no lo abres.
+- name: "Juegos"
+  description: "Tiendas y lanzadores de juegos"
+  expanded: true
+  selected: false
+  subgroups:
+    - name: "Steam"
+      description: "La tienda de juegos de PC, con Proton (CachyOS) para jugar los de Windows"
+      selected: true
+      packages: [ steam, proton-cachyos-slr ]
+    - name: "Sober (Roblox)"
+      description: "Roblox en Linux"
+      selected: false
+      packages: [ vortex-flatpak-sober ]
+    - name: "Prism Launcher (Minecraft)"
+      description: "Minecraft con mods y varias versiones, con Java 27 y su recolector de basura afinado"
+      selected: false
+      packages: [ prismlauncher, jdk-openjdk ]
+    - name: "An Anime Game Launcher (Genshin Impact)"
+      description: "Lanzador para jugar Genshin Impact en Linux"
+      selected: false
+      packages: [ vortex-flatpak-aagl ]
+    - name: "Heroic (Epic Games y GOG)"
+      description: "Tus juegos de Epic Games Store, GOG y Amazon"
+      selected: false
+      packages: [ vortex-flatpak-heroic ]
+    - name: "Lutris"
+      description: "Otros juegos y lanzadores de Windows"
+      selected: false
+      packages: [ lutris ]
+
+- name: "Apps"
+  description: "Lo de todos los días"
+  expanded: true
+  selected: false
+  subgroups:
+    - name: "Firefox"
+      description: "Navegador web (ya viene instalado)"
+      selected: true
+      packages: [ firefox ]
+    - name: "Vortex Studio"
+      description: "El editor de video de la Vortex Suite"
+      selected: true
+      packages: [ vortex-studio ]
+    - name: "Discord"
+      description: "Chat de voz y texto"
+      selected: false
+      packages: [ discord ]
+    - name: "Zoom"
+      description: "Videollamadas"
+      selected: false
+      packages: [ vortex-flatpak-zoom ]
+    - name: "OBS Studio"
+      description: "Grabar la pantalla y transmitir en vivo"
+      selected: false
+      packages: [ obs-studio ]
+    - name: "VLC"
+      description: "Reproductor de videos y música"
+      selected: false
+      packages: [ vlc, vlc-plugins-all ]
+    - name: "LibreOffice"
+      description: "Documentos, hojas de cálculo y presentaciones (en español)"
+      selected: false
+      packages: [ libreoffice-fresh, libreoffice-fresh-es ]
+    - name: "Spotify"
+      description: "Música"
+      selected: false
+      packages: [ vortex-flatpak-spotify ]

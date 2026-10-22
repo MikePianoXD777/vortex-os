@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# vortex-post-instalacion: lo corre Calamares dentro del sistema recién copiado al disco.
+#
+#   vortex-post-instalacion kernel          antes de generar el initramfs
+#   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
+#
+# La imagen del USB es Vortex completo, pero trae piezas que solo sirven para arrancar desde
+# el USB (hooks de archiso, el usuario live, el instalador). Aquí se quitan y se hace lo que
+# install.sh decide según el equipo: drivers de la GPU (chwd), Bluetooth y systemd-oomd.
+set -uo pipefail
+
+log() { printf 'vortex-post-instalacion: %s\n' "$*"; }
+
+paso_kernel() {
+  # Sin los hooks de archiso; los pasos initcpiocfg e initcpio de Calamares arman el normal.
+  rm -f /etc/mkinitcpio.conf.d/archiso.conf
+  # mkarchiso deja /boot vacío (el kernel del USB va aparte): cada kernel instalado vuelve a
+  # /boot desde /usr/lib/modules, con su preset de mkinitcpio.
+  local vmlinuz dir pkgbase preset
+  for vmlinuz in /usr/lib/modules/*/vmlinuz; do
+    dir="${vmlinuz%/vmlinuz}"
+    read -r pkgbase <"$dir/pkgbase" 2>/dev/null || continue
+    install -Dm644 "$vmlinuz" "/boot/vmlinuz-$pkgbase"
+    preset="/etc/mkinitcpio.d/$pkgbase.preset"
+    if [[ ! -e "$preset" ]]; then
+      sed "s|%PKGBASE%|$pkgbase|g" /usr/share/mkinitcpio/hook.preset | install -Dm644 /dev/stdin "$preset"
+    fi
+    log "kernel $pkgbase en /boot"
+  done
+}
+
+paso_final() {
+  local usuario="${1:-}"
+
+  # --- Lo que es solo del USB ---
+  rm -f /etc/systemd/system/multi-user.target.wants/vortex-live.service \
+    /etc/systemd/system/vortex-live.service \
+    /etc/systemd/system/multi-user.target.wants/pacman-init.service \
+    /etc/systemd/system/pacman-init.service \
+    /etc/systemd/system/etc-pacman.d-gnupg.mount \
+    /usr/local/bin/vortex-live /usr/local/bin/vortex-instalador \
+    /usr/share/applications/vortex-instalar.desktop \
+    /etc/vortex/live
+  rm -rf /etc/calamares
+  # Calamares y lo que solo usa el arranque del USB (sus dependencias de KDE se van con él).
+  local sobran=()
+  for p in cachyos-calamares ckbcomp mkinitcpio-archiso; do
+    pacman -Qq "$p" >/dev/null 2>&1 && sobran+=("$p")
+  done
+  ((${#sobran[@]})) && { pacman -Rns --noconfirm "${sobran[@]}" || log "no pude quitar ${sobran[*]}"; }
+
+  # --- Drivers de la GPU (como install.sh): NVIDIA, AMD, Intel, híbridas ---
+  if command -v chwd >/dev/null; then
+    chwd -a || log "chwd no pudo instalar los drivers (¿sin internet?): luego, «sudo chwd -a»"
+  fi
+
+  # --- Servicios según el equipo (como install/20-sistema.sh) ---
+  if [[ -d /sys/class/bluetooth && -n "$(ls -A /sys/class/bluetooth 2>/dev/null)" ]]; then
+    systemctl enable bluetooth.service
+  fi
+  # scx_lavd ya reparte la CPU: las reglas de ananicy sobran.
+  systemctl disable ananicy-cpp.service 2>/dev/null || true
+  # systemd-oomd ayuda con poca RAM: se queda en equipos de menos de 8 GB.
+  if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 8000)); then
+    systemctl disable systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
+  fi
+
+  # --- Ese usuario: su grupo de gamemode (prioridad al jugar) ---
+  if [[ -n "$usuario" ]] && id "$usuario" >/dev/null 2>&1; then
+    getent group gamemode >/dev/null && usermod -aG gamemode "$usuario"
+  fi
+  # Este script tampoco sirve después de instalar.
+  rm -f /usr/local/bin/vortex-post-instalacion
+  log "listo"
+}
+
+case "${1:-}" in
+  kernel) paso_kernel ;;
+  final) shift; paso_final "$@" ;;
+  *) echo "uso: vortex-post-instalacion kernel | final USUARIO" >&2; exit 1 ;;
+esac

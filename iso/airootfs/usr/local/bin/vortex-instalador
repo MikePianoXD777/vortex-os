@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# vortex-instalador: abre el instalador gráfico (Calamares) como root en la sesión actual.
+#   vortex-instalador              lo abre ya (ícono «Instalar Vortex OS»)
+#   vortex-instalador --al-entrar  espera a que el escritorio arranque (lo usa vortex-sesion)
+set -uo pipefail
+runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+if [[ "${1:-}" == --al-entrar ]]; then
+  for _ in $(seq 120); do
+    compgen -G "$runtime/hypr/*/.socket.sock" >/dev/null && break
+    sleep 0.5
+  done
+  sleep 5   # que el shell termine de aparecer antes de abrir la ventana
+fi
+if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+  WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && ls wayland-* 2>/dev/null | grep -v '\.lock$' | head -n1)"
+fi
+pgrep -x calamares >/dev/null && exit 0
+export WAYLAND_DISPLAY XDG_RUNTIME_DIR="$runtime" QT_QPA_PLATFORM=wayland
+exec sudo --preserve-env=WAYLAND_DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,LANG calamares

@@ -1,0 +1,13 @@
+# Vortex OS (live): usuario «liveuser» y entrada automática al escritorio (bin vortex-live).
+[Unit]
+Description=Vortex OS: preparar la sesión del USB
+Before=greetd.service
+After=systemd-sysusers.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vortex-live
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
