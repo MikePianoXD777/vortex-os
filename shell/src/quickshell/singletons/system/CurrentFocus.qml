@@ -12,6 +12,20 @@ Item {
     readonly property string displayText: appTitle !== "" ? appTitle : appClass
     readonly property bool isFocused: displayText !== ""
 
+    // Vortex: current_focus.sh (bash + subshell + socat, y hyprctl + jq en cada cambio de
+    // foco) solo corre mientras alguna cara de foco está activa en la barra. Todas las
+    // caras de módulo se crean aunque el módulo no esté en la barra, y «focus» no viene
+    // en la barra por defecto.
+    property int subscribers: 0
+
+    function subscribe() {
+        subscribers++;
+    }
+
+    function unsubscribe() {
+        subscribers = Math.max(0, subscribers - 1);
+    }
+
     function updateFocus(dataStr) {
         if (!dataStr) return;
         let txt = (typeof dataStr === "string" ? dataStr : "").trim();
@@ -29,7 +43,7 @@ Item {
     Process {
         id: focusDaemon
         command: ["bash", "-c", "exec " + Caching.serpantinumDir + "/scripts/current_focus.sh"]
-        running: typeof Caching !== "undefined" && Caching.serpantinumDir !== undefined && Caching.serpantinumDir !== ""
+        running: root.subscribers > 0 && typeof Caching !== "undefined" && Caching.serpantinumDir !== undefined && Caching.serpantinumDir !== ""
         stdout: SplitParser {
             onRead: data => root.updateFocus(data)
         }

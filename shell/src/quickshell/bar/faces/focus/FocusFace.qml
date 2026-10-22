@@ -24,6 +24,28 @@ Item {
     readonly property bool isFocused: CurrentFocus.isFocused
     readonly property bool isFaceVisible: isFocused
 
+    // Vortex: el vigilante de foco solo corre mientras esta cara está activa
+    property bool focusSubscribed: false
+
+    function syncFocusSubscription() {
+        if (moduleActive && !focusSubscribed) {
+            focusSubscribed = true;
+            CurrentFocus.subscribe();
+        } else if (!moduleActive && focusSubscribed) {
+            focusSubscribed = false;
+            CurrentFocus.unsubscribe();
+        }
+    }
+
+    onModuleActiveChanged: syncFocusSubscription()
+    Component.onCompleted: syncFocusSubscription()
+    Component.onDestruction: {
+        if (focusSubscribed) {
+            focusSubscribed = false;
+            CurrentFocus.unsubscribe();
+        }
+    }
+
     property real startPadding: (isSolid && !distinctPills) ? 0 : (barWindow ? barWindow.cs(6) : 6)
     property real endPadding: (isSolid && !distinctPills) ? 0 : (barWindow ? barWindow.cs(12) : 12)
     property real maxLength: barWindow ? barWindow.cs(300) : 300
