@@ -61,6 +61,23 @@ else
   aviso "No reconocí tu gestor de arranque: agrega el kernel linux-cachyos a mano."
 fi
 
+# La ESP (vfat) de archinstall se monta con fmask=0022: todos pueden leer la semilla
+# aleatoria del arranque y systemd lo avisa en cada inicio («world accessible, which is
+# a security hole»). Con 0077 solo root la lee; nada más cambia.
+for esp in /boot /efi /boot/efi; do
+  [[ "$(findmnt -n -o FSTYPE "$esp" 2>/dev/null)" == vfat ]] || continue
+  [[ "$(findmnt -n -o OPTIONS "$esp")" == *fmask=0022* ]] || continue
+  srun sed -i -E "\\|^[^#][^[:space:]]*[[:space:]]+${esp}[[:space:]]+vfat[[:space:]]| { s/fmask=0022/fmask=0077/; s/dmask=0022/dmask=0077/ }" /etc/fstab
+  # vfat no cambia la máscara con «remount»: se desmonta y se vuelve a montar (systemd
+  # tiene que releer el fstab antes).
+  srun systemctl daemon-reload
+  if srun umount "$esp" && srun mount "$esp"; then
+    bien "Partición de arranque $esp solo legible por root"
+  else
+    aviso "No pude volver a montar $esp; los permisos nuevos se aplican al reiniciar."
+  fi
+done
+
 # --- Drivers de GPU ---
 # chwd (de CachyOS) detecta NVIDIA/AMD/Intel, híbridas y portátiles.
 if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
