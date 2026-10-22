@@ -12,6 +12,8 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
+                                       enfocada, modo juego automático, presión de memoria)
   claude                               abre Claude en una terminal
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
@@ -117,6 +119,74 @@ cmd_modo_juego() {
   esac
 }
 
+# Gestor de recursos automático (bin/vortex-gestor, servicio de usuario vortex-gestor).
+cmd_gestor() {
+  local unidad=vortex-gestor.service
+  case "${1:-estado}" in
+    estado) gestor_estado ;;
+    encender)
+      systemctl --user enable "$unidad" >/dev/null 2>&1 || { aviso "no pude habilitar $unidad"; exit 1; }
+      # Fuera de Hyprland (p. ej. por SSH) no puede arrancar: lo hará al entrar al escritorio.
+      if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || hypr_corriendo; then
+        systemctl --user start "$unidad" || true
+      fi
+      echo "Gestor de recursos encendido (arranca solo con cada sesión)."
+      ;;
+    apagar)
+      systemctl --user disable --now "$unidad" >/dev/null 2>&1 || true
+      echo "Gestor de recursos apagado (no vuelve a arrancar hasta: vortex gestor encender)."
+      ;;
+    *) aviso "usa: vortex gestor [estado|encender|apagar]"; exit 1 ;;
+  esac
+}
+
+gestor_estado() {
+  local unidad=vortex-gestor.service archivo="${XDG_RUNTIME_DIR:-/run/user/$UID}/vortex/gestor"
+  local activo habilitado k v
+  activo="$(systemctl --user is-active "$unidad" 2>/dev/null)" || true
+  habilitado="$(systemctl --user is-enabled "$unidad" 2>/dev/null)" || true
+  if [[ "$activo" != active || ! -r "$archivo" ]]; then
+    echo "Gestor de recursos: no está corriendo (${activo:-desconocido})"
+    if [[ "$habilitado" == enabled ]]; then
+      echo "  Está habilitado: arranca solo al entrar al escritorio (Hyprland)."
+    else
+      echo "  Está apagado. Para encenderlo: vortex gestor encender"
+    fi
+    return 0
+  fi
+  local -A e=()
+  while IFS='=' read -r k v; do [[ -n "$k" ]] && e[$k]="$v"; done <"$archivo"
+  local mem
+  mem="$(systemctl --user show -p MemoryCurrent --value "$unidad" 2>/dev/null)" || mem=""
+  printf 'Gestor de recursos: activo desde las %(%H:%M)T' "${e[inicio]:-0}"
+  [[ "$mem" =~ ^[0-9]+$ ]] && printf ' (usa %s MB)' "$(((mem + 524288) / 1048576))"
+  printf '
+'
+  if [[ "${e[foco_pid]:-0}" != 0 ]]; then
+    printf '  Ventana enfocada: %s (pid %s)' "${e[foco_clase]:-?}" "${e[foco_pid]}"
+    if [[ -n "${e[foco_cgroup]:-}" ]]; then printf ', con prioridad en %s' "${e[foco_cgroup]##*/}"; else printf ', sin cambiar (no se puede ordenar)'; fi
+    [[ "${e[foco_nice]:-0}" != 0 ]] && printf ' y nice %s' "${e[foco_nice]}"
+    printf '
+'
+  else
+    echo "  Ventana enfocada: ninguna"
+  fi
+  echo "  Apps con su propio scope: ${e[apps]:-0}"
+  local modo
+  case "${e[modo_juego]:-apagado}" in
+    propio) modo="encendido por el gestor" ;;
+    ajeno) modo="encendido (a mano o por gamemode)" ;;
+    *) modo="apagado" ;;
+  esac
+  printf '  Juegos abiertos: %s · modo juego: %s · fondo animado: %s\n' "${e[juegos]:-0}" "$modo" \
+    "$([[ "${e[fondo_pausado]:-0}" == 1 ]] && echo en pausa || echo normal)"
+  printf '  Presión de memoria: %s · avisos: %s' "${e[psi]:-?}" "${e[psi_eventos]:-0}"
+  [[ "${e[psi_ultimo]:-0}" != 0 ]] && printf ' (el último a las %(%H:%M)T; memoria soltada: %s)' "${e[psi_ultimo]}" "${e[reclamos]:-0}"
+  printf '\n'
+  [[ -r /proc/pressure/memory ]] && printf '    ahora: %s\n' "$(sed 's/ total=.*//' /proc/pressure/memory | paste -sd ',' | sed 's/,/, /')"
+  echo "  El shell suelta memoria cuando falta: ${e[shell_soltar]:-sin probar}"
+}
+
 cmd_claude() {
   local pausa="$CONF/claude-pausa"
   case "${1:-}" in
@@ -213,6 +283,7 @@ cmd_actualizar() {
 
 case "${1:-ayuda}" in
   modo-juego) shift; cmd_modo_juego "$@" ;;
+  gestor) shift; cmd_gestor "$@" ;;
   claude) shift; cmd_claude "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;

@@ -32,6 +32,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start")
     -- Primer inicio: pone el primer fondo de Vortex si todavía no hay ninguno.
     hl.exec_cmd("vortex primer-inicio")
+    -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
+    -- presión de memoria). «vortex gestor apagar» lo deshabilita.
+    hl.exec_cmd("systemctl --user -q is-enabled vortex-gestor.service && systemctl --user start vortex-gestor.service")
 end)
 require("config/monitors")
 require("config/settings")

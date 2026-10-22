@@ -3,9 +3,36 @@ paso "Escritorio: Hyprland + el shell de Vortex (Serpantinum)"
 
 # Comandos de Vortex para todos (también para los atajos de Hyprland). Son copias y no
 # enlaces: lo que está en /usr/local/bin no debe poder cambiarlo el usuario sin sudo.
-for comando in vortex vortex-bench vortex-mcp; do
+for comando in vortex vortex-bench vortex-mcp vortex-gestor; do
   srun install -Dm755 "$VORTEX_DIR/bin/$comando" "/usr/local/bin/$comando"
 done
+
+# Gestor de recursos automático: prioridad a la ventana enfocada, modo juego solo al abrir
+# un juego y respuesta a la presión de memoria. Su ayudante en C (escucha a Hyprland y al
+# kernel sin despertar la CPU) se compila aquí; el compilador viene en base-devel (paso 10).
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run cc -O2 -s -o /usr/local/bin/vortex-eventos "$VORTEX_DIR/src/vortex-eventos.c"
+else
+  tmp_eventos="$(mktemp -d)"
+  if cc -O2 -s -o "$tmp_eventos/vortex-eventos" "$VORTEX_DIR/src/vortex-eventos.c"; then
+    srun install -Dm755 "$tmp_eventos/vortex-eventos" /usr/local/bin/vortex-eventos
+  else
+    aviso "No se pudo compilar vortex-eventos: el gestor de recursos automático no funcionará"
+  fi
+  rm -rf "$tmp_eventos"
+fi
+escribir_sistema /etc/systemd/user/vortex-gestor.service <"$VORTEX_DIR/config/systemd/vortex-gestor.service"
+# Habilitado para este usuario: el mismo enlace que crea «systemctl --user enable», hecho a
+# mano para no depender de que haya una sesión de systemd (el instalador de la ISO no la tiene).
+# Lo arranca Hyprland al entrar (config/hypr/hyprland.lua); «vortex gestor apagar» lo quita.
+run mkdir -p "$HOME/.config/systemd/user/graphical-session.target.wants"
+run ln -sfn /etc/systemd/user/vortex-gestor.service \
+  "$HOME/.config/systemd/user/graphical-session.target.wants/vortex-gestor.service"
+if [[ "$VORTEX_DRY_RUN" != 1 ]]; then
+  # Si ya estaba corriendo (reinstalación), que tome la versión nueva.
+  systemctl --user daemon-reload 2>/dev/null && systemctl --user try-restart vortex-gestor.service 2>/dev/null || true
+fi
+bien "Gestor de recursos automático instalado (vortex gestor estado)"
 
 # Audio con PipeWire: si otro paquete trae jack2 primero, choca con pipewire-jack y pacman
 # no lo resuelve solo con --noconfirm.

@@ -50,6 +50,7 @@ sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archis
 | Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
+| Recursos | `vortex-gestor` (servicio de usuario, ~2 MB de RAM) | reparte solo la CPU y la RAM: prioridad a la ventana enfocada, modo juego al abrir un juego y memoria liberada cuando falta |
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
 | Claude | Claude Code + servidor MCP `vortex` | Super+A, y puede ver tu pantalla cuando se lo pides |
 
@@ -66,6 +67,22 @@ pantalla); en laptops sí.
 | Super+Shift+A | esconder/mostrar la barra |
 | Super+E | archivos (Thunar) |
 | Super+S / N / B / M / W / D / H | calendario, red, sistema, música, fondos, lanzador, Ajustes |
+
+### Gestor de recursos
+
+`vortex-gestor` arranca con la sesión y no hace nada mientras no pase algo (escucha a Hyprland y al
+kernel; no hay bucles que despierten la CPU):
+
+- **Ventana enfocada primero:** su app va a su propio scope de systemd con más peso de CPU y disco, y
+  las demás bajan. Con `scx_lavd` (que no usa esos pesos) además sube un poco su prioridad (nice) cuando
+  el sistema deja devolverla después (usuarios del grupo `gamemode`, que se agrega con lo de juegos).
+- **Modo juego solo:** al abrir un juego (Steam, gamescope, Wine, Minecraft o una ventana que dice ser
+  un juego) apaga los efectos y pausa el fondo animado; al cerrarlo lo deja todo como estaba.
+- **Poca memoria:** cuando el kernel avisa presión de memoria, comprime lo que no usan las apps de fondo
+  (nunca la enfocada ni el juego) para que lo de delante no dé tirones.
+
+`vortex gestor estado` muestra qué está haciendo; `vortex gestor apagar` / `encender` lo controlan.
+Las pruebas corren sin VM: `pruebas/gestor.sh`.
 
 ### Claude en el sistema
 
@@ -114,11 +131,13 @@ packages/            listas de paquetes por grupo
 shell/               Serpantinum (git subtree del tag v2.2.14) con los parches de Vortex
 packaging/           PKGBUILD del shell (vortex-shell)
 config/              Hyprland, ajustes iniciales del shell, fondos, gamemode y ajustes del sistema
-bin/vortex           comando principal (fondo, java, modo-juego, claude, bench, actualizar)
+bin/vortex           comando principal (fondo, java, modo-juego, gestor, claude, bench, actualizar)
+bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, su ayudante en C)
 bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
 iso/                 perfil de archiso (releng + Vortex) y «vortex-instalar»
 vm/                  VM de pruebas con QEMU, mediciones y previews
+pruebas/             pruebas que corren sin VM (gestor de recursos)
 ```
 
 ## Probar en una máquina virtual
