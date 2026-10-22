@@ -100,6 +100,10 @@ vortex-shell
 wl-gammarelay-rs
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
-# calamares: el oficial, compilado en [vortex] (iso/paquetes.sh).
+# calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el
+# paquete no pide: unsquashfs (copiar la imagen), os-prober (ver si hay otro sistema, p. ej.
+# Windows) y ckbcomp (teclado de la consola).
 calamares
+squashfs-tools
+os-prober
 ckbcomp

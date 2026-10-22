@@ -40,6 +40,12 @@ sed -E 's/ archiso_pxe_[a-z]+//g' "$releng/airootfs/etc/mkinitcpio.conf.d/archis
 cp -a "$releng/airootfs/etc/systemd/system/pacman-init.service" \
   "$releng/airootfs/etc/systemd/system/etc-pacman.d-gnupg.mount" "$raiz/etc/systemd/system/"
 ln -s ../pacman-init.service "$raiz/etc/systemd/system/multi-user.target.wants/pacman-init.service"
+# El mirrorlist de Arch viene todo comentado: este hook de releng activa los espejos HTTPS al
+# instalarse en la imagen (sin él pacman no tiene servidores, ni en el live ni en lo instalado).
+# El otro hook borra los hooks marcados «remove from airootfs» al terminar de armar la imagen.
+mkdir -p "$raiz/etc/pacman.d/hooks"
+cp -a "$releng/airootfs/etc/pacman.d/hooks/uncomment-mirrors.hook" \
+  "$releng/airootfs/etc/pacman.d/hooks/zzzz99-remove-custom-hooks-from-airootfs.hook" "$raiz/etc/pacman.d/hooks/"
 cp -a "$AQUI/airootfs/." "$raiz/"
 
 # Paquetes: los de Vortex + lo que releng necesita para arrancar el USB.

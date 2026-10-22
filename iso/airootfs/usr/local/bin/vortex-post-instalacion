@@ -46,7 +46,7 @@ paso_final() {
   rm -rf /etc/calamares
   # Calamares y lo que solo usa el arranque del USB (sus dependencias de KDE se van con él).
   local sobran=()
-  for p in calamares ckbcomp mkinitcpio-archiso; do
+  for p in calamares ckbcomp os-prober mkinitcpio-archiso; do
     pacman -Qq "$p" >/dev/null 2>&1 && sobran+=("$p")
   done
   ((${#sobran[@]})) && { pacman -Rns --noconfirm "${sobran[@]}" || log "no pude quitar ${sobran[*]}"; }

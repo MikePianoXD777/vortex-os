@@ -15,5 +15,7 @@ if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
   WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && ls wayland-* 2>/dev/null | grep -v '\.lock$' | head -n1)"
 fi
 pgrep -x calamares >/dev/null && exit 0
+# En español por defecto (el live usa LANG=C.UTF-8); en la primera pantalla se elige otro idioma.
+export LANG="${VORTEX_INSTALADOR_IDIOMA:-es_MX.UTF-8}"
 export WAYLAND_DISPLAY XDG_RUNTIME_DIR="$runtime" QT_QPA_PLATFORM=wayland
 exec sudo --preserve-env=WAYLAND_DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,LANG calamares
