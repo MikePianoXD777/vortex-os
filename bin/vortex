@@ -3,6 +3,13 @@
 set -euo pipefail
 
 VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+# Copiado en /usr/local/bin, «..» no es el repo: el instalador deja su ruta en /etc/vortex-release.
+VORTEX_RELEASE="${VORTEX_RELEASE:-/etc/vortex-release}"
+if [[ ! -f "$VORTEX_DIR/install.sh" && -r "$VORTEX_RELEASE" ]]; then
+  repo="$(sed -n 's/^VORTEX_REPO="\(.*\)"$/\1/p' "$VORTEX_RELEASE")"
+  [[ -f "$repo/install.sh" ]] && VORTEX_DIR="$repo"
+  unset repo
+fi
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex"
 ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml

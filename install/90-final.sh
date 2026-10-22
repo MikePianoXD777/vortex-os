@@ -5,6 +5,14 @@ if [[ "$VORTEX_DRY_RUN" != 1 ]]; then
   mkdir -p "$HOME/.config/vortex"
   echo "$VORTEX_VERSION" >"$HOME/.config/vortex/version"
 fi
+# /etc/vortex-release: dice que esto es Vortex OS (las apps de la Vortex Suite lo leen para
+# ofrecer su «Rendimiento Vortex OS») y dónde está el código, para «vortex actualizar»
+# (los comandos copiados en /usr/local/bin no saben de qué carpeta salieron).
+escribir_sistema /etc/vortex-release <<EOF
+NAME="Vortex OS"
+VERSION="$VORTEX_VERSION"
+VORTEX_REPO="$VORTEX_DIR"
+EOF
 
 [[ -d "$VORTEX_RESPALDO" ]] && info "Tus configs anteriores quedaron en ~/${VORTEX_RESPALDO#"$HOME"/}"
 info "Registro completo: $VORTEX_LOG"
