@@ -23,7 +23,10 @@ Singleton {
 
     function refreshTrackedNodes() {
         const list = root.pipewireNodes();
-        root.trackedNodes = list ? list : [];
+        // Vortex: solo se enlazan los nodos de audio. Todo lo que lee este archivo
+        // (salidas, entradas, apps) filtra por n.audio, y n.audio se sabe sin enlazar
+        // el nodo; enlazar también cámaras, vídeo y MIDI solo gastaba memoria y eventos.
+        root.trackedNodes = list ? list.filter(n => n && n.audio) : [];
     }
 
     Connections {
