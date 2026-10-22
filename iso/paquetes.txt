@@ -100,5 +100,6 @@ vortex-shell
 wl-gammarelay-rs
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
-cachyos-calamares
+# calamares: el oficial, compilado en [vortex] (iso/paquetes.sh).
+calamares
 ckbcomp

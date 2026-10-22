@@ -9,7 +9,7 @@ de tu fondo) optimizado, y **Claude integrado** para que pueda ver lo que haces 
 
 > Estado: **0.2 en desarrollo**. En una VM (QEMU/KVM, UEFI, Arch limpio) el instalador corre completo, arranca
 > con `linux-cachyos` y `scx_lavd` en ~3 s, y el shell funciona en español con 0 avisos en su registro.
-> Falta: terminar de optimizar la RAM, probar en hardware real y construir la ISO.
+> La ISO con instalador gráfico está en pruebas. Falta probar en hardware real.
 
 ## Instalar
 
@@ -32,11 +32,14 @@ y sus mods, tus sesiones y tus archivos se quedan donde están. Si tu disco usa 
 el instalador toma una foto del sistema (snapper) y una copia instantánea de `/home`, para volver atrás si
 hiciera falta.
 
-O con la ISO de Vortex: arranca, escribe `vortex-instalar`, y `archinstall` te guía. Al reiniciar
-y entrar con tu usuario, Vortex se termina de instalar solo.
+O con la **ISO de Vortex** (en pruebas): arranca en el escritorio de Vortex para probarlo, y el
+instalador gráfico («Instalar Vortex OS», se abre solo) te guía: idioma, teclado, disco y usuario, y
+eliges tus apps y juegos con casillas (Steam, Sober, Prism Launcher, el lanzador de Genshin, Heroic, Zoom,
+Discord, OBS, Vortex Studio...). Se instala sin internet; las apps sí la necesitan.
 
 ```bash
-sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso)
+iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
+sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso y el repo de CachyOS)
 ```
 
 ## Qué trae
@@ -121,9 +124,9 @@ porque usa el mismo kernel y los mismos drivers. Lo que se gana es menos RAM y p
 - [x] **0.1** Instalador por pasos, modo juego, `vortex-bench`, `vortex-mcp`, VM de pruebas
 - [x] Instalación completa probada en una VM con Arch limpio
 - [x] Shell nuevo: Serpantinum en `shell/`, sin telemetría, en español, 0 avisos en su registro
-- [ ] Optimizar la RAM del shell sin cambiar cómo se ve (en curso)
+- [x] Optimizar el shell sin cambiar cómo se ve (−36 % de RAM y −82 % de CPU en reposo frente a Caelestia)
 - [ ] Probar en hardware real (BIOS, NVIDIA/AMD/Intel, híbridas, laptops, CPUs sin x86-64-v3)
-- [ ] Construir y probar la ISO
+- [ ] ISO con instalador gráfico (Calamares) y apps para elegir (en pruebas)
 - [ ] Publicar la versión estable
 
 ## Estructura
@@ -140,7 +143,7 @@ bin/vortex           comando principal (fondo, java, modo-juego, gestor, claude,
 bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, su ayudante en C)
 bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
-iso/                 perfil de archiso (releng + Vortex) y «vortex-instalar»
+iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
 vm/                  VM de pruebas con QEMU, mediciones y previews
 pruebas/             pruebas que corren sin VM (gestor de recursos)
 ```

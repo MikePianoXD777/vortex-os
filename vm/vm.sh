@@ -8,7 +8,7 @@
 #   vm/vm.sh copiar O D   copia con rsync (la ruta remota va como :ruta)
 #   vm/vm.sh clic X Y     clic en ese punto (con VORTEX_VM_VIDEO=2d se ve con «captura»)
 #   vm/vm.sh tecla N...   teclas con nombres de QEMU (ret, tab, meta_l-d...)
-#   vm/vm.sh escribir T   escribe un texto (letras, números, espacio y . , - _ /)
+#   vm/vm.sh escribir T   escribe un texto (letras, números y símbolos comunes, teclado US)
 #   vm/vm.sh apagar       apaga la VM y espera (hasta 60 s) a que QEMU termine
 #   vm/vm.sh matar        corta la VM de golpe si no se apaga
 #   vm/vm.sh borrar       borra el disco para empezar de cero
@@ -92,6 +92,21 @@ nombre_tecla() {
     -) echo minus ;;
     _) echo shift-minus ;;
     /) echo slash ;;
+    # Con distribución US (la del live y de la mayoría de las pruebas).
+    ";") echo semicolon ;;
+    :) echo shift-semicolon ;;
+    "|") echo shift-backslash ;;
+    ">") echo shift-dot ;;
+    "<") echo shift-comma ;;
+    =) echo equal ;;
+    "'") echo apostrophe ;;
+    '"') echo shift-apostrophe ;;
+    "*") echo shift-8 ;;
+    "&") echo shift-7 ;;
+    '$') echo shift-4 ;;
+    "(") echo shift-9 ;;
+    ")") echo shift-0 ;;
+    "~") echo shift-grave_accent ;;
     *) return 1 ;;
   esac
 }
@@ -148,7 +163,7 @@ case "${1:-}" in
     for t in "$@"; do monitor "sendkey $t"; sleep 0.15; done
     ;;
   escribir)
-    # vm/vm.sh escribir TEXTO: letras, números, espacio y . , - _ /
+    # vm/vm.sh escribir TEXTO: letras, números y símbolos comunes (teclado US)
     texto="${2:?falta el texto}"
     for ((i = 0; i < ${#texto}; i++)); do
       t="$(nombre_tecla "${texto:i:1}")" || { echo "No sé escribir «${texto:i:1}»" >&2; exit 1; }

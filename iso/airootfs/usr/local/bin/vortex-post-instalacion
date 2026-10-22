@@ -40,11 +40,13 @@ paso_final() {
     /etc/systemd/system/etc-pacman.d-gnupg.mount \
     /usr/local/bin/vortex-live /usr/local/bin/vortex-instalador \
     /usr/share/applications/vortex-instalar.desktop \
-    /etc/vortex/live
+    /etc/vortex/live \
+    /etc/systemd/system-preset/05-vortex-live.preset \
+    /etc/systemd/system/systemd-firstboot.service
   rm -rf /etc/calamares
   # Calamares y lo que solo usa el arranque del USB (sus dependencias de KDE se van con él).
   local sobran=()
-  for p in cachyos-calamares ckbcomp mkinitcpio-archiso; do
+  for p in calamares ckbcomp mkinitcpio-archiso; do
     pacman -Qq "$p" >/dev/null 2>&1 && sobran+=("$p")
   done
   ((${#sobran[@]})) && { pacman -Rns --noconfirm "${sobran[@]}" || log "no pude quitar ${sobran[*]}"; }

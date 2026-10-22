@@ -98,7 +98,38 @@ for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-flatpaks vortex-ses
 done
 cc -O2 -s -o "$raiz/usr/local/bin/vortex-eventos" "$RAIZ/src/vortex-eventos.c"
 
-# Servicios encendidos (en el live y en lo instalado): los mismos que deja install.sh.
+# Servicios encendidos (en el live y en lo instalado): los mismos que deja install.sh. Van como
+# presets de systemd: al instalarse systemd en la imagen se aplican los presets («preset-all») y
+# los enlaces sueltos se pierden. networkd y homed se apagan (chocarían con NetworkManager).
+mkdir -p "$raiz/etc/systemd/system-preset"
+cat >"$raiz/etc/systemd/system-preset/10-vortex.preset" <<'PRESET'
+# Vortex OS: lo que deja encendido install.sh.
+enable NetworkManager.service
+enable NetworkManager-wait-online.service
+enable NetworkManager-dispatcher.service
+enable systemd-resolved.service
+enable greetd.service
+enable scx_loader.service
+enable power-profiles-daemon.service
+enable vortex-flatpaks.service
+disable systemd-networkd.service
+disable systemd-networkd.socket
+disable systemd-networkd-wait-online.service
+disable systemd-homed.service
+disable ananicy-cpp.service
+PRESET
+# Solo del live (vortex-post-instalacion lo borra).
+cat >"$raiz/etc/systemd/system-preset/05-vortex-live.preset" <<'PRESET'
+enable vortex-live.service
+enable pacman-init.service
+PRESET
+# Sin preguntas de primer arranque (systemd-firstboot) en el live: la imagen no tiene machine-id
+# a propósito. En lo instalado no hace falta: Calamares pone idioma, zona y machine-id.
+ln -sfn /dev/null "$raiz/etc/systemd/system/systemd-firstboot.service"
+echo "LANG=C.UTF-8" >"$raiz/etc/locale.conf"
+echo "KEYMAP=us" >"$raiz/etc/vconsole.conf"
+ln -sfn /usr/share/zoneinfo/UTC "$raiz/etc/localtime"
+
 quiere() { # quiere OBJETIVO UNIDAD [RUTA]
   local d="$raiz/etc/systemd/system/$1.wants"
   mkdir -p "$d"
@@ -123,6 +154,7 @@ if [[ -n "${VORTEX_ISO_LLAVE_PRUEBA:-}" ]]; then
   echo openssh >>"$perfil/packages.x86_64"
   install -Dm600 "$VORTEX_ISO_LLAVE_PRUEBA" "$raiz/root/.ssh/authorized_keys"
   quiere multi-user sshd.service
+  echo "enable sshd.service" >>"$raiz/etc/systemd/system-preset/05-vortex-live.preset"
   echo "AVISO: ISO DE PRUEBA, con una llave SSH de root. No la publiques." >&2
 fi
 

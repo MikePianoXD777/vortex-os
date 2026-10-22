@@ -21,10 +21,11 @@ for d in vortex-shell vortex-studio vortex-flatpaks; do
   rm -rf "$RAIZ/packaging/$d/"{pkg,src}
 done
 
-# Del AUR: la luz nocturna que pide el shell.
+# Del AUR: la luz nocturna que pide el shell y Calamares (el instalador gráfico). Calamares se
+# compila aquí porque los de CachyOS están enlazados a un boost viejo (no arrancan con el de Arch).
 aur="$(mktemp -d)"
 trap 'rm -rf "$aur"' EXIT
-for p in wl-gammarelay-rs; do
+for p in wl-gammarelay-rs calamares; do
   echo "==> $p (AUR)"
   git clone -q --depth 1 "https://aur.archlinux.org/$p.git" "$aur/$p"
   (cd "$aur/$p" && makepkg -s --noconfirm --needed -f)
