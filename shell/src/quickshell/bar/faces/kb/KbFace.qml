@@ -5,6 +5,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.SystemTray
 import "../../../reusables"
 import "../../../"
@@ -150,9 +151,35 @@ Item {
             onStreamFinished: {
                 let txt = this.text.trim();
                 if (txt !== "" && root.kbLayout !== txt) root.kbLayout = txt;
-                if (!root.isPreview && (!module || module.moduleActive) && !kbWaiter.running) kbWaiter.running = true;
+                if (!root.hyprEvents && !root.isPreview && (!module || module.moduleActive) && !kbWaiter.running) kbWaiter.running = true;
                 if (barWindow) barWindow.fastPollerLoaded = true;
             }
+        }
+    }
+
+    // Vortex: en Hyprland el aviso de cambio de distribución («activelayout») llega por
+    // el socket de eventos que Quickshell ya tiene abierto, así no queda residente
+    // kb_wait.sh (bash + socat + grep) esperándolo. Los demás compositores siguen igual.
+    readonly property bool hyprEvents: !root.isNiri && !root.isSway && !root.isMango
+        && Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
+
+    Connections {
+        target: (root.hyprEvents && !root.isPreview) ? Hyprland : null
+        function onRawEvent(event) {
+            if (event.name !== "activelayout") return;
+            if (module && !module.moduleActive) return;
+            kbLayoutDelay.restart();
+        }
+    }
+
+    Timer {
+        id: kbLayoutDelay
+        // Vortex: los mismos 50 ms que esperaba kb_wait.sh antes de volver a leer
+        interval: 50
+        repeat: false
+        onTriggered: {
+            kbPoller.running = false;
+            if (!root.isPreview && (!module || module.moduleActive) && !root.isNiri) kbPoller.running = true;
         }
     }
 

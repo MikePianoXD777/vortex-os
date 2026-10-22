@@ -151,7 +151,10 @@ PanelWindow {
     Process {
         id: clipWatcher
         running: true
-        command: ["sh", "-c", "wl-paste --watch echo 1 & w=$!; trap 'kill $w 2>/dev/null' EXIT TERM; while kill -0 $PPID 2>/dev/null && kill -0 $w 2>/dev/null; do sleep 1; done"]
+        // Vortex: wl-paste directo, con setpriv --pdeathsig para que muera si el shell
+        // muere de golpe. Antes un sh lo cuidaba con un bucle «sleep 1» (un proceso
+        // residente más y un fork por segundo para siempre).
+        command: ["setpriv", "--pdeathsig", "TERM", "wl-paste", "--watch", "echo", "1"]
         stdout: SplitParser {
             onRead: (data) => {
                 if (clipboardWindow.isVisible) {

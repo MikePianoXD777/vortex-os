@@ -79,35 +79,37 @@ Item {
         }
     }
 
+    // Vortex: la carpeta de grabación se vigila con FileView (inotify dentro del shell)
+    // en vez de un «inotifywait -m» residente. checkRecording() solo lee rec_pid y
+    // rec_start_epoch, que screenshot.sh crea al empezar y borra al terminar; FileView
+    // avisa cuando se crean, cambian o se borran (vigila también la carpeta).
+    readonly property bool recWatchWanted: !root.isCleaningUp && (!module || module.moduleActive) && root.recCacheDir !== ""
+    property bool recDirReady: false
+
+    // La carpeta tiene que existir para poder vigilarla (antes lo hacía el mkdir del watcher)
     Process {
-        id: recWatcher
-        running: !root.isCleaningUp && (!module || module.moduleActive) && root.recCacheDir !== ""
-        command: root.recCacheDir ? [
-            "bash", "-c",
-            "mkdir -p '" + root.recCacheDir + "' && exec inotifywait -m -e create,delete,modify,moved_to,moved_from '" + root.recCacheDir + "' 2>/dev/null"
-        ] : []
-        stdout: SplitParser {
-            onRead: data => {
-                root.checkRecording();
-            }
-        }
+        id: recDirMaker
+        running: root.recWatchWanted && !root.recDirReady
+        command: root.recCacheDir ? ["mkdir", "-p", root.recCacheDir] : []
         onExited: (exitCode, exitStatus) => {
-            if (exitCode === 127 || root.isCleaningUp) return;
-            if ((!module || module.moduleActive) && root.recCacheDir !== "") {
-                recWatcherRestartTimer.restart();
-            }
+            if (exitCode === 0) root.recDirReady = true;
         }
     }
 
-    Timer {
-        id: recWatcherRestartTimer
-        interval: 1000
-        repeat: false
-        onTriggered: {
-            if (!root.isCleaningUp && (!module || module.moduleActive) && root.recCacheDir !== "" && !recWatcher.running) {
-                recWatcher.running = true;
-            }
-        }
+    FileView {
+        printErrors: false
+        preload: false
+        watchChanges: true
+        path: (root.recWatchWanted && root.recDirReady) ? root.recCacheDir + "/rec_pid" : ""
+        onFileChanged: root.checkRecording()
+    }
+
+    FileView {
+        printErrors: false
+        preload: false
+        watchChanges: true
+        path: (root.recWatchWanted && root.recDirReady) ? root.recCacheDir + "/rec_start_epoch" : ""
+        onFileChanged: root.checkRecording()
     }
 
     Timer {
@@ -238,8 +240,7 @@ Item {
 
     Component.onDestruction: {
         root.isCleaningUp = true;
-        recWatcherRestartTimer.stop();
-        recWatcher.running = false;
+        recDirMaker.running = false;
         recCheckProc.running = false;
     }
 }

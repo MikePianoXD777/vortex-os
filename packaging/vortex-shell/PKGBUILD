@@ -19,7 +19,7 @@ depends=(
     'wl-clipboard' 'cliphist' 'grim' 'satty' 'zbar' 'brightnessctl' 'ddcutil' 'iw'
     'networkmanager' 'bluez' 'bluez-utils' 'libnotify'
     'pipewire' 'pipewire-pulse' 'pipewire-alsa' 'wireplumber' 'libpulse' 'pavucontrol' 'alsa-utils'
-    'lm_sensors' 'python' 'python-jeepney' 'psmisc' 'pciutils'
+    'lm_sensors' 'python' 'python-jeepney' 'psmisc' 'pciutils' 'util-linux'
     'gpu-screen-recorder' 'wf-recorder' 'power-profiles-daemon' 'pambase'
     'adwaita-icon-theme' 'kitty' 'playerctl'
 )
