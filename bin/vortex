@@ -96,6 +96,12 @@ cmd_modo_juego() {
         fi
         powerprofilesctl set performance 2>/dev/null || true
       fi
+      # Vortex: pausa el fondo animado (video) en todos los monitores mientras juegas:
+      # así no decodifica video detrás del juego. Con un fondo fijo no hace nada.
+      # La marca .fondo dice que lo pausó Vortex: solo entonces «off» lo reanuda.
+      if shell_ipc wallpaper setPlayback all pause >/dev/null 2>&1; then
+        touch "$marca.fondo"
+      fi
       touch "$marca"
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
@@ -107,7 +113,11 @@ cmd_modo_juego() {
         anterior="$(cat "$marca.anterior")"
         [[ -n "$anterior" ]] && { powerprofilesctl set "$anterior" 2>/dev/null || true; }
       fi
-      rm -f "$marca" "$marca.anterior"
+      # Vortex: el fondo animado vuelve a correr (solo si lo pausó «on»).
+      if [[ -f "$marca.fondo" ]]; then
+        shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
+      fi
+      rm -f "$marca" "$marca.anterior" "$marca.fondo"
       notificar -t 2000 "Modo juego desactivado"
       ;;
     alternar)
@@ -149,23 +159,55 @@ cmd_claude() {
 # sistema la memoria que no usa. Java 27 ya trae las cabeceras de objeto compactas.
 JAVA_JUEGOS="-XX:+UseZGC -XX:+DisableExplicitGC -XX:+PerfDisableSharedMem -XX:+UseTransparentHugePages"
 
+# Vortex: heap máximo (-Xmx) según la RAM, en GB. Sin -Xmx la JVM toma 1/4 de la RAM
+# (8 GB en 32 GB, 21 GB en 84 GB): ZGC deja crecer el heap hasta ahí y se come RAM que
+# el resto del sistema necesita. Minecraft normal va sobrado con 2–4 GB y los modpacks
+# grandes con 6; además, fuera del heap el juego usa ~1–2 GB más (LWJGL, Metaspace,
+# código compilado), así que se deja al menos la mitad de la RAM al sistema y la GPU.
+# Tampoco se baja de 2 GB: con el heap justo, ZGC no termina a tiempo de recolectar y
+# el juego espera a que haya memoria («allocation stall»), que es justo un tirón.
+#   < 7 GB → 2 GB   < 11 GB → 3 GB   < 22 GB → 4 GB   desde 22 GB → 6 GB
+# Se cambia con VORTEX_JAVA_XMX (en GB), p. ej. para un modpack enorme:
+#   VORTEX_JAVA_XMX=8 vortex java aplicar
+java_xmx_gb() {
+  if [[ -n "${VORTEX_JAVA_XMX:-}" ]]; then
+    [[ "$VORTEX_JAVA_XMX" =~ ^[1-9][0-9]*$ ]] || { aviso "VORTEX_JAVA_XMX debe ser un número de GB (p. ej. 6)"; exit 1; }
+    echo "$VORTEX_JAVA_XMX"; return
+  fi
+  local mb
+  mb=$(($(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1024))
+  if ((mb < 7000)); then echo 2
+  elif ((mb < 11000)); then echo 3
+  elif ((mb < 22000)); then echo 4
+  else echo 6
+  fi
+}
+
 cmd_java() {
   case "${1:-}" in
     "")
+      local xmx
+      xmx="$(java_xmx_gb)"
       echo "Java: $(java -version 2>&1 | head -n1)"
-      echo "Argumentos para jugar: $JAVA_JUEGOS"
+      echo "Memoria sugerida para tu RAM: -Xmx${xmx}G (cámbiala con VORTEX_JAVA_XMX=<GB>)"
+      echo "Argumentos para jugar: -Xmx${xmx}G $JAVA_JUEGOS"
       echo "Aplícalos a tus launchers de Minecraft con: vortex java aplicar"
       ;;
     aplicar)
-      local hecho=0 f
+      local hecho=0 f xmx args
+      xmx="$(java_xmx_gb)"
+      # Vortex: los launchers que guardan -Xmx dentro de los argumentos (oficial,
+      # TLauncher) lo pierden al reemplazarlos: va incluido. Si el launcher pone su
+      # propio -Xmx después, gana el suyo (la JVM usa el último); nada se rompe.
+      args="-Xmx${xmx}G $JAVA_JUEGOS"
       # TLauncher
       f="$HOME/.tlauncher/tlauncher-2.0.properties"
       if [[ -f "$f" ]]; then
         cp -a "$f" "$f.antes-de-vortex"
         if grep -q '^minecraft.javaargs=' "$f"; then
-          sed -i "s|^minecraft.javaargs=.*|minecraft.javaargs=$JAVA_JUEGOS|" "$f"
+          sed -i "s|^minecraft.javaargs=.*|minecraft.javaargs=$args|" "$f"
         else
-          printf 'minecraft.javaargs=%s\n' "$JAVA_JUEGOS" >>"$f"
+          printf 'minecraft.javaargs=%s\n' "$args" >>"$f"
         fi
         echo "TLauncher: listo (respaldo en ${f##*/}.antes-de-vortex)"; hecho=1
       fi
@@ -173,7 +215,7 @@ cmd_java() {
       f="$HOME/.minecraft/launcher_profiles.json"
       if [[ -f "$f" ]] && jq -e '.profiles' "$f" >/dev/null 2>&1; then
         cp -a "$f" "$f.antes-de-vortex"
-        jq --arg a "$JAVA_JUEGOS" '.profiles |= map_values(.javaArgs = $a)' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
+        jq --arg a "$args" '.profiles |= map_values(.javaArgs = $a)' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
         echo "Launcher oficial: listo (respaldo en ${f##*/}.antes-de-vortex)"; hecho=1
       fi
       # Prism Launcher
@@ -184,6 +226,18 @@ cmd_java() {
           sed -i "s|^JvmArgs=.*|JvmArgs=$JAVA_JUEGOS|" "$f"
         else
           printf 'JvmArgs=%s\n' "$JAVA_JUEGOS" >>"$f"
+        fi
+        # Vortex: Prism pasa su propio -Xmx desde MaxMemAlloc (en MB): se ajusta ahí.
+        if grep -q '^MaxMemAlloc=' "$f"; then
+          sed -i "s|^MaxMemAlloc=.*|MaxMemAlloc=$((xmx * 1024))|" "$f"
+        else
+          printf 'MaxMemAlloc=%s\n' "$((xmx * 1024))" >>"$f"
+        fi
+        # Un mínimo mayor que el nuevo máximo haría fallar el arranque de la JVM.
+        local minimo
+        minimo="$(sed -n 's/^MinMemAlloc=//p' "$f" | head -n1)"
+        if [[ "$minimo" =~ ^[0-9]+$ ]] && ((minimo > xmx * 1024)); then
+          sed -i "s|^MinMemAlloc=.*|MinMemAlloc=512|" "$f"
         fi
         echo "Prism Launcher: listo (respaldo en ${f##*/}.antes-de-vortex)"; hecho=1
       fi
