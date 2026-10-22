@@ -32,7 +32,11 @@ Item {
     readonly property string hoursText: Qt.formatDateTime(root.currentTime, root.hourFmt)
     readonly property string minutesText: Qt.formatDateTime(root.currentTime, "mm")
     readonly property string meridiemText: root.is12h ? Qt.formatDateTime(root.currentTime, "AP") : ""
-    readonly property string dateText: Qt.formatDateTime(root.currentTime, "dddd, d MMMM").toUpperCase()
+    // Vortex: la fecha en el idioma del shell (Qt.formatDateTime siempre sale en inglés).
+    // En español y portugués va con «de»: «JUEVES, 22 DE OCTUBRE».
+    readonly property string dateLang: (typeof I18n !== "undefined" && I18n.currentLang) ? I18n.currentLang : "en"
+    readonly property string dateText: root.currentTime.toLocaleDateString(Qt.locale(root.dateLang),
+        (root.dateLang.indexOf("es") === 0 || root.dateLang.indexOf("pt") === 0) ? "dddd, d 'de' MMMM" : "dddd, d MMMM").toUpperCase()
 
     Connections {
         target: typeof DateTime !== "undefined" ? DateTime : null
