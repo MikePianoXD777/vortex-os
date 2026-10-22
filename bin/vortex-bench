@@ -31,7 +31,8 @@ ESCRITORIO = {
 
 # Qué es mejor en cada medida: "menos" o "mas".
 MEDIDAS = {
-    "ram_usada_mb": ("RAM usada en reposo", "MB", "menos"),
+    "ram_usada_mb": ("RAM usada en reposo (total − disponible)", "MB", "menos"),
+    "ram_ocupada_mb": ("RAM ocupada en reposo (como htop)", "MB", "menos"),
     "ram_escritorio_mb": ("RAM del escritorio", "MB", "menos"),
     "ram_sesion_mb": ("RAM de toda la sesión del usuario", "MB", "menos"),
     "procesos": ("Procesos", "", "menos"),
@@ -196,6 +197,13 @@ def medir() -> dict:
         "escritorio": os.environ.get("XDG_CURRENT_DESKTOP", "?"),
         "ram_total_mb": round(mem["MemTotal"] / 1024),
         "ram_usada_mb": round((mem["MemTotal"] - mem["MemAvailable"]) / 1024),
+        # Vortex: «disponible» descuenta el colchón libre que el kernel reserva (las marcas
+        # de agua, más altas con vm.watermark_scale_factor): esa memoria no la usa nadie.
+        # «Ocupada» es lo que muestra htop: total − libre − búferes − caché recuperable
+        # (la memoria compartida, Shmem, cuenta como ocupada).
+        "ram_ocupada_mb": round((mem["MemTotal"] - mem["MemFree"] - mem.get("Buffers", 0)
+                                 - (mem.get("Cached", 0) - mem.get("Shmem", 0))
+                                 - mem.get("SReclaimable", 0)) / 1024),
         "ram_escritorio_mb": escritorio,
         "ram_sesion_mb": sesion,
         "ram_sesion_detalle": sesion_detalle,
@@ -216,7 +224,7 @@ def mostrar(d: dict) -> None:
     for clave, (nombre, unidad, _) in MEDIDAS.items():
         valor = d.get(clave)
         texto = "?" if valor is None else f"{valor} {unidad}".strip()
-        print(f"  {nombre:<32} {texto}")
+        print(f"  {nombre:<42} {texto}")
     if d.get("firmware_loader_s") is not None:
         print(f"  {'(firmware+gestor, ajenos)':<32} {d['firmware_loader_s']} s")
     if d["ram_escritorio_detalle"]:
@@ -228,7 +236,7 @@ def mostrar(d: dict) -> None:
 def comparar(a: dict, b: dict) -> None:
     print(f"A: {a['distro']} ({a['fecha']})")
     print(f"B: {b['distro']} ({b['fecha']})\n")
-    print(f"  {'':<32} {'A':>10} {'B':>10}   B frente a A")
+    print(f"  {'':<42} {'A':>10} {'B':>10}   B frente a A")
     for clave, (nombre, unidad, mejor) in MEDIDAS.items():
         va, vb = a.get(clave), b.get(clave)
         if va is None or vb is None:
@@ -241,7 +249,7 @@ def comparar(a: dict, b: dict) -> None:
         else:
             veces = vb / va
             veredicto = f"{veces:.2f}x {'mejor' if veces >= 1 else 'peor'}"
-        print(f"  {nombre:<32} {va:>10} {vb:>10}   {veredicto}")
+        print(f"  {nombre:<42} {va:>10} {vb:>10}   {veredicto}")
 
 
 def main() -> int:
