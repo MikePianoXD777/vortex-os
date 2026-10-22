@@ -48,6 +48,19 @@ CONFIG_PATH = os.environ.get("QS_SETTINGS", os.path.expanduser("~/.config/serpan
 
 SYSTEM_STATES = {"Desktop", "Locked", "Quickshell", "Unknown"}
 
+# Vortex: los avisos de límite en el idioma del shell (antes siempre en inglés).
+def wellbeing_texts():
+    lang = "en"
+    try:
+        with open(CONFIG_PATH) as f:
+            lang = (json.load(f).get("general", {}) or {}).get("language", "en") or "en"
+    except Exception:
+        pass
+    if str(lang).startswith("es"):
+        return ("Bienestar digital", "¡Llegaste al límite diario total!", "{app}: llegaste a su límite diario")
+    return ("Digital Wellbeing", "Overall daily limit reached!", "{app} daily limit reached!")
+
+
 def detect_compositor():
     if os.environ.get("MANGO_INSTANCE_SIGNATURE"):
         return "mango"
@@ -612,7 +625,8 @@ def main():
             if tracker.cached_json:
                 total_seconds = tracker.cached_json.get("total", 0)
                 if overall_limit > 0 and total_seconds >= overall_limit and not notified_overall:
-                    subprocess.Popen(["notify-send", "-u", "critical", "Digital Wellbeing", "Overall daily limit reached!"])
+                    titulo, total_msg, _ = wellbeing_texts()
+                    subprocess.Popen(["notify-send", "-u", "critical", titulo, total_msg])
                     notified_overall = True
 
                 app_seconds = 0
@@ -623,7 +637,8 @@ def main():
                 
                 app_limit = app_limits.get(current_app_class, 0)
                 if app_limit > 0 and app_seconds >= app_limit and current_app_class not in notified_apps:
-                    subprocess.Popen(["notify-send", "-u", "critical", "Digital Wellbeing", f"{current_app_title} daily limit reached!"])
+                    titulo, _, app_msg = wellbeing_texts()
+                    subprocess.Popen(["notify-send", "-u", "critical", titulo, app_msg.format(app=current_app_title)])
                     notified_apps.add(current_app_class)
         else:
             tracker.fast_tick(current_app_class, current_app_title, secs=0, write_to_disk=(tick_counter % 5 == 0))

@@ -219,7 +219,7 @@ Item {
                     anchors.topMargin: Math.max(1, root.dynSpacing * 0.2)
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    text: root.isMediaActive ? (MprisController.trackArtist || "Unknown Artist") : ""
+                    text: root.isMediaActive ? (MprisController.trackArtist || I18n.t("music.unknown_artist") || "Unknown Artist") /* Vortex: traducido */ : ""
                     font.family: ThemeBackend.fontFamily
                     font.weight: Font.Medium
                     font.pixelSize: root.subSize
