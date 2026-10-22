@@ -381,10 +381,12 @@ terminar_juego() {
     timeout 20 "$VORTEX" modo-juego off >/dev/null 2>&1
   fi
   MODO_PROPIO=0
-  if ((FONDO_PAUSADO)); then
+  # Si el modo juego sigue puesto (lo puso otro, p. ej. Super+G), el fondo sigue en pausa:
+  # «vortex modo-juego off» lo reanuda cuando se quite.
+  if ((FONDO_PAUSADO)) && ! modo_juego_activo; then
     fondo play
-    FONDO_PAUSADO=0
   fi
+  FONDO_PAUSADO=0
 }
 
 agregar_juego() {

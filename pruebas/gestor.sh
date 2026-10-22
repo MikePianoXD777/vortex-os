@@ -298,8 +298,10 @@ activa 8001 fff6 steam_app_1
 evento "openwindow>>fff6,1,steam_app_1,Juego" "activewindowv2>>fff6"
 esperar "[[ \$(grep -c 'setPlayback all pause' '$T/qs.log') == 2 ]]"
 evento "closewindow>>fff6"
-esperar "[[ \$(grep -c 'setPlayback all play' '$T/qs.log') == 2 ]]"
+esperar "grep -q '^juegos=0' '$EST'"
 probar "modo juego ajeno: ni on ni off" "[[ \$(grep -c 'modo-juego' '$T/vortex.log') == 2 && -e '$T/estado/vortex/modo-juego' ]]"
+# Sigue puesto: el fondo queda en pausa hasta que quien lo puso lo quite.
+probar "modo juego ajeno: el fondo sigue en pausa" "[[ \$(grep -c 'setPlayback all play' '$T/qs.log') == 1 ]]"
 rm -f "$T/estado/vortex/modo-juego"
 
 # Juego por contentType (sin clase conocida).
