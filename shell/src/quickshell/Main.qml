@@ -352,6 +352,109 @@ PanelWindow {
 
     onCurrentActiveChanged: {
         reportWidgetState();
+        let prev = masterWindow._previousActive;
+        masterWindow._previousActive = currentActive;
+        if (masterWindow.releasableWidgets.indexOf(prev) !== -1 && prev !== currentActive) {
+            masterWindow.widgetHiddenSince[prev] = Date.now();
+            masterWindow.scheduleWidgetRelease();
+        }
+    }
+
+    // Vortex (R2b): Ajustes y el selector de fondos son los paneles más pesados (Ajustes
+    // carga ~17 pestañas para la búsqueda). Se crean al abrirlos (R2) y, si siguen
+    // cerrados un minuto después, se destruyen para devolver la memoria. Al reabrirlos
+    // se vuelven a crear desde el componente ya compilado (componentCache).
+    readonly property var releasableWidgets: ["guide", "wallpaper"]
+    readonly property int widgetReleaseDelay: 60000
+    property string _previousActive: "hidden"
+    property var widgetHiddenSince: ({})
+
+    function scheduleWidgetRelease() {
+        let now = Date.now();
+        let wait = -1;
+        for (let i = 0; i < releasableWidgets.length; i++) {
+            let name = releasableWidgets[i];
+            if (!widgetCache[name] || name === currentActive || name === targetActive) continue;
+            let since = widgetHiddenSince[name] !== undefined ? widgetHiddenSince[name] : now;
+            let left = Math.max(1000, since + widgetReleaseDelay - now);
+            if (wait < 0 || left < wait) wait = left;
+        }
+        if (wait < 0) {
+            widgetReleaseTimer.stop();
+            return;
+        }
+        widgetReleaseTimer.interval = wait;
+        widgetReleaseTimer.restart();
+    }
+
+    // Un Process en marcha (descargar un fondo, instalar una fuente…) se mataría al
+    // destruir el panel y su resultado se perdería: en ese caso se espera otra vuelta.
+    function hasRunningProcess(obj) {
+        if (!obj) return false;
+        if (obj.running === true && obj.command !== undefined && obj.processId !== undefined) return true;
+        let kids = obj.data;
+        if (!kids) return false;
+        for (let i = 0; i < kids.length; i++) {
+            if (hasRunningProcess(kids[i])) return true;
+        }
+        return false;
+    }
+
+    function releaseIdleWidgets() {
+        let now = Date.now();
+        let released = false;
+        for (let i = 0; i < releasableWidgets.length; i++) {
+            let name = releasableWidgets[i];
+            let item = widgetCache[name];
+            if (!item || name === currentActive || name === targetActive) continue;
+            let since = widgetHiddenSince[name] !== undefined ? widgetHiddenSince[name] : now;
+            if (now - since < widgetReleaseDelay - 500) continue;
+            if (widgetStack.currentItem === item && (masterWindow.isVisible || masterWindow.isClosing)) continue;
+            if (hasRunningProcess(item)) {
+                widgetHiddenSince[name] = now;
+                continue;
+            }
+            if (widgetStack.currentItem === item) widgetStack.clear(StackView.Immediate);
+            delete widgetCache[name];
+            delete widgetHiddenSince[name];
+            item.visible = false;
+            item.destroy();
+            released = true;
+        }
+        if (released) {
+            widgetGcTimer.pass = 0;
+            widgetGcTimer.interval = 2000;
+            widgetGcTimer.restart();
+        }
+        scheduleWidgetRelease();
+    }
+
+    Timer {
+        id: widgetReleaseTimer
+        repeat: false
+        onTriggered: masterWindow.releaseIdleWidgets()
+    }
+
+    // destroy() borra los objetos al volver al bucle de eventos; luego se pide al GC de
+    // JavaScript que recoja lo que dejaron, para que la memoria se devuelva de verdad.
+    // Vortex: dos pasadas (a los 2 s y a los 12 s): la primera suelta los envoltorios JS
+    // y eso libera objetos que solo una segunda pasada alcanza a recoger.
+    Timer {
+        id: widgetGcTimer
+        interval: 2000
+        repeat: false
+        property int pass: 0
+        onTriggered: {
+            gc();
+            if (pass === 0) {
+                pass = 1;
+                interval = 10000;
+                restart();
+            } else {
+                pass = 0;
+                interval = 2000;
+            }
+        }
     }
 
     onScreenChanged: {

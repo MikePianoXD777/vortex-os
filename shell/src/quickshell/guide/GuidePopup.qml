@@ -496,16 +496,21 @@ Item {
     }
 
     function openSearch() {
+        // Vortex: Ajustes ya no se precarga al arrancar (R2), así que al buscar enseguida
+        // podían faltar pestañas en el índice. Se cargan aquí las que falten, de una vez,
+        // para que la primera búsqueda salga completa.
+        if (searchLoadCursor < totalTabSlots) {
+            searchLoadTimer.stop();
+            while (searchLoadCursor < totalTabSlots) {
+                requestLoad(searchLoadCursor++);
+            }
+        }
         searchRebuildTimer.stop();
         rebuildSearchIndex();
         searchClearTimer.stop();
         searchActive = true;
         searchSelectedIndex = -1;
         searchFocusTimer.restart();
-        if (searchLoadCursor < totalTabSlots && !searchLoadTimer.running) {
-            searchLoadTimer.interval = 280;
-            searchLoadTimer.restart();
-        }
     }
 
     function closeSearch() {
