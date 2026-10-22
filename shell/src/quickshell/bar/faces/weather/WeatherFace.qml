@@ -66,7 +66,9 @@ Item {
                 width: root.isVertical ? (barWindow ? barWindow.cs(root.isCompact ? 18 : 20) : (root.isCompact ? 18 : 20)) : (barWindow ? barWindow.cs(root.isCompact ? 20 : 22) : (root.isCompact ? 20 : 22))
                 height: width
                 accentColor: ThemeBackend.mauve
-                running: root.isWeatherLoading
+                // Vortex: con el módulo de clima fuera de la barra la cara sigue creada
+                // (invisible); su animación no debe seguir pidiendo cuadros.
+                running: root.isWeatherLoading && (!module || module.moduleActive)
                 visible: root.isWeatherLoading
             }
 

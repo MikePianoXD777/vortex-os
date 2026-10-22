@@ -43,6 +43,16 @@ Item {
     property bool isLoading: false
     property bool isReady: false
     property bool _forceFetchMode: false
+    // Vortex: la consulta en curso se reemplazó por otra (su salida no cuenta como fallo)
+    property bool _fetchReplaced: false
+
+    // Vortex: si una consulta termina sin datos válidos (script que falla, sin red y sin
+    // caché) o en 20 s no llegó nada, el clima queda «listo» con los valores vacíos
+    // («--°», sin icono), igual que con los datos de «sin conexión» de weather.sh. Así el
+    // icono de carga de la barra no gira para siempre repintando a la tasa del monitor.
+    function markReadyWithoutData() {
+        if (!root.isReady) root.isReady = true;
+    }
 
     property string _lastLocationFingerprint: ""
     property string _lastUnit: ""
@@ -108,6 +118,7 @@ Item {
         if (shouldShowLoader) {
             root.isLoading = true;
         }
+        root._fetchReplaced = fetchProcess.running;
         fetchProcess.running = false;
         fetchProcess.running = true;
     }
@@ -205,7 +216,19 @@ Item {
         onExited: {
             root.isLoading = false;
             root._forceFetchMode = false;
+            // Vortex: la salida del proceso reemplazado no cuenta; la de la consulta real sí
+            if (root._fetchReplaced) root._fetchReplaced = false;
+            else root.markReadyWithoutData();
         }
+    }
+
+    Timer {
+        id: readyFallbackTimer
+        // Vortex: tope de espera para la primera carga (ver markReadyWithoutData)
+        interval: 20000
+        running: !root.isReady
+        repeat: false
+        onTriggered: root.markReadyWithoutData()
     }
 
     FileView {
