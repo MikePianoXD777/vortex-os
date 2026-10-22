@@ -1,0 +1,37 @@
+# Apps de Flatpak que se eligen en el instalador gráfico. Cada paquete solo deja una línea
+# «REMOTO ID» en /etc/vortex/flatpaks.d/; vortex-flatpaks.service las instala al arrancar
+# con red (así la instalación no depende de internet). Quitar el paquete no borra la app:
+# para eso, «flatpak uninstall ID».
+pkgbase=vortex-flatpaks
+pkgname=(vortex-flatpak-sober vortex-flatpak-zoom vortex-flatpak-aagl vortex-flatpak-heroic vortex-flatpak-spotify)
+pkgver=1
+pkgrel=1
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+depends=('flatpak')
+
+_lista() {
+  install -Dm644 /dev/stdin "$pkgdir/etc/vortex/flatpaks.d/$1.list" <<<"$2 $3"
+}
+
+package_vortex-flatpak-sober() {
+  pkgdesc='Sober: Roblox en Linux (Flatpak, se instala al arrancar con red)'
+  _lista sober flathub org.vinegarhq.Sober
+}
+package_vortex-flatpak-zoom() {
+  pkgdesc='Zoom: videollamadas (Flatpak, se instala al arrancar con red)'
+  _lista zoom flathub us.zoom.Zoom
+}
+package_vortex-flatpak-aagl() {
+  pkgdesc='An Anime Game Launcher: lanzador de Genshin Impact (Flatpak, se instala al arrancar con red)'
+  _lista aagl flathub moe.launcher.an-anime-game-launcher
+}
+package_vortex-flatpak-heroic() {
+  pkgdesc='Heroic: juegos de Epic Games y GOG (Flatpak, se instala al arrancar con red)'
+  _lista heroic flathub com.heroicgameslauncher.hgl
+}
+package_vortex-flatpak-spotify() {
+  pkgdesc='Spotify: música (Flatpak, se instala al arrancar con red)'
+  _lista spotify flathub com.spotify.Client
+}

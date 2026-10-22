@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# vortex-flatpaks: instala las apps Flatpak que se eligieron en el instalador (Sober, Zoom,
+# An Anime Game Launcher...; todas de Flathub). Cada app es un paquete chico «vortex-flatpak-<app>» que deja una
+# línea «REMOTO ID» en /etc/vortex/flatpaks.d/<app>.list; este programa (servicio
+# vortex-flatpaks.service, al arrancar con red) instala las que falten para todo el sistema.
+# Sin red no hace nada y lo vuelve a intentar en el próximo arranque.
+set -uo pipefail
+shopt -s nullglob
+
+LISTAS="${VORTEX_FLATPAKS_D:-/etc/vortex/flatpaks.d}"
+log() { printf 'vortex-flatpaks: %s\n' "$*"; }
+
+# Remotos conocidos: nombre → URL del .flatpakrepo.
+declare -A REMOTOS=(
+  [flathub]="https://dl.flathub.org/repo/flathub.flatpakrepo"
+)
+
+command -v flatpak >/dev/null || { log "flatpak no está instalado"; exit 0; }
+
+pendientes=() remotos_usados=()
+for lista in "$LISTAS"/*.list; do
+  while read -r remoto id _; do
+    [[ -z "${remoto:-}" || "$remoto" == \#* ]] && continue
+    if flatpak info --system "$id" >/dev/null 2>&1; then continue; fi
+    pendientes+=("$remoto $id")
+    remotos_usados+=("$remoto")
+  done <"$lista"
+done
+((${#pendientes[@]})) || exit 0
+
+for remoto in $(printf '%s\n' "${remotos_usados[@]}" | sort -u); do
+  url="${REMOTOS[$remoto]:-}"
+  [[ -n "$url" ]] || { log "remoto desconocido: $remoto"; continue; }
+  flatpak remote-add --system --if-not-exists "$remoto" "$url" || { log "sin red o sin $remoto: se reintenta al próximo arranque"; exit 0; }
+done
+
+for p in "${pendientes[@]}"; do
+  read -r remoto id <<<"$p"
+  log "instalando $id ($remoto)"
+  if ! flatpak install --system --noninteractive -y "$remoto" "$id"; then
+    log "no se pudo instalar $id: se reintenta al próximo arranque"
+  fi
+done
+exit 0

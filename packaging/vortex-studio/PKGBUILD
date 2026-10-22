@@ -1,0 +1,29 @@
+# Vortex Studio (editor de video de la Vortex Suite) para todo el sistema, desde su release
+# de GitHub. Lo elige el instalador gráfico de la ISO; también sirve con «makepkg -si».
+pkgname=vortex-studio
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Editor de video no lineal de la Vortex Suite'
+arch=('x86_64')
+url='https://github.com/MikePianoXD777/vortex-studio'
+license=('MIT')
+depends=('glibc' 'hicolor-icon-theme')
+options=('!strip' '!debug')
+source=("https://github.com/MikePianoXD777/vortex-studio/releases/download/v${pkgver}/VortexStudio-${pkgver}-linux-x86_64.tar.gz")
+sha256sums=('af441eb4d886b1d4f287b759d85ec832dd5e7c3a27f229c7bf9fedb60563b145')
+
+package() {
+  local raiz="$srcdir/VortexStudio-${pkgver}-linux-x86_64"
+  install -d "$pkgdir/opt"
+  cp -a "$raiz/vortex-studio" "$pkgdir/opt/vortex-studio"
+  install -d "$pkgdir/usr/bin"
+  ln -s /opt/vortex-studio/vortex-studio "$pkgdir/usr/bin/vortex-studio"
+  sed 's|@EXEC@|/usr/bin/vortex-studio|g' "$raiz/vortex-studio.desktop" \
+    | install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/vortex-studio.desktop"
+  local png tam
+  for png in "$raiz"/iconos/vortex-studio-*.png; do
+    tam="${png##*-}"; tam="${tam%.png}"
+    install -Dm644 "$png" "$pkgdir/usr/share/icons/hicolor/${tam}x${tam}/apps/vortex-studio.png"
+  done
+  install -Dm644 "$raiz/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
