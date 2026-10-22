@@ -932,7 +932,9 @@ Item {
         interval: 350
         repeat: false
         onTriggered: {
-            Quickshell.execDetached(["bash", "-c", "echo '" + root.currentTab + ":" + root.currentSubTab + "' > '" + Caching.getCacheDir("guide") + "/last_tab.txt'"]);
+            // Vortex: se escribe directo, sin lanzar «bash -c echo» (un doble fork del shell
+            // entero) en cada cambio de pestaña.
+            lastTabWatcher.setText(root.currentTab + ":" + root.currentSubTab + "\n");
         }
     }
 
