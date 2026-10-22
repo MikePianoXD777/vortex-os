@@ -50,16 +50,24 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("nautilus"))
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("serpantinum reload"))
-hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("serpantinum msg toggle clipboard"))
-hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("serpantinum msg toggle launcher"))
-hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("serpantinum msg toggle music"))
-hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("serpantinum msg toggle system"))
+-- Vortex: los paneles se abren con el evento «custom>>serpantinum:toggle NOMBRE», que
+-- Main.qml oye por el socket de eventos que Quickshell ya tiene abierto. Antes cada
+-- pulsación lanzaba «serpantinum msg» (bash, su config, qs_manager.sh, python y un
+-- cliente de quickshell: ~50 procesos y 50-75 ms antes de que el panel empezara a abrir).
+-- Los fondos siguen por «serpantinum msg»: ese camino prepara las miniaturas.
+local function panel(nombre)
+  return hl.dsp.event("serpantinum:toggle " .. nombre)
+end
+hl.bind(mainMod .. " + C", panel("clipboard"))
+hl.bind(mainMod .. " + D", panel("launcher"))
+hl.bind(mainMod .. " + M", panel("music"))
+hl.bind(mainMod .. " + B", panel("system"))
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("serpantinum msg toggle wallpaper"))
-hl.bind(mainMod .. " + S", hl.dsp.exec_cmd("serpantinum msg toggle calendar"))
-hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("serpantinum msg toggle network"))
-hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("serpantinum msg toggle volume"))
-hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("serpantinum msg toggle guide"))
-hl.bind(mainMod .. " + A", hl.dsp.exec_cmd("serpantinum msg toggle autohide"))
+hl.bind(mainMod .. " + S", panel("calendar"))
+hl.bind(mainMod .. " + N", panel("network"))
+hl.bind(mainMod .. " + V", panel("volume"))
+hl.bind(mainMod .. " + H", panel("guide"))
+hl.bind(mainMod .. " + A", panel("autohide"))
 
 -- Vortex: SUPER+número va directo a Hyprland. Antes «serpantinum msg workspace N»
 -- lanzaba en cada pulsación bash, qs_manager.sh, hyprctl y un cliente de quickshell

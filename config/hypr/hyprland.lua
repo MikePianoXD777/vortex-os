@@ -67,7 +67,7 @@ hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = t
 
 -- Atajos de Vortex.
 hl.bind("SUPER + A", hl.dsp.exec_cmd("vortex claude"))
-hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("serpantinum msg toggle autohide"))
+hl.bind("SUPER + SHIFT + A", hl.dsp.event("serpantinum:toggle autohide"))
 hl.bind("SUPER + G", hl.dsp.exec_cmd("vortex modo-juego alternar"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd("thunar"))
 

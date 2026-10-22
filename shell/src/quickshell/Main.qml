@@ -60,7 +60,16 @@ PanelWindow {
             widget: masterWindow.currentActive,
             screen: sName
         });
-        Quickshell.execDetached(["bash", "-c", "echo '" + payload + "' > " + Caching.runDir + "/current_widget"]);
+        // Vortex: se escribe directo, sin lanzar «bash -c echo» (un doble fork del shell
+        // entero) cada vez que se abre o se cierra un panel.
+        widgetStateFile.setText(payload + "\n");
+    }
+
+    FileView {
+        id: widgetStateFile
+        path: Caching.runDir ? Caching.runDir + "/current_widget" : ""
+        preload: false
+        printErrors: false
     }
 
     Process {
@@ -82,9 +91,44 @@ PanelWindow {
     Connections {
         target: Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")) ? Hyprland : null
         function onRawEvent(event) {
-            if (event.name === "custom" && event.data === "serpantinum:close") {
+            if (event.name !== "custom") return;
+            if (event.data === "serpantinum:close") {
                 mainIpc.handleCommand("close", "", "");
+            } else if (event.data.indexOf("serpantinum:toggle ") === 0) {
+                // Vortex: los atajos de los paneles (keybinds.lua) llegan aquí sin lanzar procesos
+                let target = event.data.substring(19).trim();
+                if (target === "" || target === "wallpaper") return;
+                mainIpc.handleCommand("toggle", target, "");
+                masterWindow.queueWidgetLaunchLog(target);
             }
+        }
+    }
+
+    // Vortex: lo mismo que log_widget_launch de qs_manager.sh (el lanzador ordena los
+    // paneles por uso), pero un momento después, para no competir con la animación.
+    property var pendingLaunchLogs: []
+
+    function queueWidgetLaunchLog(target) {
+        let names = [target];
+        let known = ["network", "volume", "guide", "calendar", "music", "notifications", "system"];
+        if (known.indexOf(target) !== -1 && typeof I18n !== "undefined") {
+            let shown = I18n.t("widgets." + target + ".name", "");
+            if (shown && shown !== target && shown.indexOf("widgets.") !== 0) names.push(shown);
+        }
+        masterWindow.pendingLaunchLogs = masterWindow.pendingLaunchLogs.concat(names);
+        launchLogTimer.restart();
+    }
+
+    Timer {
+        id: launchLogTimer
+        interval: 1500
+        repeat: false
+        onTriggered: {
+            let names = masterWindow.pendingLaunchLogs;
+            masterWindow.pendingLaunchLogs = [];
+            if (!Caching.qsDir || names.length === 0) return;
+            let args = ["python3", Caching.qsDir + "/launcher/app_rank.py", "--log-launch", "--name"];
+            for (let i = 0; i < names.length; i++) Quickshell.execDetached(args.concat([names[i]]));
         }
     }
 
