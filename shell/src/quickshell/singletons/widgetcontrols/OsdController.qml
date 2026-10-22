@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Bluetooth
 import Quickshell.Networking
 import Quickshell.Services.Pipewire
@@ -119,9 +120,36 @@ Item {
         }
     }
 
+    // Vortex: en Hyprland, Bloq Mayús y Bloq Num tienen un atajo que no consume la tecla
+    // (compositors/hyprland/config/keybinds.lua) y manda «custom>>serpantinum:locks» por el
+    // socket de eventos que Quickshell ya tiene abierto. Solo entonces se lee el estado
+    // (kb_locks.sh get). Antes quedaba residente un python (~9 MB) que, sin permiso para
+    // leer /dev/input, revisaba los LED 4 veces por segundo. Otros compositores, igual.
+    readonly property bool hyprLockEvents: Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
+    property bool kbFetchFromEvent: false
+
+    Connections {
+        target: controller.hyprLockEvents ? Hyprland : null
+        function onRawEvent(event) {
+            if (event.name === "custom" && event.data === "serpantinum:locks") kbLockDelay.restart();
+        }
+    }
+
+    Timer {
+        id: kbLockDelay
+        // El estado de la tecla cambia al soltarla en algunos teclados: se espera un poco
+        interval: 80
+        repeat: false
+        onTriggered: {
+            controller.kbFetchFromEvent = true;
+            kbFetcher.running = false;
+            kbFetcher.running = true;
+        }
+    }
+
     Process {
         id: kbWatcher
-        running: true
+        running: !controller.hyprLockEvents
         command: ["bash", Caching.qsDir + "/watchers/kb_locks.sh", "watch"]
         stdout: SplitParser {
             onRead: data => {
@@ -155,6 +183,17 @@ Item {
                 if (out.length >= 2) {
                     let caps = parseInt(out[0]);
                     let num = parseInt(out[1]);
+                    // Vortex: lectura pedida por el atajo de Hyprland: avisa lo que cambió
+                    let fromEvent = controller.kbFetchFromEvent && controller.kbInitialized;
+                    controller.kbFetchFromEvent = false;
+                    if (fromEvent && !isNaN(caps) && caps !== controller.lastCapsLock) {
+                        controller.lastCapsLock = caps;
+                        controller.show("capslock", caps === 1 ? "on" : "off");
+                    }
+                    if (fromEvent && !isNaN(num) && num !== controller.lastNumLock) {
+                        controller.lastNumLock = num;
+                        controller.show("numlock", num === 1 ? "on" : "off");
+                    }
                     if (!isNaN(caps)) controller.lastCapsLock = caps;
                     if (!isNaN(num)) controller.lastNumLock = num;
                     controller.kbInitialized = true;
