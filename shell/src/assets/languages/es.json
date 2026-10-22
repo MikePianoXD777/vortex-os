@@ -1752,6 +1752,9 @@
     "keep_clipboard_sub": "Si está desactivado — se restaura el portapapeles original"
   },
   "datetime": {
-    "full_date": "dddd, d 'de' MMMM"
+    "full_date": "dddd, d 'de' MMMM",
+    "yesterday": "Ayer",
+    "just_now": "Ahora",
+    "minutes_ago": "hace {n} min"
   }
 }

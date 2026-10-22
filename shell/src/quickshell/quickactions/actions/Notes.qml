@@ -7,6 +7,13 @@ import "../../reusables"
 import "../../"
 
 Item {
+
+    // Vortex: textos de tiempo en el idioma del shell (antes fijos en inglés)
+    function vortexTr(key, fallback, args) {
+        if (typeof I18n === "undefined" || !I18n.isReady) return fallback;
+        let t = I18n.t(key, args);
+        return t === key ? fallback : t;
+    }
     id: root
 
     property int requestedLayoutTemplate: 1
@@ -151,12 +158,12 @@ Item {
         }
 
         if (diffSec < 60) {
-            return "Just now";
+            return vortexTr("datetime.just_now", "Just now");
         }
 
         let diffMin = Math.floor(diffSec / 60);
         if (diffMin < 60) {
-            return diffMin + " min ago";
+            return vortexTr("datetime.minutes_ago", diffMin + " min ago", { "n": diffMin });
         }
 
         let isSameDay = now.getFullYear() === notifDate.getFullYear() &&
@@ -174,9 +181,10 @@ Item {
         if (isSameDay) {
             return timePart;
         } else if (isYesterday) {
-            return "Yesterday " + timePart;
+            return vortexTr("datetime.yesterday", "Yesterday") + " " + timePart;
         } else if (diffDays < 7) {
-            let dayName = Qt.formatDateTime(notifDate, "dddd");
+            // Vortex: el día en el idioma del shell (Qt.formatDateTime siempre sale en inglés)
+            let dayName = notifDate.toLocaleDateString(Qt.locale((typeof I18n !== "undefined" && I18n.currentLang) ? I18n.currentLang : "en"), "dddd");
             return dayName + " " + timePart;
         } else {
             return Qt.formatDateTime(notifDate, "yyyy-MM-dd ") + timePart;

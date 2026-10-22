@@ -301,7 +301,16 @@ Item {
     }
 
     property string effectiveIcon: root.showEthernet ? "󰈀" : root.wifiIcon
-    property string effectiveName: root.showEthernet ? root.ethStatus : ((root.isWifiOn ? (root.wifiSsid !== "" ? root.wifiSsid : "On") : "Off"))
+    // Vortex: «Connected»/«Disconnected» se muestran en el idioma del shell; ethStatus
+    // sigue en inglés porque se compara en otros sitios.
+    function ethStatusText(status) {
+        let key = status === "Connected" ? "network.status.connected"
+            : (status === "Disconnected" ? "network.status.disconnected" : "");
+        if (key === "" || typeof I18n === "undefined" || !I18n.isReady) return status;
+        let t = I18n.t(key);
+        return t === key ? status : t;
+    }
+    property string effectiveName: root.showEthernet ? root.ethStatusText(root.ethStatus) : ((root.isWifiOn ? (root.wifiSsid !== "" ? root.wifiSsid : "On") : "Off"))
     readonly property bool isActive: root.showEthernet ? (root.ethStatus === "Connected") : root.isWifiOn
 
     readonly property real pillLength: pillLoader.item ? (isVertical ? pillLoader.item.height : pillLoader.item.width) : 0
