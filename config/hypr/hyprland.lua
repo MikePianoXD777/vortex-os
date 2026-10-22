@@ -26,7 +26,10 @@ hl.on("hyprland.start", function()
     -- Avisos del shell que no son errores: Qt avisa que la app ya estaba registrada
     -- con el portal (el primer registro sí funcionó) y, sin adaptador Bluetooth, que
     -- no existe org.bluez. Se silencian solo esas categorías y solo para el shell.
-    local reglas = "qt.qpa.services.warning=false"
+    -- textinput: al cerrar un panel con un campo de texto, Qt avisa que desactiva la
+    -- entrada de texto de una superficie cuando el foco ya pasó a otra («disableSurface
+    -- … is focused»); es ruido del protocolo text-input-v3, la escritura funciona igual.
+    local reglas = "qt.qpa.services.warning=false;qt.qpa.wayland.textinput.warning=false"
     local bt = io.open("/sys/class/bluetooth/hci0/address")
     if bt then bt:close() else reglas = reglas .. ";quickshell.dbus.objectmanager.warning=false" end
     hl.exec_cmd("QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start")
