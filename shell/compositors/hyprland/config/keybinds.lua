@@ -61,9 +61,22 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("serpantinum msg toggle volume"))
 hl.bind(mainMod .. " + H", hl.dsp.exec_cmd("serpantinum msg toggle guide"))
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd("serpantinum msg toggle autohide"))
 
+-- Vortex: SUPER+número va directo a Hyprland. Antes «serpantinum msg workspace N»
+-- lanzaba en cada pulsación bash, qs_manager.sh, hyprctl y un cliente de quickshell
+-- (para cerrar los popups). Ahora el evento «custom>>serpantinum:close» le pide al
+-- shell que cierre sus popups (Main.qml), igual que hacía qs_manager.sh.
+local close_popups = hl.dsp.event("serpantinum:close")
 for i = 1, 10 do
   local ws = tostring(i)
   local key = tostring(i % 10)
-  hl.bind(mainMod .. " + " .. key, hl.dsp.exec_cmd("serpantinum msg workspace " .. ws))
-  hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.exec_cmd("serpantinum msg workspace " .. ws .. " move"))
+  local go_to = hl.dsp.focus({ workspace = ws })
+  local move_to = hl.dsp.window.move({ workspace = ws })
+  hl.bind(mainMod .. " + " .. key, function()
+    hl.dispatch(go_to)
+    hl.dispatch(close_popups)
+  end)
+  hl.bind(mainMod .. " + SHIFT + " .. key, function()
+    hl.dispatch(move_to)
+    hl.dispatch(close_popups)
+  end)
 end

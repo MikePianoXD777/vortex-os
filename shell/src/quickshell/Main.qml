@@ -76,7 +76,20 @@ PanelWindow {
         }
     }
 
+    // Vortex: SUPER+número cambia de escritorio directo en Hyprland y manda el evento
+    // «custom>>serpantinum:close» (compositors/hyprland/config/keybinds.lua). Aquí se
+    // cierran los popups igual que con «serpantinum msg close», sin lanzar procesos.
+    Connections {
+        target: Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")) ? Hyprland : null
+        function onRawEvent(event) {
+            if (event.name === "custom" && event.data === "serpantinum:close") {
+                mainIpc.handleCommand("close", "", "");
+            }
+        }
+    }
+
     IpcHandler {
+        id: mainIpc
         target: "main"
 
         function forceReload(): void {
