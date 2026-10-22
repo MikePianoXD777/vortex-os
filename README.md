@@ -52,7 +52,7 @@ sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archis
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
 | Recursos | `vortex-gestor` (servicio de usuario, ~2 MB de RAM) | reparte solo la CPU y la RAM: prioridad a la ventana enfocada, modo juego al abrir un juego y memoria liberada cuando falta |
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
-| Claude | Claude Code + servidor MCP `vortex` | Super+A, y puede ver tu pantalla cuando se lo pides |
+| Claude | Claude Code + servidor MCP `vortex` | Super+A; le hablas con el micrófono y puede ver tu pantalla cuando se lo pides |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
@@ -92,6 +92,11 @@ el portapapeles, tus últimos comandos y el estado del sistema.
 - Solo mira cuando usa una herramienta; no hay nada corriendo en segundo plano.
 - Cada vez que ve la pantalla, las ventanas, el portapapeles o el historial, te sale una notificación.
 - `vortex claude pausa` le corta todo; `vortex claude reanudar` lo devuelve.
+
+**Hablarle con el micrófono:** en la ventana de Claude (Super+A), toca `Espacio`, habla y toca `Espacio` otra
+vez para enviar. Es el dictado de Claude Code (`/voice`), ya activado en español; necesita tu cuenta de
+Claude.ai, la voz se transcribe en los servidores de Anthropic y no gasta tokens. Para cambiar el modo:
+`/voice hold` (mantener Espacio) o `/voice off`.
 
 ## ¿Cuánto más ligero?
 

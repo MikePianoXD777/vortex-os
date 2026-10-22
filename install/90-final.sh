@@ -15,7 +15,7 @@ cat <<'EOF'
       vortex bench               mide RAM, servicios y arranque
       vortex gestor estado       qué está priorizando el gestor de recursos
       vortex fondo ARCHIVO       cambia el fondo (y los colores)
-      Super+A                    habla con Claude
+      Super+A                    habla con Claude (Espacio para hablarle con el micrófono)
       Super+G                    modo juego a mano
 EOF
 
