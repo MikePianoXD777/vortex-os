@@ -3,6 +3,7 @@ import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Pam
 import Quickshell.Services.UPower
 import "../"
@@ -126,9 +127,37 @@ Scope {
             onStreamFinished: {
                 let txt = this.text.trim();
                 if (txt !== "" && root.kbLayout !== txt) root.kbLayout = txt;
-                kbWaiter.running = false;
-                if (rootLock.locked) kbWaiter.running = true;
+                // Vortex: antes se reiniciaba kbWaiter aquí aunque ya estuviera esperando; al
+                // matarlo, su onExited volvía a lanzar kbPoller, y este otra vez kbWaiter: un
+                // bucle de miles de procesos por segundo mientras la pantalla estaba bloqueada.
+                // Ahora solo se lanza si no está corriendo, y en Hyprland no hace falta.
+                if (rootLock.locked && !root.hyprEvents && !kbWaiter.running) kbWaiter.running = true;
             }
+        }
+    }
+
+    // Vortex: en Hyprland el cambio de distribución («activelayout») llega por el socket de
+    // eventos que Quickshell ya tiene abierto (igual que en la barra, KbFace.qml): sin
+    // kb_wait.sh (bash + socat + grep) residente mientras la pantalla está bloqueada.
+    readonly property bool hyprEvents: !root.isNiri && !root.isSway && !root.isMango
+        && Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
+
+    Connections {
+        target: root.hyprEvents ? Hyprland : null
+        function onRawEvent(event) {
+            if (event.name !== "activelayout" || !rootLock.locked) return;
+            kbLayoutDelay.restart();
+        }
+    }
+
+    Timer {
+        id: kbLayoutDelay
+        // Los mismos 50 ms que esperaba kb_wait.sh antes de volver a leer
+        interval: 50
+        repeat: false
+        onTriggered: {
+            kbPoller.running = false;
+            if (rootLock.locked) kbPoller.running = true;
         }
     }
 
