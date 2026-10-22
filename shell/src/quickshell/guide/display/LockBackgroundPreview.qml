@@ -24,6 +24,15 @@ Item {
     Layout.topMargin: rootObj.s(6)
     Layout.bottomMargin: rootObj.s(4)
 
+    // Vortex: ancho al que se decodifica el fondo de la vista previa. Va en escalones de
+    // 480 px según el ancho real de la tarjeta (no menos de 960) y solo crece, para no
+    // volver a decodificar cuando la tarjeta se encoge (p. ej. al abrir la búsqueda).
+    property int decodeWidth: 960
+    onWidthChanged: {
+        let w = Math.max(960, Math.ceil(width / 480) * 480);
+        if (w > decodeWidth) decodeWidth = w;
+    }
+
     ImagePicker {
         id: backgroundPicker
         rootObj: preview.rootObj
@@ -64,7 +73,8 @@ Item {
             source: preview.wallpaperPath !== "" && !preview.wallpaperIsVideo ? "file://" + preview.wallpaperPath : ""
             fillMode: Image.PreserveAspectCrop
             // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
-            sourceSize: Qt.size(960, 540)
+            // Se decodifica al ancho de la tarjeta (decodeWidth) para que no se vea borroso con uiScale > 1.
+            sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
             asynchronous: true
             smooth: true
             mipmap: true
@@ -79,7 +89,8 @@ Item {
             source: preview.customPath !== "" && !preview.tab.isVideoPath(preview.customPath) ? "file://" + preview.customPath : ""
             fillMode: Image.PreserveAspectCrop
             // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
-            sourceSize: Qt.size(960, 540)
+            // Se decodifica al ancho de la tarjeta (decodeWidth) para que no se vea borroso con uiScale > 1.
+            sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
             asynchronous: true
             smooth: true
             mipmap: true
