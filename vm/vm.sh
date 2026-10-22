@@ -18,7 +18,7 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISO_ARCH="$(ls "$VM"/iso/archlinux-*-x86_64.iso 2>/dev/null | sort | tail -1 || true)"
 DISCO="$VM/disco.qcow2"
 LLAVE="$VM/llave"
-PUERTO=2222
+PUERTO="${VORTEX_VM_PUERTO:-2222}"
 OVMF=/usr/share/edk2/x64
 
 mkdir -p "$VM"
