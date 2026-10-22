@@ -271,7 +271,7 @@ Item {
             horizontalPadding: rootObj.s(14)
             buttonIcon: "󰸉"
             iconFontSize: rootObj.s(15)
-            buttonText: "Select wallpaper"
+            buttonText: I18n.t("guide.theme.wallpaper.select_wallpaper") || "Select wallpaper" // Vortex: traducido
             textFontSize: rootObj.s(11)
             accentColor: ThemeBackend.mauve
             textColor: ThemeBackend.base

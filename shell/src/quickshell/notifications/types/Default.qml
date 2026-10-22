@@ -47,7 +47,7 @@ Notification {
         Text {
             Layout.fillWidth: true
             horizontalAlignment: I18n.textAlignment
-            text: model ? (model.displayName || model.appName || "System") : "System"
+            text: model ? (model.displayName || model.appName || (I18n.t("notifications.types.default.system") || "System")) : (I18n.t("notifications.types.default.system") || "System") // Vortex: traducido
             font.family: ThemeBackend.fontFamily
             font.weight: Font.Bold
             font.pixelSize: s(11)

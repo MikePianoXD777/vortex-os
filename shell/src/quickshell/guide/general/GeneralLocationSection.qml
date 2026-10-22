@@ -38,7 +38,7 @@ SettingsBlob {
 
         ClickButton {
             implicitHeight: rootObj.s(32)
-            buttonText: "Auto-detect"
+            buttonText: I18n.t("guide.general.location.autodetect") || "Auto-detect" // Vortex: traducido
             buttonIcon: "󰢹"
             accentColor: ThemeBackend.surface0
             textColor: ThemeBackend.text
@@ -87,7 +87,7 @@ SettingsBlob {
                 Input {
                     id: latInput
                     Layout.fillWidth: true
-                    placeholderText: "Latitude"
+                    placeholderText: I18n.t("guide.general.location.latitude") || "Latitude" // Vortex: traducido
                     text: Location.latitude !== 0.0 ? Location.latitude.toString() : (Location.locationData.latitude !== undefined ? Location.locationData.latitude.toString() : "")
                     baseColor: ThemeBackend.surface0
                     accentColor: ThemeBackend.mauve
@@ -103,7 +103,7 @@ SettingsBlob {
                 Input {
                     id: lonInput
                     Layout.fillWidth: true
-                    placeholderText: "Longitude"
+                    placeholderText: I18n.t("guide.general.location.longitude") || "Longitude" // Vortex: traducido
                     text: Location.longitude !== 0.0 ? Location.longitude.toString() : (Location.locationData.longitude !== undefined ? Location.locationData.longitude.toString() : "")
                     baseColor: ThemeBackend.surface0
                     accentColor: ThemeBackend.mauve
@@ -118,7 +118,7 @@ SettingsBlob {
 
                 ClickButton {
                     Layout.preferredHeight: rootObj.s(32)
-                    buttonText: "Apply"
+                    buttonText: I18n.t("guide.general.location.apply") || "Apply" // Vortex: traducido
                     accentColor: ThemeBackend.mauve
                     textColor: ThemeBackend.crust
                     cornerRadius: ThemeBackend.borderRadius

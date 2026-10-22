@@ -175,7 +175,7 @@ Item {
                         font.weight: Font.Black
                         font.pixelSize: Math.max(Scaler.s(14), Math.min(Scaler.s(24), root.height * 0.26))
                         color: bRoot.contentTextColor
-                        text: root.hasBattery ? (Math.round(root.animCapacity) + "%") : "No battery found"
+                        text: root.hasBattery ? (Math.round(root.animCapacity) + "%") : (I18n.t("widgets.battery.none") || "No battery found") // Vortex: traducido
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }

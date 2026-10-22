@@ -1533,6 +1533,12 @@
     "style": {
       "wave": "Wave",
       "circle": "Circle"
+    },
+    "user": {
+      "lock": "Lock"
+    },
+    "battery": {
+      "none": "No battery found"
     }
   },
   "cli": {

@@ -168,7 +168,7 @@ GuideTab {
 
                 ClickButton {
                     implicitHeight: rootObj.s(32)
-                    buttonText: "Copy settings"
+                    buttonText: I18n.t("guide.general.copysettings.button") || "Copy settings" // Vortex: traducido
                     buttonIcon: "󰆏"
                     accentColor: ThemeBackend.surface0
                     textColor: ThemeBackend.text

@@ -88,7 +88,7 @@ Item {
                         contentAlignment: Qt.AlignLeft
                         buttonIcon: ""
                         iconFontSize: Scaler.s(15)
-                        buttonText: "Lock"
+                        buttonText: I18n.t("widgets.user.lock") || "Lock" // Vortex: traducido
                         textFontSize: Scaler.s(12)
                         accentColor: ThemeBackend.surface1
                         bgOpacity: ThemeBackend.elementOpacity

@@ -1559,6 +1559,12 @@
       "left": "Izquierda",
       "center": "Centro",
       "right": "Derecha"
+    },
+    "user": {
+      "lock": "Bloquear"
+    },
+    "battery": {
+      "none": "Sin batería"
     }
   },
   "cli": {

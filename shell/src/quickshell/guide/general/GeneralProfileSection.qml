@@ -48,7 +48,7 @@ SettingsBlob {
                     currentIndex: 0
                     isPathSelector: true
                     fuzzySearch: true
-                    placeholderText: section.tab.currentAvatarSourcePath !== "" ? section.tab.currentAvatarSourcePath : "Select image path..."
+                    placeholderText: section.tab.currentAvatarSourcePath !== "" ? section.tab.currentAvatarSourcePath : (I18n.t("guide.general.avatar.select_image_path") || "Select image path...") // Vortex: traducido
                     fontFamily: ThemeBackend.fontFamily
                     accentColor: ThemeBackend.mauve
                     baseColor: ThemeBackend.surface0
