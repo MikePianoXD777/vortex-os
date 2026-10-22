@@ -97,9 +97,12 @@ Item {
         id: cavaProcess
         running: root.processEnabled
         onExited: root.restartCava()
+        // Vortex: cava a 30 cuadros por segundo (antes 60). Los visualizadores suavizan
+        // los niveles en cada cuadro de la pantalla (FrameAnimation de Visualizer.qml), así
+        // que la mitad de muestras basta y cava, el parseo y los bindings gastan la mitad.
         command: [
             "bash", "-c",
-            "exec cava -p <(printf '[general]\\nbars = %d\\nframerate = 60\\nsensitivity = 150\\n[output]\\nmethod = raw\\nraw_target = /dev/stdout\\ndata_format = ascii\\nascii_max_range = 1000\\nbar_delimiter = 59\\n' " + root.barCount + ")"
+            "exec cava -p <(printf '[general]\\nbars = %d\\nframerate = 30\\nsensitivity = 150\\n[output]\\nmethod = raw\\nraw_target = /dev/stdout\\ndata_format = ascii\\nascii_max_range = 1000\\nbar_delimiter = 59\\n' " + root.barCount + ")"
         ]
         stdout: SplitParser {
             onRead: data => {
