@@ -2,5 +2,8 @@
   "general": {
     "language": "es",
     "quickactions": false
+  },
+  "notifications": {
+    "dnd": false
   }
 }

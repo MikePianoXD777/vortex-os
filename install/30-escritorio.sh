@@ -164,7 +164,9 @@ for f in "$VORTEX_DIR"/config/fondos/*.jpg; do
   [[ -e "$fondos/${f##*/}" ]] || run cp "$f" "$fondos/"
 done
 
-# Ajustes: los de Serpantinum + la semilla de Vortex (español, carpeta de fondos). Solo si
+# Ajustes: los de Serpantinum + la semilla de Vortex (español, carpeta de fondos, «No
+# molestar» apagado: el settings.json de Serpantinum lo trae encendido y ninguna
+# notificación saldría). Sin los monitores del autor (trae «eDP-1» apagado). Solo si
 # no existen: después se cambian desde la app de Ajustes y Vortex no los vuelve a tocar.
 ajustes="$HOME/.config/serpantinum/settings.json"
 if [[ -f "$ajustes" ]]; then
@@ -178,7 +180,7 @@ else
   else
     mkdir -p "$(dirname "$ajustes")"
     jq -s --arg fondos "$fondos" --argjson suspender "$suspender" \
-      '(.[0] * .[1]) | .wallpaperDir = $fondos | .idle.actions.suspend.enabled = $suspender' \
+      '(.[0] * .[1]) | .wallpaperDir = $fondos | .idle.actions.suspend.enabled = $suspender | .display.monitors = {}' \
       /usr/share/serpantinum/config/serpantinum/settings.json "$VORTEX_DIR/config/serpantinum/semilla.json" \
       >"$ajustes"
   fi
