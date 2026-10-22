@@ -13,6 +13,7 @@ printf '\n%s¡Vortex OS instalado!%s\n' "$C_VERDE" "$C_FIN"
 cat <<'EOF'
     Después de reiniciar:
       vortex bench               mide RAM, servicios y arranque
+      vortex gestor estado       qué está priorizando el gestor de recursos
       vortex fondo ARCHIVO       cambia el fondo (y los colores)
       Super+A                    habla con Claude
       Super+G                    modo juego a mano

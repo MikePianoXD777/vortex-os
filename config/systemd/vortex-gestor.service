@@ -1,0 +1,28 @@
+# Vortex OS: gestor de recursos automático (se instala en /etc/systemd/user/).
+# Lo arranca Hyprland al iniciar la sesión (config/hypr/hyprland.lua) si está habilitado
+# («vortex gestor apagar» lo deshabilita) y termina solo cuando Hyprland se cierra.
+[Unit]
+Description=Vortex OS: gestor de recursos automático
+Documentation=https://github.com/MikePianoXD777/vortex-os
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+# Vortex: con los servicios de la sesión (pipewire, portales), no entre las apps que ordena.
+Slice=session.slice
+ExecStart=/usr/local/bin/vortex-gestor
+Restart=on-failure
+RestartSec=3
+# 3 = falta su ayudante (vortex-eventos): reintentar no lo arregla.
+RestartPreventExitStatus=3
+TimeoutStopSec=15
+# Vortex: es diminuto (un bash y un programa en C dormidos, ~5 MB) y debe seguir así. El
+# margen es para lo que lanza de vez en cuando (busctl, quickshell ipc, vortex modo-juego).
+MemoryHigh=32M
+MemoryMax=64M
+TasksMax=32
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=graphical-session.target

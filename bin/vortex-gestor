@@ -1,0 +1,576 @@
+#!/usr/bin/env bash
+# vortex-gestor: gestor de recursos automático de Vortex OS (servicio de usuario
+# vortex-gestor.service; lo arranca Hyprland al iniciar la sesión).
+#
+# Vortex: reparte solo la CPU y la RAM, sin que el usuario toque nada:
+#   1. La ventana enfocada tiene prioridad: su app va a su propio scope de systemd
+#      (app-vortex-CLASE-PID.scope, en app.slice) con más CPUWeight/IOWeight, y el resto
+#      de las apps baja. Con un planificador sched_ext (scx_lavd), que no usa los pesos
+#      de los cgroups, además sube un poco la prioridad (nice) de sus hilos, solo si el
+#      límite del sistema deja devolverla después.
+#   2. Modo juego automático: al abrirse un juego (clase steam_app_*, gamescope, *.exe...
+#      o una ventana que dice ser un juego) llama a «vortex modo-juego on» y pausa el fondo
+#      animado del shell; al cerrarse el último juego, lo deja todo como estaba.
+#   3. Presión de memoria: el kernel avisa (PSI) y el gestor le pide al shell que suelte
+#      memoria (si el shell sabe hacerlo) y comprime lo que las apps de fondo no usan
+#      (memory.reclaim), para que la app enfocada o el juego no den tirones.
+#
+# Es liviano: un bash dormido en read y un programa en C (vortex-eventos) dormido en poll().
+# Nada se despierta si no pasa algo; no hay bucles con sleep.
+#
+# Ajustes opcionales en ~/.config/vortex/gestor.conf (sintaxis de bash), por ejemplo:
+#   JUEGOS_CLASES='^(steam_app_[0-9]+|gamescope|aces|.+\.exe)$'
+#   PESO_FOCO=500  PESO_FONDO=50  NICE_FOCO=-5  RECLAMAR_MB=64
+set -uo pipefail
+shopt -s nullglob
+
+# --- Ajustes ---
+PESO_FOCO=500        # CPUWeight/IOWeight de la app enfocada (systemd usa 100 por defecto)
+PESO_FONDO=50        # el de las demás apps que el gestor ya ordenó
+NICE_FOCO=-5         # nice de la app enfocada con sched_ext (0 = no tocar el nice)
+JUEGOS_CLASES='^(steam_app_[0-9]+|gamescope|steam_proton|Minecraft.*|.+\.exe)$'
+ANTIRREBOTE_MS=120   # espera a que el foco se quede quieto antes de mover nada
+PSI_UMBRAL_MS=150    # aviso si las tareas esperan memoria más de esto...
+PSI_VENTANA_MS=2000  # ...dentro de esta ventana (sin privilegios: múltiplo de 2 s)
+PSI_ENFRIAR_S=20     # entre dos respuestas a la presión de memoria
+RECLAMAR_MB=64       # cuánto comprimir de cada app de fondo con presión (0 = nada)
+DEPURAR=0            # 1 = registra cada cambio de foco
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/gestor.conf"
+# shellcheck source=/dev/null
+[[ -r "$CONF" ]] && source "$CONF"
+
+# --- Rutas y comandos (las pruebas los cambian por falsos) ---
+RUN="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+PROC="${VORTEX_GESTOR_PROC:-/proc}"
+CGROOT="${VORTEX_GESTOR_CGROOT:-/sys/fs/cgroup}"
+SCX_ESTADO="${VORTEX_GESTOR_SCX:-/sys/kernel/sched_ext/state}"
+PSI="${VORTEX_GESTOR_PSI:-/proc/pressure/memory}"
+EVENTOS="${VORTEX_GESTOR_EVENTOS:-}"
+BUSCTL="${VORTEX_GESTOR_BUSCTL:-busctl}"
+RENICE="${VORTEX_GESTOR_RENICE:-renice}"
+VORTEX="${VORTEX_GESTOR_VORTEX:-vortex}"
+QS="${VORTEX_GESTOR_QS:-quickshell}"
+SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
+ESTADO_DIR="$RUN/vortex"
+ESTADO="$ESTADO_DIR/gestor"
+MARCA_JUEGO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego"
+# Las apps del usuario viven bajo su gestor de systemd; nada fuera de aquí se toca.
+RAIZ_USUARIO="/user.slice/user-$UID.slice/user@$UID.service"
+
+log() { printf 'vortex-gestor: %s\n' "$*"; }
+
+# --- Estado ---
+FOCO_PID=0 FOCO_CLASE="" FOCO_CG="" FOCO_NICE=0
+declare -A MIS_CG=()      # scope creado por el gestor → pid de su app
+declare -A NORMALIZAR=()  # scopes recién creados con el peso de foco en systemd
+declare -A AJENO_PESO=()  # cgroup que no es del gestor → su cpu.weight original
+declare -A NO_MOVER=()    # pids que no se pudieron mover (no se reintenta)
+declare -A JUEGOS=()      # dirección de ventana → clase, de los juegos abiertos
+declare -A JUEGO_CG=()    # cgroups de juegos (no se les quita memoria)
+declare -A JUEGO_PID=()   # pids de ventanas de juegos
+declare -A JUEGO_DE=()    # dirección de la ventana de un juego → su pid
+declare -A NICE_ORIG=() NICE_VISTOS=()
+NICE_RAIZ="" NICE_BASE=0
+MODO_PROPIO=0 FONDO_PAUSADO=0 PRIMER_FOCO=1
+MOVER=1 FALLOS_MOVER=0
+PSI_ESTADO="vigilada" PSI_EVENTOS=0 PSI_ULTIMO=0 PSI_TEXTO="" RECLAMOS=0
+SHELL_SOLTAR="sin probar" SHELL_INSTANCIA=""
+INICIO=$EPOCHSECONDS
+
+guardar_estado() {
+  [[ -d "$ESTADO_DIR" ]] || mkdir -p "$ESTADO_DIR" 2>/dev/null || return 0
+  local modo=apagado
+  if ((MODO_PROPIO)); then modo=propio; elif modo_juego_activo; then modo=ajeno; fi
+  {
+    printf 'inicio=%s\npid=%s\n' "$INICIO" "$$"
+    printf 'foco_pid=%s\nfoco_clase=%s\nfoco_cgroup=%s\nfoco_nice=%s\n' \
+      "$FOCO_PID" "$FOCO_CLASE" "$FOCO_CG" "$FOCO_NICE"
+    printf 'apps=%s\njuegos=%s\nmodo_juego=%s\nfondo_pausado=%s\n' \
+      "${#MIS_CG[@]}" "${#JUEGOS[@]}" "$modo" "$FONDO_PAUSADO"
+    printf 'psi=%s\npsi_eventos=%s\npsi_ultimo=%s\npsi_valor=%s\nreclamos=%s\nshell_soltar=%s\n' \
+      "$PSI_ESTADO" "$PSI_EVENTOS" "$PSI_ULTIMO" "$PSI_TEXTO" "$RECLAMOS" "$SHELL_SOLTAR"
+  } >"$ESTADO" 2>/dev/null
+}
+
+# --- Hyprland ---
+# La instancia: la del entorno si su socket existe; si no, la más reciente.
+buscar_hyprland() {
+  local d mejor=""
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" && -S "$RUN/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" ]]; then
+    HYPR_DIR="$RUN/hypr/$HYPRLAND_INSTANCE_SIGNATURE"
+    return 0
+  fi
+  for d in "$RUN"/hypr/*/; do
+    [[ -S "$d.socket2.sock" ]] || continue
+    if [[ -z "$mejor" || "$d.socket2.sock" -nt "$mejor.socket2.sock" ]]; then mejor="$d"; fi
+  done
+  [[ -n "$mejor" ]] || return 1
+  HYPR_DIR="${mejor%/}"
+  HYPRLAND_INSTANCE_SIGNATURE="${HYPR_DIR##*/}"
+  export HYPRLAND_INSTANCE_SIGNATURE
+}
+
+# --- Procesos y cgroups ---
+# CG = cgroup (v2) del proceso.
+cgroup_de() {
+  local l
+  CG=""
+  [[ -r "$PROC/$1/cgroup" ]] || return 1
+  while read -r l; do
+    if [[ "$l" == 0::* ]]; then CG="${l#0::}"; return 0; fi
+  done 2>/dev/null <"$PROC/$1/cgroup"
+  return 1
+}
+
+# Un proceso del usuario que se puede ordenar: ni Hyprland, ni Xwayland, ni el shell.
+apto() {
+  local comm
+  [[ "$1" =~ ^[0-9]+$ ]] && (($1 > 1)) || return 1
+  [[ -d "$PROC/$1" && -O "$PROC/$1" && -r "$PROC/$1/comm" ]] || return 1
+  read -r comm 2>/dev/null <"$PROC/$1/comm" || return 1
+  case "$comm" in
+    Hyprland | Xwayland | quickshell | qs | .quickshell-wra* | systemd | vortex-gestor) return 1 ;;
+  esac
+  return 0
+}
+
+# ARBOL = el proceso y todos sus descendientes.
+arbol() {
+  local i=0 p h t
+  local -a hijos
+  ARBOL=("$1")
+  while ((i < ${#ARBOL[@]} && ${#ARBOL[@]} < 4096)); do
+    p="${ARBOL[i++]}"
+    for t in "$PROC/$p"/task/*/children; do
+      hijos=()
+      read -r -a hijos 2>/dev/null <"$t" || true
+      for h in "${hijos[@]}"; do ARBOL+=("$h"); done
+    done
+  done
+}
+
+# Solo se escribe en cgroups del propio usuario.
+del_usuario() { [[ "$1" == "$RAIZ_USUARIO"/* ]]; }
+
+# Pone el peso (CPU y, si el cgroup lo tiene, disco) escribiendo directo en el cgroup:
+# no lanza procesos. Si systemd vuelve a aplicar sus propiedades, queda su valor, que es
+# el de fondo (nunca deja una app de fondo con prioridad).
+poner_peso() {
+  local base="$CGROOT$1"
+  del_usuario "$1" || return 1
+  [[ -w "$base/cpu.weight" ]] || return 1
+  { printf '%s\n' "$2" >"$base/cpu.weight"; } 2>/dev/null || return 1
+  [[ -w "$base/io.weight" ]] && { printf 'default %s\n' "$2" >"$base/io.weight"; } 2>/dev/null
+  return 0
+}
+
+# Mueve la app (el proceso de la ventana y sus hijos que estaban con él) a su propio
+# scope, ya con el peso de foco. NUEVO_CG = el cgroup del scope.
+crear_scope() {
+  local pid="$1" clase="$2" origen="$3" p limpia unidad
+  local -a pids=()
+  arbol "$pid"
+  for p in "${ARBOL[@]}"; do
+    cgroup_de "$p" && [[ "$CG" == "$origen" ]] && pids+=("$p")
+  done
+  ((${#pids[@]})) || return 1
+  limpia="${clase//[^A-Za-z0-9_.]/_}"
+  limpia="${limpia:0:48}"
+  unidad="app-vortex-${limpia:-app}-$pid.scope"
+  # Si un hijo terminó justo antes, systemd rechaza la lista entera: se reintenta solo
+  # con el proceso de la ventana (los hijos nuevos ya nacen en el scope).
+  if ! scope_systemd "$unidad" "$clase" "${pids[@]}" && { ((${#pids[@]} == 1)) || ! scope_systemd "$unidad" "$clase" "$pid"; }; then
+    NO_MOVER[$pid]=1
+    FALLOS_MOVER=$((FALLOS_MOVER + 1))
+    if ((FALLOS_MOVER >= 3)); then
+      MOVER=0
+      log "systemd no me deja mover las apps a su scope; sigo sin moverlas"
+    fi
+    return 1
+  fi
+  FALLOS_MOVER=0
+  NUEVO_CG="$RAIZ_USUARIO/app.slice/$unidad"
+  MIS_CG[$NUEVO_CG]="$pid"
+  NORMALIZAR[$NUEVO_CG]=1
+}
+
+# Pide a systemd (del usuario) un scope nuevo en app.slice con esos procesos. Si están
+# en el scope de la sesión, systemd le pide al del sistema que los mueva (es lo mismo
+# que hace «systemd-run --user --scope»).
+scope_systemd() {
+  local unidad="$1" clase="$2"
+  shift 2
+  "$BUSCTL" --user call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
+    org.freedesktop.systemd1.Manager StartTransientUnit 'ssa(sv)a(sa(sv))' "$unidad" fail 5 \
+    PIDs au "$#" "$@" Slice s app.slice Description s "Vortex: ${clase:-app}" \
+    CPUWeight t "$PESO_FOCO" IOWeight t "$PESO_FOCO" 0 >/dev/null 2>&1
+}
+
+# Cambia propiedades de un scope del gestor en systemd (solo en memoria: --runtime).
+propiedades() {
+  "$BUSCTL" --user call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
+    org.freedesktop.systemd1.Manager SetUnitProperties 'sba(sv)' "${1##*/}" true 2 \
+    CPUWeight t "$2" IOWeight t "$2" >/dev/null 2>&1
+}
+
+# ¿La app tiene que ir a su propio scope? Sí si está en el scope de la sesión (todo lo
+# que se abre desde Hyprland cae ahí) o heredó el scope de otra app del gestor (un juego
+# que abrió Steam, un programa con ventana abierto desde la terminal).
+necesita_scope() {
+  ((MOVER)) && [[ -z "${NO_MOVER[$1]:-}" ]] || return 1
+  case "${2##*/}" in
+    session-*.scope) return 0 ;;
+    app-vortex-*-"$1".scope) return 1 ;;
+    app-vortex-*.scope) return 0 ;;
+  esac
+  return 1
+}
+
+# --- nice (solo con sched_ext) ---
+scx_activo() {
+  local s=""
+  [[ -r "$SCX_ESTADO" ]] && read -r s <"$SCX_ESTADO"
+  [[ "$s" == enabled ]]
+}
+
+# ¿El límite RLIMIT_NICE del proceso deja bajar su nice hasta NICE_FOCO? Si no, no se
+# toca: subir el nice sin poder devolverlo sería quitarle prioridad para siempre.
+nice_permitido() {
+  local l
+  local -a w
+  [[ -r "$PROC/$1/limits" ]] || return 1
+  while read -r l; do
+    [[ "$l" == "Max nice priority"* ]] || continue
+    read -r -a w <<<"$l"
+    [[ "${w[3]}" == unlimited ]] && return 0
+    [[ "${w[3]}" =~ ^[0-9]+$ ]] && ((w[3] >= 20 - NICE_FOCO)) && return 0
+    return 1
+  done 2>/dev/null <"$PROC/$1/limits"
+  return 1
+}
+
+# N = nice del hilo (campo 19 de stat; el nombre del proceso puede tener espacios).
+nice_de() {
+  local s
+  local -a f
+  N=""
+  read -r s 2>/dev/null <"$1/stat" || return 1
+  read -r -a f <<<"${s##*) }"
+  N="${f[16]:-}"
+  [[ "$N" =~ ^-?[0-9]+$ ]]
+}
+
+dar_nice() {
+  local pid="$1" p t tid
+  local -a tids=()
+  ((NICE_FOCO < 0)) && scx_activo && nice_permitido "$pid" || return 0
+  NICE_ORIG=() NICE_VISTOS=() NICE_BASE=0
+  nice_de "$PROC/$pid/task/$pid" && NICE_BASE="$N"
+  arbol "$pid"
+  for p in "${ARBOL[@]}"; do
+    for t in "$PROC/$p"/task/*; do
+      tid="${t##*/}"
+      NICE_VISTOS[$tid]=1
+      nice_de "$t" || continue
+      if ((N > NICE_FOCO)); then
+        NICE_ORIG[$tid]="$N"
+        tids+=("$tid")
+      fi
+    done
+  done
+  ((${#tids[@]})) || return 0
+  "$RENICE" --priority "$NICE_FOCO" -p "${tids[@]}" >/dev/null 2>&1
+  NICE_RAIZ="$pid" FOCO_NICE="$NICE_FOCO"
+}
+
+# Devuelve el nice a los hilos que se cambiaron, y a los que nacieron después con él.
+quitar_nice() {
+  [[ -n "$NICE_RAIZ" ]] || return 0
+  local p t tid v
+  local -A por_valor=()
+  arbol "$NICE_RAIZ"
+  for p in "${ARBOL[@]}"; do
+    for t in "$PROC/$p"/task/*; do
+      tid="${t##*/}"
+      nice_de "$t" && ((N == NICE_FOCO)) || continue
+      if [[ -n "${NICE_ORIG[$tid]:-}" ]]; then
+        v="${NICE_ORIG[$tid]}"
+      elif [[ -z "${NICE_VISTOS[$tid]:-}" ]]; then
+        v="$NICE_BASE"
+      else
+        continue
+      fi
+      por_valor[$v]+=" $tid"
+    done
+  done
+  for v in "${!por_valor[@]}"; do
+    # shellcheck disable=SC2086 # la lista de hilos se separa a propósito
+    "$RENICE" --priority "$v" -p ${por_valor[$v]} >/dev/null 2>&1
+  done
+  NICE_RAIZ="" NICE_ORIG=() NICE_VISTOS=()
+}
+
+# --- Prioridad de la ventana enfocada ---
+dar_prioridad() {
+  local pid="$1" clase="$2"
+  apto "$pid" && cgroup_de "$pid" || return 0
+  if necesita_scope "$pid" "$CG"; then
+    crear_scope "$pid" "$clase" "$CG" && FOCO_CG="$NUEVO_CG"
+  elif del_usuario "$CG"; then
+    if [[ -z "${MIS_CG[$CG]:-}" && -z "${AJENO_PESO[$CG]:-}" ]]; then
+      # Un cgroup que no creó el gestor (flatpak, otra app): se guarda su peso para devolverlo.
+      local w=""
+      [[ -r "$CGROOT$CG/cpu.weight" ]] && read -r w <"$CGROOT$CG/cpu.weight"
+      [[ "$w" =~ ^[0-9]+$ ]] && AJENO_PESO[$CG]="$w"
+    fi
+    if [[ -n "${MIS_CG[$CG]:-}" || -n "${AJENO_PESO[$CG]:-}" ]] && poner_peso "$CG" "$PESO_FOCO"; then
+      FOCO_CG="$CG"
+    fi
+  fi
+  [[ -n "$FOCO_CG" && -n "${JUEGO_PID[$pid]:-}" ]] && JUEGO_CG[$FOCO_CG]=1
+  dar_nice "$pid"
+}
+
+quitar_prioridad() {
+  local cg="$FOCO_CG"
+  quitar_nice
+  FOCO_NICE=0
+  [[ -n "$cg" ]] || return 0
+  if [[ -n "${MIS_CG[$cg]:-}" ]]; then
+    if [[ -n "${NORMALIZAR[$cg]:-}" ]]; then
+      # Recién creado: en systemd tiene el peso de foco; se le deja el de fondo (una
+      # vez; después basta con escribir en el cgroup).
+      propiedades "$cg" "$PESO_FONDO" || unset 'MIS_CG[$cg]' 'JUEGO_CG[$cg]'
+      unset 'NORMALIZAR[$cg]'
+    elif [[ -d "$CGROOT$cg" ]]; then
+      poner_peso "$cg" "$PESO_FONDO"
+    else
+      # La app ya se cerró y systemd quitó su scope.
+      unset 'MIS_CG[$cg]' 'JUEGO_CG[$cg]'
+    fi
+  elif [[ -n "${AJENO_PESO[$cg]:-}" ]]; then
+    poner_peso "$cg" "${AJENO_PESO[$cg]}"
+    unset 'AJENO_PESO[$cg]'
+  fi
+}
+
+# --- Juegos ---
+es_juego() { [[ "$2" == game ]] || [[ -n "$1" && "$1" =~ $JUEGOS_CLASES ]]; }
+
+# El modo juego está puesto en esta sesión (la marca de «vortex modo-juego» es más nueva
+# que el arranque de Hyprland; si es de antes de reiniciar, no cuenta).
+modo_juego_activo() { [[ -e "$MARCA_JUEGO" && "$MARCA_JUEGO" -nt "$HYPR_DIR/.socket2.sock" ]]; }
+
+fondo() { timeout 5 "$QS" ipc -p "$SHELL_QML" call wallpaper setPlayback all "$1" >/dev/null 2>&1; }
+
+empezar_juego() {
+  log "juego abierto ($1): modo juego"
+  # Si ya estaba puesto, lo puso otro (gamemode o Super+G) y que lo quite él; salvo que
+  # lo haya puesto este gestor antes de reiniciarse (MODO_PROPIO recuperado).
+  if ! modo_juego_activo && timeout 20 "$VORTEX" modo-juego on >/dev/null 2>&1; then
+    MODO_PROPIO=1
+  fi
+  # Con el juego delante el fondo no se ve: pausarlo no cambia nada de lo que se ve.
+  fondo pause && FONDO_PAUSADO=1
+}
+
+terminar_juego() {
+  log "ya no hay juegos abiertos: todo como estaba"
+  # Solo se quita si lo puso el gestor y sigue puesto (con Super+G se pudo quitar antes).
+  if ((MODO_PROPIO)) && [[ -e "$MARCA_JUEGO" ]]; then
+    timeout 20 "$VORTEX" modo-juego off >/dev/null 2>&1
+  fi
+  MODO_PROPIO=0
+  if ((FONDO_PAUSADO)); then
+    fondo play
+    FONDO_PAUSADO=0
+  fi
+}
+
+agregar_juego() {
+  [[ -n "${JUEGOS[$1]+x}" ]] && return 0
+  JUEGOS[$1]="$2"
+  ((${#JUEGOS[@]} == 1)) && empezar_juego "$2"
+  return 0
+}
+
+# --- Presión de memoria ---
+leer_psi() {
+  local l
+  PSI_TEXTO=""
+  [[ -r "$PSI" ]] || return 0
+  while read -r l; do
+    PSI_TEXTO+="${PSI_TEXTO:+, }${l%% total=*}"
+  done <"$PSI"
+}
+
+# Si el shell sabe soltar memoria (función soltarMemoria en su IPC «vortex»), se le
+# pide. Se pregunta una vez por cada arranque del shell.
+soltar_shell() {
+  local inst="" d linea objetivo="" hay=0
+  for d in "$RUN"/quickshell/by-id/*/; do
+    if [[ -z "$inst" || "$d" -nt "$inst" ]]; then inst="$d"; fi
+  done
+  [[ -n "$inst" ]] || { SHELL_SOLTAR="shell apagado"; return 0; }
+  if [[ "$inst" != "$SHELL_INSTANCIA" ]]; then
+    SHELL_INSTANCIA="$inst"
+    while read -r linea; do
+      [[ "$linea" == target\ * ]] && objetivo="${linea#target }"
+      [[ "$objetivo" == vortex && "$linea" == *"function soltarMemoria"* ]] && hay=1
+    done < <(timeout 5 "$QS" ipc -p "$SHELL_QML" show 2>/dev/null)
+    if ((hay)); then SHELL_SOLTAR="sí"; else SHELL_SOLTAR="no sabe"; fi
+  fi
+  [[ "$SHELL_SOLTAR" == "sí" ]] || return 0
+  timeout 5 "$QS" ipc -p "$SHELL_QML" call vortex soltarMemoria >/dev/null 2>&1 &
+}
+
+# Comprime (a zram) lo que no usan las apps de fondo que ordenó el gestor; nunca la
+# enfocada ni un juego. Va en segundo plano: el kernel puede tardar un poco.
+reclamar_fondo() {
+  local cg
+  local -a archivos=()
+  ((RECLAMAR_MB > 0)) || return 0
+  for cg in "${!MIS_CG[@]}"; do
+    [[ "$cg" == "$FOCO_CG" || -n "${JUEGO_CG[$cg]:-}" ]] && continue
+    if [[ ! -d "$CGROOT$cg" ]]; then
+      unset 'MIS_CG[$cg]' 'NORMALIZAR[$cg]'
+      continue
+    fi
+    [[ -w "$CGROOT$cg/memory.reclaim" ]] && archivos+=("$CGROOT$cg/memory.reclaim")
+  done
+  ((${#archivos[@]})) || return 0
+  RECLAMOS=$((RECLAMOS + 1))
+  (
+    for f in "${archivos[@]}"; do
+      { printf '%sM\n' "$RECLAMAR_MB" >"$f"; } 2>/dev/null
+    done
+  ) &
+}
+
+# --- Eventos ---
+en_foco() {
+  local pid="$1" dir="$2" tipo="$3" clase="$4"
+  [[ "$pid" =~ ^[0-9]+$ ]] || pid=0
+  if es_juego "$clase" "$tipo"; then
+    ((pid > 1)) && JUEGO_PID[$pid]=1
+    [[ -n "$dir" ]] && JUEGO_DE[$dir]="$pid" && agregar_juego "$dir" "$clase"
+  fi
+  # El primer foco llega después de las ventanas que ya estaban abiertas: si el gestor
+  # anterior dejó el modo juego o el fondo pausado y ya no hay juegos, se deshace.
+  if ((PRIMER_FOCO)); then
+    PRIMER_FOCO=0
+    ((${#JUEGOS[@]} == 0 && (MODO_PROPIO || FONDO_PAUSADO))) && terminar_juego
+  fi
+  if [[ "$pid" == "$FOCO_PID" ]]; then
+    guardar_estado
+    return 0
+  fi
+  quitar_prioridad
+  FOCO_PID="$pid" FOCO_CLASE="$clase" FOCO_CG=""
+  ((pid > 1)) && dar_prioridad "$pid" "$clase"
+  ((DEPURAR)) && log "foco: ${clase:-nada} (pid $pid) ${FOCO_CG:+→ ${FOCO_CG##*/}}"
+  guardar_estado
+}
+
+en_abre() {
+  es_juego "$3" "$2" && agregar_juego "$1" "$3"
+  guardar_estado
+}
+
+en_cierra() {
+  [[ -n "${JUEGOS[$1]+x}" ]] || return 0
+  unset 'JUEGOS[$1]'
+  [[ -n "${JUEGO_DE[$1]:-}" ]] && unset "JUEGO_PID[${JUEGO_DE[$1]}]"
+  unset 'JUEGO_DE[$1]'
+  ((${#JUEGOS[@]} == 0)) && terminar_juego
+  guardar_estado
+}
+
+en_psi() {
+  case "$1" in
+    memoria)
+      PSI_EVENTOS=$((PSI_EVENTOS + 1))
+      if ((EPOCHSECONDS - PSI_ULTIMO >= PSI_ENFRIAR_S)); then
+        PSI_ULTIMO=$EPOCHSECONDS
+        leer_psi
+        log "presión de memoria ($PSI_TEXTO): se suelta memoria del shell y de las apps de fondo"
+        soltar_shell
+        reclamar_fondo
+      fi
+      ;;
+    no)
+      PSI_ESTADO="no ($2)"
+      log "no puedo vigilar la presión de memoria: $2"
+      ;;
+  esac
+  guardar_estado
+}
+
+# --- Arranque y salida ---
+TERMINANDO=0
+terminar() {
+  # La señal llega en medio del «IFS=$'\037' read» del bucle principal y ese IFS seguiría
+  # vigente aquí (rompería la lectura de /proc).
+  local IFS=$' \t\n'
+  ((TERMINANDO)) && return
+  TERMINANDO=1
+  quitar_prioridad
+  ((${#JUEGOS[@]})) && terminar_juego
+  # Las apps que siguen abiertas vuelven al peso normal de systemd.
+  local cg
+  for cg in "${!MIS_CG[@]}"; do
+    [[ -d "$CGROOT$cg" ]] && propiedades "$cg" 100
+  done
+  [[ -n "${AYUDANTE:-}" ]] && kill "$AYUDANTE" 2>/dev/null
+  rm -f "$ESTADO"
+  exit "${1:-0}"
+}
+
+# Si el gestor se reinicia con un juego abierto, recupera lo que había hecho.
+recuperar() {
+  local l
+  [[ -r "$ESTADO" ]] || return 0
+  while read -r l; do
+    case "$l" in
+      modo_juego=propio) modo_juego_activo && MODO_PROPIO=1 ;;
+      fondo_pausado=1) FONDO_PAUSADO=1 ;;
+    esac
+  done <"$ESTADO"
+}
+
+main() {
+  if [[ -z "$EVENTOS" ]]; then
+    EVENTOS="$(command -v vortex-eventos || true)"
+    [[ -n "$EVENTOS" ]] || EVENTOS="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/vortex-eventos"
+  fi
+  if [[ ! -x "$EVENTOS" ]]; then
+    log "falta vortex-eventos (se compila al instalar: install/30-escritorio.sh)"
+    exit 3
+  fi
+  if ! buscar_hyprland; then
+    log "no encuentro Hyprland en $RUN/hypr"
+    exit 1
+  fi
+  recuperar
+  trap 'terminar 0' TERM INT HUP
+  local psi="$PSI"
+  [[ -r "$psi" ]] || psi=-
+  local evfd tipo a b c d
+  exec {evfd}< <(exec "$EVENTOS" "$HYPR_DIR/.socket2.sock" "$HYPR_DIR/.socket.sock" "$psi" \
+    "$((PSI_UMBRAL_MS * 1000))" "$((PSI_VENTANA_MS * 1000))" "$ANTIRREBOTE_MS")
+  AYUDANTE=$!
+  log "en marcha (Hyprland ${HYPRLAND_INSTANCE_SIGNATURE:0:12}…)"
+  guardar_estado
+  while IFS=$'\037' read -r -u "$evfd" tipo a b c d; do
+    case "$tipo" in
+      foco) en_foco "$a" "$b" "$c" "$d" ;;
+      abre) en_abre "$a" "$b" "$c" ;;
+      cierra) en_cierra "$a" ;;
+      psi) en_psi "$a" "$b" ;;
+    esac
+  done
+  log "Hyprland se cerró: el gestor termina"
+  terminar 0
+}
+
+main "$@"
