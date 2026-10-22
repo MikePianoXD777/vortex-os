@@ -71,6 +71,15 @@ fi
 
 # --- Ajustes propios (encima de cachyos-settings) ---
 escribir_sistema /etc/sysctl.d/90-vortex.conf <"$VORTEX_DIR/config/sistema/sysctl.conf"
+# Vortex: memoria sin tirones (THP y MGLRU no son sysctl: van por systemd-tmpfiles).
+# thp.conf lleva el mismo nombre que el de cachyos-settings para reemplazarlo.
+escribir_sistema /etc/tmpfiles.d/thp.conf <"$VORTEX_DIR/config/sistema/thp.conf"
+escribir_sistema /etc/tmpfiles.d/90-vortex-mglru.conf <"$VORTEX_DIR/config/sistema/mglru.conf"
+# Se aplican ya (el reinicio del final también lo haría); --boot porque las líneas
+# «w!» de THP solo corren con él. Si fallan no se aborta.
+srun sysctl -q -p /etc/sysctl.d/90-vortex.conf || aviso "no pude aplicar los sysctl ahora; se aplican al reiniciar"
+srun systemd-tmpfiles --boot --create /etc/tmpfiles.d/thp.conf /etc/tmpfiles.d/90-vortex-mglru.conf \
+  || aviso "no pude aplicar THP/MGLRU ahora; se aplican al reiniciar"
 escribir_sistema /etc/systemd/journald.conf.d/90-vortex.conf <"$VORTEX_DIR/config/sistema/journald.conf"
 escribir_sistema /etc/scx_loader.toml <"$VORTEX_DIR/config/sistema/scx_loader.toml"
 
