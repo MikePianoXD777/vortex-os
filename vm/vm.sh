@@ -6,6 +6,9 @@
 #   vm/vm.sh ssh [cmd]    entra por SSH (root en la ISO, vortex en el disco)
 #   vm/vm.sh captura F    guarda una captura de la pantalla de la VM en F (.png)
 #   vm/vm.sh copiar O D   copia con rsync (la ruta remota va como :ruta)
+#   vm/vm.sh clic X Y     clic en ese punto (con VORTEX_VM_VIDEO=2d se ve con «captura»)
+#   vm/vm.sh tecla N...   teclas con nombres de QEMU (ret, tab, meta_l-d...)
+#   vm/vm.sh escribir T   escribe un texto (letras, números, espacio y . , - _ /)
 #   vm/vm.sh apagar       apaga la VM y espera (hasta 60 s) a que QEMU termine
 #   vm/vm.sh matar        corta la VM de golpe si no se apaga
 #   vm/vm.sh borrar       borra el disco para empezar de cero
@@ -52,11 +55,16 @@ qemu_comun() {
     -drive "if=pflash,format=raw,file=$VM/OVMF_VARS.fd"
     -drive "file=$DISCO,if=virtio,cache=unsafe"
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$PUERTO-:22"
-    -device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless
+    # VORTEX_VM_VIDEO=2d: sin aceleración 3D, pero «captura» funciona (screendump) y se puede
+    # ver y manejar el instalador gráfico de la ISO (Hyprland va con render por software).
+    $( [[ "${VORTEX_VM_VIDEO:-}" == 2d ]] && echo "-device virtio-vga,xres=1920,yres=1080 -display none" \
+       || echo "-device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless" )
     -device virtio-keyboard -device virtio-tablet
     # Tarjeta de sonido como en una PC real (sin salida al host, para no sonar en tus parlantes).
     -audiodev none,id=sonido -device ich9-intel-hda -device hda-output,audiodev=sonido
     -monitor "unix:$VM/monitor.sock,server,nowait"
+    # QMP: para mandar clics y teclas con coordenadas exactas (vm/vm.sh clic X Y).
+    -qmp "unix:$VM/qmp.sock,server,nowait"
     -serial "file:$VM/serial.log"
     -pidfile "$VM/qemu.pid" -daemonize
   )
@@ -65,6 +73,28 @@ qemu_comun() {
 corriendo() { [[ -f "$VM/qemu.pid" ]] && kill -0 "$(cat "$VM/qemu.pid")" 2>/dev/null; }
 
 monitor() { printf '%s\n' "$*" | socat - "UNIX-CONNECT:$VM/monitor.sock" >/dev/null; }
+
+# Órdenes QMP (JSON, una por argumento) después del saludo obligatorio.
+qmp() {
+  { echo '{"execute":"qmp_capabilities"}'; for orden in "$@"; do sleep 0.05; echo "$orden"; done; sleep 0.1; } |
+    socat - "UNIX-CONNECT:$VM/qmp.sock" >/dev/null
+}
+
+# Una tecla de texto como nombre de «sendkey» de QEMU (con shift si hace falta).
+nombre_tecla() {
+  local c="$1"
+  case "$c" in
+    [a-z0-9]) echo "$c" ;;
+    [A-Z]) echo "shift-${c,,}" ;;
+    " ") echo spc ;;
+    .) echo dot ;;
+    ,) echo comma ;;
+    -) echo minus ;;
+    _) echo shift-minus ;;
+    /) echo slash ;;
+    *) return 1 ;;
+  esac
+}
 
 case "${1:-}" in
   live)
@@ -104,6 +134,27 @@ case "${1:-}" in
     rm -f "$destino.ppm"
     echo "$destino"
     ;;
+  clic)
+    # vm/vm.sh clic X Y: clic izquierdo en ese punto de la pantalla (1920x1080, como en «captura»)
+    x="${2:?falta X}" y="${3:?falta Y}"
+    ax=$((x * 32767 / 1919)) ay=$((y * 32767 / 1079))
+    qmp '{"execute":"input-send-event","arguments":{"events":[{"type":"abs","data":{"axis":"x","value":'"$ax"'}},{"type":"abs","data":{"axis":"y","value":'"$ay"'}}]}}' \
+      '{"execute":"input-send-event","arguments":{"events":[{"type":"btn","data":{"down":true,"button":"left"}}]}}' \
+      '{"execute":"input-send-event","arguments":{"events":[{"type":"btn","data":{"down":false,"button":"left"}}]}}'
+    ;;
+  tecla)
+    # vm/vm.sh tecla NOMBRE...: teclas con nombres de QEMU (ret, tab, esc, meta_l-d, ctrl-a...)
+    shift
+    for t in "$@"; do monitor "sendkey $t"; sleep 0.15; done
+    ;;
+  escribir)
+    # vm/vm.sh escribir TEXTO: letras, números, espacio y . , - _ /
+    texto="${2:?falta el texto}"
+    for ((i = 0; i < ${#texto}; i++)); do
+      t="$(nombre_tecla "${texto:i:1}")" || { echo "No sé escribir «${texto:i:1}»" >&2; exit 1; }
+      monitor "sendkey $t"; sleep 0.08
+    done
+    ;;
   apagar)
     corriendo || exit 0
     monitor system_powerdown
@@ -124,6 +175,6 @@ case "${1:-}" in
     echo "Disco borrado."
     ;;
   *)
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac
