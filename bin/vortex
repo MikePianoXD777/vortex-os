@@ -19,6 +19,7 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  configurar-usuario                   deja tu usuario con la config de Vortex (sin instalar nada)
   gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
                                        enfocada, modo juego automático, presión de memoria)
   claude                               abre Claude en una terminal
@@ -342,8 +343,28 @@ cmd_actualizar() {
   fi
 }
 
+# La config de Vortex para tu usuario (install/usuario.sh), sin instalar nada. La ISO la corre
+# en el primer inicio de cada usuario nuevo; sirve también para dejar todo como recién instalado
+# (lo que ya existe se respeta, o se respalda si se reemplaza).
+cmd_configurar_usuario() {
+  [[ -f "$VORTEX_DIR/install/usuario.sh" ]] || { aviso "no encuentro el código de Vortex ($VORTEX_DIR)"; exit 1; }
+  export VORTEX_DIR VORTEX_SI=1 VORTEX_DRY_RUN="${VORTEX_DRY_RUN:-0}"
+  VORTEX_RESPALDO="$CONF/respaldo-$(date +%Y%m%d-%H%M%S)"
+  export VORTEX_RESPALDO
+  # shellcheck source=install/lib.sh
+  source "$VORTEX_DIR/install/lib.sh"
+  # shellcheck source=install/usuario.sh
+  source "$VORTEX_DIR/install/usuario.sh"
+  if [[ "$VORTEX_DRY_RUN" != 1 ]]; then
+    mkdir -p "$CONF"
+    cat "$VORTEX_RELEASE" 2>/dev/null | sed -n 's/^VERSION="\(.*\)"$/\1/p' >"$CONF/version"
+  fi
+  bien "Tu usuario quedó configurado para Vortex OS"
+}
+
 case "${1:-ayuda}" in
   modo-juego) shift; cmd_modo_juego "$@" ;;
+  configurar-usuario) cmd_configurar_usuario ;;
   gestor) shift; cmd_gestor "$@" ;;
   claude) shift; cmd_claude "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
