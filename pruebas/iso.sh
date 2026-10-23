@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Pruebas de las piezas de la ISO (iso/, Calamares, Claude por usuario), sin construir la ISO, sin
-# root, sin red y sin tocar tu HOME ni tu sistema: todo pasa en carpetas temporales.
-#   1. sintaxis (bash -n) y YAML de Calamares (uv/pyyaml), y que los paquetes de la lista existan;
+# root, sin red y sin tocar tu HOME ni tu sistema: todo pasa en carpetas temporales. La única
+# salvedad es el YAML de Calamares, que necesita pyyaml: si no está (python3) ni se puede traer con
+# uv, esa prueba se salta, no falla.
+#   1. sintaxis (bash -n) y YAML de Calamares (pyyaml), y que los paquetes de la lista existan;
 #   2. «vortex claude instalar» (install/claude.sh) con un instalador y un «claude» de mentira:
-#      lo instala, registra el MCP, deja la voz sin pisar ajustes, es idempotente, reintenta;
+#      lo instala, registra el MCP, deja la voz sin pisar ajustes, es idempotente, reintenta, y
+#      avisa con una notificación (también si el bus de la sesión aún no está en el entorno);
+#      «vortex claude» (Super+A) sin Claude instalado lo termina de instalar en la terminal;
 #   3. vortex-sesion: lanza esa instalación en segundo plano solo con la marca /etc/vortex/claude
 #      (/etc se simula con un overlay en un user namespace);
-#   4. iso/paquetes.sh: no recompila un paquete del AUR si el repo ya tiene esa versión;
+#   4. iso/paquetes.sh: no recompila un paquete del AUR si el repo ya tiene esa versión, ni si lo
+#      compilado sigue enlazando con las bibliotecas del sistema (binarios de verdad, con cc);
 #   5. vortex-post-instalacion: el autologin de Calamares pasa a greetd ([initial_session]);
 #   6. el hook de pacman que activa RemoveMake en paru, con pacman de verdad en una raíz falsa.
 #
@@ -32,6 +37,7 @@ en_casa() { # en_casa HOME [VAR=valor ...] -- comando...
   while [[ "$1" != -- ]]; do extra+=("$1"); shift; done
   shift
   env -u XDG_STATE_HOME -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_DATA_HOME -u TMPDIR -u HYPRLAND_INSTANCE_SIGNATURE \
+    -u DBUS_SESSION_BUS_ADDRESS -u TERMINAL \
     HOME="$casa" PATH="$T/shim:/usr/bin:/bin" "${extra[@]}" "$@"
 }
 
@@ -95,16 +101,22 @@ if u.get("autologinGroup") != "autologin":
 print("\n".join(mal))
 sys.exit(1 if mal else 0)
 PY
-yaml_rc=1
-if command -v uv >/dev/null; then
-  uv run --no-project --with pyyaml python -I "$T/yaml.py" "$AQUI" >"$T/yaml.out" 2>&1 && yaml_rc=0
-elif python3 -c 'import yaml' 2>/dev/null; then
-  python3 -I "$T/yaml.py" "$AQUI" >"$T/yaml.out" 2>&1 && yaml_rc=0
-else
-  echo "sin uv ni pyyaml" >"$T/yaml.out"
+# Con python3 + pyyaml no hace falta red; si no, uv lo trae (y se necesita red la primera vez). Si
+# no hay de dónde sacar pyyaml no es un error del código: esta prueba se salta.
+python_yaml=()
+if python3 -I -c 'import yaml' 2>/dev/null; then
+  python_yaml=(python3 -I)
+elif command -v uv >/dev/null && timeout 90 uv run --no-project --with pyyaml python -I -c 'import yaml' >/dev/null 2>&1; then
+  python_yaml=(uv run --no-project --with pyyaml python -I)
 fi
-probar "YAML de Calamares válido; Claude marcado por defecto; paquetes vortex-* existen; casilla de autologin" test "$yaml_rc" -eq 0
-sed 's/^/      /' "$T/yaml.out"
+if ((${#python_yaml[@]})); then
+  yaml_rc=1
+  "${python_yaml[@]}" "$T/yaml.py" "$AQUI" >"$T/yaml.out" 2>&1 && yaml_rc=0
+  probar "YAML de Calamares válido; Claude marcado por defecto; paquetes vortex-* existen; casilla de autologin" test "$yaml_rc" -eq 0
+  sed 's/^/      /' "$T/yaml.out"
+else
+  salto "sin pyyaml (ni uv con red para traerlo): se salta la validación del YAML de Calamares"
+fi
 
 # ---------------------------------------------------------------------------------------------
 echo "== vortex claude instalar"
@@ -126,6 +138,7 @@ EOF
 cat >"$T/shim/notify-send" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >>"$HOME/notificaciones.log"
+echo "${DBUS_SESSION_BUS_ADDRESS:-}" >>"$HOME/notificaciones-bus.log"
 EOF
 chmod +x "$T/shim/notify-send"
 URL_BUENA="file://$T/claude/install.sh"
@@ -164,10 +177,28 @@ en_casa "$H" "${RAPIDO[@]}" VORTEX_CLAUDE_INSTALADOR="file://$T/no-existe.sh" --
 probar "--al-entrar sin red: sale bien, avisa y no deja marca" test $? -eq 0 -a ! -e "$H/.local/state/vortex/claude-listo" -a ! -e "$H/.local/bin/claude"
 probar "--al-entrar sin red: dice que reintenta en el próximo inicio" contiene "$T/c4.out" "próximo inicio"
 
+# El bus de usuario de systemd (lo que ve la sesión): un socket en $XDG_RUNTIME_DIR/bus. Se crea el
+# archivo-socket y basta; nadie le habla.
+mkdir -p "$T/rt" "$T/sin-bus"
+python3 -I -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$T/rt/bus" 2>/dev/null
+
 H="$T/c5"; mkdir -p "$H"
-en_casa "$H" "${RAPIDO[@]}" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude instalar --al-entrar >"$T/c5.out" 2>&1
+en_casa "$H" "${RAPIDO[@]}" XDG_RUNTIME_DIR="$T/rt" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude instalar --al-entrar >"$T/c5.out" 2>&1
 probar "--al-entrar con red: instala y deja la marca" test $? -eq 0 -a -x "$H/.local/bin/claude" -a -f "$H/.local/state/vortex/claude-listo"
 probar "--al-entrar con red: avisa con una notificación" contiene "$H/notificaciones.log" "Claude está listo"
+if [[ -S "$T/rt/bus" ]]; then
+  # vortex-sesion lo lanza antes de Hyprland: sin DBUS_SESSION_BUS_ADDRESS en el entorno.
+  probar "la notificación encuentra el bus de la sesión aunque el entorno no lo traiga" contiene "$H/notificaciones-bus.log" "unix:path=$T/rt/bus"
+  H="$T/c5b"; mkdir -p "$H"
+  en_casa "$H" "${RAPIDO[@]}" XDG_RUNTIME_DIR="$T/rt" DBUS_SESSION_BUS_ADDRESS=unix:path=/otro/bus VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- \
+    "$VORTEX" claude instalar --al-entrar >"$T/c5b.out" 2>&1
+  probar "si el entorno ya trae el bus, no lo cambia" contiene "$H/notificaciones-bus.log" "unix:path=/otro/bus"
+else
+  salto "no se pudo crear un socket de prueba: se salta la prueba del bus de la notificación"
+fi
+H="$T/c5c"; mkdir -p "$H"
+en_casa "$H" "${RAPIDO[@]}" XDG_RUNTIME_DIR="$T/sin-bus" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude instalar --al-entrar >"$T/c5c.out" 2>&1
+probar "sin bus de sesión: avisa igual y no inventa uno" test "$(head -n1 "$H/notificaciones-bus.log" 2>/dev/null || echo x)" = "" -a -s "$H/notificaciones.log"
 
 H="$T/c6"; mkdir -p "$H/.local/state/vortex"
 ( exec 9>"$H/.local/state/vortex/claude.lock"; flock 9; sleep 4 ) &
@@ -189,6 +220,51 @@ H="$T/c7"; mkdir -p "$H"
 en_casa "$H" VORTEX_DRY_RUN=1 VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude instalar >"$T/c7.out" 2>&1
 probar "modo prueba: no instala nada ni deja marca" test $? -eq 0 -a ! -e "$H/.local/bin/claude" -a ! -e "$H/.local/state/vortex/claude-listo"
 probar "vortex ayuda: lista «claude instalar»" contiene <(en_casa "$T/c7" -- "$VORTEX" ayuda) "claude instalar"
+
+# ---------------------------------------------------------------------------------------------
+echo "== vortex claude (Super+A) sin Claude instalado"
+# Terminales de mentira: corren de verdad lo que Vortex les pide (bash -lc ...), con la entrada vacía.
+cat >"$T/shim/kitty" <<'EOF'
+#!/usr/bin/env bash
+echo "kitty $*" >>"$HOME/terminal.log"
+shift 4   # --title TÍTULO --directory CARPETA
+exec "$@"
+EOF
+cat >"$T/shim/terminal-falsa" <<'EOF'
+#!/usr/bin/env bash
+echo "terminal-falsa $*" >>"$HOME/terminal.log"
+shift     # -e
+exec "$@"
+EOF
+chmod +x "$T/shim/kitty" "$T/shim/terminal-falsa"
+
+# Sin Claude (la ISO lo instala ~30 s después de entrar): la terminal lo instala y luego lo abre.
+H="$T/a1"; mkdir -p "$H"
+en_casa "$H" TERMINAL=kitty VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a1.out" 2>&1
+probar "sin Claude: la terminal lo instala (y deja la marca)" test -x "$H/.local/bin/claude" -a -f "$H/.local/state/vortex/claude-listo"
+probar "sin Claude: la instalación corre una sola vez" lineas "$H/instalaciones" x 1
+probar "sin Claude: después de instalar lo abre" lineas "$H/claude-args.log" '^$' 1
+probar "sin Claude: le dice a la persona que se está instalando" contiene "$T/a1.out" "Claude todavía no está instalado"
+probar "sin Claude: no queda en «orden no encontrada»" bash -c "! grep -qiE 'no encontrada|not found' '$T/a1.out'"
+probar "sin Claude: abre kitty con el título de siempre" contiene "$H/terminal.log" "kitty --title Claude · Vortex --directory $H bash -lc"
+# Con otra terminal ($TERMINAL) pasa lo mismo.
+H="$T/a2"; mkdir -p "$H"
+en_casa "$H" TERMINAL=terminal-falsa VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a2.out" 2>&1
+probar "sin Claude, otra terminal: lo instala y lo abre" test -x "$H/.local/bin/claude" -a "$(grep -c '^$' "$H/claude-args.log" 2>/dev/null || true)" = 1
+probar "sin Claude, otra terminal: se abrió con -e" contiene "$H/terminal.log" "terminal-falsa -e bash -lc"
+# Sin red: lo dice en la terminal en vez de quedarse mudo, y no abre nada que no existe.
+H="$T/a3"; mkdir -p "$H"
+en_casa "$H" TERMINAL=kitty VORTEX_CLAUDE_INSTALADOR="file://$T/no-existe.sh" -- "$VORTEX" claude </dev/null >"$T/a3.out" 2>&1
+probar "sin Claude y sin red: avisa que no pudo instalarlo" contiene "$T/a3.out" "No pude instalar Claude Code"
+probar "sin Claude y sin red: no deja marca ni claude" test ! -e "$H/.local/state/vortex/claude-listo" -a ! -e "$H/.local/bin/claude"
+probar "sin Claude y sin red: no queda en «orden no encontrada»" bash -c "! grep -qiE 'no encontrada|not found' '$T/a3.out'"
+# Con Claude ya instalado: abre directo, sin instalar nada.
+H="$T/a4"; mkdir -p "$H/.local/bin"
+printf '#!/usr/bin/env bash\necho abrio >>"$HOME/claude-abrio"\n' >"$H/.local/bin/claude"; chmod +x "$H/.local/bin/claude"
+en_casa "$H" TERMINAL=kitty VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a4.out" 2>&1
+probar "con Claude instalado: lo abre" test -f "$H/claude-abrio"
+probar "con Claude instalado: no instala nada" test ! -e "$H/instalaciones" -a ! -e "$H/.local/state/vortex/claude-listo"
+probar "con Claude instalado: no avisa de ninguna instalación" bash -c "! grep -q 'todavía no está instalado' '$T/a4.out'"
 
 # ---------------------------------------------------------------------------------------------
 echo "== vortex-sesion lanza Claude en segundo plano"
@@ -268,6 +344,43 @@ rm -rf "$P/repo2"; mkdir -p "$P/repo2"
 nuevo_pkgbuild "$P/f4" 1 "bash libvortex-que-no-existe.so=9-64"
 (cd "$P/f4" && PKGDEST="$P/repo2" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
 probar "sus dependencias ya no se cumplen (soname cambiado): se compila" bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/f4' '$P/repo2'"
+
+# El caso real: un makepkg normal NO escribe sonames en el .PKGINFO (solo lo que el PKGBUILD declare,
+# p. ej. boost-libs sin versión), así que pacman -T no se entera de que el soname cambió. Se prueba con
+# binarios de verdad: un programa que pide libvortex-prueba.so.9, con la biblioteca dentro del paquete
+# (se reutiliza) o sin ella en el sistema (como un Calamares contra un boost de otro soname: se compila).
+if command -v cc >/dev/null && command -v readelf >/dev/null; then
+  C="$P/c"; mkdir -p "$C"
+  echo 'int vortex_prueba(void) { return 7; }' >"$C/lib.c"
+  echo 'int vortex_prueba(void); int main(void) { return vortex_prueba() == 7 ? 0 : 1; }' >"$C/prog.c"
+  cc -shared -fPIC -Wl,-soname,libvortex-prueba.so.9 -o "$C/libvortex-prueba.so.9" "$C/lib.c" \
+    && cc -o "$C/prog" "$C/prog.c" "$C/libvortex-prueba.so.9" 2>/dev/null
+  probar "(el programa de prueba pide libvortex-prueba.so.9)" bash -c "readelf -d '$C/prog' | grep -q 'NEEDED.*libvortex-prueba.so.9'"
+  elf_pkgbuild() { # elf_pkgbuild DIR [con-biblioteca]: depende de «bash», como un PKGBUILD cualquiera
+    mkdir -p "$1"; cp "$C/prog" "$1/"
+    {
+      printf 'pkgname=falso\npkgver=1.0\npkgrel=1\narch=(any)\ndepends=(bash)\noptions=(!strip !debug)\n'
+      printf 'package() {\n  install -Dm755 "$startdir/prog" "$pkgdir/usr/bin/falso-prog"\n'
+      if [[ "${2:-}" == con-biblioteca ]]; then
+        cp "$C/libvortex-prueba.so.9" "$1/"
+        printf '  install -Dm755 "$startdir/libvortex-prueba.so.9" "$pkgdir/usr/lib/libvortex-prueba.so.9"\n'
+      fi
+      printf '}\n'
+    } >"$1/PKGBUILD"
+  }
+  rm -rf "$P/repo3" "$P/repo4"; mkdir -p "$P/repo3" "$P/repo4"
+  elf_pkgbuild "$P/e1" con-biblioteca
+  (cd "$P/e1" && PKGDEST="$P/repo3" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
+  elf_pkgbuild "$P/e2"
+  (cd "$P/e2" && PKGDEST="$P/repo4" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
+  probar "(su .PKGINFO no declara el soname: pacman -T no lo vería)" bash -c "! bsdtar -xOf '$P'/repo4/falso-1.0-1-any.pkg.tar.zst .PKGINFO | grep -q libvortex-prueba"
+  probar "(y pacman -T de sus dependencias pasa)" bash -c "bsdtar -xOf '$P'/repo4/falso-1.0-1-any.pkg.tar.zst .PKGINFO | sed -n 's/^depend = //p' | xargs pacman -T >/dev/null"
+  probar "pide una biblioteca que trae el propio paquete: no hace falta compilar" bash -c "source '$AQUI/iso/paquetes.sh'; ya_en_repo '$P/e1' '$P/repo3'"
+  probar "pide una biblioteca que el sistema ya no tiene (soname cambiado, sin sonames en el .PKGINFO): se compila" \
+    bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/e2' '$P/repo4'"
+else
+  salto "sin compilador de C ni readelf: se salta la prueba de bibliotecas (NEEDED) de ya_en_repo"
+fi
 
 # construir_aur de punta a punta con un «AUR» local (repos git) y un solo paquete falso.
 export GIT_AUTHOR_NAME=prueba GIT_AUTHOR_EMAIL=p@p GIT_COMMITTER_NAME=prueba GIT_COMMITTER_EMAIL=p@p

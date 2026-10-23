@@ -22,7 +22,7 @@ Uso: vortex <comando>
   configurar-usuario                   deja tu usuario con la config de Vortex (sin instalar nada)
   gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
                                        enfocada, modo juego automático, presión de memoria)
-  claude                               abre Claude en una terminal
+  claude                               abre Claude en una terminal (si falta, antes lo instala)
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
                                        en tu primer inicio con red si elegiste Claude al instalar)
@@ -254,6 +254,12 @@ cmd_claude_instalar() {
   [[ "$VORTEX_DRY_RUN" == 1 ]] && exit 0
   : >"$ESTADO/claude-listo"
   if ((al_entrar)); then
+    # Lo lanza vortex-sesion antes de que arranque el escritorio, y el bus de la sesión no lo
+    # exporta PAM sino el escritorio: sin DBUS_SESSION_BUS_ADDRESS, notify-send no lo encontraría
+    # aunque el servidor de notificaciones ya esté en pie. El de systemd está en $XDG_RUNTIME_DIR/bus.
+    if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "${XDG_RUNTIME_DIR:-/run/user/$UID}/bus" ]]; then
+      export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR:-/run/user/$UID}/bus"
+    fi
     notificar -t 10000 "Claude está listo" "Presiona Super+A. Toca Espacio para hablarle con el micrófono."
   else
     echo "Claude está listo: Super+A (o «vortex claude») lo abre."
@@ -279,11 +285,21 @@ cmd_claude() {
       # El instalador de Claude Code lo deja en ~/.local/bin, que no está en el PATH
       # del escritorio: se agrega aquí para que lo encuentre la terminal que se abre.
       export PATH="$HOME/.local/bin:$PATH"
-      local term="${TERMINAL:-kitty}"
-      if [[ "$term" == kitty ]]; then
-        exec kitty --title "Claude · Vortex" --directory "$HOME" bash -lc 'claude; exec bash'
+      local term="${TERMINAL:-kitty}" yo="" orden='claude; exec bash'
+      # Vortex: con la ISO, Claude se instala solo en segundo plano (unos 30 s después de entrar, y
+      # con red), así que Super+A puede llegar antes, o sin internet. En vez de un «claude: orden no
+      # encontrada», la terminal lo termina de instalar y lo abre: si la instalación del inicio sigue
+      # en curso espera a que acabe, y si no hay red lo dice. Va el ejecutable de este mismo vortex
+      # como $1 (la terminal puede no tenerlo en el PATH).
+      if ! command -v claude >/dev/null 2>&1; then
+        yo="$(readlink -f "${BASH_SOURCE[0]}")"
+        # shellcheck disable=SC2016  # el $1 lo expande bash -lc de la terminal, no este script
+        orden='echo "Claude todavía no está instalado: lo instalo ahora…"; "$1" claude instalar && claude; exec bash'
       fi
-      exec "$term" -e bash -lc 'cd ~; claude; exec bash'
+      if [[ "$term" == kitty ]]; then
+        exec kitty --title "Claude · Vortex" --directory "$HOME" bash -lc "$orden" vortex "$yo"
+      fi
+      exec "$term" -e bash -lc "cd ~; $orden" vortex "$yo"
       ;;
     *) aviso "usa: vortex claude [pausa|reanudar|estado|instalar]"; exit 1 ;;
   esac

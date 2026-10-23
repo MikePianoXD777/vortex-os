@@ -20,6 +20,36 @@ PROPIOS=(vortex-shell vortex-studio vortex-flatpaks vortex-claude)
 AUR=(wl-gammarelay-rs calamares)
 AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 
+# ¿Los ejecutables y bibliotecas del paquete encuentran todas las bibliotecas que piden? (0 = sí)
+# Se leen los NEEDED de cada ELF del paquete (readelf -d) y se buscan en el sistema (ldconfig -p)
+# o dentro del propio paquete. No se pueden sacar del .PKGINFO: con un makepkg normal (sin devtools;
+# /etc/makepkg.conf trae !autodeps) solo lleva lo que el PKGBUILD declara a mano, nombres de paquete
+# sin soname (p. ej. boost-libs), así que no dice nada de un soname que el sistema ya cambió.
+# Si no se puede saber (sin ldconfig, el paquete no se abre) devuelve 1: se compila.
+enlaza_bien() {
+  local f="$1" d e lib rc=0
+  local -A sistema=() propias=()
+  while IFS= read -r lib; do
+    [[ -z "$lib" ]] || sistema["$lib"]=1
+  done < <(LC_ALL=C ldconfig -p 2>/dev/null | awk '/^[[:space:]]/ {print $1}')
+  ((${#sistema[@]})) || return 1
+  d="$(mktemp -d "${TMPDIR:-/tmp}/vortex-enlaza.XXXXXX")" || return 1
+  bsdtar -xf "$f" -C "$d" 2>/dev/null || { rm -rf "$d"; return 1; }
+  # Lo que el propio paquete trae (sus bibliotecas privadas, p. ej. libcalamares.so).
+  while IFS= read -r lib; do
+    [[ -z "$lib" ]] || propias["$lib"]=1
+  done < <(find "$d" \( -type f -o -type l \) -printf '%f\n')
+  while IFS= read -r -d '' e; do
+    # ¿Es un ELF? (\x7fELF, en hexadecimal: bash no traga los bytes nulos de otros archivos)
+    [[ "$(head -c4 "$e" 2>/dev/null | od -An -tx1 | tr -d ' \n')" == 7f454c46 ]] || continue
+    while IFS= read -r lib; do
+      if [[ -n "$lib" && -z "${sistema[$lib]:-}" && -z "${propias[$lib]:-}" ]]; then rc=1; fi
+    done < <(LC_ALL=C readelf -d "$e" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p')
+  done < <(find "$d" -type f -print0)
+  rm -rf "$d"
+  return "$rc"
+}
+
 # ¿El repo ya tiene los paquetes que armaría este PKGBUILD, en esa misma versión? (0 = sí, no
 # hace falta compilar). Con `makepkg --packagelist` salen los nombres de archivo con la versión
 # del PKGBUILD (epoch:pkgver-pkgrel), y con PKGDEST apuntando al repo se comparan ahí.
@@ -27,8 +57,9 @@ AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 #  - el PKGBUILD tiene pkgver() (paquetes -git: la versión real solo se sabe al compilar);
 #  - falta algún archivo del paquete en el repo;
 #  - el paquete quedó enlazado a una biblioteca que el sistema ya cambió (p. ej. boost subió su
-#    soname): sus dependencias (.PKGINFO) ya no se cumplen con lo instalado (pacman -T). Un
-#    Calamares viejo contra un boost nuevo no arranca, que es justo lo que pasó con el de CachyOS.
+#    soname): un Calamares viejo contra un boost nuevo no arranca, que es justo lo que pasó con el
+#    de CachyOS. Se revisa con las versiones mínimas que el PKGBUILD declare (pacman -T sobre los
+#    «depend =» del .PKGINFO) y, sobre todo, con los NEEDED de sus binarios (enlaza_bien).
 ya_en_repo() {
   local dir="$1" repo="$2" lista=() f pkg deps=()
   [[ -z "${VORTEX_PAQUETES_FORZAR:-}" ]] || return 1
@@ -44,6 +75,7 @@ ya_en_repo() {
     [[ -n "$f" ]] || return 1
     mapfile -t deps < <(bsdtar -xOf "$f" .PKGINFO 2>/dev/null | sed -n 's/^depend = //p')
     ((${#deps[@]} == 0)) || pacman -T "${deps[@]}" >/dev/null 2>&1 || return 1
+    enlaza_bien "$f" || return 1
   done
   return 0
 }

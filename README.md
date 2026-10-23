@@ -156,9 +156,9 @@ bin/vortex           comando principal (fondo, java, modo-juego, gestor, claude,
 bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, su ayudante en C)
 bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
-iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
+iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]; sus pruebas: pruebas/iso.sh
 vm/                  VM de pruebas con QEMU, mediciones y previews
-pruebas/             pruebas que corren sin VM (gestor de recursos, piezas de la ISO)
+pruebas/             pruebas que corren sin VM (gestor de recursos)
 ```
 
 ## Probar en una máquina virtual
