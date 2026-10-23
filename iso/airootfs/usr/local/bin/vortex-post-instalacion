@@ -193,6 +193,24 @@ paso_final() {
     getent group gamemode >/dev/null && usermod -aG gamemode "$usuario"
   fi
 
+  # --- Dual boot: si hay Windows en el firmware, «Reiniciar en Windows» en el lanzador ---
+  if command -v efibootmgr >/dev/null && efibootmgr 2>/dev/null | grep -q 'Windows Boot Manager'; then
+    # Solo esto sin contraseña: elegir Windows para el próximo arranque (BootNext).
+    printf '%%wheel ALL=(root) NOPASSWD: /usr/bin/efibootmgr -q --bootnext [0-9A-F][0-9A-F][0-9A-F][0-9A-F]\n' >/etc/sudoers.d/vortex-windows
+    chmod 440 /etc/sudoers.d/vortex-windows
+    visudo -cqf /etc/sudoers.d/vortex-windows || rm -f /etc/sudoers.d/vortex-windows
+    install -Dm644 /dev/stdin /usr/share/applications/vortex-windows.desktop <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Reiniciar en Windows
+Comment=Reinicia una sola vez en Windows; al apagarlo vuelves a Vortexine's OS
+Exec=vortex windows
+Icon=system-reboot
+Categories=System;
+DESKTOP
+    log "hay Windows: «Reiniciar en Windows» en el lanzador"
+  fi
+
   # --- Inicio de sesión automático, si marcó la casilla de la pantalla «Usuarios» ---
   paso_inicio_automatico "$usuario"
   log "listo"
