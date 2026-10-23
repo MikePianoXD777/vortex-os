@@ -115,6 +115,11 @@ elseif ok and type(teclado) == "table" then
 end
 
 -- Juegos de Steam, Lutris y gamescope: sin vsync y sin que se bloquee la pantalla.
+-- Ventanas como en Caelestia: un poco transparentes (95 %) con el fondo desenfocado detrás, menos
+-- en pantalla completa y en los juegos (ahí, opacas). El modo juego apaga el desenfoque.
+hl.config({ decoration = { blur = { ignore_opacity = true, popups = true, input_methods = true } } })
+hl.window_rule({ match = { fullscreen = false }, opacity = "0.95 override" })
+hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, opacity = "1.0 override" })
 hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = true, idle_inhibit = "always" })
 
 -- Atajos de Vortex.
