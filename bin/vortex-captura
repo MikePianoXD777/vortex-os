@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# vortex-captura: capturas directas, sin preguntar nada (como en Caelestia). La imagen queda en el
+# portapapeles y además en Imágenes/Capturas, y avisa con una notificación.
+#
+#   vortex-captura            región: congela toda la pantalla (todos los monitores), seleccionas
+#                             con el ratón y listo (Esc cancela). Impr Pant y Super+Shift+S.
+#   vortex-captura pantalla   el monitor donde está el ratón (Super+Impr Pant)
+#   vortex-captura ventana    la ventana activa (Alt+Impr Pant)
+set -uo pipefail
+
+modo="${1:-region}"
+dir="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Capturas"
+mkdir -p "$dir"
+archivo="$dir/Captura_$(date +%Y-%m-%d_%H-%M-%S).png"
+
+avisar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" "$@" || true; }
+
+case "$modo" in
+  region)
+    # hyprpicker -r -z congela la imagen de todas las pantallas (sin cursor) mientras se elige la
+    # región: lo que se captura es lo que se veía al presionar la tecla, aunque algo se mueva.
+    congelado=""
+    if command -v hyprpicker >/dev/null; then
+      hyprpicker -r -z >/dev/null 2>&1 &
+      congelado=$!
+      sleep 0.12
+    fi
+    region="$(slurp -d 2>/dev/null)"
+    [[ -n "$congelado" ]] && kill "$congelado" 2>/dev/null
+    [[ -n "$region" ]] || exit 0          # Esc o clic sin arrastrar: no hace nada
+    grim -g "$region" "$archivo" || { avisar -u critical "Captura" "No se pudo tomar la captura"; exit 1; }
+    ;;
+  pantalla)
+    monitor="$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused) | .name' | head -n 1)"
+    grim ${monitor:+-o "$monitor"} "$archivo" || { avisar -u critical "Captura" "No se pudo tomar la captura"; exit 1; }
+    ;;
+  ventana)
+    # Sin ventana activa, «hyprctl activewindow -j» da {} y jq -e no imprime nada.
+    g="$(hyprctl activewindow -j 2>/dev/null | jq -er 'select(.at) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')" ||
+      { avisar -u low "Captura de la ventana" "No hay ninguna ventana activa"; exit 0; }
+    grim -g "$g" "$archivo" || { avisar -u critical "Captura" "No se pudo tomar la captura"; exit 1; }
+    ;;
+  *)
+    echo "uso: vortex-captura [region|pantalla|ventana]" >&2
+    exit 1
+    ;;
+esac
+
+wl-copy --type image/png <"$archivo"
+avisar -i "$archivo" "Captura copiada" "Pégala con Ctrl+V. También quedó en Imágenes/Capturas."

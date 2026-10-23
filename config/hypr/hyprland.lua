@@ -91,8 +91,12 @@ require("config/monitors")
 hl.on("hyprland.start", function() hl.exec_cmd("vortex-pantallas") end)
 hl.on("monitor.added", function() hl.exec_cmd("vortex-pantallas") end)
 require("config/settings")
--- Vortexine's 1.2: ventanas más redondeadas, con curva suave (como el shell, borderRadius 18).
-hl.config({ decoration = { rounding = 18, rounding_power = 2.5 } })
+-- Vortexine's 1.2: ventanas más redondeadas, con curva suave (como el shell, borderRadius 18), y
+-- un 15 % más de espacio entre ventanas y en las orillas (4 → 5 y 6 → 7 px).
+hl.config({
+    decoration = { rounding = 18, rounding_power = 2.5 },
+    general = { gaps_in = 5, gaps_out = 7 },
+})
 require("config/keybinds")
 hl.bind = bind_original
 

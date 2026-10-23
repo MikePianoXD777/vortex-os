@@ -167,8 +167,8 @@ local esperado = {
     ["SUPER + ALT + S"] = "special:special", ["CTRL + SUPER + SHIFT + Down"] = "e+0",
     ["ALT + TAB"] = "cycle_next", ["CTRL + ALT + TAB"] = "group.next", ["SUPER + Comma"] = "group.toggle",
     ["SUPER + U"] = "out_of_group", ["SUPER + SHIFT + Comma"] = "lock_active",
-    ["Print"] = "serpantinum screenshot", ["SUPER + Print"] = "screenshot --full",
-    ["ALT + Sys_Req"] = "--geometry", ["SUPER + SHIFT + S"] = "serpantinum screenshot",
+    ["Print"] = "vortex-captura", ["SUPER + Print"] = "vortex-captura pantalla",
+    ["ALT + Sys_Req"] = "vortex-captura ventana", ["SUPER + SHIFT + S"] = "vortex-captura",
     ["CTRL + ALT + R"] = "--record --full", ["SUPER + ALT + R"] = "--record --full",
     ["SUPER + SHIFT + ALT + R"] = "--backend wf-recorder", ["SUPER + SHIFT + C"] = "hyprpicker",
     ["CTRL + SUPER + Space"] = "playerctl play-pause", ["CTRL + SUPER + Equal"] = "playerctl next",
@@ -355,24 +355,8 @@ local function comando_de_atajo(teclas)
 end
 
 print("== Alt+Impr (captura de la ventana activa)")
-local tiene_jq = os.execute("command -v jq >/dev/null 2>&1")
-if not tiene_jq then
-    print("  --  no hay jq: se salta")
-else
-    local captura = comando_de_atajo("ALT + Sys_Req")
-    ok("Alt+Impr es un comando de shell", type(captura) == "string")
-    escribir(TEMP .. "/bin/hyprctl", '#!/bin/sh\ncat "' .. TEMP .. '/ventana.json"\n')
-    os.execute("chmod +x '" .. TEMP .. "/bin/hyprctl'")
-    programa_falso("serpantinum")
-    programa_falso("notify-send")
-    escribir(TEMP .. "/ventana.json", '{"at": [10, 20], "size": [300, 200], "class": "kitty"}')
-    local llamadas = correr(captura)
-    ok("con ventana activa captura su geometría", llamadas == "serpantinum screenshot --geometry 10,20 300x200\n", llamadas)
-    escribir(TEMP .. "/ventana.json", "{}")
-    llamadas = correr(captura)
-    ok("sin ventana activa no captura con una geometría inválida", not llamadas:find("serpantinum", 1, true), llamadas)
-    ok("…y avisa que no hay ventana", llamadas:find("notify-send", 1, true) and llamadas:find("No hay ninguna ventana activa", 1, true), llamadas)
-end
+-- La lógica (sin ventana activa avisa y no captura) vive en bin/vortex-captura.
+ok("Alt+Impr llama a vortex-captura ventana", comando_de_atajo("ALT + Sys_Req") == "vortex-captura ventana", comando_de_atajo("ALT + Sys_Req"))
 
 print("== Super+. (selector de emojis)")
 s = pulsar("SUPER + Period")

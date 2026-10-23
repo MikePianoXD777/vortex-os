@@ -423,16 +423,14 @@ atajo("SUPER + C", ejecutar("command -v zeditor >/dev/null && exec zeditor; exec
 -- Capturas, grabación y colores
 ---------------------------------------------------------------------------------------------
 
--- Mike usaba su script «captura»: Impr = región, Super+Impr = pantalla, Alt+Impr = ventana.
--- Las dos primeras ya son así en Serpantinum. «serpantinum screenshot» sin opciones abre el
--- selector de región (que siempre congela la pantalla); también graba video desde su panel.
--- Alt+Impr: sin ventana activa «hyprctl activewindow -j» da {} y jq -e no imprime nada (con
--- -r solo saldría «null,null nullxnull», una geometría que grim no acepta): se avisa y ya.
-atajo("ALT + Sys_Req", ejecutar(
-    [==[g="$(hyprctl activewindow -j | jq -er 'select(.at) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')" || ]==] ..
-    [==[{ notify-send -u low 'Captura de la ventana' 'No hay ninguna ventana activa'; exit 0; }; ]==] ..
-    [==[exec serpantinum screenshot --geometry "$g"]==]))
-atajo({ "SUPER + SHIFT + S", "SUPER + SHIFT + ALT + S" }, ejecutar("serpantinum screenshot"))
+-- Capturas directas, como en Caelestia (bin/vortex-captura): sin preguntar nada, al portapapeles
+-- y a Imágenes/Capturas. Impr y Super+Shift+S = región (congela toda la pantalla y se elige con el
+-- ratón), Super+Impr = el monitor del ratón, Alt+Impr = la ventana activa (con Alt, Impr manda
+-- Sys_Req). Shift+Impr sigue abriendo el editor de Serpantinum, y su panel (grabar video, etc.)
+-- queda en Ctrl+Alt+R / Super+Alt+R.
+atajo({ "Print", "SUPER + SHIFT + S", "SUPER + SHIFT + ALT + S" }, ejecutar("vortex-captura"))
+atajo("SUPER + Print", ejecutar("vortex-captura pantalla"))
+atajo("ALT + Sys_Req", ejecutar("vortex-captura ventana"))
 
 -- Grabar la pantalla (se vuelve a pulsar para parar): sin sonido, con el sonido del equipo y
 -- una región. Caelestia usaba gpu-screen-recorder igual; la región usa wf-recorder.
