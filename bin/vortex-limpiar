@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# vortex-limpiar: deja «limpio» un sistema que pasó a Vortexine's OS con install.sh encima de otro
+# (p. ej. CachyOS con KDE Plasma o Caelestia), para que rinda como una instalación nueva SIN perder
+# tus archivos ni tus sesiones (navegador, Discord, Steam, llavero...): no toca /home.
+#
+#   sudo vortex-limpiar --prueba   solo muestra lo que haría
+#   sudo vortex-limpiar            lo hace (pregunta antes de cada parte)
+#   sudo vortex-limpiar --si       lo hace sin preguntar
+#
+# Qué hace:
+#   1. Servicios que sobran: ananicy-cpp y systemd-oomd (scx_lavd y la RAM los vuelven
+#      innecesarios), colord; cups y libvirtd quedan dormidos (despiertan solos al usarlos).
+#   2. Pantalla de inicio: la de Vortexine's (greetd + tuigreet, recuerda tu usuario) en vez de la
+#      de KDE (plasmalogin/sddm). Con gnome-keyring, el llavero se sigue abriendo solo al entrar.
+#   3. GRUB sin menú: arranca directo (el menú sale con Esc al prender; las fotos de snapper
+#      siguen ahí), y se llama «Vortexine's OS».
+#   4. Quita Caelestia, el escritorio KDE Plasma (las apps de KDE que uses, como Dolphin, se
+#      quedan) y el «hello» de CachyOS.
+#   5. Limpia la caché de pacman (deja las 2 últimas versiones) y los paquetes huérfanos.
+# Antes de empezar toma una foto con snapper si está configurado. Para deshacer: el menú de GRUB
+# (Esc al prender) → «snapshots» → la foto «Antes de vortex-limpiar».
+set -uo pipefail
+
+PRUEBA=0 SI=0
+for a in "$@"; do
+  case "$a" in
+    --prueba | --dry-run) PRUEBA=1 ;;
+    --si | -y) SI=1 ;;
+    -h | --ayuda) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "uso: sudo vortex-limpiar [--prueba|--si]" >&2; exit 1 ;;
+  esac
+done
+((PRUEBA)) || [[ $EUID -eq 0 ]] || { echo "Córrelo con sudo: sudo vortex-limpiar (o --prueba para ver qué haría)" >&2; exit 1; }
+
+paso() { printf '\n==> %s\n' "$*"; }
+info() { printf '    %s\n' "$*"; }
+run() {
+  if ((PRUEBA)); then printf '    $ %s\n' "$*"; else "$@"; fi
+}
+seguir() {   # seguir "pregunta": sí por defecto
+  ((PRUEBA || SI)) && return 0
+  local r
+  read -r -p "    ¿$1? [S/n] " r </dev/tty || return 1
+  [[ -z "$r" || "$r" =~ ^[sSyY] ]]
+}
+activo() { systemctl is-enabled "$1" >/dev/null 2>&1 || systemctl is-active "$1" >/dev/null 2>&1; }
+instalado() { pacman -Qq "$1" >/dev/null 2>&1; }
+
+# --- 0. Foto de respaldo ---
+paso "Foto del sistema antes de limpiar"
+if command -v snapper >/dev/null && snapper list-configs 2>/dev/null | grep -q '^root '; then
+  run snapper -c root create -t single -c important -d "Antes de vortex-limpiar"
+  info "Para deshacer: Esc al prender → menú de GRUB → snapshots → «Antes de vortex-limpiar»."
+else
+  info "snapper no está configurado: no hay foto automática (sigue solo si tienes respaldo)."
+  seguir "Seguir sin foto" || exit 1
+fi
+
+# --- 1. Servicios ---
+paso "Servicios que sobran"
+apagar=()
+for s in ananicy-cpp.service colord.service; do activo "$s" && apagar+=("$s"); done
+if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 8000)); then
+  for s in systemd-oomd.service systemd-oomd.socket; do activo "$s" && apagar+=("$s"); done
+fi
+dormir=()   # servicio que se apaga y su socket, que lo despierta al usarlo
+activo cups.service && dormir+=("cups.service:cups.socket")
+activo libvirtd.service && dormir+=("libvirtd.service:libvirtd.socket")
+if ((${#apagar[@]} + ${#dormir[@]})); then
+  ((${#apagar[@]})) && info "se apagan: ${apagar[*]}"
+  for d in "${dormir[@]}"; do info "dormido hasta usarlo: ${d%%:*} (despierta con ${d##*:})"; done
+  if seguir "Aplicar"; then
+    ((${#apagar[@]})) && run systemctl disable --now "${apagar[@]}"
+    for d in "${dormir[@]}"; do
+      run systemctl disable --now "${d%%:*}"
+      run systemctl enable --now "${d##*:}"
+    done
+  fi
+else
+  info "nada que apagar"
+fi
+
+# --- 2. Pantalla de inicio ---
+paso "Pantalla de inicio de Vortexine's"
+dm="$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null)"
+if [[ "$dm" == greetd.service ]]; then
+  info "ya es la de Vortexine's (greetd)"
+elif ! instalado greetd || [[ ! -f /etc/greetd/config.toml ]]; then
+  info "falta greetd o su config: corre antes install.sh"
+else
+  info "ahora: ${dm:-ninguna} → greetd (tuigreet, recuerda tu usuario; escribes tu contraseña y entras)"
+  if seguir "Cambiarla"; then
+    # El llavero (gnome-keyring) se abre solo con tu contraseña al entrar, como con la de KDE.
+    pam=/etc/pam.d/greetd
+    if instalado gnome-keyring && [[ -f "$pam" ]] && ! grep -q pam_gnome_keyring "$pam"; then
+      if ((PRUEBA)); then
+        info "$ agregar pam_gnome_keyring a $pam (auth y session)"
+      else
+        cp -a "$pam" "$pam.antes-vortex"
+        sed -i '/^auth.*include.*system-local-login/a -auth      optional     pam_gnome_keyring.so' "$pam"
+        sed -i '/^session.*include.*system-local-login/a -session   optional     pam_gnome_keyring.so auto_start' "$pam"
+      fi
+    fi
+    [[ -n "$dm" ]] && run systemctl disable "$dm"
+    run systemctl enable greetd.service
+    info "Si al reiniciar no sale la pantalla de inicio: Ctrl+Alt+F2, entra con tu usuario y"
+    info "corre «sudo systemctl enable --force ${dm:-plasmalogin.service}» para volver a la de antes."
+  fi
+fi
+
+# --- 3. GRUB directo ---
+paso "Arranque directo (GRUB sin menú)"
+g=/etc/default/grub
+if [[ -f "$g" ]] && command -v grub-mkconfig >/dev/null; then
+  info "GRUB_TIMEOUT=0, menú oculto (sale con Esc), nombre «Vortexine's OS»"
+  if seguir "Aplicar"; then
+    if ((PRUEBA)); then
+      info "$ editar $g y grub-mkconfig -o /boot/grub/grub.cfg"
+    else
+      cp -a "$g" "$g.antes-vortex"
+      sed -i -E "s/^#?GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/; s/^#?GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/; s/^#?GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR=\"Vortexine's OS\"/" "$g"
+      grep -q '^GRUB_TIMEOUT_STYLE=' "$g" || echo 'GRUB_TIMEOUT_STYLE=hidden' >>"$g"
+      grub-mkconfig -o /boot/grub/grub.cfg
+    fi
+  fi
+else
+  info "no hay GRUB (o es systemd-boot): nada que hacer"
+fi
+
+# --- 4. Paquetes de otros escritorios ---
+paso "Caelestia, KDE Plasma y el hello de CachyOS"
+candidatos=()
+for p in caelestia-shell caelestia-cli caelestia-firefox-theme cachyos-hello \
+  plasma-meta plasma-desktop plasma-workspace plasma-login-manager sddm kwin kscreen \
+  plasma-nm plasma-pa plasma-systemmonitor plasma-thunderbolt plasma-firewall \
+  plasma-browser-integration plasma-integration kde-gtk-config plasma5support \
+  plasma-activities plasma-activities-stats powerdevil kwallet-pam kinfocenter \
+  systemsettings breeze-gtk kdeplasma-addons xdg-desktop-portal-kde; do
+  instalado "$p" && candidatos+=("$p")
+done
+# Lo que otra cosa que sí usas necesita (p. ej. una app de KDE) se queda: se prueba la
+# desinstalación y se sacan de la lista los que pacman dice que romperían algo.
+quitar=("${candidatos[@]}")
+for _ in $(seq 10); do
+  ((${#quitar[@]})) || break
+  salida="$(LC_ALL=C pacman -Rs --print "${quitar[@]}" 2>&1)" && break
+  mapfile -t trabados < <(sed -n "s/.*removing \([^ ]*\) breaks dependency.*/\1/p; s/.*al eliminar \([^ ]*\) se rompe la dependencia.*/\1/p" <<<"$salida" | sort -u)
+  ((${#trabados[@]})) || { info "pacman no deja quitarlos: $salida"; quitar=(); break; }
+  filtrado=()
+  for p in "${quitar[@]}"; do printf '%s\n' "${trabados[@]}" | grep -qx "$p" || filtrado+=("$p"); done
+  quitar=("${filtrado[@]}")
+done
+if ((${#quitar[@]})); then
+  info "se quitan (con lo que ya nadie usa): ${quitar[*]}"
+  seguir "Quitarlos" && run pacman -Rns --noconfirm "${quitar[@]}"
+else
+  info "nada que quitar"
+fi
+rm_auto=()
+for f in /home/*/.config/autostart/cachyos-hello.desktop /etc/xdg/autostart/cachyos-hello.desktop; do
+  [[ -e "$f" ]] && rm_auto+=("$f")
+done
+((${#rm_auto[@]})) && run rm -f "${rm_auto[@]}"
+
+# --- 5. Disco ---
+paso "Caché de pacman y huérfanos"
+if command -v paccache >/dev/null; then
+  run paccache -rk2
+else
+  info "sin pacman-contrib (paccache): se salta la caché"
+fi
+mapfile -t huerfanos < <(pacman -Qdtq 2>/dev/null)
+if ((${#huerfanos[@]})); then
+  info "huérfanos: ${huerfanos[*]}"
+  seguir "Quitarlos" && run pacman -Rns --noconfirm "${huerfanos[@]}"
+fi
+
+paso "Listo"
+info "Reinicia para que todo quede como en una instalación nueva de Vortexine's OS."

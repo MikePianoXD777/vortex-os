@@ -3,7 +3,7 @@ paso "Escritorio: Hyprland + el shell de Vortex (Serpantinum)"
 
 # Comandos de Vortex para todos (también para los atajos de Hyprland). Son copias y no
 # enlaces: lo que está en /usr/local/bin no debe poder cambiarlo el usuario sin sudo.
-for comando in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas; do
+for comando in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar; do
   srun install -Dm755 "$VORTEX_DIR/bin/$comando" "/usr/local/bin/$comando"
 done
 
