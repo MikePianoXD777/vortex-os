@@ -16,6 +16,14 @@
 # El flatpak de verdad nunca instala, quita ni agrega remotos aquí: todo lo que cambia algo va al falso.
 #
 #   pruebas/tienda.sh
+#
+# Lo que esto NO cubre (se prueba a mano en la VM, con Flathub de verdad): empaquetar con makepkg dentro de
+# la VM e instalar (sudo pacman -U), abrir la tienda en la sesión gráfica (por SSH: XDG_RUNTIME_DIR,
+# WAYLAND_DISPLAY y HYPRLAND_INSTANCE_SIGNATURE del usuario; «setsid vortex-shop &»), sacar capturas con
+# «grim» dentro de la VM y manejarla con «vm/vm.sh clic X Y» y «vm/vm.sh escribir TEXTO» (coordenadas de
+# 1920x1080, las mismas de la captura): buscar, entrar a una app, Instalar (progreso), Abrir, Quitar,
+# Super+I y el lanzador (Super+Espacio). Ojo: si la sesión de la VM se bloquea por inactividad grim solo
+# ve la pantalla de bloqueo; reiniciar la VM la desbloquea (el autologin vuelve a entrar).
 set -uo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TIENDA="$AQUI/apps/shop"
