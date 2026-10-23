@@ -8,3 +8,5 @@ noto-fonts-emoji
 xdg-user-dirs
 firefox
 thunar                 # archivos (SUPER+E), mucho más liviano que Nautilus
+hyprpicker             # gotero de colores (SUPER+SHIFT+C)
+btop                   # monitor del sistema (CTRL+SHIFT+Esc)

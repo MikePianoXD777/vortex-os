@@ -18,6 +18,9 @@ if [[ -L "$HOME/.config/hypr" ]]; then
   info "respaldo: tu ~/.config/hypr anterior (enlace) quedó en el respaldo"
 fi
 copiar_config "$VORTEX_DIR/config/hypr/hyprland.lua" "$HOME/.config/hypr/hyprland.lua"
+# Los atajos de teclado (los de Mike en Caelestia, traducidos a Serpantinum) van en su propio archivo,
+# que hyprland.lua carga: tienen que ir siempre juntos.
+copiar_config "$VORTEX_DIR/config/hypr/atajos.lua" "$HOME/.config/hypr/atajos.lua"
 
 # Teclado: la config de Serpantinum fija «us» en Hyprland, así que se guarda la distribución del sistema
 # (formato XKB) en ~/.config/vortex/teclado.lua; ~/.config/hypr/hyprland.lua la carga. Se toma el «X11
