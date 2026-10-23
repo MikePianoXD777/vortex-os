@@ -2,7 +2,7 @@
 # Máquina virtual de pruebas de Vortex OS (QEMU + KVM, UEFI).
 #
 #   vm/vm.sh live [iso]   arranca una ISO (por defecto la de Arch) con acceso SSH por el puerto 2222
-#   vm/vm.sh disco        arranca lo instalado en el disco
+#   vm/vm.sh disco        arranca lo instalado en el disco (VORTEX_VM_VIDEO=ventana: en una ventana)
 #   vm/vm.sh ssh [cmd]    entra por SSH (root en la ISO, vortex en el disco)
 #   vm/vm.sh captura F    guarda una captura de la pantalla de la VM en F (.png)
 #   vm/vm.sh copiar O D   copia con rsync (la ruta remota va como :ruta)
@@ -48,6 +48,18 @@ EOF
 }
 
 qemu_comun() {
+  # Pantalla y sonido según VORTEX_VM_VIDEO:
+  #   (nada)   sin ventana, con 3D (egl-headless); capturas con grim dentro de la VM
+  #   2d       sin ventana ni 3D, pero «captura» (screendump) funciona: para probar la ISO
+  #   ventana  en una ventana de tu escritorio, con 3D y sonido: para usar la VM tú mismo
+  AUDIO=none
+  case "${VORTEX_VM_VIDEO:-}" in
+    2d) VIDEO=(-device virtio-vga,xres=1920,yres=1080 -display none) ;;
+    ventana)
+      VIDEO=(-device virtio-vga-gl,xres=1920,yres=1080 -display gtk,gl=on,zoom-to-fit=on)
+      AUDIO=pipewire ;;
+    *) VIDEO=(-device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless) ;;
+  esac
   QEMU=(
     qemu-system-x86_64 -enable-kvm -machine q35 -cpu host
     -smp "${VORTEX_VM_CPUS:-6}" -m "${VORTEX_VM_RAM:-6G}"
@@ -55,19 +67,21 @@ qemu_comun() {
     -drive "if=pflash,format=raw,file=$VM/OVMF_VARS.fd"
     -drive "file=$DISCO,if=virtio,cache=unsafe"
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$PUERTO-:22"
-    # VORTEX_VM_VIDEO=2d: sin aceleración 3D, pero «captura» funciona (screendump) y se puede
-    # ver y manejar el instalador gráfico de la ISO (Hyprland va con render por software).
-    $( [[ "${VORTEX_VM_VIDEO:-}" == 2d ]] && echo "-device virtio-vga,xres=1920,yres=1080 -display none" \
-       || echo "-device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless" )
+    "${VIDEO[@]}"
     -device virtio-keyboard -device virtio-tablet
-    # Tarjeta de sonido como en una PC real (sin salida al host, para no sonar en tus parlantes).
-    -audiodev none,id=sonido -device ich9-intel-hda -device hda-output,audiodev=sonido
+    -audiodev "$AUDIO,id=sonido" -device ich9-intel-hda -device hda-output,audiodev=sonido
     -monitor "unix:$VM/monitor.sock,server,nowait"
     # QMP: para mandar clics y teclas con coordenadas exactas (vm/vm.sh clic X Y).
     -qmp "unix:$VM/qmp.sock,server,nowait"
     -serial "file:$VM/serial.log"
-    -pidfile "$VM/qemu.pid" -daemonize
+    -pidfile "$VM/qemu.pid"
   )
+  if [[ "${VORTEX_VM_VIDEO:-}" == ventana ]]; then
+    lanzar() { setsid nohup "$@" >"$VM/qemu.log" 2>&1 </dev/null & sleep 2; }
+  else
+    QEMU+=(-daemonize)
+    lanzar() { "$@"; }
+  fi
 }
 
 corriendo() { [[ -f "$VM/qemu.pid" ]] && kill -0 "$(cat "$VM/qemu.pid")" 2>/dev/null; }
@@ -139,14 +153,14 @@ case "${1:-}" in
     iso="${2:-$ISO_ARCH}"
     [[ -f "$iso" ]] || { echo "No encuentro la ISO: $iso" >&2; exit 1; }
     qemu_comun
-    "${QEMU[@]}" -drive "file=$iso,media=cdrom,index=2" -drive "file=$VM/semilla.iso,media=cdrom,index=3" -boot d
+    lanzar "${QEMU[@]}" -drive "file=$iso,media=cdrom,index=2" -drive "file=$VM/semilla.iso,media=cdrom,index=3" -boot d
     echo "VM arrancando desde $(basename "$iso")"
     ;;
   disco)
     corriendo && { echo "La VM ya está corriendo." >&2; exit 1; }
     preparar
     qemu_comun
-    "${QEMU[@]}" -boot c
+    lanzar "${QEMU[@]}" -boot c
     echo "VM arrancando desde el disco"
     ;;
   ssh)
