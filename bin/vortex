@@ -33,6 +33,8 @@ Uso: vortex <comando>
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
+  miku [avatar on|off|estado]          Miku, el asistente de voz (Super+O): la abre o la cierra del todo;
+                                       «avatar off» la deja solo como voz y gasta menos RAM
   java [aplicar]                       muestra o aplica a Minecraft los ajustes de Java para jugar
   version
 EOF
@@ -529,6 +531,14 @@ case "${1:-ayuda}" in
     shift
     if [[ -x "$VORTEX_DIR/bin/vortex-otaku" ]]; then exec "$VORTEX_DIR/bin/vortex-otaku" "$@"; fi
     exec vortex-otaku "$@"
+    ;;
+  # Vortex: Miku, el asistente de voz, es su propio comando (paquete vortex-miku, /usr/bin/vortex-miku):
+  # «vortex miku …» le pasa todo tal cual (alternar, avatar on|off, estado, voz, modelo).
+  miku)
+    shift
+    command -v vortex-miku >/dev/null 2>&1 \
+      || { aviso "falta el asistente Miku (paquete vortex-miku). Instálalo con: cd \"$VORTEX_DIR/packaging/vortex-miku\" && makepkg -sif"; exit 127; }
+    exec vortex-miku "$@"
     ;;
   java) shift; cmd_java "$@" ;;
   primer-inicio) cmd_primer_inicio ;;

@@ -161,6 +161,9 @@ GuideTab {
             // Vortex: conectar con Claude (viene apagado).
             GeneralClaudeSection { tab: generalTabRoot }
 
+            // Vortex: «Miku en 3D» (el asistente de voz), ver GeneralAssistantSection.qml.
+            GeneralAssistantSection { tab: generalTabRoot }
+
             GeneralLocationSection { id: locationSection; tab: generalTabRoot }
 
             SettingsRow {

@@ -5,3 +5,4 @@ GeneralAudioSection 1.0 GeneralAudioSection.qml
 GeneralBehaviorSection 1.0 GeneralBehaviorSection.qml
 GeneralLocationSection 1.0 GeneralLocationSection.qml
 GeneralClaudeSection 1.0 GeneralClaudeSection.qml
+GeneralAssistantSection 1.0 GeneralAssistantSection.qml

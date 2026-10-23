@@ -24,6 +24,7 @@ cat <<'EOF'
       vortex gestor estado       qué está priorizando el gestor de recursos
       vortex fondo ARCHIVO       cambia el fondo (y los colores)
       Super+A                    habla con Claude (Espacio para hablarle con el micrófono)
+      Super+O                    abre y cierra a Miku, el asistente de voz
       Super+G                    modo juego a mano
 EOF
 

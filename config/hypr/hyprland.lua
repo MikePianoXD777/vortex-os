@@ -11,6 +11,7 @@ package.path = serp .. "/?.lua;" .. package.path
 local reemplazados = {
     ["SUPER + A"] = true, -- autohide de la barra → Claude (va a SUPER + SHIFT + A)
     ["SUPER + E"] = true, -- nautilus
+    ["SUPER + O"] = true, -- hoy libre en Serpantinum; si algún día lo usa, el atajo es de Miku (el asistente)
 }
 
 -- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
@@ -128,6 +129,31 @@ hl.window_rule({ match = { fullscreen = false }, opacity = "0.95 override" })
 hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, opacity = "1.0 override" })
 hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = true, idle_inhibit = "always" })
 
+-- Miku, el asistente de voz (vortex-miku, app de Qt con app_id «vortex-miku»): una ventana
+-- flotante sin marco que el atajo abre y cierra. Wayland no deja que la app se coloque ni se
+-- ponga encima, así que eso lo hacen estas reglas: fija en todos los escritorios (pin), sin
+-- borde, sombra, blur ni animación (el fondo de la ventana es transparente: el contorno del
+-- personaje no debe llevar nada alrededor), sin quitarte el teclado al abrirse ni al darle clic,
+-- y pegada al borde derecho justo debajo de la barra (que mide 44 px arriba: 40 de barra y 4 de
+-- margen; 52 deja 8 de aire). No lleva «size»: la app fija su tamaño (460x760 con el 3D, 420x240
+-- sin él) y lo cambia al reabrirse. Si la barra está en otro lado o es más gruesa, cambia el
+-- segundo número de «move» (o muévela a mano: hyprctl dispatch movewindowpixel).
+hl.window_rule({
+    name = "vortex-miku",
+    match = { class = "^vortex-miku$" },
+    float = true,
+    pin = true,
+    no_initial_focus = true,
+    no_focus = true,
+    no_shadow = true,
+    no_blur = true,
+    no_dim = true,
+    no_anim = true,
+    border_size = 0,
+    rounding = 0,
+    move = "monitor_w-window_w-12 52",
+})
+
 -- Atajos de Vortex.
 hl.bind("SUPER + A", hl.dsp.exec_cmd("vortex claude"))
 hl.bind("SUPER + SHIFT + A", hl.dsp.event("serpantinum:toggle autohide"))
@@ -135,6 +161,11 @@ hl.bind("SUPER + G", hl.dsp.exec_cmd("vortex modo-juego alternar"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd("thunar"))
 -- Vortexine's Shop (la tienda de apps; I de «instalar»). Super+S ya es el especial y Super+Shift+S, la captura.
 hl.bind("SUPER + I", hl.dsp.exec_cmd("vortex-shop"))
+
+-- Miku: abre el asistente de voz (o lo cierra del todo si ya está abierto). Super+O estaba libre
+-- (ni Serpantinum ni atajos.lua lo usan); aun así está en «reemplazados», por si una actualización de
+-- Serpantinum lo estrena.
+hl.bind("SUPER + O", hl.dsp.exec_cmd("vortex-miku"))
 
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)

@@ -11,3 +11,7 @@ iso/out/
 packaging/*/pkg/
 packaging/*/src/
 packaging/*/*.pkg.tar.*
+
+# Modelos 3D (VRM) del asistente Miku: son del autor del modelo, nunca van a git. La ISO los toma
+# de VORTEX_MIKU_MODELO al construirse (iso/miku-modelo.sh).
+*.vrm

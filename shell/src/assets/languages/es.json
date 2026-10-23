@@ -248,6 +248,12 @@
         "title": "Claude",
         "desc": "Viene apagado. Actívalo para usar Claude con Super+A (le hablas con el micrófono y ve tu pantalla solo cuando se lo pides). Necesita internet y tu cuenta de Claude: la primera vez te pide iniciar sesión",
         "working": "Trabajando…"
+      },
+      "assistant": {
+        "title": "Miku en 3D",
+        "desc": "Super + O abre y cierra a Miku, tu asistente de voz. Encendido, su modelo 3D sale al lado de la pantalla; apagado, queda solo la voz y gasta menos RAM",
+        "working": "Cambiando…",
+        "missing": "El asistente no está instalado (paquete vortex-miku)"
       }
     },
     "display": {

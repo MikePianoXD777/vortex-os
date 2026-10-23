@@ -10,7 +10,7 @@
 -- Super+flechas (enfocar), Ctrl+Super+arriba/abajo (mover la ventana), Super+L (bloquear),
 -- Super+Alt+F (maximizar), Super+clic izquierdo/derecho (mover/redimensionar), Impr (captura
 -- de región), Super+Impr (pantalla completa) y las teclas de brillo, mute, micrófono y
--- reproducción. Los de Vortex (Super+A, Super+Shift+A, Super+G, Super+E) están en hyprland.lua.
+-- reproducción. Los de Vortex (Super+A, Super+Shift+A, Super+G, Super+E, Super+O) están en hyprland.lua.
 -- Lo tuyo va en ~/.config/vortex/hypr-mio.lua (se carga al final).
 local M = {}
 

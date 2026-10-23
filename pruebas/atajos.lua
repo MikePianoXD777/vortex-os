@@ -57,7 +57,7 @@ local estado = {
     escritorio = { id = 1 }, especial = nil, ventanas = {}, activa = nil,
     monitor = { width = 1920, height = 1080, scale = 1, x = 0, y = 0 },
 }
-local registro = { binds = {}, despachos = {}, eventos = {}, ejecutados = {}, avisos = {}, config = {} }
+local registro = { binds = {}, despachos = {}, eventos = {}, ejecutados = {}, avisos = {}, config = {}, reglas = {} }
 
 local hl = { dsp = proxy("") }
 function hl.bind(teclas, accion, opciones)
@@ -74,6 +74,7 @@ function hl.on(evento, cb)
     table.insert(registro.eventos[evento], cb)
 end
 function hl.config(valores) registro.config[#registro.config + 1] = valores end
+function hl.window_rule(regla) registro.reglas[#registro.reglas + 1] = regla end
 function hl.exec_cmd(comando) registro.ejecutados[#registro.ejecutados + 1] = comando end
 hl.notification = { create = function(opciones) registro.avisos[#registro.avisos + 1] = opciones end }
 setmetatable(hl, { __index = function() return function() end end }) -- hl.env, hl.window_rule...
@@ -88,17 +89,19 @@ local PATH_ORIGINAL = package.path
 -- Carga hyprland.lua del repo (con el shell del repo, no el de /usr/share). Estricto: si
 -- atajos.lua falla, la prueba falla (hyprland.lua se lo tragaría y avisaría); con
 -- estricto = false se carga tal cual, como en Hyprland. carpeta_atajos: de dónde sale atajos.lua.
-local function cargar_config(estricto, carpeta_atajos)
+-- carpeta_serp: de dónde sale Serpantinum (por defecto el del repo).
+local function cargar_config(estricto, carpeta_atajos, carpeta_serp)
     for nombre in pairs(package.loaded) do
         if nombre == "atajos" or nombre:match("^config/") then package.loaded[nombre] = nil end
     end
     registro.binds, registro.despachos, registro.eventos, registro.ejecutados, registro.avisos = {}, {}, {}, {}, {}
     registro.config = {}
+    registro.reglas = {}
     package.path = (carpeta_atajos and (carpeta_atajos .. "/?.lua;") or "") .. PATH_ORIGINAL
     local f = assert(io.open(RAIZ .. "/config/hypr/hyprland.lua"))
     local fuente = f:read("a")
     f:close()
-    fuente = fuente:gsub('local serp = "[^"]*"', 'local serp = "' .. RAIZ .. '/shell/compositors/hyprland"', 1)
+    fuente = fuente:gsub('local serp = "[^"]*"', 'local serp = "' .. (carpeta_serp or (RAIZ .. "/shell/compositors/hyprland")) .. '"', 1)
     if estricto then
         fuente = fuente:gsub('pcall%(require, "atajos"%)', 'true, require("atajos")', 1)
         fuente = fuente:gsub('pcall%(atajos%.registrar%)', 'true, atajos.registrar()', 1)
@@ -154,6 +157,7 @@ local esperado = {
     ["SUPER + SHIFT + N"] = "toggle network", ["SUPER + ALT + M"] = "toggle music",
     ["SUPER + SHIFT + W"] = "toggle wallpaper", ["SUPER + SHIFT + A"] = "toggle autohide",
     ["SUPER + A"] = "vortex claude", ["SUPER + G"] = "vortex modo-juego alternar",
+    ["SUPER + O"] = "exec_cmd(vortex-miku)",
     ["SUPER + E"] = "thunar", ["SUPER + W"] = "firefox", ["SUPER + T"] = "kitty",
     ["SUPER + C"] = "zeditor", ["SUPER + L"] = "serpantinum lock",
     ["SUPER + Q"] = "window.close", ["SUPER + F"] = "mode=fullscreen",
@@ -194,6 +198,28 @@ for _, atajo in ipairs({ "SUPER + 1", "SUPER + 0", "SUPER + ALT + 5", "CTRL + SU
     "SUPER + ALT + Backslash", "CTRL + SUPER + ALT + Backslash",
     "CTRL + SUPER + ALT + R", "SUPER + ALT + L", "SUPER + Period", "SUPER + SHIFT + 3", "SUPER + SHIFT + 0" }) do
     ok(atajo .. " → función", type(acciones[normalizar(atajo)]) == "function")
+end
+
+-- Miku, el asistente de voz: el atajo y las reglas de su ventana (clase «vortex-miku»).
+print("== Miku (Super+O y su ventana)")
+do
+    local miku
+    for _, regla in ipairs(registro.reglas) do
+        if regla.match and regla.match.class == "^vortex-miku$" then miku = regla end
+    end
+    ok("hay una regla de ventana para la clase vortex-miku", miku ~= nil)
+    if miku then
+        ok("flotante y fija en todos los escritorios", miku.float == true and miku.pin == true)
+        ok("sin borde, sombra, blur ni esquinas redondeadas",
+            miku.border_size == 0 and miku.no_shadow == true and miku.no_blur == true and miku.rounding == 0)
+        ok("no roba el teclado al abrirse", miku.no_initial_focus == true and miku.no_focus == true)
+        ok("pegada al borde derecho, debajo de la barra (move = «monitor_w-window_w-N Y»)",
+            type(miku.move) == "string" and miku.move:match("^monitor_w%-window_w%-%d+ %d+$") ~= nil, miku.move)
+        ok("sin «size»: la app fija su tamaño (460x760 con el 3D, 420x240 sin él)", miku.size == nil)
+    end
+    -- Super+O estaba libre: si atajos.lua lo usara, saldría registrado dos veces y «ningún atajo
+    -- duplicado» (arriba) fallaría. Si una actualización de Serpantinum lo estrenara, el filtro de
+    -- «reemplazados» de hyprland.lua lo deja fuera: eso se prueba más abajo, con un Serpantinum que sí lo registra.
 end
 
 print("== Atajos de Serpantinum que ya no deben estar")
@@ -429,6 +455,25 @@ respaldo("atajos.lua que falla al registrar", falla, function(comando)
     ok("el aviso por notify-send reintenta hasta que hay servidor (falla 2 veces, sale a la 3.ª)", veces_notify == 3, llamadas)
     ok("…y el texto llega entero", llamadas:find("Vortex: atajos", 1, true) and llamadas:find("no se pudieron cargar los atajos", 1, true), llamadas)
 end)
+
+-- Un Serpantinum que estrena Super+O: Miku (Vortex) gana, y su atajo no sale dos veces.
+print("== Un Serpantinum que estrena Super+O")
+-- Copia de Serpantinum a cuyos atajos se les suma un Super+O.
+local estreno = TEMP .. "/serp-estreno"
+os.execute("mkdir -p '" .. estreno .. "' && cp -r '" .. RAIZ .. "/shell/compositors/hyprland/.' '" .. estreno .. "/'")
+local keybinds = assert(io.open(estreno .. "/config/keybinds.lua", "a"))
+keybinds:write('\nhl.bind("SUPER + O", hl.dsp.exec_cmd("serpantinum-estreno"))\n')
+keybinds:close()
+local estreno_ok, estreno_error = pcall(cargar_config, true, RAIZ .. "/config/hypr", estreno)
+ok("la config carga con ese Serpantinum", estreno_ok, estreno_error)
+if estreno_ok then
+    local o = {}
+    for _, b in ipairs(registro.binds) do
+        if normalizar(b.teclas) == normalizar("SUPER + O") then o[#o + 1] = describir(b.accion) end
+    end
+    ok("Super+O queda registrado una sola vez", #o == 1, #o)
+    ok("…y es el de Miku, no el de Serpantinum", o[1] and o[1]:find("vortex-miku", 1, true) and not o[1]:find("estreno", 1, true), o[1])
+end
 
 -- Con atajos.lua sano no hay ningún aviso.
 local sana_ok, sana_error = pcall(cargar_config, true, RAIZ .. "/config/hypr")

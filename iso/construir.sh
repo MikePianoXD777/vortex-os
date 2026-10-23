@@ -240,6 +240,16 @@ fi
 grep -rl 'Arch Linux install medium' "$perfil"/efiboot "$perfil"/syslinux "$perfil"/grub 2>/dev/null |
   xargs -r sed -i 's/Arch Linux install medium/Vortexine'\''s OS/g'
 
+# Miku (vortex-miku): el modelo 3D no va en git ni en el paquete, se pone aquí desde la carpeta
+# VORTEX_MIKU_MODELO (modelo.vrm y CREDITO.txt) a /usr/share/vortex-miku/modelo/, 0644 root. Sin
+# modelo avisa y sigue: el asistente funciona y la app dice cómo poner uno. Ver iso/miku-modelo.sh.
+# shellcheck source=iso/miku-modelo.sh
+source "$AQUI/miku-modelo.sh"
+miku_poner_modelo "$raiz"
+for archivo in "${MIKU_ARCHIVOS[@]}"; do
+  echo "file_permissions+=([\"$archivo\"]=\"0:0:644\")" >>"$perfil/profiledef.sh"
+done
+
 # --- Secure Boot sin tocar la BIOS: shim (firmado por Microsoft) + la llave de Vortexine's ---
 # VORTEX_SB_LLAVE = carpeta con MOK.key, MOK.crt y vortexines.cer (la llave de la ISO; NO va en
 # git). La firma va en una copia de mkarchiso: justo después de copiar systemd-boot al arranque

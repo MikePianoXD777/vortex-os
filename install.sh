@@ -4,7 +4,7 @@
 #   ./install.sh                  instalación normal (pregunta lo opcional)
 #   ./install.sh --prueba         muestra lo que haría, sin tocar nada
 #   ./install.sh --si             acepta todo lo que viene por defecto
-#   ./install.sh --sin-juegos --sin-dev --sin-claude
+#   ./install.sh --sin-juegos --sin-dev --sin-claude --sin-miku
 #   ./install.sh --inicio-automatico   entra al escritorio sin pedir contraseña
 set -Eeuo pipefail
 
@@ -14,9 +14,10 @@ export VORTEX_DIR
 VORTEX_JUEGOS=1
 VORTEX_DEV=1
 VORTEX_CLAUDE=1
+VORTEX_MIKU=1
 VORTEX_AUTOLOGIN=0
 
-uso() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; }
+uso() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while (($#)); do
   case "$1" in
@@ -25,6 +26,7 @@ while (($#)); do
     --sin-juegos) VORTEX_JUEGOS=0 ;;
     --sin-dev) VORTEX_DEV=0 ;;
     --sin-claude) VORTEX_CLAUDE=0 ;;
+    --sin-miku) VORTEX_MIKU=0 ;;
     --inicio-automatico) VORTEX_AUTOLOGIN=1 ;;
     -h | --ayuda | --help) uso; exit 0 ;;
     *) echo "Opción desconocida: $1" >&2; uso; exit 1 ;;
@@ -36,7 +38,7 @@ done
 source "$VORTEX_DIR/install/lib.sh"
 
 VORTEX_RESPALDO="$HOME/.config/vortex/respaldo-$(date +%Y%m%d-%H%M%S)"
-export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_AUTOLOGIN
+export VORTEX_RESPALDO VORTEX_JUEGOS VORTEX_DEV VORTEX_CLAUDE VORTEX_MIKU VORTEX_AUTOLOGIN
 
 # Dónde falló: archivo y línea, y la línea del paso que lo originó, buscándola en
 # la pila de llamadas (el fallo puede estar dentro de una función de lib.sh,

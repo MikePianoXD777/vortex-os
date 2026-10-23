@@ -42,8 +42,10 @@ if python3 -c 'import PIL' 2>/dev/null; then
 else
   echo "  --  python-pillow no está instalado: no se mide el jpg"
 fi
+# Solo imágenes y modelos: el asistente Miku (apps/miku, packaging/vortex-miku, pruebas/miku*.sh...) lleva
+# «miku» en el nombre de sus scripts. El modelo 3D (*.vrm) nunca va a git: pruebas/miku.sh.
 probar "ninguna imagen del personaje en el repo (solo el respaldo original)" \
-  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/)' || true)\" ]]"
+  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -i -E '\\.(jpe?g|png|webp|gif|bmp|avif|svg|vrm|glb|gltf|fbx|psd)\$' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/)' || true)\" ]]"
 
 # --- Entorno falso ---
 mkdir -p "$T/bin"

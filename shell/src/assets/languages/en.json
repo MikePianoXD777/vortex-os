@@ -247,6 +247,12 @@
         "title": "Claude",
         "desc": "Off by default. Turn it on to use Claude with Super+A (talk to it with the microphone; it sees your screen only when you ask). Needs internet and your Claude account: the first time it asks you to sign in",
         "working": "Working…"
+      },
+      "assistant": {
+        "title": "Miku in 3D",
+        "desc": "Super + O opens and closes Miku, your voice assistant. On, her 3D model appears beside the screen; off, only the voice stays and it uses less RAM",
+        "working": "Switching…",
+        "missing": "The assistant is not installed (vortex-miku package)"
       }
     },
     "display": {

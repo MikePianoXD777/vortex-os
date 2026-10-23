@@ -129,6 +129,10 @@ vortex-shop
 # no se pierda de la ISO si algún día cambian sus dependencias.
 pyside6
 wl-gammarelay-rs
+# Miku, el asistente de voz (Super+O): viene instalado y encendido. Trae su voz y su oído (modelos
+# incluidos: funciona sin internet) y sus dependencias (pyside6, qt6-webengine, whisper-cpp,
+# espeak-ng...). El modelo 3D no va en el paquete: iso/construir.sh lo pone (iso/miku-modelo.sh).
+vortex-miku
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el

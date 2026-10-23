@@ -89,6 +89,7 @@ arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin const
 | Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |
 | Pantallas | `vortex-pantallas` | cada monitor a su resolución máxima y su frecuencia más alta (144, 165, 200, 240 Hz), al entrar y al conectarlo; respeta lo que pongas en Ajustes → Pantalla o en `hypr-mio.lua` |
 | Tienda de apps | **Vortexine's Shop** (`vortex-shop`) | todo Flathub a un clic, sin terminal ni contraseñas; las apps no vienen en la ISO |
+| Asistente de voz | Miku (`vortex-miku`): modelo 3D VRM + Claude Sonnet + voz y oído locales | Super+O; viene instalada y encendida, y se apaga del todo al cerrarla |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
@@ -149,6 +150,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+C | editor (Zed) |
 | Super+A | habla con Claude (si lo activaste) |
 | Super+I | Vortexine's Shop: la tienda de apps |
+| Super+O | Miku, el asistente de voz: la abre (y se pone a escuchar) o la cierra del todo |
 | Super+G | modo juego a mano |
 
 **Escritorios**
@@ -267,6 +269,35 @@ Claude, y la primera vez que lo abres te pide iniciar sesión. `install.sh` preg
 hay, lo reintenta en el próximo inicio) y al terminar avisa con una notificación. A mano:
 `vortex claude instalar`.
 
+### Miku, el asistente de voz
+
+Viene instalada y encendida en la ISO (paquete `vortex-miku`; `install.sh` la pregunta, y `--sin-miku` la
+omite). **Super+O** la abre —sale pegada al borde derecho, debajo de la barra, y se pone a escuchar— y
+**Super+O otra vez la cierra del todo**: sin ventana no queda ningún proceso (ni la voz, ni el oído, ni
+Claude), así que no gasta RAM cuando no la usas.
+
+- **Qué es:** Miku Nakano en 3D (un modelo VRM) con **Claude Sonnet** de cerebro, que puede ver tu pantalla,
+  y una voz de IA genérica (no imita a ninguna persona). El oído (Whisper) y la voz (Kokoro) corren en tu
+  PC, sin internet; lo único que sale es lo que ella piensa, que pasa por Claude con tu cuenta (como Super+A).
+- **Solo voz:** en **Ajustes > General > Miku en 3D** (o `vortex miku avatar off`) se apaga el 3D y queda un
+  panel chico de asistente de voz, que gasta bastante menos RAM. `vortex miku avatar on` lo vuelve a encender.
+  (En un sistema ya instalado, el interruptor y `vortex miku` llegan con `vortex actualizar --forzar`.)
+- **Privacidad:** el micrófono solo escucha mientras su ventana está abierta, y el audio no se guarda. La
+  pantalla solo la ve cuando se lo pides, y cada vez te sale una notificación (`vortex claude pausa` le corta
+  el acceso). Sin Claude instalado o sin sesión la voz sigue funcionando: ella te dice qué falta.
+- **Comandos:** `vortex miku` abre o cierra, `vortex miku estado` dice si el 3D está encendido y si está
+  abierta, `vortex miku voz [ID]` lista o elige la voz y `vortex miku modelo RUTA.vrm` pone otro modelo 3D.
+  Las opciones quedan en `~/.config/vortex/miku.json`.
+- **El modelo 3D no viene en este repo ni en el paquete** (es del autor del personaje y su licencia pide
+  crédito). La ISO lo toma al construirse de la carpeta `VORTEX_MIKU_MODELO` (con `modelo.vrm` y
+  `CREDITO.txt`; si no se la das, usa `~/.local/share/vortex/miku` de quien corre `sudo`) y lo deja en
+  `/usr/share/vortex-miku/modelo/`; sin modelo la ISO sale igual y Miku funciona como solo voz. `install.sh`
+  tampoco lo trae: la app muestra cómo ponerlo. La ventana de Miku lleva el crédito a la vista.
+
+Las pruebas corren sin VM ni pantalla: `pruebas/miku.sh` (el comando, la ISO y el instalador),
+`pruebas/miku-qml.sh` (el interruptor de Ajustes, con el quickshell de verdad) y `pruebas/atajos.sh` (Super+O y
+las reglas de su ventana). Falta probar la ventana transparente sobre una sesión real de Hyprland.
+
 ## ¿Cuánto más ligero?
 
 Los objetivos se miden con `vortex bench`, no se prometen a ojo. En la VM se mide con un arranque en frío por
@@ -311,9 +342,10 @@ bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, s
 bin/vortex-bench     medidor de ligereza
 bin/vortex-otaku     modo otaku (easter egg): fondo de Wallhaven + toque de personalización
 bin/vortex-mcp       servidor MCP para Claude
+apps/miku/           Miku, el asistente de voz (app de Qt con el modelo 3D; la empaqueta packaging/vortex-miku)
 iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]; sus pruebas: pruebas/iso.sh
 vm/                  VM de pruebas con QEMU, mediciones y previews
-pruebas/             pruebas que corren sin VM (gestor de recursos, atajos y modo otaku)
+pruebas/             pruebas que corren sin VM (gestor de recursos, atajos, modo otaku y Miku)
 ```
 
 ## Probar en una máquina virtual
@@ -325,6 +357,23 @@ vm/vm.sh apagar && vm/vm.sh disco     # arranca lo instalado
 VORTEX_VM_USUARIO=vortex vm/vm.sh ssh # entra como el usuario de prueba
 vm/preview.sh foto escritorio         # capturas y clips para mostrar Vortex
 ```
+
+## Créditos del asistente Miku
+
+- **Modelo 3D:** «MIKU NAKANO» por **Vewertyg**, en [VRoid Hub](https://hub.vroid.com/en/characters/7619526108943069134/models/40799402200114173).
+  Condiciones del autor (van dentro del VRM): avatar para cualquiera, se permite modificar y redistribuir,
+  **crédito obligatorio, sin uso comercial** (personal ni corporativo) **ni expresión sexual**
+  ([licencia](https://hub.vroid.com/license?allowed_to_use_user=everyone&characterization_allowed_user=everyone&corporate_commercial_use=disallow&credit=necessary&modification=allow&personal_commercial_use=disallow&redistribution=allow&sexual_expression=disallow&version=1&violent_expression=allow)).
+  Miku Nakano es un personaje de «Gotoubun no Hanayome»; este repo no incluye el modelo ni imágenes suyas.
+- **3D en pantalla:** [three.js](https://threejs.org) 0.180.0 y [@pixiv/three-vrm](https://github.com/pixiv/three-vrm)
+  3.5.5 (MIT), dentro de Qt WebEngine.
+- **Voz:** [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad, Apache-2.0) con
+  [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT), onnxruntime (MIT) y
+  [espeak-ng](https://github.com/espeak-ng/espeak-ng) (GPL-3.0) para los fonemas. Es una voz de IA genérica:
+  no clona ni imita a ninguna persona.
+- **Oído:** [Whisper](https://github.com/openai/whisper) de OpenAI (MIT) con
+  [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT).
+- **Cerebro:** Claude, de Anthropic, con tu cuenta.
 
 ## Licencia
 
