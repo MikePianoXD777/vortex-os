@@ -24,8 +24,9 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   `vortex miku modelo RUTA.vrm`. Las opciones quedan en `~/.config/vortex/miku.json`.
 - **`vortex actualizar` más listo:** sigue con el código recién bajado (antes usaba el de antes del
   pull) y reconstruye el shell, la tienda o Miku cuando cambia su paquete, o los instala si faltan;
-  ya no hace falta `--forzar`. Desde la 1.2 o antes, córrelo **dos veces** (la primera trae el
-  `vortex` nuevo).
+  también pone al día la config de Hyprland (`~/.config/hypr/hyprland.lua` y `atajos.lua`, con
+  respaldo; lo tuyo sigue en `hypr-mio.lua`). Ya no hace falta `--forzar`. Desde la 1.2 o antes,
+  córrelo **dos veces** (la primera trae el `vortex` nuevo).
 
 ## Qué viene en la ISO y qué no
 

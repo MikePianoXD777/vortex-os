@@ -511,6 +511,21 @@ cmd_actualizar() {
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && hypr_corriendo && hyprctl reload >/dev/null 2>&1
   done
+  # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
+  # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
+  local f respaldo="$CONF/respaldo-$(date +%Y%m%d-%H%M%S)" cambio=0
+  for f in hyprland.lua atajos.lua; do
+    [[ -f "$VORTEX_DIR/config/hypr/$f" && -f "$HOME/.config/hypr/$f" ]] || continue
+    cmp -s "$VORTEX_DIR/config/hypr/$f" "$HOME/.config/hypr/$f" && continue
+    mkdir -p "$respaldo/.config/hypr"
+    cp -a "$HOME/.config/hypr/$f" "$respaldo/.config/hypr/$f"
+    install -m644 "$VORTEX_DIR/config/hypr/$f" "$HOME/.config/hypr/$f"
+    cambio=1
+  done
+  if ((cambio)); then
+    printf 'vortex: %s\n' "config de Hyprland al día (la anterior quedó en ${respaldo/#"$HOME"/\~})"
+    hypr_corriendo && hyprctl reload >/dev/null 2>&1
+  fi
   return 0
 }
 

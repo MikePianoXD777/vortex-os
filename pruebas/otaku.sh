@@ -410,6 +410,16 @@ probar "reconstruye la tienda (otro pkgrel) e instala Miku (faltaba), no el shel
 env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar --forzar >/dev/null 2>&1
 probar "con --forzar reconstruye los tres" "[[ \"\$(grep -vc hyprctl '$T/makepkg.log')\" == 3 ]]"
 
+# La config de Hyprland que copió el instalador se pone al día (con respaldo); sin ella no se crea.
+mkdir -p "$T/repo/config/hypr" "$H/.config/hypr"
+cp "$AQUI/config/hypr/hyprland.lua" "$AQUI/config/hypr/atajos.lua" "$T/repo/config/hypr/"
+echo '-- vieja' >"$H/.config/hypr/hyprland.lua"
+rm -f "$H/.config/hypr/atajos.lua"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1; rc=$?
+probar "pone al día ~/.config/hypr/hyprland.lua y respalda la vieja" \
+  "((rc == 0)) && cmp -s '$AQUI/config/hypr/hyprland.lua' '$H/.config/hypr/hyprland.lua' && grep -rqx -- '-- vieja' '$H/.config/vortex/'respaldo-*/.config/hypr/hyprland.lua"
+probar "no crea atajos.lua si no lo tenías" "[[ ! -e '$H/.config/hypr/atajos.lua' ]]"
+
 lista_instalador="$(sed -n 's/^for comando in \(.*\); do$/\1/p' "$AQUI/install/30-escritorio.sh")"
 lista_vortex="$(sed -n 's/^COMANDOS_VORTEX=(\(.*\))$/\1/p' "$AQUI/bin/vortex")"
 probar "la lista de bin/vortex es la misma que la de install/30-escritorio.sh" "[[ -n '$lista_instalador' && '$lista_instalador' == '$lista_vortex' ]]"
