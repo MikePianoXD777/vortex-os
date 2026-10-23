@@ -1,0 +1,448 @@
+#!/usr/bin/env bash
+# vortex-otaku: «Modo otaku» de Vortex OS (un easter egg para un amigo de Mike).
+#
+#   vortex-otaku on|off|alternar|estado|otro      (también: vortex otaku ...)
+#
+# «on» pone de fondo a Miku Nakano («Gotoubun no Hanayome») y le da un toque suave al shell
+# (fuente y bordes más redondeados). «off» devuelve el fondo y los ajustes de antes.
+#
+# Derechos de autor: este repo NO lleva imágenes del personaje. Los fondos se bajan al
+# encender, de la API pública de Wallhaven (solo SFW), a ~/Imágenes/Fondos/otaku/ (o la
+# carpeta de imágenes de tu idioma), y se borran al apagar. De cada uno se guarda su URL en
+# fuentes.json. Sin red usa un fondo ORIGINAL de Vortex (config/fondos/otaku/): audífonos
+# estilizados, sin el personaje.
+#
+# Estado:   ~/.config/vortex/otaku           (existe = encendido; lo lee la app de Ajustes)
+# Antes:    ~/.config/vortex/otaku-antes.json (fondo y ajustes previos, para «off»; si «off» no
+#           puede devolver los ajustes, se queda ahí y otro «off» lo reintenta)
+set -euo pipefail
+
+VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+# Copiado en /usr/local/bin, «..» no es el repo: el instalador deja su ruta en /etc/vortex-release.
+VORTEX_RELEASE="${VORTEX_RELEASE:-/etc/vortex-release}"
+if [[ ! -f "$VORTEX_DIR/install.sh" && -r "$VORTEX_RELEASE" ]]; then
+  repo="$(sed -n 's/^VORTEX_REPO="\(.*\)"$/\1/p' "$VORTEX_RELEASE")"
+  [[ -f "$repo/install.sh" ]] && VORTEX_DIR="$repo"
+  unset repo
+fi
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONF="$CONFIG/vortex"
+MARCA="$CONF/otaku"
+ANTES="$CONF/otaku-antes.json"
+AJUSTES="$CONFIG/serpantinum/settings.json"
+CACHE_FONDO="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
+SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
+FONDOS="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
+DESTINO="$FONDOS/otaku"
+
+# Wallhaven: búsqueda pública, solo SFW (purity=100) y categoría anime (categories=010).
+API="https://wallhaven.cc/api/v1/search?q=Nakano%20Miku&categories=010&purity=100&sorting=favorites&atleast=1920x1080"
+CUANTOS=5
+UA="vortex-otaku (Vortex OS; https://github.com/MikePianoXD777/vortex-os)"
+
+# El toque de personalización: algo suave y que no rompa nada (la fuente viene en el
+# paquete del shell, así que siempre está). Ajustes > Tema los vuelve a cambiar cuando quieras.
+TEMA_FUENTE="Google Sans Flex"
+TEMA_RADIO=16
+# Si antes no había fuente o bordes en los ajustes, se vuelve a lo que el shell usa por defecto
+# (ThemeBackend.qml): borrar la clave no le diría nada a un shell que ya está corriendo.
+TEMA_FUENTE_DEFECTO="Adwaita Mono"
+TEMA_RADIO_DEFECTO=8
+
+# Del JSON de Wallhaven: id, página y archivo de las imágenes horizontales (jpg o png),
+# solo si salen de wallhaven.cc o un subdominio suyo, con el punto de por medio (evilwallhaven.cc
+# no vale): la respuesta no puede mandarnos a otro servidor.
+FILTRO_WALLHAVEN='.data[]?
+  | select((.file_type // "") | test("^image/(jpeg|png)$"))
+  | select((.path // "") | test("^https://([a-z0-9-]+\\.)*wallhaven\\.cc/"))
+  | select((.dimension_x // 0) >= 1.5 * ((.dimension_y // 1) | if . == 0 then 1 else . end))
+  | [.id, (if (.url // "") == "" then "https://wallhaven.cc/w/" + .id else .url end), .path] | @tsv'
+
+ayuda() {
+  cat <<'EOF'
+Uso: vortex otaku <comando>
+
+  on                 enciende el modo otaku: fondo de Miku Nakano y un toque de personalización
+  off                lo apaga y devuelve tu fondo y tus ajustes de antes
+  alternar           enciende o apaga, según esté
+  estado             dice si está encendido y qué fondo tiene
+  otro               cambia al siguiente fondo (con el modo encendido)
+
+Los fondos se descargan de Wallhaven al encender y se borran al apagar; sin red se usa un
+fondo original de Vortex (audífonos). Con el modo encendido, Ajustes > Tema lo muestra.
+EOF
+}
+
+aviso() { printf 'vortex-otaku: %s\n' "$*" >&2; }
+
+notificar() { command -v notify-send >/dev/null && notify-send -a "Vortex OS" "$@" || true; }
+
+hypr() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    hyprctl "$@"
+  else
+    hyprctl -i 0 "$@"
+  fi
+}
+
+# Monitores conectados (nombres de Hyprland); nada si Hyprland no responde.
+monitores() {
+  command -v hyprctl >/dev/null || return 0
+  hypr -j monitors 2>/dev/null | jq -r '.[].name' 2>/dev/null || true
+}
+
+# Llama a la IPC del shell (Serpantinum), igual que «vortex fondo». Falla si no está corriendo.
+shell_ipc() { quickshell ipc -p "$SHELL_QML" call "$@"; }
+
+# Carpeta de fondos de Vortex (la de los ajustes del shell o la de Imágenes), como «vortex fondo».
+carpeta_fondos() {
+  local dir
+  dir="$(jq -r '.wallpaperDir // empty' "$AJUSTES" 2>/dev/null || true)"
+  printf '%s\n' "${dir:-$FONDOS}"
+}
+
+# Pone ARCHIVO en el monitor MONITOR («all» = todos). Falla si el shell no responde.
+fondo_en() { shell_ipc wallpaper setWallpaper "$1" "$2" fade >/dev/null 2>&1; }
+
+# Pone ARCHIVO en todos los monitores. Éxito si el shell respondió al menos una vez.
+fondo_en_todos() {
+  local archivo="$1" mons m ok=1
+  mons="$(monitores)"
+  if [[ -z "$mons" ]]; then
+    fondo_en all "$archivo" && ok=0
+    return "$ok"
+  fi
+  for m in $mons; do
+    if fondo_en "$m" "$archivo"; then ok=0; fi
+  done
+  return "$ok"
+}
+
+# Lo mismo que «vortex fondo» sin argumentos: el de Vortex y, si no está, el primero de la carpeta.
+fondo_por_defecto() {
+  local dir archivo
+  dir="$(carpeta_fondos)"
+  archivo="$dir/vortex-azul.jpg"
+  if [[ ! -f "$archivo" ]]; then
+    archivo="$(find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null | sort | head -n1 || true)"
+  fi
+  [[ -n "$archivo" ]] || return 1
+  fondo_en_todos "$archivo"
+}
+
+# Fondo actual de cada monitor: «MONITOR<tab>RUTA». Lo guarda el shell en su caché.
+fondos_actuales() {
+  local f nombre ruta
+  for f in "$CACHE_FONDO"/current_*; do
+    [[ -f "$f" ]] || continue
+    nombre="${f##*/current_}"
+    case "$nombre" in
+      *_name | wallpaper* | index*) continue ;;
+    esac
+    ruta="$(<"$f")"
+    if [[ "$ruta" == /* && -f "$ruta" ]]; then
+      printf '%s\t%s\n' "$nombre" "$ruta"
+    fi
+  done
+}
+
+# Cambia ajustes.json con un filtro de jq, sin dejarlo a medias (archivo temporal + mv, como
+# hace el shell al guardar; este recarga solo cuando cambia).
+ajustes_jq() {
+  local filtro="$1" tmp
+  shift
+  tmp="$(mktemp "$(dirname "$AJUSTES")/.settings_vortex_XXXXXX")" || return 1
+  if jq "$@" "$filtro" "$AJUSTES" >"$tmp" && [[ -s "$tmp" ]]; then
+    chmod --reference="$AJUSTES" "$tmp" 2>/dev/null || chmod 644 "$tmp"
+    mv "$tmp" "$AJUSTES"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+ajustes_validos() {
+  [[ -f "$AJUSTES" ]] && jq -e 'type == "object" and ((.theme // {}) | type == "object")' "$AJUSTES" >/dev/null 2>&1
+}
+
+es_imagen() {
+  local f="$1" cab
+  [[ -s "$f" ]] || return 1
+  (($(stat -c %s "$f") >= 50000)) || return 1
+  cab="$(head -c 4 "$f" | od -An -tx1 | tr -d ' \n')"
+  [[ "$cab" == ffd8ff* || "$cab" == 89504e47 ]]
+}
+
+# Baja hasta $CUANTOS fondos de Wallhaven a $1 y escribe fuentes.json. Falla si no baja ninguno.
+descargar_wallhaven() {
+  local destino="$1" json lista id pagina imagen nombre tmp n=0 fallos=0 fuentes='[]'
+  command -v curl >/dev/null || return 1
+  json="$(curl -fsSL --proto '=https' --proto-redir '=https' --max-time 25 --retry 1 -A "$UA" "$API")" || return 1
+  lista="$(jq -r "$FILTRO_WALLHAVEN" <<<"$json")" || return 1
+  [[ -n "$lista" ]] || return 1
+  while IFS=$'\t' read -r id pagina imagen; do
+    ((n < CUANTOS)) || break
+    ((fallos < 3)) || break
+    nombre="${imagen##*/}"
+    [[ "$nombre" =~ ^wallhaven-[A-Za-z0-9]+\.(jpg|png)$ ]] || continue
+    if [[ ! -s "$destino/$nombre" ]]; then
+      tmp="$destino/.$nombre.parcial"
+      if curl -fsSL --proto '=https' --proto-redir '=https' --max-time 120 --max-filesize 30000000 -A "$UA" -o "$tmp" "$imagen" && es_imagen "$tmp"; then
+        mv "$tmp" "$destino/$nombre"
+      else
+        rm -f "$tmp"
+        fallos=$((fallos + 1))
+        continue
+      fi
+    fi
+    n=$((n + 1))
+    fuentes="$(jq -c --arg a "$nombre" --arg i "$id" --arg u "$pagina" '. + [{archivo: $a, id: $i, url: $u}]' <<<"$fuentes")"
+  done <<<"$lista"
+  ((n > 0)) || return 1
+  jq -n --argjson f "$fuentes" '{
+    fuente: "Wallhaven (https://wallhaven.cc), búsqueda: Nakano Miku, solo SFW",
+    aviso: "Imágenes bajadas a tu equipo por el modo otaku; no forman parte de Vortex OS y sus derechos son de sus autores. Se borran al apagar el modo.",
+    fondos: $f
+  }' >"$destino/fuentes.json"
+}
+
+# Sin red: el fondo original de Vortex (jpg del repo; si falta, se genera al momento).
+poner_respaldo() {
+  local destino="$1" origen="$VORTEX_DIR/config/fondos/otaku/otaku-respaldo.jpg"
+  if [[ -s "$origen" ]]; then
+    cp -f "$origen" "$destino/otaku-respaldo.jpg" || return 1
+  else
+    python3 "$VORTEX_DIR/config/fondos/otaku/generar.py" --salida "$destino/otaku-respaldo.jpg" >/dev/null 2>&1 || return 1
+  fi
+  jq -n '{
+    fuente: "Fondo original de Vortex OS, generado por código (config/fondos/otaku/generar.py)",
+    aviso: "Sin imágenes de terceros ni del personaje.",
+    fondos: [{archivo: "otaku-respaldo.jpg", id: null, url: null}]
+  }' >"$destino/fuentes.json"
+}
+
+# Quita de $DESTINO lo que dejó una pasada anterior y la fuentes.json nueva ya no lista (un «off» con
+# el shell caído deja los archivos; luego un «on» con otra lista o sin red reescribe fuentes.json).
+# Sin esto el siguiente «off» no los borraría y «otro» los seguiría ofreciendo. Solo toca lo que
+# este comando crea (wallhaven-*.jpg|png y otaku-respaldo.jpg), nunca otros archivos de la carpeta.
+podar_sobras() {
+  local f nombre
+  local -A vigentes=()
+  [[ -f "$DESTINO/fuentes.json" ]] || return 0
+  while IFS= read -r nombre; do
+    vigentes[$nombre]=1
+  done < <(jq -r '.fondos[]?.archivo // empty' "$DESTINO/fuentes.json" 2>/dev/null || true)
+  ((${#vigentes[@]})) || return 0
+  while IFS= read -r f; do
+    nombre="${f##*/}"
+    [[ -n "${vigentes[$nombre]:-}" ]] || rm -f "$f"
+  done < <(find "$DESTINO" -maxdepth 1 -type f \( -name 'wallhaven-*.jpg' -o -name 'wallhaven-*.png' -o -name 'otaku-respaldo.jpg' \) 2>/dev/null)
+}
+
+# Borra lo que bajó el modo otaku (solo los archivos de fuentes.json) y la carpeta si queda vacía.
+borrar_descargas() {
+  local f
+  [[ -d "$DESTINO" ]] || return 0
+  if [[ -f "$DESTINO/fuentes.json" ]]; then
+    while IFS= read -r f; do
+      if [[ "$f" =~ ^[A-Za-z0-9._-]+$ ]]; then rm -f "$DESTINO/$f"; fi
+    done < <(jq -r '.fondos[]?.archivo // empty' "$DESTINO/fuentes.json" 2>/dev/null || true)
+    rm -f "$DESTINO/fuentes.json"
+  fi
+  rm -f "$DESTINO"/.*.parcial
+  rmdir "$DESTINO" 2>/dev/null || true
+}
+
+# Guarda cómo estaba todo antes (fondo de cada monitor y los ajustes que se van a tocar).
+# Si ya existe (una pasada anterior se cortó a medias), vale ese: es lo de antes de verdad.
+guardar_antes() {
+  local fondos='{}' m p tema='null'
+  [[ -f "$ANTES" ]] && return 0
+  while IFS=$'\t' read -r m p; do
+    [[ -n "$m" ]] && fondos="$(jq -c --arg m "$m" --arg p "$p" '.[$m] = $p' <<<"$fondos")"
+  done < <(fondos_actuales)
+  if ajustes_validos; then
+    tema="$(jq -c '{fontFamily: (.theme.fontFamily // null), borderRadius: (.theme.borderRadius // null)}' "$AJUSTES")"
+  fi
+  jq -n --argjson fondos "$fondos" --argjson tema "$tema" '{fondos: $fondos, tema: $tema}' >"$ANTES.$$"
+  mv "$ANTES.$$" "$ANTES"
+}
+
+aplicar_toque() {
+  [[ "$(jq -c '.tema' "$ANTES")" != null ]] || return 0
+  ajustes_jq '.theme = ((.theme // {}) | .fontFamily = $f | .borderRadius = $r)' --arg f "$TEMA_FUENTE" --argjson r "$TEMA_RADIO" \
+    || aviso "no pude cambiar los ajustes del shell; sigo sin ese toque"
+}
+
+restaurar_ajustes() {
+  [[ -f "$ANTES" ]] || return 0
+  [[ "$(jq -c '.tema' "$ANTES" 2>/dev/null || echo null)" != null ]] || return 0
+  ajustes_validos || return 0
+  ajustes_jq '$a[0].tema as $t
+    | .theme = ((.theme // {})
+      | .fontFamily = ($t.fontFamily // $fd)
+      | .borderRadius = ($t.borderRadius // $rd))' --slurpfile a "$ANTES" --arg fd "$TEMA_FUENTE_DEFECTO" --argjson rd "$TEMA_RADIO_DEFECTO" \
+    || { aviso "no pude devolver los ajustes del shell a como estaban; los de antes quedan guardados en $ANTES"; return 1; }
+}
+
+# Devuelve el fondo de antes en cada monitor (o el de Vortex si no había). Falla si el shell no responde.
+restaurar_fondos() {
+  local m p primero="" mons ok=1
+  local -A previo=()
+  if [[ -f "$ANTES" ]]; then
+    while IFS=$'\t' read -r m p; do
+      [[ -n "$m" && -f "$p" ]] || continue
+      previo[$m]="$p"
+      [[ -n "$primero" ]] || primero="$p"
+    done < <(jq -r '.fondos // {} | to_entries[] | [.key, .value] | @tsv' "$ANTES" 2>/dev/null || true)
+  fi
+  if [[ -z "$primero" ]]; then
+    fondo_por_defecto
+    return
+  fi
+  mons="$(monitores)"
+  if [[ -z "$mons" ]]; then
+    for m in "${!previo[@]}"; do
+      if fondo_en "$m" "${previo[$m]}"; then ok=0; fi
+    done
+  else
+    for m in $mons; do
+      if fondo_en "$m" "${previo[$m]:-$primero}"; then ok=0; fi
+    done
+  fi
+  return "$ok"
+}
+
+escribir_marca() { # FUENTE FONDO DESDE
+  printf 'fuente=%s\nfondo=%s\ndesde=%s\n' "$1" "$2" "$3" >"$MARCA.$$"
+  mv "$MARCA.$$" "$MARCA"
+}
+
+leer_marca() { # CLAVE
+  sed -n "s/^$1=//p" "$MARCA" 2>/dev/null | head -n1 || true
+}
+
+imagenes() { find "$DESTINO" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.png' \) ! -name '.*' 2>/dev/null | sort; }
+
+# Un solo vortex-otaku a la vez (un doble clic en el interruptor no debe bajar dos veces).
+# El candado va en /run/user (se borra solo); si no se puede, se sigue sin él.
+un_solo_proceso() {
+  mkdir -p "$CONF"
+  exec 9>"${XDG_RUNTIME_DIR:-$CONF}/vortex-otaku.lock" || return 0
+  flock -n 9 || { aviso "otro vortex-otaku está trabajando; espera a que termine"; exit 1; }
+}
+
+cmd_on() {
+  local fuente=wallhaven elegido
+  un_solo_proceso
+  if [[ -f "$MARCA" ]]; then
+    echo "El modo otaku ya está encendido (otro fondo: vortex otaku otro; apagarlo: vortex otaku off)."
+    return 0
+  fi
+  mkdir -p "$DESTINO"
+  echo "Trayendo fondos de Wallhaven..."
+  if ! descargar_wallhaven "$DESTINO"; then
+    fuente=respaldo
+    aviso "no pude traer fondos de Wallhaven (¿sin red?); uso el fondo original de Vortex"
+    if ! poner_respaldo "$DESTINO"; then
+      aviso "tampoco pude preparar el fondo de respaldo; no cambio nada"
+      rm -f "$DESTINO"/.*.parcial
+      rmdir "$DESTINO" 2>/dev/null || true
+      exit 1
+    fi
+  fi
+  podar_sobras
+  guardar_antes
+  aplicar_toque
+  elegido="$(imagenes | shuf -n1)"
+  [[ -n "$elegido" ]] || { aviso "no quedó ningún fondo en $DESTINO"; exit 1; }
+  # Los ajustes van primero: el fondo, al final, es lo que fija los colores (matugen).
+  if ! fondo_en_todos "$elegido"; then
+    aviso "el shell no responde; el fondo no se cambió. Con el escritorio abierto: vortex otaku otro"
+  fi
+  escribir_marca "$fuente" "$elegido" "$(date +%s)"
+  notificar -t 2500 "Modo otaku activado" "Para apagarlo: Ajustes > Tema, o vortex otaku off"
+  echo "Modo otaku encendido ($fuente): $elegido"
+}
+
+cmd_off() {
+  un_solo_proceso
+  if [[ ! -f "$MARCA" && ! -f "$ANTES" ]]; then
+    echo "El modo otaku ya está apagado."
+    return 0
+  fi
+  local fondo_ok=0 ajustes_ok=0 anterior
+  anterior="$(jq -r '.fondos // {} | to_entries[0].value // empty' "$ANTES" 2>/dev/null || true)"
+  restaurar_fondos || fondo_ok=1
+  restaurar_ajustes || ajustes_ok=1
+  if ((fondo_ok == 0)); then
+    # Un momento para que termine el cambio de fondo antes de borrar el anterior.
+    sleep 2
+    borrar_descargas
+  else
+    aviso "no pude devolver el fondo (¿el shell no está abierto?); dejo los archivos en $DESTINO"
+    [[ -n "$anterior" ]] && aviso "con el escritorio abierto: vortex fondo '$anterior'"
+  fi
+  # Si los ajustes no volvieron, lo de antes se queda en $ANTES (otro «off» lo reintenta, y un
+  # «on» nuevo lo respeta); la marca sí se quita: el modo ya está apagado.
+  rm -f "$MARCA"
+  if ((ajustes_ok == 0)); then rm -f "$ANTES"; fi
+  if ((ajustes_ok != 0)); then
+    echo "Modo otaku apagado, pero los ajustes del shell no volvieron: lo de antes sigue en $ANTES (reintenta con vortex otaku off)."
+  elif ((fondo_ok == 0)); then
+    notificar -t 2500 "Modo otaku apagado" "Tu fondo y tus ajustes volvieron como estaban"
+    echo "Modo otaku apagado: todo volvió a como estaba."
+  else
+    echo "Modo otaku apagado: los ajustes volvieron, pero el fondo no se pudo cambiar."
+  fi
+}
+
+cmd_otro() {
+  local actual siguiente primero="" f tomar=0 fuente
+  un_solo_proceso
+  [[ -f "$MARCA" ]] || { aviso "el modo otaku está apagado (vortex otaku on)"; exit 1; }
+  actual="$(leer_marca fondo)"
+  siguiente=""
+  while IFS= read -r f; do
+    [[ -n "$primero" ]] || primero="$f"
+    if ((tomar)) && [[ -z "$siguiente" ]]; then siguiente="$f"; fi
+    [[ "$f" == "$actual" ]] && tomar=1
+  done < <(imagenes)
+  siguiente="${siguiente:-$primero}"
+  [[ -n "$siguiente" ]] || { aviso "no hay fondos en $DESTINO"; exit 1; }
+  fuente="$(leer_marca fuente)"
+  if fondo_en_todos "$siguiente"; then
+    escribir_marca "${fuente:-wallhaven}" "$siguiente" "$(leer_marca desde)"
+    echo "Fondo: $siguiente"
+  else
+    aviso "el shell no responde; el fondo no se cambió"
+    exit 1
+  fi
+}
+
+cmd_estado() {
+  if [[ -f "$MARCA" ]]; then
+    echo "Modo otaku: encendido"
+    echo "  Fondo: $(leer_marca fondo)"
+    case "$(leer_marca fuente)" in
+      respaldo) echo "  Origen: fondo original de Vortex (no había red al encender)" ;;
+      *) echo "  Origen: Wallhaven (las páginas están en $DESTINO/fuentes.json)" ;;
+    esac
+    echo "  Tu fondo y tus ajustes de antes: $ANTES"
+  else
+    echo "Modo otaku: apagado"
+  fi
+}
+
+case "${1:-ayuda}" in
+  on | encender) cmd_on ;;
+  off | apagar) cmd_off ;;
+  alternar)
+    if [[ -f "$MARCA" ]]; then cmd_off; else cmd_on; fi
+    ;;
+  estado) cmd_estado ;;
+  otro | siguiente) cmd_otro ;;
+  ayuda | -h | --help) ayuda ;;
+  *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;
+esac

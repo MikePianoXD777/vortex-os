@@ -646,6 +646,11 @@
           "liquid": "Liquid glass"
         }
       },
+      "otaku": {
+        "title": "Otaku mode",
+        "desc": "Miku Nakano wallpaper, a different font and softer corners. Downloaded when enabled; turn it off and everything goes back as it was",
+        "working": "Working…"
+      },
       "colors": {
         "title": "Color themes",
         "desc": "Select a predefined color palette preset or create your own custom theme.",
