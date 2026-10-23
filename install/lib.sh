@@ -95,8 +95,23 @@ marcar_explicitos() {
 
 instalar_pacman() {
   (($#)) || return 0
+  cambiar_jre_por_jdk "$@"
   con_reintentos srun pacman -S --needed --noconfirm "$@"
   marcar_explicitos "$@"
+}
+
+# jdk-openjdk ya trae el Java para correr programas y choca con jre-openjdk(-headless): con
+# --noconfirm pacman contesta «no» a quitar el que choca y la instalación falla. Si se va a
+# instalar el JDK y está el JRE de la misma versión, se cambia uno por otro (--ask 4: «sí» solo a
+# quitar los paquetes en conflicto). Lo que use Java sigue funcionando: el JDK lo provee.
+cambiar_jre_por_jdk() {
+  local p hay=0
+  for p in "$@"; do [[ "$p" == jdk-openjdk ]] && hay=1; done
+  ((hay)) || return 0
+  pacman -Qq jdk-openjdk >/dev/null 2>&1 && return 0
+  pacman -Qq jre-openjdk >/dev/null 2>&1 || pacman -Qq jre-openjdk-headless >/dev/null 2>&1 || return 0
+  info "Cambiando jre-openjdk por jdk-openjdk (el JDK trae el mismo Java y más)"
+  con_reintentos srun pacman -S --needed --noconfirm --ask 4 jdk-openjdk
 }
 
 # --removemake: borra las dependencias de compilación al terminar de construir (cmake, meson,
