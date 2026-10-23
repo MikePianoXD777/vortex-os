@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vortex: comando para manejar Vortex OS.
+# vortex: comando para manejar Vortexine's OS.
 set -euo pipefail
 
 VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
@@ -39,7 +39,7 @@ EOF
 
 aviso() { printf 'vortex: %s\n' "$*" >&2; }
 
-notificar() { command -v notify-send >/dev/null && notify-send -a "Vortex OS" "$@" || true; }
+notificar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" "$@" || true; }
 
 hypr() {
   if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
@@ -488,7 +488,7 @@ cmd_configurar_usuario() {
     mkdir -p "$CONF"
     cat "$VORTEX_RELEASE" 2>/dev/null | sed -n 's/^VERSION="\(.*\)"$/\1/p' >"$CONF/version"
   fi
-  bien "Tu usuario quedó configurado para Vortex OS"
+  bien "Tu usuario quedó configurado para Vortexine's OS"
 }
 
 case "${1:-ayuda}" in

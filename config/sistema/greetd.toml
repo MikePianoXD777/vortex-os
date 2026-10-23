@@ -1,4 +1,4 @@
-# Vortex OS: pantalla de inicio en texto (tuigreet). Recuerda el último usuario.
+# Vortexine's OS: pantalla de inicio en texto (tuigreet). Recuerda el último usuario.
 # La sesión arranca con stdin a /dev/null (greetd la lanza con «sh -c»): si heredara
 # /dev/tty1, cualquier programa del inicio que pregunte algo se quedaría esperando
 # para siempre una respuesta del teclado.

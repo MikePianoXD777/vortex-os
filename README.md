@@ -1,4 +1,4 @@
-# Vortex OS
+# Vortexine's OS
 
 Parte de **Vortex Suite**: las funciones de los grandes, pero fáciles de usar.
 La capacidad sí; la complejidad no.
@@ -33,7 +33,7 @@ el instalador toma una foto del sistema (snapper) y una copia instantánea de `/
 hiciera falta.
 
 O con la **ISO de Vortex** (en pruebas): arranca en el escritorio de Vortex para probarlo, y el
-instalador gráfico («Instalar Vortex OS», se abre solo) te guía: idioma, teclado, disco y usuario, y
+instalador gráfico («Instalar Vortexine's OS», se abre solo) te guía: idioma, teclado, disco y usuario, y
 eliges tus apps y juegos con casillas (Steam, Sober, Prism Launcher, el lanzador de Genshin, Heroic, Zoom,
 Discord, OBS, Vortex Studio...). Se instala sin internet; las apps sí la necesitan. «Claude» (el
 asistente de Super+A) viene marcado: se le instala Claude Code a cada usuario en su primer inicio con
@@ -245,7 +245,7 @@ variante (`vm/medir-frio.sh`), porque reiniciar solo el shell deja memoria acumu
 
 ```bash
 vortex bench --guardar                       # en tu sistema actual, antes
-vortex bench --guardar                       # en Vortex OS, después
+vortex bench --guardar                       # en Vortexine's OS, después
 vortex bench --comparar antes.json despues.json
 ```
 

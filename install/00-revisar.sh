@@ -2,7 +2,7 @@
 paso "Revisando el equipo"
 
 [[ $EUID -ne 0 ]] || error "Corre el instalador con tu usuario normal, no como root."
-[[ -f /etc/arch-release ]] || error "Vortex OS se instala sobre Arch Linux (o CachyOS)."
+[[ -f /etc/arch-release ]] || error "Vortexine's OS se instala sobre Arch Linux (o CachyOS)."
 
 case "$(uname -m)" in
   x86_64) ;;

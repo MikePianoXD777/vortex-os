@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Módulo de Calamares de Vortex OS: en PC con BIOS, que el módulo bootloader sí instale GRUB.
+Módulo de Calamares de Vortexine's OS: en PC con BIOS, que el módulo bootloader sí instale GRUB.
 
 El módulo bootloader de Calamares 3.4 (main.py) toma la carpeta EFI de
 globalstorage["efiSystemPartition"] sin mirar el firmware, y en la rama de BIOS de

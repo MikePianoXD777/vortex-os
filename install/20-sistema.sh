@@ -46,12 +46,12 @@ elif tiene bootctl && sudo bootctl is-installed >/dev/null 2>&1; then
     bien "systemd-boot ya tiene una entrada con linux-cachyos"
   elif [[ -n "$base" ]]; then
     # Copia la entrada actual y le cambia el kernel por linux-cachyos.
-    run sudo sh -c "sed -e 's/^title.*/title   Vortex OS/' \
+    run sudo sh -c "sed -e 's/^title.*/title   Vortexine'\''s OS/' \
       -e 's/vmlinuz-linux[^ ]*/vmlinuz-linux-cachyos/' \
       -e 's/initramfs-linux[^ ]*\\.img/initramfs-linux-cachyos.img/' \
       '$entradas/$base' > '$entradas/vortex-os.conf'"
     srun bootctl set-default vortex-os.conf
-    bien "Entrada de systemd-boot «Vortex OS» creada"
+    bien "Entrada de systemd-boot «Vortexine's OS» creada"
   else
     aviso "No encontré entradas de systemd-boot (¿imagen unificada?); agrega linux-cachyos a mano."
   fi

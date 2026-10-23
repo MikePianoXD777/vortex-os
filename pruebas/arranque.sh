@@ -312,7 +312,7 @@ arranque() { limpia; VORTEX_RAIZ="$T/raiz" FAKE_NVIDIA="${1:-}" en_shim bash "$P
 hacer_boot bios; grub
 D="$T/raiz/etc/default/grub.d/10-vortex.cfg"
 probar "BIOS: deja /etc/default/grub.d/10-vortex.cfg" test -f "$D"
-probar "BIOS: título «Vortex OS»" bash -c "source '$D'; [[ \$GRUB_DISTRIBUTOR == 'Vortex OS' ]]"
+probar "BIOS: título «Vortex OS»" bash -c "source '$D'; [[ \$GRUB_DISTRIBUTOR == \"Vortexine's OS\" ]]"
 probar "BIOS: linux-cachyos va primero y por defecto (GRUB_TOP_LEVEL)" bash -c "source '$D'; [[ \$GRUB_TOP_LEVEL == /boot/vmlinuz-linux-cachyos ]]"
 probar "BIOS: os-prober encendido (GRUB 2.12+ lo trae apagado; sin esto Windows no sale)" bash -c "source '$D'; [[ \$GRUB_DISABLE_OS_PROBER == false ]]"
 probar "BIOS: tiempo de espera de 3 s, como systemd-boot" bash -c "source '$D'; [[ \$GRUB_TIMEOUT == 3 ]]"
@@ -324,7 +324,7 @@ probar "UEFI: no deja nada de GRUB" test ! -e "$T/raiz/etc/default/grub.d"
 # BIOS: el módulo bootloader ya instaló GRUB.
 hacer_boot bios
 mkdir -p "$T/raiz/boot/grub/i386-pc"; touch "$T/raiz/boot/grub/i386-pc/core.img"
-printf 'menuentry "Vortex OS Linux" {\n}\nmenuentry "Windows" {\n}\n' >"$T/raiz/boot/grub/grub.cfg"
+printf 'menuentry "Vortexine'\''s OS Linux" {\n}\nmenuentry "Windows" {\n}\n' >"$T/raiz/boot/grub/grub.cfg"
 arranque
 probar "BIOS: con GRUB instalado lo dice y cuenta sus entradas" contiene "$T/arranque.out" "arranque (BIOS): GRUB con 2 entradas"
 probar "BIOS: no crea entradas de systemd-boot" test ! -e "$T/raiz/boot/loader"
@@ -340,18 +340,18 @@ hacer_uefi() {
   printf 'title Arch Linux\nlinux /x\noptions root=UUID=1234 rw quiet splash\n' >"$T/raiz/boot/loader/entries/arch.conf"
 }
 hacer_uefi; arranque ""
-probar "UEFI: entrada «Vortex OS» con linux-cachyos" contiene "$T/raiz/boot/loader/entries/vortex-os.conf" "linux   /vmlinuz-linux-cachyos"
+probar "UEFI: entrada «Vortexine's OS» con linux-cachyos" contiene "$T/raiz/boot/loader/entries/vortex-os.conf" "linux   /vmlinuz-linux-cachyos"
 probar "UEFI: entrada del kernel de Arch de respaldo, sin aviso de NVIDIA" \
-  contiene "$T/raiz/boot/loader/entries/vortex-os-arch.conf" "title   Vortex OS (kernel de Arch, respaldo)"
+  contiene "$T/raiz/boot/loader/entries/vortex-os-arch.conf" "title   Vortexine's OS (kernel de Arch, respaldo)"
 probar "UEFI: linux-cachyos por defecto" contiene "$T/raiz/boot/loader/loader.conf" "default vortex-os.conf"
 probar "UEFI: sin NVIDIA no avisa" no_contiene "$T/arranque.out" "NVIDIA"
 hacer_uefi; arranque 1
 probar "UEFI con NVIDIA: el título del kernel de Arch dice que no tiene driver de video" \
   contiene "$T/raiz/boot/loader/entries/vortex-os-arch.conf" "sin driver de NVIDIA: solo consola"
-probar "UEFI con NVIDIA: la entrada de Vortex OS sigue igual" contiene "$T/raiz/boot/loader/entries/vortex-os.conf" "title   Vortex OS"
+probar "UEFI con NVIDIA: la entrada de Vortexine's OS sigue igual" contiene "$T/raiz/boot/loader/entries/vortex-os.conf" "title   Vortexine's OS"
 probar "UEFI con NVIDIA: usa la misma consulta que chwd (clase 03xx)" contiene "$T/llamadas" "lspci -d 10de:*:03xx"
 hacer_uefi; rm "$T/raiz/boot/vmlinuz-linux"; arranque 1
-probar "UEFI sin kernel de Arch (se quitó por espacio): solo la entrada de Vortex OS" \
+probar "UEFI sin kernel de Arch (se quitó por espacio): solo la entrada de Vortexine's OS" \
   test -f "$T/raiz/boot/loader/entries/vortex-os.conf" -a ! -e "$T/raiz/boot/loader/entries/vortex-os-arch.conf"
 
 hacer_boot bios; rmdir "$T/raiz/sys/firmware" "$T/raiz/sys"; grub
@@ -400,7 +400,7 @@ probar "con marca y red: termina bien" test "$rc" -eq 0
 probar "con marca y red: borra la marca" test ! -e "$T/marca"
 probar "con marca y red: actualiza los llaveros y el sistema entero antes (nunca -Sy a secas)" \
   bash -c "mapfile -t l < <(grep -v '^notify\|^runuser' '$T/llamadas'); [[ \${l[0]} == 'pacman -Sy --noconfirm --needed archlinux-keyring cachyos-keyring' && \${l[1]} == 'pacman -Su --noconfirm' && \${l[2]} == 'chwd -a' && \${#l[@]} -eq 3 ]]"
-probar "con marca y red: avisa en el escritorio de quien tiene sesión con bus" contiene "$T/llamadas" "notify-send unix:path=$T/run/1000/bus -a Vortex OS -i video-display Drivers de video instalados Reinicia para usarlos."
+probar "con marca y red: avisa en el escritorio de quien tiene sesión con bus" contiene "$T/llamadas" "notify-send unix:path=$T/run/1000/bus -a Vortexine's OS -i video-display Drivers de video instalados Reinicia para usarlos."
 probar "con marca y red: no avisa a quien no tiene bus de sesión" no_contiene "$T/llamadas" "1001"
 touch "$T/marca"
 gpu_servicio FAKE_PACMAN_FALLA=1

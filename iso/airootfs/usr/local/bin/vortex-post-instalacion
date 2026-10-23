@@ -3,7 +3,7 @@
 #
 #   vortex-post-instalacion kernel          antes de generar el initramfs
 #   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
-#   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortex OS»)
+#   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortexine's OS»)
 #   vortex-post-instalacion espejos RAIZ    antes de instalar las apps, desde el USB (RAIZ = el disco nuevo)
 #   vortex-post-instalacion inicio-automatico USUARIO   entra solo al escritorio (lo llama «final»)
 #   vortex-post-instalacion grub            el menú de GRUB, solo en BIOS (lo llama «final»)
@@ -114,7 +114,7 @@ paquetes_del_live() {
 # en /etc/default/grub para que sobreviva a quien vuelva a correr grub-mkconfig más adelante, y
 # para no depender de cómo el módulo grubcfg reescribe /etc/default/grub (él pone root=,
 # cryptdevice= y el nombre; esto manda al final).
-#  - GRUB_DISTRIBUTOR: el título; GRUB le agrega «Linux» (en el menú sale «Vortex OS Linux»).
+#  - GRUB_DISTRIBUTOR: el título; GRUB le agrega «Linux» (en el menú sale «Vortexine's OS Linux»).
 #  - GRUB_TOP_LEVEL: linux-cachyos va primero y por defecto; el de Arch queda en «Advanced options».
 #  - GRUB_DISABLE_OS_PROBER=false: desde GRUB 2.12 viene apagado; sin esto Windows no sale en el menú.
 #  - GRUB_TIMEOUT=3: como el «timeout 3» de systemd-boot.
@@ -122,8 +122,8 @@ paso_grub() {
   local raiz="${VORTEX_RAIZ:-}"
   es_bios || return 0
   install -Dm644 /dev/stdin "$raiz/etc/default/grub.d/10-vortex.cfg" <<'EOF'
-# Vortex OS (vortex-post-instalacion): el menú de GRUB, que solo se usa en PC con BIOS.
-GRUB_DISTRIBUTOR='Vortex OS'
+# Vortexine's OS (vortex-post-instalacion): el menú de GRUB, que solo se usa en PC con BIOS.
+GRUB_DISTRIBUTOR="Vortexine's OS"
 GRUB_TOP_LEVEL='/boot/vmlinuz-linux-cachyos'
 GRUB_DISABLE_OS_PROBER=false
 GRUB_TIMEOUT=3
@@ -236,7 +236,7 @@ paso_arranque() {
   # Calamares deja entradas de systemd-boot al estilo kernel-install: copias del kernel en
   # /boot/<machine-id>/<versión>/ que pacman no actualiza (al primer kernel nuevo no arrancaría),
   # tituladas «Arch Linux» y con el kernel de Arch por defecto. Se cambian por las de install.sh:
-  # «Vortex OS» con linux-cachyos y el de Arch de respaldo, apuntando a /vmlinuz-* e
+  # «Vortexine's OS» con linux-cachyos y el de Arch de respaldo, apuntando a /vmlinuz-* e
   # /initramfs-*.img, que mkinitcpio actualiza con cada kernel.
   local raiz="${VORTEX_RAIZ:-}" boot entradas opciones mid
   boot="$raiz/boot"
@@ -270,14 +270,14 @@ paso_arranque() {
   for kernel in linux-cachyos linux; do
     [[ -e "$boot/vmlinuz-$kernel" ]] || continue
     if [[ "$kernel" == linux-cachyos ]]; then
-      nombre=vortex-os titulo="Vortex OS"
+      nombre=vortex-os titulo="Vortexine's OS"
     else
-      nombre=vortex-os-arch titulo="Vortex OS (kernel de Arch, respaldo)"
+      nombre=vortex-os-arch titulo="Vortexine's OS (kernel de Arch, respaldo)"
       # chwd solo trae los módulos de NVIDIA ya compilados para los kernels linux-cachyos*, y
       # nvidia-utils apaga nouveau: con el kernel de Arch una NVIDIA arranca sin driver de video
       # (solo consola). La entrada sirve de rescate, pero el título lo dice para que nadie se asuste.
       if hay_nvidia; then
-        titulo="Vortex OS (kernel de Arch, respaldo; sin driver de NVIDIA: solo consola)"
+        titulo="Vortexine's OS (kernel de Arch, respaldo; sin driver de NVIDIA: solo consola)"
         log "hay una NVIDIA: la entrada del kernel de Arch queda como rescate, sin driver de video"
       fi
     fi

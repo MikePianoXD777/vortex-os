@@ -1,4 +1,4 @@
-# Marca de Vortex OS para Calamares.
+# Marca de Vortexine's OS para Calamares.
 ---
 componentName: vortex
 welcomeStyleCalamares: false
@@ -10,13 +10,13 @@ sidebar: widget
 navigation: widget
 
 strings:
-  productName: "Vortex OS"
-  shortProductName: "Vortex"
-  version: "0.1.0"
-  shortVersion: "0.1"
-  versionedName: "Vortex OS 0.1"
-  shortVersionedName: "Vortex 0.1"
-  bootloaderEntryName: "Vortex OS"
+  productName: "Vortexine's OS"
+  shortProductName: "Vortexine's"
+  version: "1.0.0"
+  shortVersion: "1.0"
+  versionedName: "Vortexine's OS 1.0"
+  shortVersionedName: "Vortexine's 1.0"
+  bootloaderEntryName: "Vortexine's OS"
   productUrl: "https://github.com/MikePianoXD777/vortex-os"
   supportUrl: "https://github.com/MikePianoXD777/vortex-os/issues"
 

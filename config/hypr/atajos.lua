@@ -1,4 +1,4 @@
--- Vortex OS: atajos de teclado (~/.config/hypr/atajos.lua).
+-- Vortexine's OS: atajos de teclado (~/.config/hypr/atajos.lua).
 -- Son los de Mike en CachyOS con Caelestia (keybinds.lua, variables.lua y sus cambios en
 -- hypr-vars.lua / hypr-user.lua), con cada acción traducida a su equivalente en Serpantinum:
 -- lanzador y paneles por evento, «serpantinum screenshot», bloqueo, sesión, etc. Los

@@ -1,7 +1,7 @@
-# Vortex OS: instala las apps Flatpak elegidas en el instalador (bin/vortex-flatpaks).
+# Vortexine's OS: instala las apps Flatpak elegidas en el instalador (bin/vortex-flatpaks).
 # Corre al arrancar con red; si no hay nada pendiente termina al instante.
 [Unit]
-Description=Vortex OS: instalar las apps Flatpak elegidas
+Description=Vortexine's OS: instalar las apps Flatpak elegidas
 Wants=network-online.target
 After=network-online.target
 ConditionDirectoryNotEmpty=/etc/vortex/flatpaks.d

@@ -16,7 +16,7 @@ if ! grep -qs 'mise activate' "$bashrc_usuario"; then
   if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
     run "echo 'mise activate bash' >> $bashrc_usuario"
   else
-    printf '\n# Vortex OS\ncommand -v mise >/dev/null && eval "$(mise activate bash)"\n' >>"$bashrc_usuario"
+    printf '\n# Vortexine'\''s OS\ncommand -v mise >/dev/null && eval "$(mise activate bash)"\n' >>"$bashrc_usuario"
   fi
 fi
 

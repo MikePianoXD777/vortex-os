@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Genera los fondos originales de Vortex OS (remolinos galácticos), sin imágenes de terceros.
+"""Genera los fondos originales de Vortexine's OS (remolinos galácticos), sin imágenes de terceros.
 
     python3 config/fondos/generar.py            # todos los fondos en config/fondos/
     python3 config/fondos/generar.py --vista    # además, vistas previas pequeñas en /tmp

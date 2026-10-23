@@ -1,6 +1,6 @@
-# Vortex OS (live): usuario «liveuser» y entrada automática al escritorio (bin vortex-live).
+# Vortexine's OS (live): usuario «liveuser» y entrada automática al escritorio (bin vortex-live).
 [Unit]
-Description=Vortex OS: preparar la sesión del USB
+Description=Vortexine's OS: preparar la sesión del USB
 Before=greetd.service
 After=systemd-sysusers.service
 

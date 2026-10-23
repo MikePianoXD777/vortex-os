@@ -1,10 +1,10 @@
-# Vortex OS: termina de instalar los drivers de la GPU (chwd) si la instalación no tuvo red.
+# Vortexine's OS: termina de instalar los drivers de la GPU (chwd) si la instalación no tuvo red.
 # vortex-post-instalacion deja la marca /var/lib/vortex/chwd-pendiente cuando «chwd -a» falla
 # dentro del instalador; sin la marca (siempre en el live y en cuanto se resuelve) no corre.
 # Si falla (sin red otra vez) se reintenta cada 10 minutos, 4 veces por arranque; y en el próximo
 # arranque vuelve a empezar.
 [Unit]
-Description=Vortex OS: instalar los drivers de la GPU que faltaron
+Description=Vortexine's OS: instalar los drivers de la GPU que faltaron
 Wants=network-online.target
 After=network-online.target
 ConditionPathExists=/var/lib/vortex/chwd-pendiente

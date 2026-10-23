@@ -181,6 +181,6 @@ if tiene mise && ! grep -qs 'mise activate' "$HOME/.bashrc"; then
   if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
     run "echo 'mise activate bash' >> $HOME/.bashrc"
   else
-    printf '\n# Vortex OS\ncommand -v mise >/dev/null && eval "$(mise activate bash)"\n' >>"$HOME/.bashrc"
+    printf '\n# Vortexine'\''s OS\ncommand -v mise >/dev/null && eval "$(mise activate bash)"\n' >>"$HOME/.bashrc"
   fi
 fi

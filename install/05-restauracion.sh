@@ -11,8 +11,8 @@ if [[ "$(findmnt -no FSTYPE / 2>/dev/null)" != btrfs ]]; then
 else
   # El sistema (/), con snapper si está configurado (CachyOS lo trae así).
   if tiene snapper && snapper list-configs 2>/dev/null | grep -q '^root '; then
-    srun snapper -c root create -t single -c important -d "Antes de Vortex OS"
-    bien "Foto del sistema con snapper: «Antes de Vortex OS» (se ve con: snapper list)"
+    srun snapper -c root create -t single -c important -d "Antes de Vortexine's OS"
+    bien "Foto del sistema con snapper: «Antes de Vortexine's OS» (se ve con: snapper list)"
   else
     info "snapper no está configurado para /: no se toma foto del sistema"
   fi

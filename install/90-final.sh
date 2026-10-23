@@ -5,11 +5,11 @@ if [[ "$VORTEX_DRY_RUN" != 1 ]]; then
   mkdir -p "$HOME/.config/vortex"
   echo "$VORTEX_VERSION" >"$HOME/.config/vortex/version"
 fi
-# /etc/vortex-release: dice que esto es Vortex OS (las apps de la Vortex Suite lo leen para
-# ofrecer su «Rendimiento Vortex OS») y dónde está el código, para «vortex actualizar»
+# /etc/vortex-release: dice que esto es Vortexine's OS (las apps de la Vortex Suite lo leen para
+# ofrecer su «Rendimiento Vortexine's OS») y dónde está el código, para «vortex actualizar»
 # (los comandos copiados en /usr/local/bin no saben de qué carpeta salieron).
 escribir_sistema /etc/vortex-release <<EOF
-NAME="Vortex OS"
+NAME="Vortexine's OS"
 VERSION="$VORTEX_VERSION"
 VORTEX_REPO="$VORTEX_DIR"
 EOF
@@ -17,7 +17,7 @@ EOF
 [[ -d "$VORTEX_RESPALDO" ]] && info "Tus configs anteriores quedaron en ~/${VORTEX_RESPALDO#"$HOME"/}"
 info "Registro completo: $VORTEX_LOG"
 
-printf '\n%s¡Vortex OS instalado!%s\n' "$C_VERDE" "$C_FIN"
+printf '\n%s¡Vortexine'\''s OS instalado!%s\n' "$C_VERDE" "$C_FIN"
 cat <<'EOF'
     Después de reiniciar:
       vortex bench               mide RAM, servicios y arranque
@@ -34,5 +34,5 @@ reiniciar_defecto=s
 if [[ "$VORTEX_DRY_RUN" != 1 ]] && preguntar "¿Reiniciar ahora?" "$reiniciar_defecto"; then
   sudo systemctl reboot
 elif [[ "$reiniciar_defecto" == n ]]; then
-  info "Reinicia cuando puedas para entrar a Vortex OS."
+  info "Reinicia cuando puedas para entrar a Vortexine's OS."
 fi

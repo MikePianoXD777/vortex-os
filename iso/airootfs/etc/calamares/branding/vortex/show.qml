@@ -1,4 +1,4 @@
-/* Diapositivas de Vortex OS mientras se instala (Calamares, slideshowAPI 2). */
+/* Diapositivas de Vortexine's OS mientras se instala (Calamares, slideshowAPI 2). */
 import QtQuick 2.15
 import calamares.slideshow 1.0
 

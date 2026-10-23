@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Máquina virtual de pruebas de Vortex OS (QEMU + KVM, UEFI).
+# Máquina virtual de pruebas de Vortexine's OS (QEMU + KVM, UEFI).
 #
 #   vm/vm.sh live [iso]   arranca una ISO (por defecto la de Arch) con acceso SSH por el puerto 2222
 #   vm/vm.sh disco        arranca lo instalado en el disco (VORTEX_VM_VIDEO=ventana: en una ventana)

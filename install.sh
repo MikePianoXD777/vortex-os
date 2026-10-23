@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalador de Vortex OS: convierte un Arch Linux recién instalado en Vortex OS.
+# Instalador de Vortexine's OS: convierte un Arch Linux recién instalado en Vortexine's OS.
 #
 #   ./install.sh                  instalación normal (pregunta lo opcional)
 #   ./install.sh --prueba         muestra lo que haría, sin tocar nada

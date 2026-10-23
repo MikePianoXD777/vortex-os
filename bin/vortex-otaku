@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vortex-otaku: «Modo otaku» de Vortex OS (un easter egg para un amigo de Mike).
+# vortex-otaku: «Modo otaku» de Vortexine's OS (un easter egg para un amigo de Mike).
 #
 #   vortex-otaku on|off|alternar|estado|otro      (también: vortex otaku ...)
 #
@@ -39,7 +39,7 @@ DESTINO="$FONDOS/otaku"
 # Wallhaven: búsqueda pública, solo SFW (purity=100) y categoría anime (categories=010).
 API="https://wallhaven.cc/api/v1/search?q=Nakano%20Miku&categories=010&purity=100&sorting=favorites&atleast=1920x1080"
 CUANTOS=5
-UA="vortex-otaku (Vortex OS; https://github.com/MikePianoXD777/vortex-os)"
+UA="vortex-otaku (Vortexine's OS; https://github.com/MikePianoXD777/vortex-os)"
 
 # El toque de personalización: algo suave y que no rompa nada (la fuente viene en el
 # paquete del shell, así que siempre está). Ajustes > Tema los vuelve a cambiar cuando quieras.
@@ -76,7 +76,7 @@ EOF
 
 aviso() { printf 'vortex-otaku: %s\n' "$*" >&2; }
 
-notificar() { command -v notify-send >/dev/null && notify-send -a "Vortex OS" "$@" || true; }
+notificar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" "$@" || true; }
 
 hypr() {
   if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
@@ -202,7 +202,7 @@ descargar_wallhaven() {
   ((n > 0)) || return 1
   jq -n --argjson f "$fuentes" '{
     fuente: "Wallhaven (https://wallhaven.cc), búsqueda: Nakano Miku, solo SFW",
-    aviso: "Imágenes bajadas a tu equipo por el modo otaku; no forman parte de Vortex OS y sus derechos son de sus autores. Se borran al apagar el modo.",
+    aviso: "Imágenes bajadas a tu equipo por el modo otaku; no forman parte de Vortexine’s OS y sus derechos son de sus autores. Se borran al apagar el modo.",
     fondos: $f
   }' >"$destino/fuentes.json"
 }
@@ -216,7 +216,7 @@ poner_respaldo() {
     python3 "$VORTEX_DIR/config/fondos/otaku/generar.py" --salida "$destino/otaku-respaldo.jpg" >/dev/null 2>&1 || return 1
   fi
   jq -n '{
-    fuente: "Fondo original de Vortex OS, generado por código (config/fondos/otaku/generar.py)",
+    fuente: "Fondo original de Vortexine’s OS, generado por código (config/fondos/otaku/generar.py)",
     aviso: "Sin imágenes de terceros ni del personaje.",
     fondos: [{archivo: "otaku-respaldo.jpg", id: null, url: null}]
   }' >"$destino/fuentes.json"

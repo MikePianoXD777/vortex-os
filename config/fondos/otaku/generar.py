@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fondo ORIGINAL de respaldo del «Modo otaku» de Vortex OS (bin/vortex-otaku).
+"""Fondo ORIGINAL de respaldo del «Modo otaku» de Vortexine's OS (bin/vortex-otaku).
 
 Se usa cuando Wallhaven no responde o no hay red. No dibuja ningún personaje ni usa
 imágenes de terceros: solo unos audífonos estilizados, ondas de sonido y notas, con la

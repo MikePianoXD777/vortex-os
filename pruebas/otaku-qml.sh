@@ -168,7 +168,7 @@ probar "el comando termina igual y deja la marca (no lo mata el cierre)" \
 echo "== Falta vortex-otaku (sistema actualizado sin reinstalar /usr/local/bin)"
 correr falta
 probar "avisa con una notificación y el interruptor vuelve a apagado" \
-  "grep -q 'notify-send: -a Vortex OS Modo otaku Falta el comando vortex-otaku' '$T/falta/cmd.log' && grep -q 'T fin otakuOn=false busy=false checked=false enabled=true' '$T/falta/salida.log'"
+  "grep -q 'notify-send: -a Vortexine.s OS Modo otaku Falta el comando vortex-otaku' '$T/falta/cmd.log' && grep -q 'T fin otakuOn=false busy=false checked=false enabled=true' '$T/falta/salida.log'"
 
 echo
 if ((FALLOS)); then

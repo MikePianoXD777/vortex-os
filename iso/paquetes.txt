@@ -1,5 +1,5 @@
 # Paquetes de la imagen del live. Lo que se instala con Calamares es una copia de esta imagen,
-# así que es también el sistema base de Vortex OS: lo mismo que deja install.sh (packages/*.txt)
+# así que es también el sistema base de Vortexine's OS: lo mismo que deja install.sh (packages/*.txt)
 # más lo que hace falta para arrancar desde el USB e instalar. Steam, Java y las demás apps
 # NO van aquí: se eligen en el instalador (iso/airootfs/etc/calamares/modules/netinstall.yaml).
 

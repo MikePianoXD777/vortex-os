@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Arma el repo local [vortex] con los paquetes propios de Vortex OS (los que no están en los
+# Arma el repo local [vortex] con los paquetes propios de Vortexine's OS (los que no están en los
 # repos de Arch ni de CachyOS). Se corre como usuario normal (makepkg no corre como root).
 #
 #   iso/paquetes.sh [carpeta]     # por defecto /var/tmp/vortex-repo
@@ -32,14 +32,14 @@ AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 # El .PKGINFO de lo compilado así lleva este «packager»: es la marca con la que ya_en_repo sabe que
 # un paquete que ya está en el repo no salió con las banderas del constructor (el .BUILDINFO no
 # guarda CFLAGS, así que no hay otra forma de saberlo).
-PACKAGER_GENERICO="Vortex OS (x86-64 generico)"
+PACKAGER_GENERICO="Vortexines OS (x86-64 generico)"
 
 # Lo que se agrega al final de la config genérica (ver config_generica). makepkg hace «source» de
 # esto y aborta si termina con error: de ahí los «if» en vez de «&&» y el «true» del final.
 ajuste_generico() {
   cat <<'AJUSTE'
 
-# --- Vortex OS: nada se compila para la CPU de quien construye la ISO (iso/paquetes.sh) ---
+# --- Vortexine's OS: nada se compila para la CPU de quien construye la ISO (iso/paquetes.sh) ---
 _vortex_generico() {
   sed -E \
     -e 's/(^|[[:space:]])-march=[^[:space:]]+/\1-march=x86-64/g' \

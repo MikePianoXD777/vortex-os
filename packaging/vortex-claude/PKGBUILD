@@ -7,7 +7,7 @@
 pkgname=vortex-claude
 pkgver=1
 pkgrel=1
-pkgdesc='Claude, el asistente de Vortex OS (Super+A, con micrófono): se instala para cada usuario en su primer inicio con red'
+pkgdesc="Claude, el asistente de Vortexine's OS (Super+A, con micrófono): se instala para cada usuario en su primer inicio con red"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -16,7 +16,7 @@ depends=('curl' 'jq' 'sox')
 
 package() {
   install -Dm644 /dev/stdin "$pkgdir/etc/vortex/claude" <<'MARCA'
-# Vortex OS: «Claude» elegido en el instalador. Con esta marca, bin/vortex-sesion instala Claude Code
+# Vortexine's OS: «Claude» elegido en el instalador. Con esta marca, bin/vortex-sesion instala Claude Code
 # para cada usuario en su primer inicio con red (vortex claude instalar). Borra el archivo para que
 # no lo haga más.
 MARCA

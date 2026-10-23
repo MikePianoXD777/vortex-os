@@ -21,7 +21,7 @@ avisar() {
     bus="${VORTEX_GPU_RUN_USER:-/run/user}/$uid/bus"
     [[ -S "$bus" ]] || continue
     runuser -u "$usuario" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=$bus" \
-      notify-send -a "Vortex OS" -i video-display "$titulo" "$texto" 2>/dev/null || true
+      notify-send -a "Vortexine's OS" -i video-display "$titulo" "$texto" 2>/dev/null || true
   done < <(loginctl list-users --no-legend 2>/dev/null)
 }
 

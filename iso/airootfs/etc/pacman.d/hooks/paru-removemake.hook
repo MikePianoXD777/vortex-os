@@ -1,5 +1,5 @@
 # remove from airootfs!
-# Vortex OS: paru con RemoveMake activo desde la imagen, como lo deja install/10-repos.sh con sed.
+# Vortexine's OS: paru con RemoveMake activo desde la imagen, como lo deja install/10-repos.sh con sed.
 # RemoveMake hace que paru borre las dependencias de compilación al terminar (cmake, meson,
 # headers...), también cuando se llama sin --removemake («vortex actualizar», paru a mano).
 # Corre al instalar paru en la imagen (mkarchiso); como este hook lleva la marca de arriba, el

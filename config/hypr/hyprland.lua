@@ -1,4 +1,4 @@
--- Vortex OS: config de Hyprland (~/.config/hypr/hyprland.lua).
+-- Vortexine's OS: config de Hyprland (~/.config/hypr/hyprland.lua).
 -- Carga los módulos de Serpantinum desde el sistema (/usr/share/serpantinum), así sus
 -- actualizaciones llegan solas, y encima pone lo de Vortex: los atajos de teclado
 -- (atajos.lua, al lado de este archivo) y lo demás de este archivo. Tus cambios van en

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vortex-sesion: inicio de sesión de Vortex OS (lo lanza greetd en lugar de start-hyprland).
+# vortex-sesion: inicio de sesión de Vortexine's OS (lo lanza greetd en lugar de start-hyprland).
 # La primera vez de cada usuario le deja la config de Vortex («vortex configurar-usuario»:
 # Hyprland, teclado, fondos, ajustes del shell) y después entra al escritorio. En el live
 # (/etc/vortex/live) además abre el instalador cuando el escritorio ya está arriba; y si se

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vortex-gestor: gestor de recursos automático de Vortex OS (servicio de usuario
+# vortex-gestor: gestor de recursos automático de Vortexine's OS (servicio de usuario
 # vortex-gestor.service; lo arranca Hyprland al iniciar la sesión).
 #
 # Vortex: reparte solo la CPU y la RAM, sin que el usuario toque nada:
