@@ -14,6 +14,9 @@ intel-ucode
 mkinitcpio
 mkinitcpio-archiso
 efibootmgr
+# UEFI arranca con systemd-boot (viene en systemd); en una PC con BIOS/legacy eso no sirve y el
+# módulo bootloader de Calamares instala GRUB (iso/airootfs/etc/calamares/modules/bootloader_vortex.conf).
+grub
 sudo
 nano
 git
@@ -104,7 +107,8 @@ wl-gammarelay-rs
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el
 # paquete no pide: unsquashfs (copiar la imagen), os-prober (ver si hay otro sistema, p. ej.
-# Windows) y ckbcomp (teclado de la consola).
+# Windows; en una PC con BIOS se queda en lo instalado: GRUB lo usa para su menú) y ckbcomp
+# (teclado de la consola).
 calamares
 squashfs-tools
 os-prober

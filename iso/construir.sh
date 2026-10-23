@@ -120,6 +120,8 @@ enable greetd.service
 enable scx_loader.service
 enable power-profiles-daemon.service
 enable vortex-flatpaks.service
+# Termina los drivers de la GPU si la instalación no tuvo red (marca chwd-pendiente; si no hay marca, no corre).
+enable vortex-gpu.service
 disable systemd-networkd.service
 disable systemd-networkd.socket
 disable systemd-networkd-wait-online.service
@@ -148,6 +150,7 @@ quiere multi-user systemd-resolved.service
 quiere multi-user scx_loader.service
 quiere multi-user power-profiles-daemon.service
 quiere multi-user vortex-flatpaks.service /etc/systemd/system/vortex-flatpaks.service
+quiere multi-user vortex-gpu.service /etc/systemd/system/vortex-gpu.service
 quiere network-online NetworkManager-wait-online.service
 ln -sfn /usr/lib/systemd/system/greetd.service "$raiz/etc/systemd/system/display-manager.service"
 ln -sfn /usr/lib/systemd/system/NetworkManager-dispatcher.service "$raiz/etc/systemd/system/dbus-org.freedesktop.nm-dispatcher.service"

@@ -1,0 +1,6 @@
+# Vortex OS: prepara a Calamares para instalar GRUB en PC con BIOS (ver main.py).
+---
+type:       "job"
+name:       "vortex-bios"
+interface:  "python"
+script:     "main.py"
