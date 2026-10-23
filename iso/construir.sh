@@ -42,7 +42,9 @@ cp -a "$releng/airootfs/etc/systemd/system/pacman-init.service" \
 ln -s ../pacman-init.service "$raiz/etc/systemd/system/multi-user.target.wants/pacman-init.service"
 # El mirrorlist de Arch viene todo comentado: este hook de releng activa los espejos HTTPS al
 # instalarse en la imagen (sin él pacman no tiene servidores, ni en el live ni en lo instalado).
-# El otro hook borra los hooks marcados «remove from airootfs» al terminar de armar la imagen.
+# El otro hook borra los hooks marcados «remove from airootfs» al terminar de armar la imagen;
+# los nuestros (iso/airootfs/etc/pacman.d/hooks, p. ej. paru-removemake.hook: RemoveMake en
+# /etc/paru.conf) llevan esa marca y se copian abajo con el resto de airootfs.
 mkdir -p "$raiz/etc/pacman.d/hooks"
 cp -a "$releng/airootfs/etc/pacman.d/hooks/uncomment-mirrors.hook" \
   "$releng/airootfs/etc/pacman.d/hooks/zzzz99-remove-custom-hooks-from-airootfs.hook" "$raiz/etc/pacman.d/hooks/"

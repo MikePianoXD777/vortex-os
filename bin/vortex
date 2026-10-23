@@ -24,6 +24,8 @@ Uso: vortex <comando>
                                        enfocada, modo juego automático, presión de memoria)
   claude                               abre Claude en una terminal
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
+  claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
+                                       en tu primer inicio con red si elegiste Claude al instalar)
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
   actualizar                           actualiza Vortex, su shell y el sistema
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
@@ -205,6 +207,59 @@ gestor_estado() {
   echo "  El shell suelta memoria cuando falta: ${e[shell_soltar]:-sin probar}"
 }
 
+# Instala Claude Code para tu usuario, sin sudo: install/claude.sh, lo mismo que hace install.sh.
+#   vortex claude instalar              ahora, aquí
+#   vortex claude instalar --al-entrar  en segundo plano al iniciar sesión (lo lanza vortex-sesion
+#                                       si el instalador dejó la marca /etc/vortex/claude): espera a
+#                                       que el escritorio arranque y a que haya red. Sin red no hace
+#                                       nada y no deja su marca: se reintenta en el próximo inicio.
+# Deja ~/.local/state/vortex/claude-listo cuando termina; con esa marca vortex-sesion ya no lo
+# vuelve a intentar. Solo corre una instalación a la vez (candado claude.lock).
+cmd_claude_instalar() {
+  local al_entrar=0 hay_red=0 i
+  case "${1:-}" in
+    --al-entrar) al_entrar=1 ;;
+    "") ;;
+    *) aviso "usa: vortex claude instalar"; exit 1 ;;
+  esac
+  [[ -f "$VORTEX_DIR/install/claude.sh" ]] || { aviso "no encuentro el código de Vortex ($VORTEX_DIR)"; exit 1; }
+  mkdir -p "$ESTADO"
+  exec 9>"$ESTADO/claude.lock"
+  if ((al_entrar)); then
+    flock -n 9 || exit 0
+  else
+    flock -n 9 || {
+      echo "Ya hay otra instalación de Claude en curso (la del inicio de sesión): espero a que termine…"
+      flock 9
+    }
+  fi
+  export VORTEX_DIR VORTEX_DRY_RUN="${VORTEX_DRY_RUN:-0}"
+  # shellcheck source=install/lib.sh
+  source "$VORTEX_DIR/install/lib.sh"
+  # shellcheck source=install/claude.sh
+  source "$VORTEX_DIR/install/claude.sh"
+  if ((al_entrar)); then
+    # Que el escritorio termine de arrancar antes de gastar CPU y red en esto.
+    sleep "${VORTEX_CLAUDE_ESPERA:-30}"
+    for i in $(seq "${VORTEX_CLAUDE_INTENTOS_RED:-18}"); do
+      if claude_hay_red; then hay_red=1; break; fi
+      sleep "${VORTEX_CLAUDE_PAUSA_RED:-10}"
+    done
+    if ((!hay_red)); then
+      echo "vortex: sin red; Claude se instalará en el próximo inicio de sesión con internet"
+      exit 0
+    fi
+  fi
+  claude_instalar_usuario || exit 1
+  [[ "$VORTEX_DRY_RUN" == 1 ]] && exit 0
+  : >"$ESTADO/claude-listo"
+  if ((al_entrar)); then
+    notificar -t 10000 "Claude está listo" "Presiona Super+A. Toca Espacio para hablarle con el micrófono."
+  else
+    echo "Claude está listo: Super+A (o «vortex claude») lo abre."
+  fi
+}
+
 cmd_claude() {
   local pausa="$CONF/claude-pausa"
   case "${1:-}" in
@@ -216,6 +271,7 @@ cmd_claude() {
       rm -f "$pausa"
       echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
       ;;
+    instalar) shift; cmd_claude_instalar "$@" ;;
     estado)
       if [[ -f "$pausa" ]]; then echo "en pausa"; else echo "con acceso (te avisa cada vez que mira)"; fi
       ;;
@@ -229,7 +285,7 @@ cmd_claude() {
       fi
       exec "$term" -e bash -lc 'cd ~; claude; exec bash'
       ;;
-    *) aviso "usa: vortex claude [pausa|reanudar|estado]"; exit 1 ;;
+    *) aviso "usa: vortex claude [pausa|reanudar|estado|instalar]"; exit 1 ;;
   esac
 }
 
