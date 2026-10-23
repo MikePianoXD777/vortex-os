@@ -420,13 +420,8 @@ PanelWindow {
     // Vortex: para cerrar el panel al enfocar otra ventana (ver onRawEvent).
     property double vortexPanelOpenedAt: 0
     property string vortexWindowAtOpen: ""
-    onCurrentActiveChanged: {
-        if (currentActive === "hidden") return;
-        vortexPanelOpenedAt = Date.now();
-        let t = (typeof Hyprland !== "undefined") ? Hyprland.activeToplevel : null;
-        vortexWindowAtOpen = (t && t.address) ? String(t.address).replace(/^0x/, "") : "";
-    }
-
+    // Un solo manejador: QML no admite dos onCurrentActiveChanged en el mismo objeto
+    // («Property value set multiple times») y, con dos, el shell entero no carga.
     onCurrentActiveChanged: {
         reportWidgetState();
         let prev = masterWindow._previousActive;
@@ -434,6 +429,12 @@ PanelWindow {
         if (masterWindow.releasableWidgets.indexOf(prev) !== -1 && prev !== currentActive) {
             masterWindow.widgetHiddenSince[prev] = Date.now();
             masterWindow.scheduleWidgetRelease();
+        }
+
+        if (currentActive !== "hidden") {
+            vortexPanelOpenedAt = Date.now();
+            let t = (typeof Hyprland !== "undefined") ? Hyprland.activeToplevel : null;
+            vortexWindowAtOpen = (t && t.address) ? String(t.address).replace(/^0x/, "") : "";
         }
     }
 

@@ -34,6 +34,12 @@ provides=('serpantinum')
 conflicts=('serpantinum' 'serpantinum-git')
 backup=('etc/pam.d/serpantinum')
 
+# Antes de empaquetar: un manejador on<Señal> repetido en un mismo objeto QML («Property value
+# set multiple times») hace que el shell entero no cargue. Si lo hay, el paquete no se construye.
+check() {
+    python3 -I "$startdir/../../pruebas/qml-duplicados.py" "$startdir/../../shell/src/quickshell"
+}
+
 package() {
     local origen="$startdir/../../shell"
     local share="$pkgdir/usr/share/serpantinum"
