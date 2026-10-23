@@ -1,0 +1,375 @@
+#!/usr/bin/python3
+"""vortex-miku: Miku, la asistente de voz de Vortex OS (SUPER + O).
+
+  vortex-miku                 abre a Miku y se pone a escuchar; si ya está abierta, la cierra del todo
+  vortex-miku alternar        lo mismo
+  vortex-miku avatar on|off   enciende o apaga el 3D (apagado queda solo el asistente de voz)
+  vortex-miku estado          avatar=on|off y abierta=si|no
+  vortex-miku modelo RUTA.vrm usa otro modelo 3D (un VRM)
+  vortex-miku voz [ID]        sin ID lista las voces; con ID elige una (si hace falta, baja su archivito)
+  vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
+  vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
+
+La configuración está en ~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta>"}.
+Los modelos de la voz (Supertonic 3) y del oído (Whisper) no vienen en la ISO: la primera vez que se abre
+a Miku se bajan a ~/.local/share/vortex/miku/{voz,oido}/ (con internet, y comprobados con sha256).
+Cerrar a Miku termina la app y todos sus procesos (voz, oído, Claude): sin ella abierta no queda nada
+corriendo. Solo usa la biblioteca estándar, así que arranca al instante.
+"""
+
+import fcntl
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def _raiz() -> Path:
+    """Donde está la app: apps/miku/ (desde el repo) o /usr/share/vortex-miku (instalada)."""
+    if os.environ.get("VORTEX_MIKU_RAIZ"):
+        return Path(os.environ["VORTEX_MIKU_RAIZ"])
+    aqui = Path(__file__).resolve().parent
+    return aqui if (aqui / "miku" / "app.py").is_file() else Path("/usr/share/vortex-miku")
+
+
+RAIZ = _raiz()
+sys.path.insert(0, str(RAIZ))
+from miku import config, descargas, rutas, voces  # noqa: E402  (solo biblioteca estándar)
+
+APP = RAIZ / "miku" / "app.py"
+MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
+
+
+def error(texto: str, codigo: int = 1) -> int:
+    print(f"vortex-miku: {texto}", file=sys.stderr)
+    return codigo
+
+
+# ---- Procesos ------------------------------------------------------------------------------------
+
+def _estado_proc(pid: int):
+    """(ppid, pgrp, estado) de un proceso, o None si ya no existe."""
+    try:
+        resto = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        return int(resto[1]), int(resto[2]), resto[0]
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def _vivo(pid: int) -> bool:
+    e = _estado_proc(pid)
+    return e is not None and e[2] != "Z"
+
+
+def _todos() -> dict[int, tuple[int, int, str]]:
+    r = {}
+    for d in os.listdir("/proc"):
+        if d.isdigit():
+            e = _estado_proc(int(d))
+            if e:
+                r[int(d)] = e
+    return r
+
+
+def _descendientes(pid: int, tabla=None) -> set[int]:
+    tabla = tabla or _todos()
+    hijos: dict[int, list[int]] = {}
+    for p, (pp, _g, _s) in tabla.items():
+        hijos.setdefault(pp, []).append(p)
+    visto, pendientes = set(), [pid]
+    while pendientes:
+        for h in hijos.get(pendientes.pop(), []):
+            if h not in visto:
+                visto.add(h)
+                pendientes.append(h)
+    return visto
+
+
+def _es_miku(pid: int) -> bool:
+    try:
+        return MARCA_CMDLINE in Path(f"/proc/{pid}/cmdline").read_text().replace("\0", " ")
+    except OSError:
+        return False
+
+
+def pid_abierta() -> int | None:
+    """El PID de la app abierta de este usuario, o None. Se comprueba que siga viva y sea Miku (no un PID reciclado)."""
+    try:
+        pid = int((rutas.runtime() / "vortex-miku.pid").read_text().strip())
+    except (OSError, ValueError):
+        return None
+    return pid if _vivo(pid) and _es_miku(pid) else None
+
+
+def cerrar_todo(pid: int) -> None:
+    """Cierra la app y todo lo que lanzó (voz, oído, Claude y sus herramientas). Primero con calma, luego a la fuerza."""
+    tabla = _todos()
+    familia = _descendientes(pid, tabla)
+    try:
+        os.kill(pid, signal.SIGTERM)             # la app se despide sola: borra audios y la conversación
+    except OSError:
+        pass
+    limite = time.monotonic() + 4.0
+    while time.monotonic() < limite and _vivo(pid):
+        time.sleep(0.05)
+    # Barrido: lo que haya quedado vivo de la familia o del grupo de la app (que es una sesión propia).
+    tabla = _todos()
+    restos = {p for p in familia | {pid} if p in tabla and tabla[p][2] != "Z"}
+    restos |= {p for p, (_pp, g, s) in tabla.items() if g == pid and s != "Z"}
+    restos.discard(os.getpid())
+    for senal, espera in ((signal.SIGTERM, 0.6), (signal.SIGKILL, 0.0)):
+        for p in restos:
+            try:
+                os.kill(p, senal)
+            except OSError:
+                pass
+        limite = time.monotonic() + espera
+        while time.monotonic() < limite and any(_vivo(p) for p in restos):
+            time.sleep(0.05)
+        restos = {p for p in restos if _vivo(p)}
+        if not restos:
+            break
+    for nombre in ("vortex-miku.pid",):
+        try:
+            (rutas.runtime() / nombre).unlink()
+        except OSError:
+            pass
+    shutil.rmtree(rutas.runtime() / "vortex-miku", ignore_errors=True)    # audios temporales de la voz
+
+
+def lanzar() -> int:
+    """Abre la app, aparte de este comando: sesión propia, para poder cerrarla entera después."""
+    registro = open(rutas.runtime() / "vortex-miku.log", "w")
+    env = dict(os.environ)
+    env.setdefault("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+    try:
+        p = subprocess.Popen([sys.executable, "-I", str(APP)], stdin=subprocess.DEVNULL, stdout=registro, stderr=registro,
+                             start_new_session=True, close_fds=True, env=env)
+    except OSError as e:
+        return error(f"no pude abrir a Miku ({e}).")
+    (rutas.runtime() / "vortex-miku.pid").write_text(str(p.pid))
+    time.sleep(0.5)
+    if p.poll() is not None:
+        try:
+            cola = Path(rutas.runtime() / "vortex-miku.log").read_text().strip().splitlines()[-6:]
+        except OSError:
+            cola = []
+        (rutas.runtime() / "vortex-miku.pid").unlink(missing_ok=True)
+        return error("Miku se cerró al abrir. " + (" | ".join(cola) if cola else "Mira el registro en " + str(rutas.runtime() / "vortex-miku.log")))
+    return 0
+
+
+class Candado:
+    """Un candado por usuario en $XDG_RUNTIME_DIR: dos pulsaciones seguidas no abren dos Mikus."""
+
+    def __enter__(self):
+        self.f = open(rutas.runtime() / "vortex-miku.lock", "w")
+        fcntl.flock(self.f, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *_):
+        fcntl.flock(self.f, fcntl.LOCK_UN)
+        self.f.close()
+
+
+# ---- Órdenes -------------------------------------------------------------------------------------
+
+def alternar() -> int:
+    with Candado():
+        pid = pid_abierta()
+        if pid:
+            cerrar_todo(pid)
+            return 0
+        return lanzar()
+
+
+def reabrir_si_esta_abierta() -> bool:
+    """Para que un cambio (avatar, voz, modelo) se vea ya: si Miku está abierta, la cierra y la abre de nuevo."""
+    with Candado():
+        pid = pid_abierta()
+        if not pid:
+            return False
+        cerrar_todo(pid)
+        lanzar()
+        return True
+
+
+def orden_avatar(args: list[str]) -> int:
+    valores = {"on": True, "si": True, "sí": True, "true": True, "1": True, "off": False, "no": False, "false": False, "0": False}
+    if len(args) != 1 or args[0].lower() not in valores:
+        return error("uso: vortex-miku avatar on|off", 2)
+    nuevo = valores[args[0].lower()]
+    try:
+        config.guardar({"avatar": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    reabrir_si_esta_abierta()
+    print(f"avatar={'on' if nuevo else 'off'}")
+    return 0
+
+
+def orden_estado() -> int:
+    print(f"avatar={'on' if config.cargar()['avatar'] else 'off'}")
+    print(f"abierta={'si' if pid_abierta() else 'no'}")
+    return 0
+
+
+def orden_modelo(args: list[str]) -> int:
+    if len(args) != 1:
+        return error("uso: vortex-miku modelo RUTA.vrm", 2)
+    origen = Path(os.path.expanduser(args[0]))
+    try:
+        with open(origen, "rb") as f:
+            cabecera = f.read(12)
+    except OSError as e:
+        return error(f"no puedo leer «{origen}»: {e.strerror or e}")
+    # Un VRM es un glTF binario (.glb): empieza con «glTF».
+    if cabecera[:4] != b"glTF":
+        return error(f"«{origen.name}» no parece un modelo VRM (un VRM empieza con «glTF»).")
+    destino = rutas.MODELO_USUARIO
+    credito_dest = destino.parent / "CREDITO.txt"
+    credito_origen = origen.parent / "CREDITO.txt"
+    try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        mismo = destino.exists() and os.path.samefile(origen, destino)
+        if not mismo:
+            tmp = destino.with_name(destino.name + f".{os.getpid()}.tmp")
+            shutil.copyfile(origen, tmp)
+            os.replace(tmp, destino)
+            if credito_origen.is_file():
+                shutil.copyfile(credito_origen, credito_dest)
+            else:
+                credito_dest.unlink(missing_ok=True)       # el crédito de otro modelo no vale para este
+    except OSError as e:
+        return error(f"no pude copiar el modelo: {e}")
+    if config.cargar_crudo().get("modelo"):
+        config.guardar({"modelo": ""})                     # si no, ese "modelo" de miku.json taparía el nuevo
+    print(f"Modelo listo: {destino}")
+    if not mismo and not credito_origen.is_file():
+        print("Aviso: no hay un CREDITO.txt junto al modelo. Respeta la licencia de su autor y ponle el crédito que pida.")
+    if reabrir_si_esta_abierta():
+        print("Miku estaba abierta: la volví a abrir con el modelo nuevo.")
+    return 0
+
+
+def orden_voz(args: list[str]) -> int:
+    actual = config.cargar()["voz"]
+    catalogo = voces.catalogo()
+    if not args:
+        print("Voces de Miku (la elegida lleva *):")
+        for v in catalogo:
+            if v.get("incluida"):
+                estado = "lista" if voces.disponible(v) else "se baja con el modelo la primera vez que abras a Miku"
+            else:
+                estado = "lista" if voces.disponible(v) else "se baja al elegirla (~290 KB)"
+            print(f"{'*' if v['id'] == actual else ' '} {v['id']:<14} {v['nombre']}  [{estado}]")
+            if v.get("descripcion"):
+                print(f"    {v['descripcion']}")
+        print("\nTodas son voces de Supertonic 3 (licencia BigScience OpenRAIL-M).\nElige una con: vortex-miku voz ID")
+        return 0
+    if len(args) != 1:
+        return error("uso: vortex-miku voz [ID]", 2)
+    voz = voces.buscar(args[0])
+    if voz is None:
+        return error(f"no existe la voz «{args[0]}». Mira las que hay con: vortex-miku voz")
+    if not voz.get("incluida"):
+        try:
+            voces.descargar_estilo(voz, progreso=lambda t, f: None)
+        except descargas.ErrorDescarga as e:
+            return error(str(e))
+    try:
+        config.guardar({"voz": voz["id"]})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print(f"Voz elegida: {voz['nombre']}")
+    if not voces.modelo_listo():
+        print("Aún no está bajado el modelo de voz: se baja la primera vez que abras a Miku (o ya, con: vortex-miku preparar).")
+    if reabrir_si_esta_abierta():
+        print("Miku estaba abierta: la volví a abrir con la voz nueva.")
+    return 0
+
+
+def orden_preparar() -> int:
+    """Baja la voz y el oído ya, mostrando el progreso en la terminal (la app hace lo mismo sola al abrirse)."""
+    faltan = descargas.pendientes()
+    if not faltan:
+        print("La voz y el oído de Miku ya están listos.")
+        return 0
+    print(f"Preparando la voz de Miku (una sola vez, {descargas.TAMANO_TOTAL_TEXTO if len(faltan) == len(descargas.paquetes()) else descargas.megas(descargas.bytes_pendientes(faltan))})…")
+    d = descargas.Descarga(faltan, progreso=lambda t, f: print(f"\r  {f:4.0%}  {t}   ", end="", flush=True))
+    try:
+        d.correr()
+    except descargas.ErrorDescarga as e:
+        print()
+        return error(str(e))
+    except KeyboardInterrupt:
+        print()
+        return error("descarga cancelada; lo bajado se conserva y sigue donde se quedó la próxima vez.", 130)
+    print("\nListo: la voz y el oído de Miku están en", rutas.DATOS)
+    return 0
+
+
+def orden_decir(args: list[str]) -> int:
+    salida = None
+    if "-o" in args:
+        i = args.index("-o")
+        if i + 1 >= len(args):
+            return error("uso: vortex-miku decir \"texto\" [-o archivo.wav]", 2)
+        salida = args[i + 1]
+        args = args[:i] + args[i + 2:]
+    texto = " ".join(args).strip()
+    if not texto:
+        return error("uso: vortex-miku decir \"texto\" [-o archivo.wav]", 2)
+    cfg = config.cargar()
+    if not voces.modelo_listo():
+        return error("el modelo de voz aún no está bajado. Bájalo con: vortex-miku preparar")
+    destino = salida or str(rutas.temporales() / f"decir-{os.getpid()}.wav")
+    r = subprocess.run([sys.executable, "-I", str(RAIZ / "miku" / "voz_worker.py"), "--voz", cfg["voz"],
+                        "--estilo", "miku" if cfg["avatar"] else "normal", "--salida", destino, texto])
+    if r.returncode != 0:
+        return r.returncode
+    if salida:
+        print(f"Listo: {salida}")
+        return 0
+    try:
+        for reproductor in (["pw-play"], ["paplay"], ["aplay", "-q"]):
+            if shutil.which(reproductor[0]):
+                subprocess.run(reproductor + [destino])
+                break
+        else:
+            return error("no encuentro con qué reproducir sonido (pw-play).")
+    finally:
+        Path(destino).unlink(missing_ok=True)
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in ("alternar", "abrir", "toggle"):
+        return alternar()
+    orden, args = argv[0], argv[1:]
+    if orden in ("-h", "--help", "ayuda"):
+        print(__doc__.strip())
+        return 0
+    if orden == "avatar":
+        return orden_avatar(args)
+    if orden == "estado":
+        return orden_estado()
+    if orden == "modelo":
+        return orden_modelo(args)
+    if orden == "voz":
+        return orden_voz(args)
+    if orden == "preparar":
+        return orden_preparar()
+    if orden == "decir":
+        return orden_decir(args)
+    return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        sys.exit(130)

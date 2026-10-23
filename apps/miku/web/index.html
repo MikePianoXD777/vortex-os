@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Miku</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sin red: todo sale de archivos locales. three.js y three-vrm están en vendor/ (los instala el
+     paquete); su carpeta puede cambiarse con ?vendor=file:///ruta/ (pruebas). El import map se arma
+     aquí, antes de que se cargue ningún módulo. -->
+<script>
+(function () {
+  const q = new URLSearchParams(location.search);
+  let base = q.get('vendor') || './vendor/';
+  if (!base.endsWith('/')) base += '/';
+  const mapa = document.createElement('script');
+  mapa.type = 'importmap';
+  mapa.textContent = JSON.stringify({ imports: {
+    'three': base + 'three.module.min.js',
+    'three/addons/': base + 'addons/',
+    '@pixiv/three-vrm': base + 'three-vrm.module.min.js',
+  } });
+  document.head.appendChild(mapa);
+})();
+</script>
+<link rel="stylesheet" href="miku.css">
+</head>
+<body>
+<canvas id="lienzo"></canvas>
+
+<div id="sin-modelo" class="tarjeta" hidden></div>
+
+<div id="ui">
+  <div id="barra">
+    <button id="b-info" type="button" title="Crédito del modelo 3D" aria-label="Crédito del modelo 3D">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
+    </button>
+    <button id="b-cerrar" type="button" title="Cerrar (Esc)" aria-label="Cerrar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
+  <div id="credito" class="tarjeta" hidden></div>
+
+  <div id="globo" class="tarjeta" hidden>
+    <div id="tu"></div>
+    <div id="texto"></div>
+    <div id="prep" hidden>
+      <div id="prep-titulo"></div>
+      <div id="prep-barra"><div id="prep-relleno"></div></div>
+      <div id="prep-detalle"></div>
+    </div>
+    <div id="acciones" hidden></div>
+  </div>
+
+  <div id="abajo">
+    <div id="estado" class="reposo"><span id="punto"></span><span id="estado-texto">Lista</span></div>
+    <form id="form" autocomplete="off">
+      <input id="entrada" type="text" placeholder="Escríbele a Miku..." maxlength="600" spellcheck="false">
+      <button id="mic" type="button" title="Hablar (clic otra vez para terminar)" aria-label="Micrófono">
+        <span id="anillo"></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>
+        </svg>
+      </button>
+    </form>
+    <div id="pie-caja"><span id="pie"></span></div>
+  </div>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="ui.js"></script>
+<script type="module" src="escena.js"></script>
+</body>
+</html>

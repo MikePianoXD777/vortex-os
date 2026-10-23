@@ -1,0 +1,73 @@
+{
+  "voces": [
+    {
+      "id": "supertonic-f1",
+      "nombre": "Miku (F1)",
+      "descripcion": "La voz de fábrica: femenina y joven, clara. Con el 3D encendido se vuelve más grave, lenta y apagada, como Miku; sin 3D suena normal.",
+      "motor": "supertonic",
+      "estilo_voz": "F1",
+      "incluida": true,
+      "licencia": "BigScience OpenRAIL-M (los pesos de Supertonic 3 pueden usarse y redistribuirse con esa licencia, que trae restricciones de uso)"
+    },
+    {
+      "id": "supertonic-f2",
+      "nombre": "Voz F2",
+      "descripcion": "Femenina, la más expresiva de las cinco.",
+      "motor": "supertonic",
+      "estilo_voz": "F2",
+      "incluida": false,
+      "archivo": {
+        "ruta": "voice_styles/F2.json",
+        "url": "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/voice_styles/F2.json",
+        "bytes": 292423,
+        "sha256": "7c722c6a72707b1a77f035d67f0d1351ba187738e06f7683e8c72b1df3477fc6"
+      },
+      "licencia": "BigScience OpenRAIL-M"
+    },
+    {
+      "id": "supertonic-f3",
+      "nombre": "Voz F3",
+      "descripcion": "Femenina, la más grave de las cinco.",
+      "motor": "supertonic",
+      "estilo_voz": "F3",
+      "incluida": false,
+      "archivo": {
+        "ruta": "voice_styles/F3.json",
+        "url": "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/voice_styles/F3.json",
+        "bytes": 290794,
+        "sha256": "12f6ef2573baa2defa1128069cb59f203e3ab67c92af77b42df8a0e3a2f7c6ab"
+      },
+      "licencia": "BigScience OpenRAIL-M"
+    },
+    {
+      "id": "supertonic-f4",
+      "nombre": "Voz F4",
+      "descripcion": "Femenina, la más aguda y clara de las cinco.",
+      "motor": "supertonic",
+      "estilo_voz": "F4",
+      "incluida": false,
+      "archivo": {
+        "ruta": "voice_styles/F4.json",
+        "url": "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/voice_styles/F4.json",
+        "bytes": 291808,
+        "sha256": "c2fa764c1225a76dfc3e2c73e8aa4f70d9ee48793860eb34c295fff01c2e032b"
+      },
+      "licencia": "BigScience OpenRAIL-M"
+    },
+    {
+      "id": "supertonic-f5",
+      "nombre": "Voz F5",
+      "descripcion": "Femenina, grave y tranquila.",
+      "motor": "supertonic",
+      "estilo_voz": "F5",
+      "incluida": false,
+      "archivo": {
+        "ruta": "voice_styles/F5.json",
+        "url": "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/voice_styles/F5.json",
+        "bytes": 291479,
+        "sha256": "45966e73316415626cf41a7d1c6f3b4c70dbc1ba2bee5c1978ef0ce33244fc8d"
+      },
+      "licencia": "BigScience OpenRAIL-M"
+    }
+  ]
+}
