@@ -1,0 +1,196 @@
+/* Vortexine's OS: tema oscuro del instalador (diseño en Claude Design: «Instalador de Vortexine's OS»).
+   Fondo #0b0d1a, superficies #141833/#161a36, bordes #232850/#2c3366, texto #e8ebff/#a3aad6,
+   acentos #9ec5ff (azul) y #c6a8ff (violeta), esquinas redondeadas como el shell. */
+* {
+    font-family: "Adwaita Sans", "Noto Sans", sans-serif;
+}
+QWidget {
+    background-color: #0b0d1a;
+    color: #e8ebff;
+    font-size: 11pt;
+}
+QLabel, QCheckBox, QRadioButton, QGroupBox {
+    background: transparent;
+}
+#sidebarApp, #sidebarMenuApp, #logoApp {
+    background-color: #11142a;
+}
+QToolTip {
+    background-color: #161a36;
+    color: #e8ebff;
+    border: 1px solid #2c3366;
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+/* Botones: Atrás y Cancelar con borde; Siguiente/Instalar lleno, en azul. */
+QPushButton {
+    background: transparent;
+    color: #c3c8ea;
+    border: 1px solid #2c3366;
+    border-radius: 20px;
+    padding: 9px 22px;
+    min-height: 22px;
+}
+QPushButton:hover {
+    border-color: #9ec5ff;
+    color: #e8ebff;
+}
+QPushButton:pressed {
+    background-color: #161a36;
+}
+QPushButton:disabled {
+    color: #5a6194;
+    border-color: #1c2142;
+}
+#view-button-next {
+    background-color: #9ec5ff;
+    color: #0b0d1a;
+    border: none;
+    font-weight: 600;
+    padding: 9px 28px;
+}
+#view-button-next:hover {
+    background-color: #c6a8ff;
+}
+#view-button-next:disabled {
+    background-color: #2c3366;
+    color: #7a82b8;
+}
+
+/* Campos */
+QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {
+    background-color: #161a36;
+    color: #e8ebff;
+    border: 1px solid #2c3366;
+    border-radius: 12px;
+    padding: 7px 12px;
+    selection-background-color: #9ec5ff;
+    selection-color: #0b0d1a;
+}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QTextEdit:focus {
+    border-color: #9ec5ff;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 28px;
+}
+QComboBox QAbstractItemView {
+    background-color: #161a36;
+    color: #e8ebff;
+    border: 1px solid #2c3366;
+    selection-background-color: #9ec5ff;
+    selection-color: #0b0d1a;
+    outline: 0;
+}
+
+/* Listas: idiomas, zonas, teclados, apps y juegos, particiones */
+QListView, QTreeView, QTableView {
+    background-color: #141833;
+    alternate-background-color: #161a36;
+    border: 1px solid #232850;
+    border-radius: 14px;
+    padding: 6px;
+    selection-background-color: #1a2047;
+    selection-color: #e8ebff;
+    outline: 0;
+}
+QListView::item, QTreeView::item {
+    min-height: 30px;
+    border-radius: 8px;
+}
+QListView::item:hover, QTreeView::item:hover {
+    background-color: #1a2047;
+}
+QListView::item:selected, QTreeView::item:selected {
+    background-color: #24306a;
+    color: #e8ebff;
+}
+QHeaderView::section {
+    background-color: #11142a;
+    color: #a3aad6;
+    border: none;
+    padding: 6px 10px;
+}
+QCheckBox::indicator, QTreeView::indicator, QListView::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 6px;
+    border: 2px solid #4a5390;
+    background-color: #141833;
+}
+QCheckBox::indicator:checked, QTreeView::indicator:checked, QListView::indicator:checked {
+    background-color: #9ec5ff;
+    border-color: #9ec5ff;
+    image: url(/etc/calamares/branding/vortex/marca.svg);
+}
+QTreeView::indicator:indeterminate {
+    background-color: #c6a8ff;
+    border-color: #c6a8ff;
+}
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 10px;
+    border: 2px solid #4a5390;
+    background-color: #141833;
+}
+QRadioButton::indicator:checked {
+    border: 5px solid #9ec5ff;
+    background-color: #0b0d1a;
+}
+QGroupBox {
+    border: 1px solid #232850;
+    border-radius: 14px;
+    margin-top: 14px;
+    padding: 12px;
+}
+QGroupBox::title {
+    color: #c6a8ff;
+    subcontrol-origin: margin;
+    left: 14px;
+    padding: 0 4px;
+}
+
+/* Barra de progreso de la instalación */
+QProgressBar {
+    background-color: #1c2142;
+    border: none;
+    border-radius: 5px;
+    min-height: 10px;
+    max-height: 10px;
+    color: transparent;
+}
+QProgressBar::chunk {
+    border-radius: 5px;
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #9ec5ff, stop: 1 #c6a8ff);
+}
+
+/* Barras de desplazamiento finas */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background-color: #2c3366;
+    border-radius: 4px;
+    min-height: 32px;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 2px;
+}
+QScrollBar::handle:horizontal {
+    background-color: #2c3366;
+    border-radius: 4px;
+    min-width: 32px;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    width: 0;
+    height: 0;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
+}
