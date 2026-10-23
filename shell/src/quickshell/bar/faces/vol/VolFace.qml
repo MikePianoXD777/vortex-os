@@ -141,7 +141,7 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 if (Audio.defaultSink) Audio.toggleMute(Audio.defaultSink)
             } else {
-                Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle volume"])
+                Quickshell.execDetached(["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/qs_manager.sh\" toggle volume"])
             }
         }
 
@@ -243,7 +243,7 @@ Item {
             transform: Translate { y: volPill.initAnimTrigger ? 0 : s(15); Behavior on y { NumberAnimation { duration: 620; easing.type: Easing.OutQuint } } }
             Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
 
-            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle volume"])
+            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/qs_manager.sh\" toggle volume"])
             onRightClicked: if (!root.isPreview && Audio.defaultSink) Audio.toggleMute(Audio.defaultSink)
 
             property real wheelAccumulator: 0
@@ -281,7 +281,7 @@ Item {
             iconFontSize: s(root.isCompact ? 14 : 15)
             accentColor: root.isSoundActive ? (root.isCompact ? Qt.lighter(ThemeBackend.mauve, 1.08) : ThemeBackend.mauve) : (root.isCompact ? Qt.lighter(ThemeBackend.surface1, 1.12) : ThemeBackend.surface1)
             textColor: root.isSoundActive ? ThemeBackend.base : (root.isCompact ? ThemeBackend.text : ThemeBackend.subtext0)
-            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle volume"])
+            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/qs_manager.sh\" toggle volume"])
         }
     }
 }

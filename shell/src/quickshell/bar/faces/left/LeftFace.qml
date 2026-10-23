@@ -129,14 +129,14 @@ Item {
             id: settingsBtn
             visible: root.effectiveShowSettings
             glyph: "󰒓"
-            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle guide"])
+            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/qs_manager.sh\" toggle guide"])
         }
 
         MenuButton {
             id: launcherBtn
             visible: root.showLauncher
             glyph: "󰍉"
-            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle launcher"])
+            onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/qs_manager.sh\" toggle launcher"])
         }
     }
 }

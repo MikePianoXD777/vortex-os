@@ -83,7 +83,7 @@ Item {
 
     Process {
         id: autoProcess
-        command: ["bash", "-c", Caching.serpantinumDir + "/scripts/location.sh --refresh"]
+        command: ["bash", "-c", "\"" + Caching.serpantinumDir + "/scripts/location.sh\" --refresh"]
         onExited: {
             root.isDetecting = false;
         }
@@ -93,7 +93,7 @@ Item {
         id: manualProcess
         property string lat: ""
         property string lon: ""
-        command: ["bash", "-c", Caching.serpantinumDir + "/scripts/location_manual.sh '" + lat + "' '" + lon + "'"]
+        command: ["bash", Caching.serpantinumDir + "/scripts/location_manual.sh", String(lat), String(lon)]
         onExited: {
             root.isDetecting = false;
         }
