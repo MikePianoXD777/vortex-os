@@ -140,7 +140,13 @@ chmod +x "$T/bin/vortex-otaku" "$T/bin-notif/notify-send"
 # corre ESCENARIO; deja su salida en $T/ESCENARIO/{salida,cmd}.log
 correr() {
   local esc="$1" r="$T/$1" ruta="$T/bin:$T/bin-notif:$PATH"
-  [[ "$esc" == falta ]] && ruta="$T/bin-notif:$PATH"
+  if [[ "$esc" == falta ]]; then
+    # En un Vortexine's instalado el vortex-otaku de verdad está en el PATH: se quitan sus carpetas.
+    local d sin=""
+    local IFS=:
+    for d in $PATH; do [[ -x "$d/vortex-otaku" ]] || sin+="${sin:+:}$d"; done
+    ruta="$T/bin-notif:$sin"
+  fi
   mkdir -p "$r/home" "$r/rt" "$r/cfg" "$r/cache" "$r/state"
   chmod 700 "$r/rt"
   env -i HOME="$r/home" PATH="$ruta" XDG_RUNTIME_DIR="$r/rt" XDG_CONFIG_HOME="$r/cfg" XDG_CACHE_HOME="$r/cache" \

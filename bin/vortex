@@ -475,26 +475,42 @@ instalar_comandos() {
   done
 }
 
+# Versión (pkgver-pkgrel) de un PKGBUILD de packaging/, sin ejecutarlo.
+version_pkgbuild() {
+  awk -F= '/^pkgver=/ {v = $2} /^pkgrel=/ {r = $2} END {print v "-" r}' "$VORTEX_DIR/packaging/$1/PKGBUILD"
+}
+
 cmd_actualizar() {
-  if [[ -d "$VORTEX_DIR/.git" ]]; then
-    # Sin red, sin repo publicado o con historia divergida el pull falla: no debe
-    # abortar antes de actualizar los paquetes, ni quedarse pidiendo credenciales.
-    GIT_TERMINAL_PROMPT=0 git -C "$VORTEX_DIR" pull --ff-only \
-      || aviso "no pude actualizar Vortex (¿sin red o repo sin publicar?); sigo con los paquetes"
+  if [[ "${1:-}" != --ya-traido ]]; then
+    if [[ -d "$VORTEX_DIR/.git" ]]; then
+      # Sin red, sin repo publicado o con historia divergida el pull falla: no debe
+      # abortar antes de actualizar los paquetes, ni quedarse pidiendo credenciales.
+      if GIT_TERMINAL_PROMPT=0 git -C "$VORTEX_DIR" pull --ff-only; then
+        # Lo de abajo puede haber cambiado con el pull: se sigue con el vortex recién traído.
+        exec "$VORTEX_DIR/bin/vortex" actualizar --ya-traido "$@"
+      fi
+      aviso "no pude actualizar Vortex (¿sin red o repo sin publicar?); sigo con los paquetes"
+    else
+      aviso "este Vortex no es un repo git; no puedo actualizarlo"
+    fi
   else
-    aviso "este Vortex no es un repo git; no puedo actualizarlo"
+    shift
   fi
   instalar_comandos
   paru -Syu
-  # El shell viene de shell/ de este repo: se reconstruye su paquete si cambió.
-  local instalado
-  instalado="$(pacman -Q vortex-shell 2>/dev/null | awk '{print $2}' | cut -d- -f1)"
-  if [[ "$instalado" != "$(cat "$VORTEX_DIR/shell/version.txt")" ]] || [[ "${1:-}" == --forzar ]]; then
-    (cd "$VORTEX_DIR/packaging/vortex-shell" && makepkg -sif --noconfirm)
+  # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
+  # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
+  local pkg instalado
+  for pkg in vortex-shell vortex-shop vortex-miku; do
+    [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
+    instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
+    [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar ]] || continue
+    (cd "$VORTEX_DIR/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
+    rm -rf "$VORTEX_DIR/packaging/$pkg/"{pkg,src} "$VORTEX_DIR/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
-    hypr_corriendo && hyprctl reload >/dev/null 2>&1
-  fi
+    [[ "$pkg" == vortex-shell ]] && hypr_corriendo && hyprctl reload >/dev/null 2>&1
+  done
   return 0
 }
 

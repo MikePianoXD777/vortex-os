@@ -22,6 +22,10 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   justo debajo de la barra. No te quita el teclado al abrirse.
 - **Comandos:** `vortex miku` (abre o cierra), `vortex miku estado`, `vortex miku voz [ID]` y
   `vortex miku modelo RUTA.vrm`. Las opciones quedan en `~/.config/vortex/miku.json`.
+- **`vortex actualizar` más listo:** sigue con el código recién bajado (antes usaba el de antes del
+  pull) y reconstruye el shell, la tienda o Miku cuando cambia su paquete, o los instala si faltan;
+  ya no hace falta `--forzar`. Desde la 1.2 o antes, córrelo **dos veces** (la primera trae el
+  `vortex` nuevo).
 
 ## Qué viene en la ISO y qué no
 

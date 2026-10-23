@@ -383,6 +383,33 @@ probar "copia los comandos que faltaban (vortex-otaku) y reemplaza los viejos (v
 mtime_antes="$(stat -c %Y.%y "$T/destino/vortex-otaku")"
 env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1
 probar "si no cambiaron, no los vuelve a copiar (ni pide sudo)" "[[ \"\$(stat -c %Y.%y '$T/destino/vortex-otaku')\" == '$mtime_antes' ]]"
+
+# Paquetes propios: se reconstruye solo el que falta o tiene otra versión que su PKGBUILD.
+for p in vortex-shell vortex-shop vortex-miku; do
+  mkdir -p "$T/repo/packaging/$p"
+  cp "$AQUI/packaging/$p/PKGBUILD" "$T/repo/packaging/$p/PKGBUILD"
+done
+v_shell="$(awk -F= '/^pkgver=/ {v = $2} /^pkgrel=/ {r = $2} END {print v "-" r}' "$AQUI/packaging/vortex-shell/PKGBUILD")"
+v_shop="$(awk -F= '/^pkgver=/ {v = $2} /^pkgrel=/ {r = $2} END {print v "-" r}' "$AQUI/packaging/vortex-shop/PKGBUILD")"
+# shell al día, tienda con el pkgrel viejo, Miku sin instalar
+cat >"$T/bin/pacman" <<EOF
+#!/usr/bin/env bash
+case "\$2" in
+  vortex-shell) echo "vortex-shell $v_shell" ;;
+  vortex-shop) echo "vortex-shop ${v_shop%-*}-0" ;;
+  *) exit 1 ;;
+esac
+EOF
+printf '#!/usr/bin/env bash\nbasename "$PWD" >>"$T/makepkg.log"\n' >"$T/bin/makepkg"
+printf '#!/usr/bin/env bash\necho "hyprctl $*" >>"$T/makepkg.log"\n' >"$T/bin/hyprctl"
+chmod +x "$T/bin/pacman" "$T/bin/makepkg" "$T/bin/hyprctl"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1; rc=$?
+probar "reconstruye la tienda (otro pkgrel) e instala Miku (faltaba), no el shell al día" \
+  "((rc == 0)) && [[ \"\$(grep -v hyprctl '$T/makepkg.log' | sort | tr '\n' ' ')\" == 'vortex-miku vortex-shop ' ]]"
+: >"$T/makepkg.log"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar --forzar >/dev/null 2>&1
+probar "con --forzar reconstruye los tres" "[[ \"\$(grep -vc hyprctl '$T/makepkg.log')\" == 3 ]]"
+
 lista_instalador="$(sed -n 's/^for comando in \(.*\); do$/\1/p' "$AQUI/install/30-escritorio.sh")"
 lista_vortex="$(sed -n 's/^COMANDOS_VORTEX=(\(.*\))$/\1/p' "$AQUI/bin/vortex")"
 probar "la lista de bin/vortex es la misma que la de install/30-escritorio.sh" "[[ -n '$lista_instalador' && '$lista_instalador' == '$lista_vortex' ]]"
