@@ -1,0 +1,13 @@
+# Secure Boot: cada kernel o systemd-boot nuevo se firma con la llave de esta PC (bin/vortex-firmar).
+# Va después de 90-mkinitcpio-install, que copia el kernel a /boot. Sin llave no hace nada.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/systemd/boot/efi/systemd-bootx64.efi
+
+[Action]
+Description = Firmando el arranque para Secure Boot...
+When = PostTransaction
+Exec = /usr/local/bin/vortex-firmar

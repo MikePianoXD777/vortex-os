@@ -288,6 +288,12 @@ paso_arranque() {
   [[ -e "$entradas/$defecto" ]] || defecto=vortex-os-arch.conf
   printf 'default %s\ntimeout 3\nconsole-mode keep\n' "$defecto" >"$boot/loader/loader.conf"
   log "arranque: $(ls "$entradas" | tr '\n' ' ')(por defecto $defecto)"
+  # Secure Boot sin tocar la BIOS: shim + una llave de esta PC con la que se firman systemd-boot y
+  # los kernels (bin/vortex-firmar; el hook 99-vortex-firmar los vuelve a firmar en cada
+  # actualización). Si Secure Boot está activo, al reiniciar MokManager pide aceptar la llave.
+  if [[ -z "$raiz" && -x /usr/local/bin/vortex-firmar ]]; then
+    /usr/local/bin/vortex-firmar preparar || log "Secure Boot: no quedó preparado (con Secure Boot apagado arranca igual)"
+  fi
   # Este script ya no sirve después de instalar.
   [[ -z "$raiz" ]] && rm -f /usr/local/bin/vortex-post-instalacion
   return 0

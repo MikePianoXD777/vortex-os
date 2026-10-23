@@ -101,7 +101,7 @@ install -Dm644 "$cfg/scx_loader.toml" "$raiz/etc/scx_loader.toml"
 sed 's|start-hyprland </dev/null|vortex-sesion|' "$cfg/greetd.toml" | install -Dm644 /dev/stdin "$raiz/etc/greetd/config.toml"
 install -Dm644 "$RAIZ/config/systemd/vortex-gestor.service" "$raiz/etc/systemd/user/vortex-gestor.service"
 install -Dm644 "$RAIZ/config/systemd/vortex-flatpaks.service" "$raiz/etc/systemd/system/vortex-flatpaks.service"
-for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-flatpaks vortex-sesion vortex-otaku; do
+for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-flatpaks vortex-sesion vortex-otaku vortex-pantallas vortex-firmar; do
   install -Dm755 "$RAIZ/bin/$c" "$raiz/usr/local/bin/$c"
 done
 cc -O2 -s -o "$raiz/usr/local/bin/vortex-eventos" "$RAIZ/src/vortex-eventos.c"
@@ -240,6 +240,57 @@ fi
 grep -rl 'Arch Linux install medium' "$perfil"/efiboot "$perfil"/syslinux "$perfil"/grub 2>/dev/null |
   xargs -r sed -i 's/Arch Linux install medium/Vortexine'\''s OS/g'
 
-mkarchiso -v -w "$TRABAJO/work" -o "$SALIDA" "$perfil"
+# --- Secure Boot sin tocar la BIOS: shim (firmado por Microsoft) + la llave de Vortexine's ---
+# VORTEX_SB_LLAVE = carpeta con MOK.key, MOK.crt y vortexines.cer (la llave de la ISO; NO va en
+# git). La firma va en una copia de mkarchiso: justo después de copiar systemd-boot al arranque
+# UEFI, systemd-boot pasa a llamarse grubx64.efi (el que shim abre) firmado con la llave, shim va
+# como BOOTx64.EFI, MokManager (mmx64.efi) a su lado, y los kernels quedan firmados. La primera
+# vez que el USB arranca con Secure Boot, shim no conoce la llave y abre MokManager: «Enroll key
+# from disk» → EFI → vortexines.cer. Sin VORTEX_SB_LLAVE la ISO sale como antes (sin firmar).
+mkarchiso_bin=mkarchiso
+if [[ -n "${VORTEX_SB_LLAVE:-}" ]]; then
+  for f in MOK.key MOK.crt vortexines.cer; do
+    [[ -f "$VORTEX_SB_LLAVE/$f" ]] || { echo "Secure Boot: falta $VORTEX_SB_LLAVE/$f" >&2; exit 1; }
+  done
+  pacman -S --needed --noconfirm sbsigntools mtools >/dev/null
+  shim="$(ls "$REPO"/shim-signed-*.pkg.tar.* 2>/dev/null | grep -v '\.sig$' | sort -V | tail -n 1 || true)"
+  [[ -n "$shim" ]] || { echo "Secure Boot: falta shim-signed en el repo [vortex] (corre iso/paquetes.sh)" >&2; exit 1; }
+  export VORTEX_SB_DIR="$TRABAJO/secureboot"
+  mkdir -p "$VORTEX_SB_DIR"
+  chmod 700 "$VORTEX_SB_DIR"
+  bsdtar -xf "$shim" -C "$VORTEX_SB_DIR" usr/share/shim-signed/shimx64.efi usr/share/shim-signed/mmx64.efi
+  install -m 600 "$VORTEX_SB_LLAVE/MOK.key" "$VORTEX_SB_LLAVE/MOK.crt" "$VORTEX_SB_LLAVE/vortexines.cer" "$VORTEX_SB_DIR/"
+  mkarchiso_bin="$TRABAJO/mkarchiso"
+  cat >"$TRABAJO/secureboot.sh" <<'SBEOF'
+# Vortexine's OS: Secure Boot con shim (lo agrega iso/construir.sh).
+_vortex_firmar() {
+    sbsign --key "${VORTEX_SB_DIR}/MOK.key" --cert "${VORTEX_SB_DIR}/MOK.crt" --output "$1.firmado" "$1" &&
+        mv -f -- "$1.firmado" "$1"
+}
+_vortex_secureboot() {
+    local k
+    _msg_info "Vortexine's OS: arranque con shim y firmas para Secure Boot..."
+    install -m 0644 -- "${isofs_dir}/EFI/BOOT/BOOTx64.EFI" "${isofs_dir}/EFI/BOOT/grubx64.efi"
+    _vortex_firmar "${isofs_dir}/EFI/BOOT/grubx64.efi" || exit 1
+    install -m 0644 -- "${VORTEX_SB_DIR}/usr/share/shim-signed/shimx64.efi" "${isofs_dir}/EFI/BOOT/BOOTx64.EFI"
+    install -m 0644 -- "${VORTEX_SB_DIR}/usr/share/shim-signed/mmx64.efi" "${isofs_dir}/EFI/BOOT/mmx64.efi"
+    install -m 0644 -- "${VORTEX_SB_DIR}/vortexines.cer" "${isofs_dir}/EFI/vortexines.cer"
+    for k in "${boot_dir}/vmlinuz-"* "${isofs_dir}/${install_dir}/boot/${arch}/vmlinuz-"*; do
+        [[ -e "$k" ]] || continue
+        _vortex_firmar "$k" || exit 1
+    done
+    _msg_info "Done!"
+}
+SBEOF
+  awk -v sb="$TRABAJO/secureboot.sh" '
+    /^_make_bootmode_uefi\.systemd-boot\(\) \{$/ { while ((getline l < sb) > 0) print l; antes++ }
+    { print }
+    /_make_common_bootmode_uefi\.systemd-boot_copy_files "\$\{uefi_arch\[\$arch\]\}"/ && !hecho { print "    _vortex_secureboot"; hecho = 1 }
+    END { if (antes != 1 || !hecho) exit 1 }' "$(command -v mkarchiso)" >"$mkarchiso_bin" ||
+    { echo "Secure Boot: esta versión de mkarchiso no se dejó modificar (¿cambió archiso?)" >&2; exit 1; }
+  chmod 755 "$mkarchiso_bin"
+fi
+
+"$mkarchiso_bin" -v -w "$TRABAJO/work" -o "$SALIDA" "$perfil"
 rm -rf "$TRABAJO"
 ls -la "$SALIDA"

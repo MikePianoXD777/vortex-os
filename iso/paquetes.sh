@@ -20,7 +20,7 @@ RAIZ="$(dirname "$AQUI")"
 # gráfico) se compila aquí porque los de CachyOS están enlazados a un boost viejo (no arrancan
 # con el de Arch).
 PROPIOS=(vortex-shell vortex-studio vortex-flatpaks vortex-claude)
-AUR=(wl-gammarelay-rs calamares)
+AUR=(wl-gammarelay-rs calamares shim-signed)
 AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 
 # La ISO tiene que arrancar en cualquier x86-64 (construir.sh usa el [cachyos] genérico), pero el

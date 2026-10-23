@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# vortex-firmar: Secure Boot sin tocar la BIOS en lo instalado (UEFI con systemd-boot).
+#
+#   vortex-firmar            firma los kernels de /boot y systemd-boot con la llave de esta PC
+#                            (lo corre solo el hook de pacman en cada kernel o systemd nuevo)
+#   vortex-firmar preparar   crea la llave de esta PC, pone shim en el arranque y, si Secure
+#                            Boot está activo, pide a MokManager que la acepte (lo corre el
+#                            instalador; contraseña de un solo uso: 1234)
+#   vortex-firmar inscribir  vuelve a pedir que MokManager acepte la llave (p. ej. si activaste
+#                            Secure Boot después de instalar)
+#   vortex-firmar estado     dice cómo está
+#
+# Cómo arranca: el firmware abre shim (firmado por Microsoft, como en Fedora y Ubuntu), shim abre
+# systemd-boot (grubx64.efi, firmado con la llave de esta PC) y systemd-boot el kernel (firmado con
+# la misma llave; lo verifica a través de shim). La llave es de cada PC y vive en
+# /etc/vortex/secureboot (solo root): nunca sale de la máquina. Sin Secure Boot todo arranca igual.
+set -uo pipefail
+
+LLAVE="${VORTEX_SB_LLAVE_DIR:-/etc/vortex/secureboot}"
+RAIZ="${VORTEX_RAIZ:-}"
+ESP="$RAIZ/boot"
+SHIM="$RAIZ/usr/share/shim-signed"
+SDBOOT="$RAIZ/usr/lib/systemd/boot/efi/systemd-bootx64.efi"
+CLAVE_MOK=1234
+
+log() { printf 'vortex-firmar: %s\n' "$*"; }
+
+hay_llave() { [[ -f "$LLAVE/MOK.key" && -f "$LLAVE/MOK.crt" ]]; }
+
+firmar_uno() {
+  local origen="$1" destino="$2"
+  # Ya firmado con esta llave: no se toca.
+  if [[ "$origen" == "$destino" ]] && sbverify --cert "$LLAVE/MOK.crt" "$destino" >/dev/null 2>&1; then
+    return 0
+  fi
+  sbsign --key "$LLAVE/MOK.key" --cert "$LLAVE/MOK.crt" --output "$destino.vortex" "$origen" >/dev/null 2>&1 &&
+    mv -f -- "$destino.vortex" "$destino" || { rm -f -- "$destino.vortex"; log "no pude firmar $destino"; return 1; }
+}
+
+firmar() {
+  hay_llave || return 0
+  command -v sbsign >/dev/null || { log "falta sbsigntools"; return 1; }
+  local k d mal=0
+  for k in "$ESP"/vmlinuz-*; do
+    [[ -f "$k" ]] || continue
+    firmar_uno "$k" "$k" || mal=1
+  done
+  # systemd-boot, como lo abre shim (grubx64.efi), en las dos rutas donde está shim.
+  if [[ -f "$SDBOOT" ]]; then
+    for d in "$ESP/EFI/vortex-os" "$ESP/EFI/BOOT"; do
+      [[ -f "$d/mmx64.efi" ]] || continue
+      firmar_uno "$SDBOOT" "$d/grubx64.efi" || mal=1
+    done
+  fi
+  return "$mal"
+}
+
+sb_activo() { mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled'; }
+
+inscribir() {
+  hay_llave || { log "no hay llave en $LLAVE"; return 1; }
+  if mokutil --test-key "$LLAVE/MOK.cer" 2>&1 | grep -qi 'already enrolled'; then
+    log "la llave ya está aceptada"
+    return 0
+  fi
+  local hash
+  hash="$(mktemp)" || return 1
+  mokutil --generate-hash="$CLAVE_MOK" >"$hash" && mokutil --hash-file "$hash" --import "$LLAVE/MOK.cer"
+  local r=$?
+  rm -f -- "$hash"
+  if ((r == 0)); then
+    : >"$LLAVE/pendiente"
+    log "al reiniciar sale MokManager (pantalla azul): Enroll MOK → Continue → Yes → escribe $CLAVE_MOK → Reboot"
+  fi
+  return "$r"
+}
+
+preparar() {
+  [[ -d /sys/firmware/efi ]] || { log "PC con BIOS: no hay Secure Boot"; return 0; }
+  [[ -f "$SHIM/shimx64.efi" && -f "$SHIM/mmx64.efi" ]] || { log "falta shim-signed: no preparo Secure Boot"; return 0; }
+  [[ -f "$SDBOOT" && -d "$ESP/EFI" ]] || { log "no hay systemd-boot en $ESP: no preparo Secure Boot"; return 0; }
+  # La llave de esta PC.
+  if ! hay_llave; then
+    install -d -m 700 "$LLAVE"
+    openssl req -newkey rsa:2048 -nodes -keyout "$LLAVE/MOK.key" -new -x509 -sha256 -days 36500 \
+      -subj "/CN=Vortexine's OS ($(cat "$RAIZ/etc/hostname" 2>/dev/null || echo pc))/" \
+      -addext "extendedKeyUsage=codeSigning" -out "$LLAVE/MOK.crt" >/dev/null 2>&1 &&
+      openssl x509 -outform DER -in "$LLAVE/MOK.crt" -out "$LLAVE/MOK.cer" ||
+      { log "no pude crear la llave"; return 1; }
+    chmod 600 "$LLAVE/MOK.key"
+  fi
+  # shim y MokManager en la carpeta de Vortexine's y en la ruta de respaldo (la que abre el
+  # firmware si pierde sus entradas). systemd-boot se queda también en EFI/systemd por si acaso.
+  local d
+  for d in "$ESP/EFI/vortex-os" "$ESP/EFI/BOOT"; do
+    install -d "$d"
+    install -m 644 "$SHIM/mmx64.efi" "$d/mmx64.efi"
+  done
+  install -m 644 "$SHIM/shimx64.efi" "$ESP/EFI/vortex-os/shimx64.efi"
+  install -m 644 "$SHIM/shimx64.efi" "$ESP/EFI/BOOT/BOOTX64.EFI"
+  firmar || return 1
+  # Entrada de arranque «Vortexine's OS» → shim, la primera en el orden.
+  if [[ -z "$RAIZ" ]] && command -v efibootmgr >/dev/null; then
+    # La partición del ESP por su número de dispositivo (funciona igual dentro del chroot del
+    # instalador, donde findmnt/lsblk ven las rutas de afuera).
+    local mm disco num
+    mm="$(mountpoint -d "$ESP" 2>/dev/null)"
+    num="$(cat "/sys/dev/block/$mm/partition" 2>/dev/null)"
+    disco="$(basename "$(readlink -f "/sys/dev/block/$mm/..")" 2>/dev/null)"
+    if [[ -n "$disco" && -n "$num" ]]; then
+      if ! efibootmgr 2>/dev/null | grep -qi 'vortex-os\\shimx64.efi'; then
+        efibootmgr -q --create --disk "/dev/$disco" --part "$num" --label "Vortexine's OS" \
+          --loader '\EFI\vortex-os\shimx64.efi' || log "no pude crear la entrada de arranque (queda la de respaldo)"
+      fi
+    else
+      log "no encontré la partición EFI de $ESP: queda la entrada de respaldo (EFI/BOOT)"
+    fi
+  fi
+  if sb_activo; then
+    inscribir
+  else
+    log "Secure Boot apagado: todo arranca igual. Si lo activas después: sudo vortex-firmar inscribir"
+  fi
+  return 0
+}
+
+estado() {
+  if [[ ! -d /sys/firmware/efi ]]; then echo "PC con BIOS (sin Secure Boot)"; return 0; fi
+  if sb_activo; then echo "Secure Boot: activo"; else echo "Secure Boot: apagado"; fi
+  if hay_llave; then
+    if mokutil --test-key "$LLAVE/MOK.cer" 2>&1 | grep -qi 'already enrolled'; then
+      echo "Llave de esta PC: aceptada"
+    elif [[ -e "$LLAVE/pendiente" ]]; then
+      echo "Llave de esta PC: pendiente (al reiniciar, MokManager: Enroll MOK → Continue → Yes → $CLAVE_MOK)"
+    else
+      echo "Llave de esta PC: sin aceptar (sudo vortex-firmar inscribir)"
+    fi
+  else
+    echo "Sin llave (sudo vortex-firmar preparar)"
+  fi
+}
+
+case "${1:-}" in
+  "") firmar ;;
+  preparar) preparar ;;
+  inscribir) inscribir ;;
+  estado) estado ;;
+  *) echo "uso: vortex-firmar [preparar|inscribir|estado]" >&2; exit 1 ;;
+esac

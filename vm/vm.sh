@@ -29,7 +29,16 @@ mkdir -p "$VM"
 preparar() {
   [[ -f "$LLAVE" ]] || ssh-keygen -q -t ed25519 -N '' -C vortex-vm -f "$LLAVE"
   [[ -f "$DISCO" ]] || qemu-img create -q -f qcow2 "$DISCO" 40G
-  [[ -f "$VM/OVMF_VARS.fd" ]] || cp "$OVMF/OVMF_VARS.4m.fd" "$VM/OVMF_VARS.fd"
+  if [[ ! -f "$VM/OVMF_VARS.fd" ]]; then
+    # Con VORTEX_VM_SB=1: variables con las llaves de Microsoft y Secure Boot encendido (como una PC
+    # con Windows). Se arman una vez con virt-fw-vars (pip install virt-firmware).
+    if [[ "${VORTEX_VM_SB:-0}" == 1 ]]; then
+      [[ -f "${VORTEX_VM_SB_VARS:-}" ]] || { echo "Falta VORTEX_VM_SB_VARS (virt-fw-vars -i $OVMF/OVMF_VARS.4m.fd -o vars.fd --enroll-redhat --secure-boot)" >&2; exit 1; }
+      cp "$VORTEX_VM_SB_VARS" "$VM/OVMF_VARS.fd"
+    else
+      cp "$OVMF/OVMF_VARS.4m.fd" "$VM/OVMF_VARS.fd"
+    fi
+  fi
 
   # Semilla de cloud-init: la ISO de Arch la lee al arrancar y así deja entrar por SSH con la llave.
   local semilla="$VM/semilla"
@@ -60,10 +69,15 @@ qemu_comun() {
       AUDIO=pipewire ;;
     *) VIDEO=(-device virtio-vga-gl,xres=1920,yres=1080 -display egl-headless) ;;
   esac
+  local maquina=q35 codigo="$OVMF/OVMF_CODE.4m.fd" sb=()
+  if [[ "${VORTEX_VM_SB:-0}" == 1 ]]; then
+    maquina=q35,smm=on codigo="$OVMF/OVMF_CODE.secboot.4m.fd"
+    sb=(-global driver=cfi.pflash01,property=secure,value=on)
+  fi
   QEMU=(
-    qemu-system-x86_64 -enable-kvm -machine q35 -cpu host
+    qemu-system-x86_64 -enable-kvm -machine "$maquina" -cpu host "${sb[@]}"
     -smp "${VORTEX_VM_CPUS:-6}" -m "${VORTEX_VM_RAM:-6G}"
-    -drive "if=pflash,format=raw,readonly=on,file=$OVMF/OVMF_CODE.4m.fd"
+    -drive "if=pflash,format=raw,readonly=on,file=$codigo"
     -drive "if=pflash,format=raw,file=$VM/OVMF_VARS.fd"
     -drive "file=$DISCO,if=virtio,cache=unsafe"
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$PUERTO-:22"

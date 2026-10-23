@@ -31,13 +31,13 @@ secure_boot_activo() {
     return 1
   fi
 }
-# Vortexine's OS todavía no trae shim ni kernel firmados: con Secure Boot activo el sistema instalado
-# no arranca (el firmware lo rechaza). Se avisa antes de que formatee nada; la notificación es
-# crítica para que se quede en pantalla hasta que se cierre.
+# Con Secure Boot activo, Vortexine's OS arranca con shim y una llave propia de esta PC: al terminar
+# y reiniciar, MokManager (una pantalla azul) pide aceptarla una sola vez. Se avisa antes para que
+# nadie se asuste; la notificación es crítica para que se quede en pantalla hasta que se cierre.
 if secure_boot_activo; then
-  aviso_sb="Secure Boot está activado. Vortexine's OS todavía no está firmado para él: el sistema que instales no arrancará mientras siga activado. Desactívalo en la BIOS/UEFI (Seguridad > Secure Boot) antes de instalar."
+  aviso_sb="Secure Boot está activado y Vortexine's OS lo soporta, sin tocar la BIOS. Al terminar y reiniciar saldrá una pantalla azul (MokManager) una sola vez: elige «Enroll MOK», luego «Continue», «Yes», escribe 1234 y elige «Reboot»."
   echo "vortex-instalador: $aviso_sb" >&2
-  notify-send -u critical -t 0 -a "Vortexine's OS" "Secure Boot está activado" "$aviso_sb" 2>/dev/null || true
+  notify-send -u critical -t 0 -a "Vortexine's OS" "Secure Boot" "$aviso_sb" 2>/dev/null || true
 fi
 
 # En español por defecto (el live usa LANG=C.UTF-8); en la primera pantalla se elige otro idioma.

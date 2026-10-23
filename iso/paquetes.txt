@@ -19,6 +19,10 @@ intel-ucode
 mkinitcpio
 mkinitcpio-archiso
 efibootmgr
+# Secure Boot sin tocar la BIOS: shim firmado por Microsoft (de [vortex], del AUR), MokManager y firmas
+shim-signed
+mokutil
+sbsigntools
 # UEFI arranca con systemd-boot (viene en systemd); en una PC con BIOS/legacy eso no sirve y el
 # módulo bootloader de Calamares instala GRUB (iso/airootfs/etc/calamares/modules/bootloader_vortex.conf).
 grub
