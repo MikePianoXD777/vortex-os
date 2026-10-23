@@ -83,6 +83,27 @@ qmp() {
 # Una tecla de texto como nombre de «sendkey» de QEMU (con shift si hace falta).
 nombre_tecla() {
   local c="$1"
+  # Latinoamericano (VORTEX_VM_TECLADO=latam): los símbolos están en otras teclas que en US.
+  if [[ "${VORTEX_VM_TECLADO:-us}" == latam ]]; then
+    case "$c" in
+      -) echo slash; return ;;
+      _) echo shift-slash; return ;;
+      /) echo shift-7; return ;;
+      :) echo shift-dot; return ;;
+      ";") echo shift-comma; return ;;
+      "|") echo grave_accent; return ;;
+      =) echo shift-0; return ;;
+      '"') echo shift-2; return ;;
+      "'") echo minus; return ;;
+      "(") echo shift-8; return ;;
+      ")") echo shift-9; return ;;
+      ">") echo shift-less; return ;;
+      "<") echo less; return ;;
+      "*") echo shift-bracket_right; return ;;
+      "&") echo shift-6; return ;;
+      "+") echo bracket_right; return ;;
+    esac
+  fi
   case "$c" in
     [a-z0-9]) echo "$c" ;;
     [A-Z]) echo "shift-${c,,}" ;;

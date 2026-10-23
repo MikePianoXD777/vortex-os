@@ -3,6 +3,7 @@
 #
 #   vortex-post-instalacion kernel          antes de generar el initramfs
 #   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
+#   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortex OS»)
 #
 # La imagen del USB es Vortex completo, pero trae piezas que solo sirven para arrancar desde
 # el USB (hooks de archiso, el usuario live, el instalador). Aquí se quitan y se hace lo que
@@ -71,13 +72,53 @@ paso_final() {
   if [[ -n "$usuario" ]] && id "$usuario" >/dev/null 2>&1; then
     getent group gamemode >/dev/null && usermod -aG gamemode "$usuario"
   fi
-  # Este script tampoco sirve después de instalar.
-  rm -f /usr/local/bin/vortex-post-instalacion
   log "listo"
+}
+
+paso_arranque() {
+  # Calamares deja entradas de systemd-boot al estilo kernel-install: copias del kernel en
+  # /boot/<machine-id>/<versión>/ que pacman no actualiza (al primer kernel nuevo no arrancaría),
+  # tituladas «Arch Linux» y con el kernel de Arch por defecto. Se cambian por las de install.sh:
+  # «Vortex OS» con linux-cachyos y el de Arch de respaldo, apuntando a /vmlinuz-* e
+  # /initramfs-*.img, que mkinitcpio actualiza con cada kernel.
+  local raiz="${VORTEX_RAIZ:-}" boot entradas opciones mid
+  boot="$raiz/boot"
+  entradas="$boot/loader/entries"
+  [[ -d "$entradas" ]] || { log "no hay $entradas: no toco el arranque"; return 0; }
+  opciones="$(cat "$raiz/etc/kernel/cmdline" 2>/dev/null || true)"
+  if [[ -z "$opciones" ]]; then
+    opciones="$(sed -n 's/^options[[:space:]]*//p' "$entradas"/*.conf 2>/dev/null | head -n1)"
+  fi
+  # Sin opciones repetidas (Calamares y kernel-install agregan root= y rootflags= cada uno).
+  opciones="$(tr ' ' '\n' <<<"$opciones" | awk 'NF && !visto[$0]++' | grep -vx 'splash' | paste -sd ' ')"
+  [[ "$opciones" == *root=* ]] || { log "no encontré root= en las opciones del kernel: no toco el arranque"; return 0; }
+  printf '%s\n' "$opciones" >"$raiz/etc/kernel/cmdline"
+  mid="$(cat "$raiz/etc/machine-id" 2>/dev/null || true)"
+  rm -f "$entradas"/*.conf
+  [[ -n "$mid" && -d "$boot/$mid" ]] && rm -rf "${boot:?}/$mid"
+  local nombre kernel titulo
+  for kernel in linux-cachyos linux; do
+    [[ -e "$boot/vmlinuz-$kernel" ]] || continue
+    if [[ "$kernel" == linux-cachyos ]]; then
+      nombre=vortex-os titulo="Vortex OS"
+    else
+      nombre=vortex-os-arch titulo="Vortex OS (kernel de Arch, respaldo)"
+    fi
+    printf 'title   %s\nlinux   /vmlinuz-%s\ninitrd  /initramfs-%s.img\noptions %s\n' \
+      "$titulo" "$kernel" "$kernel" "$opciones" >"$entradas/$nombre.conf"
+  done
+  local defecto=vortex-os.conf
+  [[ -e "$entradas/$defecto" ]] || defecto=vortex-os-arch.conf
+  printf 'default %s\ntimeout 3\nconsole-mode keep\n' "$defecto" >"$boot/loader/loader.conf"
+  log "arranque: $(ls "$entradas" | tr '\n' ' ')(por defecto $defecto)"
+  # Este script ya no sirve después de instalar.
+  [[ -z "$raiz" ]] && rm -f /usr/local/bin/vortex-post-instalacion
+  return 0
 }
 
 case "${1:-}" in
   kernel) paso_kernel ;;
   final) shift; paso_final "$@" ;;
-  *) echo "uso: vortex-post-instalacion kernel | final USUARIO" >&2; exit 1 ;;
+  arranque) paso_arranque ;;
+  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque" >&2; exit 1 ;;
 esac
