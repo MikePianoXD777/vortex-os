@@ -111,7 +111,9 @@ cc -O2 -s -o "$raiz/usr/local/bin/vortex-eventos" "$RAIZ/src/vortex-eventos.c"
 # los enlaces sueltos se pierden. networkd y homed se apagan (chocarían con NetworkManager).
 mkdir -p "$raiz/etc/systemd/system-preset"
 cat >"$raiz/etc/systemd/system-preset/10-vortex.preset" <<'PRESET'
-# Vortex OS: lo que deja encendido install.sh.
+# Vortex OS: lo que deja encendido install.sh. fstrim.timer (TRIM semanal) viene apagado en Arch y
+# nada más lo enciende: en un SSD con ext4 o xfs no habría TRIM nunca (con btrfs Calamares ya monta
+# con discard=async, y ambos juntos no estorban). En discos que no lo soportan no hace nada.
 enable NetworkManager.service
 enable NetworkManager-wait-online.service
 enable NetworkManager-dispatcher.service
@@ -120,6 +122,7 @@ enable greetd.service
 enable scx_loader.service
 enable power-profiles-daemon.service
 enable vortex-flatpaks.service
+enable fstrim.timer
 disable systemd-networkd.service
 disable systemd-networkd.socket
 disable systemd-networkd-wait-online.service

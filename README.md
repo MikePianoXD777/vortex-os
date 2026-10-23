@@ -46,8 +46,9 @@ sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archis
 ```
 
 `iso/paquetes.sh` no vuelve a compilar los paquetes del AUR (Calamares tarda ~10 min) si el repo ya tiene esa
-misma versión; `VORTEX_PAQUETES_FORZAR=1` los compila de todos modos. Las piezas de la ISO se prueban sin
-construirla: `pruebas/iso.sh`.
+misma versión; `VORTEX_PAQUETES_FORZAR=1` los compila de todos modos. Todo se compila para un x86-64
+genérico (no para tu CPU, aunque tu `makepkg.conf` diga `-march=native`, como el de CachyOS): la ISO tiene que
+arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 
 ## Qué trae
 
