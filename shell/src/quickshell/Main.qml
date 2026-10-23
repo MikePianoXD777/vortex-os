@@ -91,17 +91,6 @@ PanelWindow {
     Connections {
         target: Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")) ? Hyprland : null
         function onRawEvent(event) {
-            // Vortex: si enfocas otra ventana con un panel abierto (Ajustes, calendario, red…), el
-            // panel se cierra solo. Se ignora el foco vacío (lo da Hyprland al abrir el propio
-            // panel), la misma ventana que estaba al abrirlo y los primeros 400 ms tras abrirlo.
-            if (event.name === "activewindowv2") {
-                let addr = (event.data || "").trim().replace(/^0x/, "");
-                if (addr === "" || masterWindow.currentActive === "hidden" || masterWindow.isClosing) return;
-                if (Date.now() - masterWindow.vortexPanelOpenedAt < 400) return;
-                if (addr === masterWindow.vortexWindowAtOpen) return;
-                mainIpc.handleCommand("close", "", "");
-                return;
-            }
             if (event.name !== "custom") return;
             if (event.data === "serpantinum:close") {
                 mainIpc.handleCommand("close", "", "");
@@ -417,11 +406,6 @@ PanelWindow {
 
     property string targetActive: "hidden"
     property string currentActive: "hidden"
-    // Vortex: para cerrar el panel al enfocar otra ventana (ver onRawEvent).
-    property double vortexPanelOpenedAt: 0
-    property string vortexWindowAtOpen: ""
-    // Un solo manejador: QML no admite dos onCurrentActiveChanged en el mismo objeto
-    // («Property value set multiple times») y, con dos, el shell entero no carga.
     onCurrentActiveChanged: {
         reportWidgetState();
         let prev = masterWindow._previousActive;
@@ -429,12 +413,6 @@ PanelWindow {
         if (masterWindow.releasableWidgets.indexOf(prev) !== -1 && prev !== currentActive) {
             masterWindow.widgetHiddenSince[prev] = Date.now();
             masterWindow.scheduleWidgetRelease();
-        }
-
-        if (currentActive !== "hidden") {
-            vortexPanelOpenedAt = Date.now();
-            let t = (typeof Hyprland !== "undefined") ? Hyprland.activeToplevel : null;
-            vortexWindowAtOpen = (t && t.address) ? String(t.address).replace(/^0x/, "") : "";
         }
     }
 
