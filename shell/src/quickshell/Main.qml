@@ -21,6 +21,24 @@ PanelWindow {
         right: true
     }
 
+    // Vortex: el panel abierto (Ajustes, red, audio, música…) se cierra al hacer clic fuera de él.
+    // HyprlandFocusGrab solo se suelta con un clic en otra superficie (no al pasar el ratón,
+    // aunque el foco siga al ratón): entonces se cierra y se recuerda cuál fue, para que el
+    // «toggle» de su botón en la barra, que llega justo después, no lo vuelva a abrir.
+    property string vortexCerradoPorClic: ""
+    property double vortexCerradoEn: 0
+    HyprlandFocusGrab {
+        id: vortexClicFuera
+        windows: [masterWindow]
+        active: masterWindow.currentActive !== "hidden" && !masterWindow.isClosing
+        onCleared: {
+            if (masterWindow.currentActive === "hidden") return;
+            masterWindow.vortexCerradoPorClic = masterWindow.currentActive;
+            masterWindow.vortexCerradoEn = Date.now();
+            switchWidget("hidden", "");
+        }
+    }
+
     Shortcut {
         sequence: "Escape"
         context: Qt.WindowShortcut
@@ -148,6 +166,14 @@ PanelWindow {
             cmd = cmd || "";
             targetWidget = targetWidget || "";
             arg = arg || "";
+
+            // Vortex: el clic en el botón de la barra de un panel abierto primero lo cierra (clic
+            // fuera, ver vortexClicFuera) y luego llega su «toggle»: sin esto se volvería a abrir.
+            if (cmd === "toggle" && targetWidget !== "" && targetWidget === masterWindow.vortexCerradoPorClic
+                    && Date.now() - masterWindow.vortexCerradoEn < 600) {
+                masterWindow.vortexCerradoPorClic = "";
+                return;
+            }
 
             if (cmd === "clearNotifications" || cmd === "clear_notifications" || cmd === "clearNotifs") {
                 NotificationManager.clearNotifications();
