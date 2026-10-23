@@ -655,6 +655,11 @@
           "blur": "Desenfoque",
           "liquid": "Cristal líquido"
         }
+      },
+      "otaku": {
+        "title": "Modo otaku",
+        "desc": "Fondo de Miku Nakano y bordes más suaves. Se descarga al encenderlo; al apagarlo todo vuelve como estaba",
+        "working": "Trabajando… (descargando fondos)"
       }
     },
     "file_picker": {

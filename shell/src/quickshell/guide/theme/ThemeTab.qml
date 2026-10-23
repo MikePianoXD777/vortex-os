@@ -52,6 +52,9 @@ ThemeTabState {
 
             ThemeAppearanceSection { id: appearanceSection; tab: themeTabRoot }
 
+            // Vortex: «Modo otaku» (easter egg), ver ThemeOtakuSection.qml.
+            ThemeOtakuSection { tab: themeTabRoot }
+
             ThemePresetsSection { tab: themeTabRoot }
         }
     }
