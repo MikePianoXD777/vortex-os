@@ -156,6 +156,11 @@ nombre_tecla() {
     "(") echo shift-9 ;;
     ")") echo shift-0 ;;
     "~") echo shift-grave_accent ;;
+    "{") echo shift-bracket_left ;;
+    "}") echo shift-bracket_right ;;
+    "[") echo bracket_left ;;
+    "]") echo bracket_right ;;
+    "@") echo shift-2 ;;
     *) return 1 ;;
   esac
 }
