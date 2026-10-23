@@ -489,7 +489,11 @@ cmd_actualizar() {
   instalado="$(pacman -Q vortex-shell 2>/dev/null | awk '{print $2}' | cut -d- -f1)"
   if [[ "$instalado" != "$(cat "$VORTEX_DIR/shell/version.txt")" ]] || [[ "${1:-}" == --forzar ]]; then
     (cd "$VORTEX_DIR/packaging/vortex-shell" && makepkg -sif --noconfirm)
+    # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
+    # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
+    hypr_corriendo && hyprctl reload >/dev/null 2>&1
   fi
+  return 0
 }
 
 # La config de Vortex para tu usuario (install/usuario.sh), sin instalar nada. La ISO la corre
