@@ -158,7 +158,7 @@ paso_final() {
     /etc/systemd/system/multi-user.target.wants/pacman-init.service \
     /etc/systemd/system/pacman-init.service \
     /etc/systemd/system/etc-pacman.d-gnupg.mount \
-    /usr/local/bin/vortex-live /usr/local/bin/vortex-instalador \
+    /usr/local/bin/vortex-live /usr/local/bin/vortex-instalador /usr/local/bin/vortex-teclado-live \
     /usr/share/applications/vortex-instalar.desktop \
     /etc/vortex/live \
     /etc/systemd/system-preset/05-vortex-live.preset \

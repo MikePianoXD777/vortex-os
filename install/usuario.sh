@@ -101,10 +101,42 @@ for f in "$VORTEX_DIR"/config/fondos/*.jpg; do
   [[ -e "$fondos/${f##*/}" ]] || run cp "$f" "$fondos/"
 done
 
-# Ajustes: los de Serpantinum + la semilla de Vortex (español, carpeta de fondos, «No
-# molestar» apagado: el settings.json de Serpantinum lo trae encendido y ninguna
-# notificación saldría). Sin los monitores del autor (trae «eDP-1» apagado). Solo si
-# no existen: después se cambian desde la app de Ajustes y Vortex no los vuelve a tocar.
+# Dónde está el shell instalado (otra ruta solo para pruebas).
+serpantinum="${VORTEX_SERPANTINUM:-/usr/share/serpantinum}"
+
+# Idioma del shell: el del sistema, o sea el que se eligió al instalar (LANG en /etc/locale.conf),
+# si Serpantinum lo trae traducido; si no, español. Se lee el archivo y no el entorno de la sesión:
+# es lo que fijó el instalador y no depende de cómo se inició la sesión. El live usa
+# LANG=C.UTF-8 (no es un idioma), así que ahí sale español. Los nombres son los de I18n.qml
+# del shell: el código ISO 639-1 (en, pt, fr...), «zh_tw» para el chino de Taiwán, Hong Kong
+# y Macao, y «ua» para el ucraniano (uk).
+idioma_del_shell() {
+  local conf="${VORTEX_LOCALE_CONF:-/etc/locale.conf}"
+  local idiomas="$serpantinum/src/assets/languages"
+  local lang idioma pais
+  lang=$(sed -n 's/^LANG=//p' "$conf" 2>/dev/null | tail -n1 | tr -d "\"'")
+  lang="${lang%%.*}"
+  lang="${lang%%@*}"
+  idioma="${lang%%_*}"
+  pais="${lang#*_}"
+  idioma="${idioma,,}"
+  case "$idioma" in
+    zh) case "${pais^^}" in TW | HK | MO) idioma=zh_tw ;; esac ;;
+    uk) idioma=ua ;;
+  esac
+  # Solo letras y guion bajo (termina en un nombre de archivo) y que el shell tenga el archivo.
+  if [[ "$idioma" =~ ^[a-z_]+$ && -f "$idiomas/$idioma.json" ]]; then
+    printf '%s\n' "$idioma"
+  else
+    printf 'es\n'
+  fi
+}
+
+# Ajustes: los de Serpantinum + la semilla de Vortex (carpeta de fondos, «No molestar» apagado:
+# el settings.json de Serpantinum lo trae encendido y ninguna notificación saldría) y el idioma
+# del sistema (la semilla trae «es» solo como respaldo). Sin los monitores del autor (trae
+# «eDP-1» apagado). Solo si no existen: después se cambian desde la app de Ajustes y Vortex no
+# los vuelve a tocar.
 ajustes="$HOME/.config/serpantinum/settings.json"
 if [[ -f "$ajustes" ]]; then
   info "se conservan tus ajustes del shell (~/.config/serpantinum/settings.json)"
@@ -112,16 +144,17 @@ else
   # PC de escritorio: se bloquea y apaga la pantalla, pero nunca se suspende.
   suspender=true
   es_laptop || suspender=false
+  idioma="$(idioma_del_shell)"
   if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
-    run "crear $ajustes (semilla de Vortex, suspender=$suspender)"
+    run "crear $ajustes (semilla de Vortex, idioma=$idioma, suspender=$suspender)"
   else
     mkdir -p "$(dirname "$ajustes")"
-    jq -s --arg fondos "$fondos" --argjson suspender "$suspender" \
-      '(.[0] * .[1]) | .wallpaperDir = $fondos | .idle.actions.suspend.enabled = $suspender | .display.monitors = {}' \
-      /usr/share/serpantinum/config/serpantinum/settings.json "$VORTEX_DIR/config/serpantinum/semilla.json" \
+    jq -s --arg fondos "$fondos" --argjson suspender "$suspender" --arg idioma "$idioma" \
+      '(.[0] * .[1]) | .wallpaperDir = $fondos | .general.language = $idioma | .idle.actions.suspend.enabled = $suspender | .display.monitors = {}' \
+      "$serpantinum/config/serpantinum/settings.json" "$VORTEX_DIR/config/serpantinum/semilla.json" \
       >"$ajustes"
   fi
-  bien "Ajustes del shell creados (español; suspender en inactividad: $suspender)"
+  bien "Ajustes del shell creados (idioma: $idioma; suspender en inactividad: $suspender)"
 fi
 
 # Sin la bienvenida de Serpantinum (reproduce un audio de 44 MB); el primer fondo lo pone
@@ -130,7 +163,7 @@ run mkdir -p "$HOME/.local/state/serpantinum"
 run touch "$HOME/.local/state/serpantinum/first_launch.done"
 
 # Terminal (kitty) con los colores que genera matugen a partir del fondo.
-[[ -e "$HOME/.config/kitty/kitty.conf" ]] || copiar_config /usr/share/serpantinum/config/kitty/kitty.conf "$HOME/.config/kitty/kitty.conf"
+[[ -e "$HOME/.config/kitty/kitty.conf" ]] || copiar_config "$serpantinum/config/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 
 # Habilitado para este usuario: el mismo enlace que crea «systemctl --user enable», hecho a
 # mano para no depender de que haya una sesión de systemd (el instalador de la ISO no la tiene).

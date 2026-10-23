@@ -2,6 +2,9 @@
 # vortex-instalador: abre el instalador gráfico (Calamares) como root en la sesión actual.
 #   vortex-instalador              lo abre ya (ícono «Instalar Vortex OS»)
 #   vortex-instalador --al-entrar  espera a que el escritorio arranque (lo usa vortex-sesion)
+#
+# Variables solo para pruebas: VORTEX_INSTALADOR_IDIOMA (idioma de Calamares), VORTEX_SB_VARIABLE
+# (la variable EFI de Secure Boot).
 set -uo pipefail
 runtime="${XDG_RUNTIME_DIR:-/run/user/$UID}"
 if [[ "${1:-}" == --al-entrar ]]; then
@@ -15,7 +18,51 @@ if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
   WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && ls wayland-* 2>/dev/null | grep -v '\.lock$' | head -n1)"
 fi
 pgrep -x calamares >/dev/null && exit 0
+
+# ¿Secure Boot está activado? La variable EFI trae 4 bytes de atributos y luego el valor (1 = sí).
+# Sin ella (BIOS, o sin efivarfs) se pregunta a mokutil, si está.
+secure_boot_activo() {
+  local variable="${VORTEX_SB_VARIABLE:-/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c}"
+  if [[ -r "$variable" ]]; then
+    [[ "$(od -An -tu1 -j4 -N1 "$variable" 2>/dev/null | tr -d ' ')" == 1 ]]
+  elif command -v mokutil >/dev/null; then
+    mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled'
+  else
+    return 1
+  fi
+}
+# Vortex OS todavía no trae shim ni kernel firmados: con Secure Boot activo el sistema instalado
+# no arranca (el firmware lo rechaza). Se avisa antes de que formatee nada; la notificación es
+# crítica para que se quede en pantalla hasta que se cierre.
+if secure_boot_activo; then
+  aviso_sb="Secure Boot está activado. Vortex OS todavía no está firmado para él: el sistema que instales no arrancará mientras siga activado. Desactívalo en la BIOS/UEFI (Seguridad > Secure Boot) antes de instalar."
+  echo "vortex-instalador: $aviso_sb" >&2
+  notify-send -u critical -t 0 -a "Vortex OS" "Secure Boot está activado" "$aviso_sb" 2>/dev/null || true
+fi
+
 # En español por defecto (el live usa LANG=C.UTF-8); en la primera pantalla se elige otro idioma.
 export LANG="${VORTEX_INSTALADOR_IDIOMA:-es_MX.UTF-8}"
+
+# Teclado con el que abre la página «Teclado» de Calamares (ver keyboard_vortex.conf): su adivinado
+# por idioma da «es» (España) hasta para es_MX, así que aquí se deja en localed la que corresponde:
+# latam para el español de Latinoamérica, es para el de España. Con otro idioma no se toca nada.
+# Solo si localed todavía no tiene distribución: así no se pisa la que se eligió en una apertura
+# anterior del instalador. vortex-teclado-live se la pasa también al escritorio del live.
+teclado_inicial() {
+  local teclado actual
+  case "${LANG%%.*}" in
+    es_AR | es_BO | es_CL | es_CO | es_CR | es_CU | es_DO | es_EC | es_GT | es_HN | es_MX | es_NI | es_PA | es_PE | es_PR | es_PY | es_SV | es_UY | es_VE)
+      teclado=latam ;;
+    es_ES) teclado=es ;;
+    *) return 0 ;;
+  esac
+  actual="$(localectl status 2>/dev/null | awk -F': *' '/X11 Layout/ {print $2; exit}')"
+  [[ -z "$actual" || "$actual" == "(unset)" || "$actual" == "n/a" ]] || return 0
+  # --no-convert: solo la distribución X11; la consola del live no se toca. Con sudo porque
+  # polkit pediría una contraseña (no hay agente) para cambiar el teclado del sistema.
+  sudo -n localectl --no-convert set-x11-keymap "$teclado" pc105 2>/dev/null || true
+}
+teclado_inicial
+
 export WAYLAND_DISPLAY XDG_RUNTIME_DIR="$runtime" QT_QPA_PLATFORM=wayland
 exec sudo --preserve-env=WAYLAND_DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,LANG calamares

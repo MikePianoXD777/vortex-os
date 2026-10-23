@@ -47,6 +47,17 @@ es chica (100-260 MB) y también hace de `/boot`: con poco espacio libre Vortex 
 y crea una partición EFI nueva de 500 MB o más. Si los drivers de la GPU no se pudieron bajar durante
 la instalación (sin internet), el sistema los termina de instalar solo en cuanto haya red y avisa.
 
+El teclado que eliges en el instalador se aplica también al escritorio del live, para que la contraseña
+y la frase de cifrado se escriban con el teclado que vas a usar (el instalador abre con **latam** si el
+idioma es el español de Latinoamérica), y el shell queda en el idioma del sistema que elegiste.
+
+> **Secure Boot:** la ISO y el sistema instalado todavía no están firmados (no llevan shim ni kernel
+> firmado), así que con Secure Boot activo el firmware los rechaza («Security Violation», «Access
+> Denied»). **Desactívalo en la BIOS/UEFI antes de arrancar la ISO** (suele estar en Seguridad o
+> Arranque; se entra con F2, F10, F12, Supr o Esc al encender, y en algunas laptops con un botón
+> aparte). Si el live llega a abrirse con Secure Boot activo (p. ej. desde Ventoy), el instalador lo
+> avisa antes de tocar el disco. Firmarlo (shim + llave propia) sigue pendiente.
+
 ```bash
 iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
 sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso y el repo de CachyOS)
