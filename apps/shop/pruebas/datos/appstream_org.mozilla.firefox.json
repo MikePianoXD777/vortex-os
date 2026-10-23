@@ -1,0 +1,246 @@
+{
+ "bundle": {
+  "runtime": "org.freedesktop.Platform/x86_64/25.08",
+  "sdk": "org.freedesktop.Sdk/x86_64/25.08",
+  "type": "flatpak",
+  "value": "app/org.mozilla.firefox/x86_64/stable"
+ },
+ "categories": [
+  "Network",
+  "WebBrowser"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Sin posibilidad de chatear con otros jugadores",
+     "id": "social",
+     "level": "none"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin posibilidad de gastar",
+     "id": "money",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    },
+    {
+     "description": "Sin violencia con personajes animados",
+     "id": "violence",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 3,
+   "minimumAgeText": "3"
+  }
+ },
+ "description": "<p>When it comes to your life online, you have a choice: accept the factory settings or put your privacy first. When you choose Firefox as your default browser, you’re choosing to protect your data while supporting an independent tech company. Firefox is also the only major browser backed by a non-profit fighting to give you more openness, transparency and control of your life online. Join hundreds of millions of people who choose to protect what's important by choosing Firefox - a web browser designed to be fast, easy to use, customizable and private.</p>",
+ "developer_name": "Mozilla",
+ "icon": "https://dl.flathub.org/media/icons/128x128/org.mozilla.firefox.png",
+ "icons": [],
+ "id": "org.mozilla.firefox",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": true,
+ "keywords": [
+  "Browser",
+  "Explorer",
+  "Internet"
+ ],
+ "kudos": [
+  "HiDpiIcon",
+  "HighContrast"
+ ],
+ "launchable": {
+  "type": "desktop-id",
+  "value": "org.mozilla.firefox.desktop"
+ },
+ "metadata": {
+  "flathub::manifest": "https://hg.mozilla.org/mozilla-central/file/tip/browser/installer/linux/app/flatpak",
+  "flathub::verification::login_is_organization": false,
+  "flathub::verification::method": "manual",
+  "flathub::verification::timestamp": "1675948428",
+  "flathub::verification::verified": true
+ },
+ "mimetypes": [
+  "application/json",
+  "application/pdf",
+  "application/rdf+xml",
+  "application/rss+xml",
+  "application/x-xpinstall",
+  "application/xhtml+xml",
+  "application/xml",
+  "audio/flac",
+  "audio/ogg",
+  "audio/webm",
+  "image/avif",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/svg+xml",
+  "image/webp",
+  "text/html",
+  "text/xml",
+  "video/ogg",
+  "video/webm",
+  "x-scheme-handler/chrome",
+  "x-scheme-handler/http",
+  "x-scheme-handler/https",
+  "x-scheme-handler/mailto"
+ ],
+ "name": "Firefox",
+ "project_license": "MPL-2.0",
+ "releases": [
+  {
+   "timestamp": "1792368000",
+   "type": "stable",
+   "version": "158.0.1"
+  }
+ ],
+ "screenshots": [
+  {
+   "default": true,
+   "sizes": [
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/624x351/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "624"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "1248"
+    },
+    {
+     "height": "63",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/112x63/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "112"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/224x126/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "224"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/752x423/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "752"
+    },
+    {
+     "height": "846",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1504x846/org.mozilla.firefox-af5d1ae7c121ea4864b3c5a1098f8f9c.png",
+     "width": "1504"
+    }
+   ]
+  },
+  {
+   "sizes": [
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/624x351/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "624"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "1248"
+    },
+    {
+     "height": "63",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/112x63/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "112"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/224x126/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "224"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/752x423/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "752"
+    },
+    {
+     "height": "846",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1504x846/org.mozilla.firefox-c6f98b38b8b28b113a75a6b34037b759.png",
+     "width": "1504"
+    }
+   ]
+  },
+  {
+   "sizes": [
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/624x351/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "624"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1248x702/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "1248"
+    },
+    {
+     "height": "63",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/112x63/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "112"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/224x126/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "224"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/752x423/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "752"
+    },
+    {
+     "height": "846",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org.mozilla.firefox-stable/1504x846/org.mozilla.firefox-60e855c1f4180607e40c9762a0fb9fa6.png",
+     "width": "1504"
+    }
+   ]
+  }
+ ],
+ "summary": "Fast, Private & Safe Web Browser",
+ "type": "desktop",
+ "urls": {
+  "bugtracker": "https://bugzilla.mozilla.org/",
+  "donation": "https://donate.mozilla.org/",
+  "help": "https://support.mozilla.org/",
+  "homepage": "https://www.mozilla.org/firefox/",
+  "translate": "https://wiki.mozilla.org/L10n:Starting_a_localization"
+ }
+}

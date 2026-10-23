@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Vortexine's Shop: la tienda de aplicaciones de Vortexine's OS (apps de Flathub que se instalan para tu
+# usuario, sin contraseña). Este lanzador corre «python -m vortex_shop» con el código donde esté:
+#   1. VORTEX_SHOP_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo (apps/shop/vortex_shop);
+#   3. /usr/share/vortex-shop, donde lo instala el paquete vortex-shop.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_SHOP_DIR:-}" "$aqui" /usr/share/vortex-shop; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_shop/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine's Shop no está instalada del todo: no encuentro su código (¿falta el paquete vortex-shop?)." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_shop "$@"

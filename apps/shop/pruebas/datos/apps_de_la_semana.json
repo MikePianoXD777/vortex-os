@@ -1,0 +1,29 @@
+{
+ "apps": [
+  {
+   "app_id": "app.drey.Haystack",
+   "isFullscreen": false,
+   "position": 1
+  },
+  {
+   "app_id": "io.github.screwys.Rufin",
+   "isFullscreen": false,
+   "position": 2
+  },
+  {
+   "app_id": "org.gnome.design.Emblem",
+   "isFullscreen": false,
+   "position": 3
+  },
+  {
+   "app_id": "org.gnome.gitlab.YaLTeR.VideoTrimmer",
+   "isFullscreen": false,
+   "position": 4
+  },
+  {
+   "app_id": "re.sonny.OhMySVG",
+   "isFullscreen": false,
+   "position": 5
+  }
+ ]
+}

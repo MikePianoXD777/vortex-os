@@ -127,6 +127,8 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd("vortex claude"))
 hl.bind("SUPER + SHIFT + A", hl.dsp.event("serpantinum:toggle autohide"))
 hl.bind("SUPER + G", hl.dsp.exec_cmd("vortex modo-juego alternar"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd("thunar"))
+-- Vortexine's Shop (la tienda de apps; I de «instalar»). Super+S ya es el especial y Super+Shift+S, la captura.
+hl.bind("SUPER + I", hl.dsp.exec_cmd("vortex-shop"))
 
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)

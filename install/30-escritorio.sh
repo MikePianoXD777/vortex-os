@@ -64,6 +64,19 @@ else
   rm -rf "$VORTEX_DIR/packaging/vortex-shell/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shell/"*.pkg.tar.*
 fi
 bien "Shell de Vortex instalado"
+
+# Vortexine's Shop: la tienda de apps (Flathub, se instalan para tu usuario sin contraseña).
+# Igual que el shell: empaquetada desde apps/shop de este repo; sus dependencias son de los repos.
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-shop)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-shop" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortexine's Shop instalada (vortex-shop)"
+  else
+    aviso "No se pudo instalar Vortexine's Shop (packaging/vortex-shop): sigues sin la tienda de apps"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-shop/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shop/"*.pkg.tar.*
+fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 

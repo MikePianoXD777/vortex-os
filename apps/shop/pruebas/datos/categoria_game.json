@@ -1,0 +1,358 @@
+{
+ "facetDistribution": null,
+ "facetStats": null,
+ "hits": [
+  {
+   "added_at": 1743316841,
+   "app_id": "org.vinegarhq.Sober",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "Not affiliated with Roblox. Research project, use at your own risk. Read the notice on our website before using.\n      We ported Roblox to Linux because they wouldn't.\n      \n        Enjoy millions of experiences on Roblox, chat with friends, and explore!\n        Seamlessly run Roblox on Linux, faster than on Windows.\n        No emulators. No virtual machines. No cruft. We disable ads and telemetry by default.\n        No strings attached - Sober is a community project. We made it closed source to reduce the potential for abuse (which would lead to Roblox blocking us again)\n      \n      Make Sober your own. See our documentation for a list of options.\n      \n        Turn on server location indicators, bring back the nostalgic oof sound, customize textures, try experimental settings, and more.\n      \n    ",
+   "developer_name": "VinegarHQ & Sober contributors",
+   "favorites_count": 379,
+   "icon": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/icons/128x128/org.vinegarhq.Sober.png",
+   "id": "org_vinegarhq_Sober",
+   "installs_last_month": 196277,
+   "isMobileFriendly": false,
+   "is_free_license": false,
+   "keywords": [
+    "roblox",
+    "vinegar",
+    "launcher"
+   ],
+   "localized_keywords": [
+    "launcher",
+    "roblox",
+    "vinegar"
+   ],
+   "main_categories": "game",
+   "name": "Sober",
+   "project_license": "LicenseRef-proprietary=https://sober.vinegarhq.org/notice.txt",
+   "runtime": "org.gnome.Platform/x86_64/51",
+   "sub_categories": [
+    "GNOME",
+    "GTK"
+   ],
+   "summary": "Play, chat & explore on Roblox",
+   "translations": {},
+   "trending": 0.028929179828166143,
+   "type": "desktop-application",
+   "updated_at": 1791156758,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1743317849",
+   "verification_verified": true,
+   "verification_website": "vinegarhq.org"
+  },
+  {
+   "added_at": 1497742883,
+   "app_id": "com.valvesoftware.Steam",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "Steam is a software distribution service with an online store, automated installation, automatic updates, achievements, SteamCloud synchronized savegame and screenshot functionality, and many social features.\n    ",
+   "developer_name": "Valve Corporation",
+   "favorites_count": 540,
+   "icon": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/icons/128x128/com.valvesoftware.Steam.png",
+   "id": "com_valvesoftware_Steam",
+   "installs_last_month": 93794,
+   "isMobileFriendly": false,
+   "is_free_license": false,
+   "keywords": null,
+   "localized_keywords": null,
+   "main_categories": "game",
+   "name": "Steam",
+   "project_license": "LicenseRef-proprietary",
+   "runtime": "org.freedesktop.Platform/x86_64/26.08",
+   "sub_categories": [
+    "PackageManager"
+   ],
+   "summary": "Juega a los juegos populares y los últimos lanzamientos",
+   "trending": 0.12141077346083258,
+   "type": "desktop-application",
+   "updated_at": 1790440441,
+   "verification_login_is_organization": null,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "none",
+   "verification_timestamp": null,
+   "verification_verified": false,
+   "verification_website": null
+  },
+  {
+   "added_at": 1646944179,
+   "app_id": "com.heroicgameslauncher.hgl",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "Heroic es un lanzador de juegos de código abierto. Actualmente admite iniciar juegos de la\n      Epic Games Store con Legendary, juegos de GOG con nuestra implementación personalizada gogdl\n      y juegos de Amazon con Nile.\n      Funciones principales:\n      \n        Accede a tus juegos de Epic, GOG y Amazon en una interfaz de usuario intuitiva.\n        Agrega juegos fuera de GOG, Amazon o Epic Games Store, nativos o no. Incluso se admiten aplicaciones de navegador.\n        Una cola de descarga para descargar varios juegos a la vez.\n        Instala y lanza tus juegos de Windows usando Wine o Proton. O lanza tus juegos nativos de GOG.\n        Soporte de guardado en la nube para GOG y Epic Games.\n        Importa juegos instalados desde Epic Store o GOG Galaxy.\n        Verifica y repara instalaciones corruptas o incluso mueve tu instalación a diferentes carpetas.\n        Administrador Proton/Wine integrado para una instalación sencilla de nuevas y actualizaciones.\n        Winetricks integrado\n        Soporte para instalación y desinstalación de DLCs de juegos\n        Accede a la tienda de Epic y GOG, así como a la Wiki de Heroic directamente desde la aplicación.\n        Consulta la puntuación en Metacritic, IGCB u OpenCritic para el juego.\n        Y muchas más funciones\n      \n      Limitaciones actuales en Flatpak:\n      \n        Debido a problemas con el controlador en el modo de juego SteamDeck, Heroic utiliza Flatpak Runtime 23.08 en la rama estable. Si necesitas runtime 24.08 para tener soporte HDR y más, utiliza la rama beta de Flathub.\n      \n    ",
+   "developer_name": "Heroic Games Launcher",
+   "favorites_count": 604,
+   "icon": "https://dl.flathub.org/media/com/heroicgameslauncher/hgl/086b2f476c35a2b036fbad1b19d7a285/icons/128x128/com.heroicgameslauncher.hgl.png",
+   "id": "com_heroicgameslauncher_hgl",
+   "installs_last_month": 89042,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [],
+   "localized_keywords": null,
+   "main_categories": "game",
+   "name": "Heroic",
+   "project_license": "GPL-3.0",
+   "runtime": "org.freedesktop.Platform/x86_64/26.08",
+   "sub_categories": [
+    "PackageManager"
+   ],
+   "summary": "Juega juegos de Epic, GOG y Amazon",
+   "trending": 0.028890155291893618,
+   "type": "desktop-application",
+   "updated_at": 1792071152,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1675767418",
+   "verification_verified": true,
+   "verification_website": "heroicgameslauncher.com"
+  },
+  {
+   "added_at": 1666334692,
+   "app_id": "org.prismlauncher.PrismLauncher",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity.\n      Features:\n      \n        Easily install game modifications, such as Fabric, Forge and Quilt\n        Easily install and update modpacks from the Launcher\n        Control your Java settings, and enable Mangohud or Gamemode with a toggle\n        Manage worlds and resource packs from the launcher\n        See logs and other details easily through a dashboard\n        Kill Minecraft in case of a crash/freeze\n        Isolate Minecraft instances to keep everything clean\n        Install and update mods directly from the launcher\n        Customize the launcher with themes, and more\n        And cat :3\n      \n    ",
+   "developer_name": "Prism Launcher Contributors",
+   "favorites_count": 304,
+   "icon": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/icons/128x128/org.prismlauncher.PrismLauncher.png",
+   "id": "org_prismlauncher_PrismLauncher",
+   "installs_last_month": 83600,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "game",
+    "minecraft",
+    "mc"
+   ],
+   "localized_keywords": [
+    "game",
+    "mc",
+    "minecraft"
+   ],
+   "main_categories": "game",
+   "name": "Prism Launcher",
+   "project_license": "GPL-3.0-only",
+   "runtime": "org.kde.Platform/x86_64/6.10",
+   "sub_categories": [
+    "ActionGame",
+    "AdventureGame",
+    "Simulation",
+    "PackageManager"
+   ],
+   "summary": "Custom Minecraft Launcher to easily manage multiple Minecraft installations at once",
+   "translations": {},
+   "trending": -0.20990886879784437,
+   "type": "desktop-application",
+   "updated_at": 1790694375,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1678358592",
+   "verification_verified": true,
+   "verification_website": "prismlauncher.org"
+  },
+  {
+   "added_at": 1638541433,
+   "app_id": "net.davidotek.pupgui2",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "\n      Install and manage Wine- and Proton-based compatibility tools for Steam and Lutris with this graphical user interface.\n    \n      Supported launchers:\n      \n        Steam\n        Lutris\n        Heroic Games Launcher\n        Bottles\n        WineZGUI\n        Both normal, Snap and Flatpak installations are supported\n      \n      Supported compatibility tools:\n      \n        GE-Proton\n        SteamTinkerLaunch\n        Proton-Tkg\n        Luxtorpeda\n        Boxtron\n        Roberta\n        NorthstarProton\n        Scrumplex's Steam-Play-None\n        Wine-GE\n        Lutris-Wine\n        Kron4ek's Vanilla Wine-Builds\n        DXVK and DXVK async (includes D8VK)\n        VKD3D\n      \n      Double click compatibility tools to show more information and games using the tool.\n      Advanced settings and the color theme can be managed in the About dialog.\n    ",
+   "developer_name": "DavidoTek",
+   "favorites_count": 211,
+   "icon": "https://dl.flathub.org/media/net/davidotek/pupgui2/cb80abc806d40793dec0412c81f83c68/icons/128x128/net.davidotek.pupgui2.png",
+   "id": "net_davidotek_pupgui2",
+   "installs_last_month": 66464,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "Proton-GE",
+    "GE-Proton"
+   ],
+   "localized_keywords": [
+    "GE-Proton",
+    "Proton-GE"
+   ],
+   "main_categories": "game",
+   "name": "ProtonUp-Qt",
+   "project_license": "GPL-3.0",
+   "runtime": "org.kde.Platform/x86_64/6.10",
+   "sub_categories": [
+    "Utility"
+   ],
+   "summary": "Install Wine- and Proton-based compatibility tools",
+   "trending": -0.5741999671376276,
+   "type": "desktop-application",
+   "updated_at": 1792007485,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1679838996",
+   "verification_verified": true,
+   "verification_website": "davidotek.net"
+  },
+  {
+   "added_at": 1498226331,
+   "app_id": "org.libretro.RetroArch",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "\n      RetroArch enables you to run classic games on a wide range of computers and consoles through its slick graphical interface. Settings are also unified so configuration is done once and for all.\n    \n      \n      It enables you to run classic games on a wide range of computers and consoles through its slick graphical interface. Settings are also unified so configuration is done once and for all. RetroArch has advanced features like shaders, netplay, rewinding, next-frame response times, runahead, and more!\n    \n    ",
+   "developer_name": "libretro",
+   "favorites_count": 228,
+   "icon": "https://dl.flathub.org/media/org/libretro/RetroArch/0f9e059f4695b7116bab0d3d1cae1936/icons/128x128/org.libretro.RetroArch.png",
+   "id": "org_libretro_RetroArch",
+   "installs_last_month": 63011,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "retro",
+    "gaming",
+    "emulator"
+   ],
+   "localized_keywords": [
+    "emulator",
+    "gaming",
+    "retro"
+   ],
+   "main_categories": "game",
+   "name": "RetroArch",
+   "project_license": "GPL-3.0-or-later",
+   "runtime": "org.kde.Platform/x86_64/6.11",
+   "sub_categories": [
+    "Emulator"
+   ],
+   "summary": "Frontend for emulators, game engines and media players",
+   "translations": {},
+   "trending": 0.00031255568546753474,
+   "type": "desktop-application",
+   "updated_at": 1787699454,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "manual",
+   "verification_timestamp": "1680093180",
+   "verification_verified": true,
+   "verification_website": null
+  },
+  {
+   "added_at": 1491928957,
+   "app_id": "org.DolphinEmu.dolphin-emu",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "Dolphin is an emulator for two recent Nintendo video game consoles: the GameCube and the Wii. It allows PC gamers to enjoy games for these two consoles in full HD (1080p) with several enhancements: compatibility with all PC controllers, turbo speed, networked multiplayer, and even more!\n    ",
+   "developer_name": "Dolphin Emulator Project",
+   "favorites_count": 168,
+   "icon": "https://dl.flathub.org/media/org/dolphinemu/dolphin-emu/545d6103cffc1fc13e2704ce509e2c0b/icons/128x128/org.DolphinEmu.dolphin-emu.png",
+   "id": "org_DolphinEmu_dolphin-emu",
+   "installs_last_month": 56138,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": null,
+   "localized_keywords": null,
+   "main_categories": "game",
+   "name": "Dolphin Emulator",
+   "project_license": "GPL-2.0+",
+   "runtime": "org.kde.Platform/x86_64/6.11",
+   "sub_categories": [
+    "Emulator"
+   ],
+   "summary": "GameCube / Wii / Triforce Emulator",
+   "translations": {},
+   "trending": -0.26099356492561543,
+   "type": "desktop-application",
+   "updated_at": 1791648648,
+   "verification_login_is_organization": null,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "none",
+   "verification_timestamp": null,
+   "verification_verified": false,
+   "verification_website": null
+  },
+  {
+   "added_at": 1559591101,
+   "app_id": "net.lutris.Lutris",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "Lutris te ayuda a instalar y jugar a videojuegos de todas las épocas y casi todos los sistemas. Proporciona un interfaz centralizado para lanzar todos tus juegos Al aprovechar y combinar emuladores existentes, reimplementaciones de motores y capas de compatibilidad.\n    ",
+   "developer_name": "Lutris Team",
+   "favorites_count": 279,
+   "icon": "https://dl.flathub.org/media/net/lutris/Lutris/3cc8d32fd68604816f0a5f6872bf91b5/icons/128x128/net.lutris.Lutris.png",
+   "id": "net_lutris_Lutris",
+   "installs_last_month": 51653,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "juego",
+    "wine",
+    "emulador"
+   ],
+   "localized_keywords": [
+    "chơi game",
+    "emulador",
+    "emulator",
+    "emulatore",
+    "emulação",
+    "emülator",
+    "gaming",
+    "igranje",
+    "juego",
+    "oyun",
+    "spellen",
+    "spielen",
+    "spilling",
+    "trình giả lập",
+    "wine",
+    "εξομοιωτής",
+    "بازی؛واین؛شبیه‌ساز؛",
+    "模拟器",
+    "游戏"
+   ],
+   "main_categories": "game",
+   "name": "Lutris",
+   "project_license": "GPL-3.0-or-later",
+   "runtime": "org.gnome.Platform/x86_64/49",
+   "sub_categories": [
+    "PackageManager"
+   ],
+   "summary": "Plataforma de preservación de videojuegos",
+   "trending": 0.013341395134275142,
+   "type": "desktop-application",
+   "updated_at": 1772056059,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1679863034",
+   "verification_verified": true,
+   "verification_website": "lutris.net"
+  }
+ ],
+ "hitsPerPage": 30,
+ "page": 1,
+ "processingTimeMs": 2,
+ "query": "",
+ "totalHits": 736,
+ "totalPages": 25
+}

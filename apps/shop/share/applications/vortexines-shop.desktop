@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine's Shop
+GenericName=Tienda de aplicaciones
+Comment=Instala aplicaciones y juegos de Flathub con un clic, sin terminal ni contraseñas
+Exec=vortex-shop
+Icon=vortexines-shop
+Terminal=false
+Categories=System;PackageManager;
+Keywords=tienda;apps;aplicaciones;juegos;instalar;programas;flatpak;flathub;
+StartupNotify=true
+StartupWMClass=vortexines-shop

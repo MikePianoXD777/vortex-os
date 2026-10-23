@@ -1,0 +1,306 @@
+{
+ "branding": null,
+ "bundle": {
+  "runtime": "org.freedesktop.Platform/x86_64/26.08",
+  "sdk": "org.freedesktop.Sdk/x86_64/26.08",
+  "type": "flatpak",
+  "value": "app/com.valvesoftware.Steam/x86_64/stable"
+ },
+ "categories": [
+  "Game",
+  "PackageManager"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Funcionalidad de chat sin controlar entre jugadores • Compartición de información que permite a otros identificar al usuario • Funcionalidad de sonido o vídeo sin controlar entre jugadores",
+     "id": "social",
+     "level": "intense"
+    },
+    {
+     "description": "Posibilidad de gastar dinero real en el juego",
+     "id": "money",
+     "level": "intense"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    },
+    {
+     "description": "Sin violencia con personajes animados",
+     "id": "violence",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 15,
+   "minimumAgeText": "12"
+  }
+ },
+ "description": "<p>Steam is a software distribution service with an online store, automated installation, automatic updates, achievements, SteamCloud synchronized savegame and screenshot functionality, and many social features.</p>\n    ",
+ "developer_name": "Valve Corporation",
+ "icon": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/icons/128x128/com.valvesoftware.Steam.png",
+ "icons": [
+  {
+   "height": 128,
+   "scale": null,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/icons/128x128/com.valvesoftware.Steam.png",
+   "width": 128
+  },
+  {
+   "height": 128,
+   "scale": 2,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/icons/128x128@2/com.valvesoftware.Steam.png",
+   "width": 128
+  }
+ ],
+ "id": "com.valvesoftware.Steam",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": false,
+ "keywords": null,
+ "kudos": null,
+ "launchable": {
+  "type": "desktop-id",
+  "value": "com.valvesoftware.Steam.desktop"
+ },
+ "metadata": {
+  "flathub::manifest": null,
+  "flathub::verification::login_is_organization": null,
+  "flathub::verification::login_name": null,
+  "flathub::verification::login_provider": null,
+  "flathub::verification::method": null,
+  "flathub::verification::timestamp": null,
+  "flathub::verification::verified": null,
+  "flathub::verification::website": null
+ },
+ "mimetypes": null,
+ "name": "Steam",
+ "project_license": "LicenseRef-proprietary",
+ "provides": [
+  "com.valvesoftware.Steam.desktop",
+  "x-scheme-handler/steam",
+  "x-scheme-handler/steamlink"
+ ],
+ "recommends": null,
+ "releases": [
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1782432000",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.0.0.87"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1759190400",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.0.0.85"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1755561600",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.0.0.84"
+  }
+ ],
+ "requires": null,
+ "screenshots": [
+  {
+   "caption": "The main Steam library window",
+   "default": true,
+   "sizes": [
+    {
+     "height": "1026",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-1_orig.png",
+     "width": "1200"
+    },
+    {
+     "height": "642",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-1_752x642@1.png",
+     "width": "752"
+    },
+    {
+     "height": "533",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-1_624x533@1.png",
+     "width": "624"
+    },
+    {
+     "height": "191",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-1_224x191@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Steam Store interface",
+   "default": null,
+   "sizes": [
+    {
+     "height": "720",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-2_orig.png",
+     "width": "1280"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-2_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-2_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-2_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "125",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-2_224x125@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": null,
+   "default": null,
+   "sizes": [
+    {
+     "height": "582",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-3_orig.png",
+     "width": "1200"
+    },
+    {
+     "height": "364",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-3_752x364@1.png",
+     "width": "752"
+    },
+    {
+     "height": "302",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-3_624x302@1.png",
+     "width": "624"
+    },
+    {
+     "height": "108",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-3_224x108@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": null,
+   "default": null,
+   "sizes": [
+    {
+     "height": "717",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-4_orig.png",
+     "width": "1200"
+    },
+    {
+     "height": "449",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-4_752x449@1.png",
+     "width": "752"
+    },
+    {
+     "height": "372",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-4_624x372@1.png",
+     "width": "624"
+    },
+    {
+     "height": "133",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-4_224x133@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": null,
+   "default": null,
+   "sizes": [
+    {
+     "height": "535",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-5_orig.png",
+     "width": "1200"
+    },
+    {
+     "height": "335",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-5_752x335@1.png",
+     "width": "752"
+    },
+    {
+     "height": "278",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-5_624x278@1.png",
+     "width": "624"
+    },
+    {
+     "height": "99",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/valvesoftware/Steam/71bd4338705ac5f74c133bfbaacaa3d8/screenshots/image-5_224x99@1.png",
+     "width": "224"
+    }
+   ]
+  }
+ ],
+ "summary": "Juega a los juegos populares y los últimos lanzamientos",
+ "supports": null,
+ "translation": null,
+ "type": "desktop-application",
+ "urls": {
+  "bugtracker": "https://github.com/flathub/com.valvesoftware.Steam/issues",
+  "contact": null,
+  "contribute": null,
+  "donation": null,
+  "faq": null,
+  "help": "https://github.com/flathub/com.valvesoftware.Steam/wiki",
+  "homepage": "https://store.steampowered.com/",
+  "translate": null,
+  "vcs_browser": null
+ }
+}

@@ -122,6 +122,12 @@ neovim
 
 # --- Repo [vortex] (paquetes propios, iso/paquetes.sh) ---
 vortex-shell
+# Vortexine's Shop: la tienda de apps. Las apps de Flathub NO vienen en la ISO: se descargan desde la
+# tienda cuando la persona las elige (para su usuario, sin contraseña).
+vortex-shop
+# La interfaz de la tienda (Qt Quick en Python). Ya la pide vortex-shop; va explícito para que
+# no se pierda de la ISO si algún día cambian sus dependencias.
+pyside6
 wl-gammarelay-rs
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---

@@ -88,10 +88,29 @@ arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin const
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
 | Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |
 | Pantallas | `vortex-pantallas` | cada monitor a su resolución máxima y su frecuencia más alta (144, 165, 200, 240 Hz), al entrar y al conectarlo; respeta lo que pongas en Ajustes → Pantalla o en `hypr-mio.lua` |
+| Tienda de apps | **Vortexine's Shop** (`vortex-shop`) | todo Flathub a un clic, sin terminal ni contraseñas; las apps no vienen en la ISO |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
 pantalla); en laptops sí.
+
+### Vortexine's Shop
+
+La tienda de aplicaciones (Super+I, o «Vortexine's Shop» en el lanzador). Muestra **todo lo que hay en
+[Flathub](https://flathub.org)** —juegos, navegadores, chat, oficina, edición— con búsqueda, categorías,
+fichas con capturas y una lista de recomendadas por Vortexine's (Steam, Prism Launcher, Sober, Heroic,
+Discord, Firefox, OBS...).
+
+- **Sin terminal ni contraseñas:** instala con Flatpak **para tu usuario** (`flatpak --user`), así que no pide
+  `sudo` ni polkit; ve el progreso real de la descarga y puede quitar y actualizar lo que instaló. Las apps
+  que ya vienen con el sistema (las que se eligieron en el instalador) aparecen como instaladas, pero solo
+  un administrador las quita.
+- **No ocupan lugar en la ISO:** la ISO solo trae la tienda (`vortex-shop` y PySide6, unos 55 MB en total);
+  cada app se descarga de Flathub cuando la eliges. Flathub se agrega solo la primera vez.
+- Todo viene de la API pública de Flathub y se guarda en `~/.cache/vortexines-shop/` (listas 1 h, fichas
+  24 h): sin internet muestra lo último que vio.
+- Su código está en `apps/shop/` (motor en Python, interfaz en QML) y su paquete en `packaging/vortex-shop`;
+  las pruebas, que no instalan nada, son `pruebas/tienda.sh`.
 
 ### Atajos de teclado
 
@@ -129,6 +148,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+E | archivos (Thunar) |
 | Super+C | editor (Zed) |
 | Super+A | habla con Claude (si lo activaste) |
+| Super+I | Vortexine's Shop: la tienda de apps |
 | Super+G | modo juego a mano |
 
 **Escritorios**
@@ -283,7 +303,8 @@ install.sh           instalador; corre install/NN-*.sh en orden
 install/             pasos: revisar, restauración, repos, sistema, escritorio, juegos, dev, claude, final
 packages/            listas de paquetes por grupo
 shell/               Serpantinum (git subtree del tag v2.2.14) con los parches de Vortex
-packaging/           PKGBUILD del shell (vortex-shell)
+packaging/           PKGBUILD del shell (vortex-shell) y de la tienda (vortex-shop)
+apps/shop/           Vortexine's Shop: la tienda de apps de Flathub (motor Python + interfaz QML); sus pruebas: pruebas/tienda.sh
 config/              Hyprland, ajustes iniciales del shell, fondos, gamemode y ajustes del sistema
 bin/vortex           comando principal (fondo, java, modo-juego, gestor, claude, bench, actualizar)
 bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, su ayudante en C)

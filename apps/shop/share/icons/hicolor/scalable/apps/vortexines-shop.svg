@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortexine's Shop: una bolsa de tienda con una «V» (de Vortex) en los colores de Vortexine's OS.
+     Dibujo original de este proyecto. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vx-bolsa" x1="22" y1="40" x2="106" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+    <linearGradient id="vx-borde" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#vx-borde)" stroke-width="1.5"/>
+  <!-- asas -->
+  <path d="M47 52 V42 a17 17 0 0 1 34 0 V52" fill="none" stroke="url(#vx-bolsa)" stroke-width="6.5" stroke-linecap="round"/>
+  <!-- cuerpo de la bolsa -->
+  <path d="M30 50 h68 a6 6 0 0 1 6 6.6 l-4 44.6 a11 11 0 0 1 -11 10 h-50 a11 11 0 0 1 -11 -10 l-4 -44.6 a6 6 0 0 1 6 -6.6 z" fill="url(#vx-bolsa)"/>
+  <!-- la V de Vortex -->
+  <path d="M49 70 L64 92 L79 70" fill="none" stroke="#0b0d1a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="36.5" cy="59" r="2.6" fill="#0b0d1a" fill-opacity="0.45"/>
+  <circle cx="91.5" cy="59" r="2.6" fill="#0b0d1a" fill-opacity="0.45"/>
+</svg>
