@@ -1,0 +1,11 @@
+# El nombre del sistema (os-release) vuelve a ser «Vortexine's OS» tras actualizar filesystem.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+
+[Action]
+Description = Nombre del sistema: Vortexine's OS
+When = PostTransaction
+Exec = /usr/local/bin/vortex-os-release

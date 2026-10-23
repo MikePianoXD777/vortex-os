@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# vortex-os-release: el nombre del sistema en /usr/lib/os-release (lo leen fastfetch, «Acerca de» y
+# otros) pasa a «Vortexine's OS». ID y ID_LIKE no se tocan (arch o cachyos): hay herramientas que
+# deciden por ellos. El archivo es del paquete filesystem: el hook 98-vortex-os-release lo vuelve a
+# poner tras cada actualización de ese paquete.
+set -u
+f="${VORTEX_OS_RELEASE:-/usr/lib/os-release}"
+[[ -f "$f" ]] || exit 0
+version="$(sed -n 's/^VERSION="\(.*\)"$/\1/p' /etc/vortex-release 2>/dev/null)"
+nombre="Vortexine's OS"
+sed -i -e '/^NAME=/d' -e '/^PRETTY_NAME=/d' -e '/^VERSION=/d' -e '/^HOME_URL=/d' "$f"
+{
+  printf 'NAME="%s"\n' "$nombre"
+  printf 'PRETTY_NAME="%s%s"\n' "$nombre" "${version:+ $version}"
+  [[ -n "$version" ]] && printf 'VERSION="%s"\n' "$version"
+  printf 'HOME_URL="https://github.com/MikePianoXD777/vortex-os"\n'
+  cat "$f"
+} >"$f.vortex" && cat "$f.vortex" >"$f"
+rm -f "$f.vortex"
+exit 0
