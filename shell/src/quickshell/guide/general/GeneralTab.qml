@@ -158,6 +158,9 @@ GuideTab {
 
             GeneralBehaviorSection { tab: generalTabRoot }
 
+            // Vortex: conectar con Claude (viene apagado).
+            GeneralClaudeSection { tab: generalTabRoot }
+
             GeneralLocationSection { id: locationSection; tab: generalTabRoot }
 
             SettingsRow {

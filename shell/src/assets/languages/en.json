@@ -242,6 +242,11 @@
       "screenshot_on_release": {
         "title": "Capture region on mouse release",
         "desc": "Take the screenshot as soon as you finish dragging, without clicking the shutter"
+      },
+      "claude": {
+        "title": "Claude",
+        "desc": "Off by default. Turn it on to use Claude with Super+A (talk to it with the microphone; it sees your screen only when you ask). Needs internet and your Claude account: the first time it asks you to sign in",
+        "working": "Working…"
       }
     },
     "display": {

@@ -16,7 +16,7 @@ fi
 # vortex-claude dejó la marca /etc/vortex/claude: aquí se instala en segundo plano, con la
 # prioridad más baja y esperando a que el escritorio arranque y haya red, para no retrasar la
 # entrada. Sin red (o si falla) no deja su marca (claude-listo) y se reintenta en el próximo inicio.
-if [[ -e /etc/vortex/claude && ! -e "$estado/claude-listo" ]] && command -v vortex >/dev/null; then
+if [[ -e /etc/vortex/claude && ! -e "$estado/claude-listo" && ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/claude-apagado" ]] && command -v vortex >/dev/null; then
   nice -n 19 vortex claude instalar --al-entrar >"$estado/claude.log" 2>&1 </dev/null &
 fi
 exec start-hyprland </dev/null

@@ -22,7 +22,9 @@ Uso: vortex <comando>
   configurar-usuario                   deja tu usuario con la config de Vortex (sin instalar nada)
   gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
                                        enfocada, modo juego automático, presión de memoria)
-  claude                               abre Claude en una terminal (si falta, antes lo instala)
+  claude                               abre Claude en una terminal (si está activado)
+  claude activar|desactivar|activado   conecta Vortexine's OS con Claude (viene apagado; también
+                                       desde Ajustes → General → Claude). Necesita tu cuenta de Claude
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
                                        en tu primer inicio con red si elegiste Claude al instalar)
@@ -267,9 +269,40 @@ cmd_claude_instalar() {
   fi
 }
 
+# Claude viene apagado: se activa al instalar (casilla «Claude») o después desde Ajustes. Está
+# activado si se instaló (marca claude-listo o el ejecutable) y no se desactivó (claude-apagado).
+claude_activado() {
+  [[ -e "$CONF/claude-apagado" ]] && return 1
+  # /etc/vortex/claude: se eligió Claude al instalar (la ISO lo instala sola al entrar).
+  [[ -e "${VORTEX_MARCA_CLAUDE:-/etc/vortex/claude}" || -e "$ESTADO/claude-listo" || -x "$HOME/.local/bin/claude" ]] ||
+    command -v claude >/dev/null 2>&1
+}
+
 cmd_claude() {
   local pausa="$CONF/claude-pausa"
   case "${1:-}" in
+    activar)
+      rm -f "$CONF/claude-apagado"
+      notificar "Activando Claude" "Se está instalando para tu usuario (necesita internet)…"
+      if (cmd_claude_instalar); then
+        notificar -t 15000 "Claude activado" "Super+A lo abre. La primera vez te pide iniciar sesión con tu cuenta de Claude."
+      else
+        notificar -u critical "No pude activar Claude" "Revisa tu conexión a internet y vuelve a intentarlo desde Ajustes."
+        exit 1
+      fi
+      ;;
+    desactivar)
+      mkdir -p "$CONF"; : >"$CONF/claude-apagado"
+      # Sin el servidor MCP «vortex», Claude Code (si lo usas aparte) ya no ve tu pantalla.
+      local c
+      c="$(command -v claude || echo "$HOME/.local/bin/claude")"
+      [[ -x "$c" ]] && "$c" mcp remove --scope user vortex >/dev/null 2>&1
+      rm -f "$ESTADO/claude-listo"
+      echo "Claude desactivado: Super+A ya no lo abre y no puede ver tu pantalla."
+      ;;
+    activado)
+      if claude_activado; then echo si; else echo no; exit 1; fi
+      ;;
     pausa)
       mkdir -p "$CONF"; touch "$pausa"
       echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles."
@@ -283,6 +316,11 @@ cmd_claude() {
       if [[ -f "$pausa" ]]; then echo "en pausa"; else echo "con acceso (te avisa cada vez que mira)"; fi
       ;;
     "")
+      if ! claude_activado; then
+        notificar -t 12000 "Claude está apagado" "Actívalo en Ajustes → General → Claude. Necesitas una cuenta de Claude."
+        echo "Claude está apagado: actívalo en Ajustes → General → Claude, o con «vortex claude activar»."
+        exit 0
+      fi
       # El instalador de Claude Code lo deja en ~/.local/bin, que no está en el PATH
       # del escritorio: se agrega aquí para que lo encuentre la terminal que se abre.
       export PATH="$HOME/.local/bin:$PATH"
@@ -302,7 +340,7 @@ cmd_claude() {
       fi
       exec "$term" -e bash -lc "cd ~; $orden" vortex "$yo"
       ;;
-    *) aviso "usa: vortex claude [pausa|reanudar|estado|instalar]"; exit 1 ;;
+    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar]"; exit 1 ;;
   esac
 }
 

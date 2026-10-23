@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# vortex-pantallas: cada monitor a su resolución más alta y, en ella, a su frecuencia más alta
+# (144, 165, 200, 240 Hz...). Hyprland con mode = "preferred" usa el modo que la pantalla dice
+# preferir, que en muchos monitores rápidos es 60 Hz. Lo corre hyprland.lua al entrar y cada vez
+# que se conecta un monitor.
+#
+#   vortex-pantallas            ajusta todos los monitores
+#   vortex-pantallas --probar   solo dice qué modo pondría a cada uno (no cambia nada)
+#
+# No toca nada si el usuario puso sus propios monitores en ~/.config/vortex/hypr-mio.lua (una
+# línea hl.monitor) o los cambió desde Ajustes → Pantalla: ahí manda lo suyo.
+set -uo pipefail
+
+probar=0
+[[ "${1:-}" == --probar ]] && probar=1
+
+mio="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/hypr-mio.lua"
+if ((!probar)) && [[ -f "$mio" ]] && grep -qE '^[[:space:]]*hl\.monitor[[:space:]]*\(' "$mio"; then
+  exit 0
+fi
+ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json"
+
+command -v hyprctl >/dev/null && command -v jq >/dev/null || exit 0
+monitores="$(hyprctl monitors all -j 2>/dev/null)" || exit 0
+
+# Por monitor: nombre, escala actual y el mejor modo «ANCHOxALTO@HZ». Se elige la resolución con
+# más píxeles y, entre los modos de esa resolución, el de más Hz (hasta 240; arriba de eso, el
+# más alto que haya por debajo o igual, para no forzar modos raros de 360/480 Hz).
+jq -r '.[] | select(.disabled != true) |
+  [ .name, (.scale | tostring),
+    ( [ .availableModes[]
+        | capture("^(?<w>[0-9]+)x(?<h>[0-9]+)@(?<hz>[0-9.]+)Hz$")
+        | {w: (.w | tonumber), h: (.h | tonumber), hz: (.hz | tonumber)} ]
+      | if length == 0 then "" else
+          (map(.w * .h) | max) as $px
+          | map(select(.w * .h == $px)) as $res
+          | ($res | map(select(.hz <= 240.5))) as $ok
+          | (if ($ok | length) > 0 then $ok else $res end)
+          | max_by(.hz) | "\(.w)x\(.h)@\(.hz)" end ) ] | @tsv' <<<"$monitores" |
+while IFS=$'\t' read -r nombre escala modo; do
+  [[ -n "$nombre" && -n "$modo" ]] || continue
+  # Solo nombres de salida normales (DP-1, HDMI-A-1, eDP-1...): van dentro de un comando Lua.
+  [[ "$nombre" =~ ^[A-Za-z0-9._-]+$ && "$modo" =~ ^[0-9]+x[0-9]+@[0-9.]+$ && "$escala" =~ ^[0-9.]+$ ]] || continue
+  # Si en Ajustes → Pantalla eligió una frecuencia para este monitor, se respeta.
+  if ((!probar)) && [[ -f "$ajustes" ]] &&
+    jq -e --arg m "$nombre" '.display.monitors[$m] | (.framerate // .mode // .resolution) != null' "$ajustes" >/dev/null 2>&1; then
+    continue
+  fi
+  if ((probar)); then
+    printf '%s → %s (escala %s)\n' "$nombre" "$modo" "$escala"
+    continue
+  fi
+  actual="$(jq -r --arg m "$nombre" '.[] | select(.name == $m) | "\(.width)x\(.height)@\(.refreshRate)"' <<<"$monitores")"
+  # Ya está en ese modo (misma resolución y Hz, con tolerancia de 0.5 Hz): no lo vuelve a poner.
+  if awk -v a="$actual" -v b="$modo" 'BEGIN { split(a, x, "@"); split(b, y, "@"); d = x[2] - y[2]; exit !(x[1] == y[1] && d < 0.5 && d > -0.5) }'; then
+    continue
+  fi
+  hyprctl eval "hl.monitor({ output = \"$nombre\", mode = \"$modo\", position = \"auto\", scale = $escala })" >/dev/null 2>&1 ||
+    printf 'vortex-pantallas: no pude poner %s en %s\n' "$nombre" "$modo" >&2
+done
+exit 0

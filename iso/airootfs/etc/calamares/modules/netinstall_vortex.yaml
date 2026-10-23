@@ -47,8 +47,8 @@
       selected: true
       packages: [ vortex-studio ]
     - name: "Claude (asistente, Super+A, le hablas con el micrófono)"
-      description: "Claude Code integrado al escritorio: Super+A lo abre y le hablas con el micrófono (toca Espacio). Puede ver tu pantalla solo cuando se lo pides y te avisa. Se baja en tu primer inicio de sesión con internet; necesita tu cuenta de Claude"
-      selected: true
+      description: "Claude Code integrado al escritorio: Super+A lo abre y le hablas con el micrófono (toca Espacio). Puede ver tu pantalla solo cuando se lo pides y te avisa. Viene apagado: márcalo para instalarlo en tu primer inicio de sesión con internet, o actívalo después en Ajustes → General → Claude. Necesitas tu cuenta de Claude"
+      selected: false
       packages: [ vortex-claude ]
     - name: "Discord"
       description: "Chat de voz y texto"

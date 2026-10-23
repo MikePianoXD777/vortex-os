@@ -77,8 +77,8 @@ else:
     c = claude[0]
     if c["name"] != "Claude (asistente, Super+A, le hablas con el micrófono)":
         mal.append("nombre de Claude: " + c["name"])
-    if c.get("selected") is not True:
-        mal.append("Claude debe ir marcado por defecto (selected: true)")
+    if c.get("selected") is not False:
+        mal.append("Claude viene apagado: debe ir desmarcado por defecto (selected: false)")
     if c.get("packages") != ["vortex-claude"]:
         mal.append("Claude debe instalar vortex-claude: %r" % c.get("packages"))
 # Los paquetes vortex-* de la lista salen de algún PKGBUILD de packaging/.
@@ -260,7 +260,7 @@ probar "(y el preset sigue apagando networkd: se está leyendo el bloque correct
 if ((${#python_yaml[@]})); then
   yaml_rc=1
   "${python_yaml[@]}" "$T/yaml.py" "$AQUI" >"$T/yaml.out" 2>&1 && yaml_rc=0
-  probar "YAML de Calamares válido; Claude por defecto; paquetes vortex-*; autologin; actualización completa antes de las apps; espejos de CachyOS; fstrim" test "$yaml_rc" -eq 0
+  probar "YAML de Calamares válido; Claude apagado por defecto; paquetes vortex-*; autologin; actualización completa antes de las apps; espejos de CachyOS; fstrim" test "$yaml_rc" -eq 0
   sed 's/^/      /' "$T/yaml.out"
 else
   salto "sin pyyaml (ni uv con red para traerlo): se salta la validación del YAML de Calamares"
@@ -386,9 +386,22 @@ exec "$@"
 EOF
 chmod +x "$T/shim/kitty" "$T/shim/terminal-falsa"
 
-# Sin Claude (la ISO lo instala ~30 s después de entrar): la terminal lo instala y luego lo abre.
+# Claude viene apagado: sin elegirlo al instalar ni activarlo, Super+A solo avisa y no instala nada.
+: >"$T/marca-claude"
+H="$T/a0"; mkdir -p "$H"
+en_casa "$H" TERMINAL=kitty VORTEX_MARCA_CLAUDE="$T/no-hay-marca" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a0.out" 2>&1
+probar "apagado: Super+A dice cómo activarlo" contiene "$T/a0.out" "Claude está apagado"
+probar "apagado: no instala nada ni abre terminal" test ! -e "$H/instalaciones" -a ! -e "$H/terminal.log"
+probar "apagado: «vortex claude activado» dice no" test "$(en_casa "$H" VORTEX_MARCA_CLAUDE="$T/no-hay-marca" -- "$VORTEX" claude activado)" = no
+en_casa "$H" VORTEX_MARCA_CLAUDE="$T/no-hay-marca" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude activar </dev/null >"$T/a0b.out" 2>&1
+probar "activar: lo instala y queda activado" test -x "$H/.local/bin/claude" -a "$(en_casa "$H" VORTEX_MARCA_CLAUDE="$T/no-hay-marca" -- "$VORTEX" claude activado)" = si
+en_casa "$H" VORTEX_MARCA_CLAUDE="$T/no-hay-marca" -- "$VORTEX" claude desactivar </dev/null >"$T/a0c.out" 2>&1
+probar "desactivar: queda apagado" test "$(en_casa "$H" VORTEX_MARCA_CLAUDE="$T/no-hay-marca" -- "$VORTEX" claude activado)" = no
+probar "desactivar: le quita el servidor MCP «vortex»" contiene "$H/claude-args.log" "mcp remove --scope user vortex"
+
+# Elegido al instalar (la ISO lo instala ~30 s después de entrar): la terminal lo instala y luego lo abre.
 H="$T/a1"; mkdir -p "$H"
-en_casa "$H" TERMINAL=kitty VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a1.out" 2>&1
+en_casa "$H" TERMINAL=kitty VORTEX_MARCA_CLAUDE="$T/marca-claude" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a1.out" 2>&1
 probar "sin Claude: la terminal lo instala (y deja la marca)" test -x "$H/.local/bin/claude" -a -f "$H/.local/state/vortex/claude-listo"
 probar "sin Claude: la instalación corre una sola vez" lineas "$H/instalaciones" x 1
 probar "sin Claude: después de instalar lo abre" lineas "$H/claude-args.log" '^$' 1
@@ -397,12 +410,12 @@ probar "sin Claude: no queda en «orden no encontrada»" bash -c "! grep -qiE 'n
 probar "sin Claude: abre kitty con el título de siempre" contiene "$H/terminal.log" "kitty --title Claude · Vortex --directory $H bash -lc"
 # Con otra terminal ($TERMINAL) pasa lo mismo.
 H="$T/a2"; mkdir -p "$H"
-en_casa "$H" TERMINAL=terminal-falsa VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a2.out" 2>&1
+en_casa "$H" TERMINAL=terminal-falsa VORTEX_MARCA_CLAUDE="$T/marca-claude" VORTEX_CLAUDE_INSTALADOR="$URL_BUENA" -- "$VORTEX" claude </dev/null >"$T/a2.out" 2>&1
 probar "sin Claude, otra terminal: lo instala y lo abre" test -x "$H/.local/bin/claude" -a "$(grep -c '^$' "$H/claude-args.log" 2>/dev/null || true)" = 1
 probar "sin Claude, otra terminal: se abrió con -e" contiene "$H/terminal.log" "terminal-falsa -e bash -lc"
 # Sin red: lo dice en la terminal en vez de quedarse mudo, y no abre nada que no existe.
 H="$T/a3"; mkdir -p "$H"
-en_casa "$H" TERMINAL=kitty VORTEX_CLAUDE_INSTALADOR="file://$T/no-existe.sh" -- "$VORTEX" claude </dev/null >"$T/a3.out" 2>&1
+en_casa "$H" TERMINAL=kitty VORTEX_MARCA_CLAUDE="$T/marca-claude" VORTEX_CLAUDE_INSTALADOR="file://$T/no-existe.sh" -- "$VORTEX" claude </dev/null >"$T/a3.out" 2>&1
 probar "sin Claude y sin red: avisa que no pudo instalarlo" contiene "$T/a3.out" "No pude instalar Claude Code"
 probar "sin Claude y sin red: no deja marca ni claude" test ! -e "$H/.local/state/vortex/claude-listo" -a ! -e "$H/.local/bin/claude"
 probar "sin Claude y sin red: no queda en «orden no encontrada»" bash -c "! grep -qiE 'no encontrada|not found' '$T/a3.out'"

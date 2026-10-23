@@ -81,6 +81,9 @@ firefox
 thunar
 hyprpicker
 btop
+nvtop
+# AppImage (casi todas usan FUSE 2)
+fuse2
 grim
 slurp
 wl-clipboard
@@ -98,7 +101,14 @@ mangohud
 lib32-mangohud
 gamescope
 
-# --- Programación (packages/dev.txt, sin Docker) ---
+# --- Programación (packages/dev.txt, sin Docker): los lenguajes en su última versión ---
+jdk-openjdk
+nodejs
+npm
+rust
+go
+clang
+cmake
 github-cli
 mise
 uv

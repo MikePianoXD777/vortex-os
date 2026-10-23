@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-if ((!VORTEX_CLAUDE)) || ! preguntar "¿Conectar Vortex con Claude (Claude Code, hablarle con el micrófono y ver tu pantalla con permiso)?" s; then
+if ((!VORTEX_CLAUDE)) || ! preguntar "¿Conectar Vortexine's OS con Claude (necesita tu cuenta de Claude; también se activa después desde Ajustes)?" n; then
   info "Claude: omitido"
   return 0
 fi
@@ -13,7 +13,7 @@ instalar_pacman sox
 # lo mismo que corre «vortex claude instalar» (y la ISO, en el primer inicio de cada usuario).
 # shellcheck source=install/claude.sh
 source "$VORTEX_DIR/install/claude.sh"
-claude_instalar_usuario || aviso "Claude quedó a medias; cuando tengas internet, corre: vortex claude instalar"
+claude_instalar_usuario && { mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/vortex"; : >"${XDG_STATE_HOME:-$HOME/.local/state}/vortex/claude-listo"; } || aviso "Claude quedó a medias; cuando tengas internet, corre: vortex claude instalar"
 
 info "Super+A abre Claude. Puede ver tu pantalla y ventanas solo cuando se lo pides,"
 info "y te avisa con una notificación cada vez. Para cortarle el acceso: vortex claude pausa"

@@ -149,8 +149,11 @@ else
     run "crear $ajustes (semilla de Vortex, idioma=$idioma, suspender=$suspender)"
   else
     mkdir -p "$(dirname "$ajustes")"
-    jq -s --arg fondos "$fondos" --argjson suspender "$suspender" --arg idioma "$idioma" \
-      '(.[0] * .[1]) | .wallpaperDir = $fondos | .general.language = $idioma | .idle.actions.suspend.enabled = $suspender | .display.monitors = {}' \
+    # En el USB (live) no hay inactividad: ni bloqueo ni pantalla apagada a mitad de la instalación.
+    inactividad=true
+    [[ -e "${VORTEX_MARCA_LIVE:-/etc/vortex/live}" ]] && inactividad=false
+    jq -s --arg fondos "$fondos" --argjson suspender "$suspender" --arg idioma "$idioma" --argjson inactividad "$inactividad" \
+      '(.[0] * .[1]) | .wallpaperDir = $fondos | .general.language = $idioma | .idle.actions.suspend.enabled = $suspender | (if $inactividad then . else .idle.enabled = false end) | .display.monitors = {}' \
       "$serpantinum/config/serpantinum/settings.json" "$VORTEX_DIR/config/serpantinum/semilla.json" \
       >"$ajustes"
   fi

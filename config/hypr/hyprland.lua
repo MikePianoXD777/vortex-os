@@ -85,6 +85,11 @@ end)
 -- pantalla 2.8K/4K lo pone en ~/.config/vortex/hypr-mio.lua:
 --   hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 require("config/monitors")
+-- Cada pantalla a su frecuencia más alta (hasta 240 Hz) en su resolución máxima: «preferred» deja
+-- muchos monitores de 144-240 Hz en 60. Lo hace bin/vortex-pantallas al entrar y al conectar un
+-- monitor; no toca los que configuraste en hypr-mio.lua o en Ajustes → Pantalla.
+hl.on("hyprland.start", function() hl.exec_cmd("vortex-pantallas") end)
+hl.on("monitor.added", function() hl.exec_cmd("vortex-pantallas") end)
 require("config/settings")
 require("config/keybinds")
 hl.bind = bind_original

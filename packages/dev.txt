@@ -1,4 +1,11 @@
-# Programación
+# Programación: los lenguajes en su última versión (mise pone otras por proyecto)
+jdk-openjdk            # Java 27
+nodejs
+npm
+rust
+go
+clang
+cmake
 github-cli
 mise                   # versiones de node, python, go, rust... por proyecto
 uv                     # Python rápido
