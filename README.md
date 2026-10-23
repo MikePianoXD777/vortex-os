@@ -36,8 +36,8 @@ O con la **ISO de Vortex** (en pruebas): arranca en el escritorio de Vortex para
 instalador gráfico («Instalar Vortexine's OS», se abre solo) te guía: idioma, teclado, disco y usuario, y
 eliges tus apps y juegos con casillas (Steam, Sober, Prism Launcher, el lanzador de Genshin, Heroic, Zoom,
 Discord, OBS, Vortex Studio...). Se instala sin internet; las apps sí la necesitan. «Claude» (el
-asistente de Super+A) viene marcado: se le instala Claude Code a cada usuario en su primer inicio con
-internet, en segundo plano. Y en la pantalla de usuario hay una casilla para entrar al escritorio sin
+asistente de Super+A) viene **apagado**: si lo marcas, se le instala Claude Code a cada usuario en su
+primer inicio con internet; si no, se activa cuando quieras en Ajustes → General → Claude. Y en la pantalla de usuario hay una casilla para entrar al escritorio sin
 pedir la contraseña.
 
 La ISO arranca e instala en PC con **UEFI** (gestor de arranque systemd-boot) y con **BIOS/legacy**
@@ -86,7 +86,8 @@ arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin const
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
 | Recursos | `vortex-gestor` (servicio de usuario, ~2 MB de RAM) | reparte solo la CPU y la RAM: prioridad a la ventana enfocada, modo juego al abrir un juego y memoria liberada cuando falta |
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
-| Claude | Claude Code + servidor MCP `vortex` | Super+A; le hablas con el micrófono y puede ver tu pantalla cuando se lo pides |
+| Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |
+| Pantallas | `vortex-pantallas` | cada monitor a su resolución máxima y su frecuencia más alta (144, 165, 200, 240 Hz), al entrar y al conectarlo; respeta lo que pongas en Ajustes → Pantalla o en `hypr-mio.lua` |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
@@ -127,7 +128,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+W | Firefox |
 | Super+E | archivos (Thunar) |
 | Super+C | editor (Zed) |
-| Super+A | habla con Claude |
+| Super+A | habla con Claude (si lo activaste) |
 | Super+G | modo juego a mano |
 
 **Escritorios**
@@ -237,7 +238,10 @@ vez para enviar. Es el dictado de Claude Code (`/voice`), ya activado en españo
 Claude.ai, la voz se transcribe en los servidores de Anthropic y no gasta tokens. Para cambiar el modo:
 `/voice hold` (mantener Espacio) o `/voice off`.
 
-**Instalar Claude:** `install.sh` lo hace en el paso de Claude. Con la ISO es una casilla del instalador
+**Activar Claude:** viene apagado (Super+A solo avisa cómo activarlo). Se activa en Ajustes → General →
+Claude o con `vortex claude activar` (y se apaga con `vortex claude desactivar`); necesita tu cuenta de
+Claude, y la primera vez que lo abres te pide iniciar sesión. `install.sh` pregunta en el paso de Claude
+(por defecto no). Con la ISO es una casilla del instalador, desmarcada
 (paquete `vortex-claude`, que deja la marca `/etc/vortex/claude`): en el primer inicio de cada usuario,
 `vortex-sesion` corre `vortex claude instalar --al-entrar` en segundo plano; espera a que haya red (si no
 hay, lo reintenta en el próximo inicio) y al terminar avisa con una notificación. A mano:
