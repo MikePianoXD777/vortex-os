@@ -1,0 +1,81 @@
+{
+ "arches": [
+  "x86_64",
+  "aarch64"
+ ],
+ "branch": "stable",
+ "branches": {
+  "stable": {
+   "download_size": 41611494,
+   "installed_size": 87398400
+  }
+ },
+ "download_size": 41611494,
+ "installed_size": 87398400,
+ "metadata": {
+  "built-extensions": [
+   "org.prismlauncher.PrismLauncher.Debug",
+   "org.prismlauncher.PrismLauncher.Sources"
+  ],
+  "builtExtensions": null,
+  "command": "prismlauncher",
+  "extensions": {
+   "org.prismlauncher.PrismLauncher.Debug": {
+    "autodelete": "true",
+    "directory": "lib/debug",
+    "no-autodownload": "true",
+    "noAutodownload": null,
+    "version": null,
+    "versions": null
+   },
+   "org.prismlauncher.PrismLauncher.Extension": {
+    "add-ld-path": "lib",
+    "autodelete": "true",
+    "directory": "extensions",
+    "no-autodownload": "true",
+    "noAutodownload": null,
+    "subdirectories": "true",
+    "version": null,
+    "versions": null
+   }
+  },
+  "extraData": null,
+  "name": "org.prismlauncher.PrismLauncher",
+  "permissions": {
+   "devices": [
+    "all"
+   ],
+   "filesystems": [
+    "xdg-run/app/com.discordapp.Discord:create",
+    "xdg-download:ro",
+    "xdg-config/kdeglobals:ro",
+    "~/.ftba:ro",
+    "/sys/kernel/mm/hugepages:ro",
+    "/sys/kernel/mm/transparent_hugepage:ro"
+   ],
+   "session-bus": {
+    "talk": [
+     "com.canonical.AppMenu.Registrar",
+     "org.kde.kconfig.notify",
+     "org.kde.KGlobalSettings"
+    ]
+   },
+   "shared": [
+    "ipc",
+    "network"
+   ],
+   "sockets": [
+    "pulseaudio",
+    "wayland",
+    "x11"
+   ]
+  },
+  "runtime": "org.kde.Platform/x86_64/6.10",
+  "runtimeInstalledSize": 1050214400,
+  "runtimeIsEol": false,
+  "runtimeName": "KDE Application Platform version 6.10",
+  "sdk": "org.kde.Sdk/x86_64/6.10",
+  "tags": null
+ },
+ "timestamp": 1790694375
+}

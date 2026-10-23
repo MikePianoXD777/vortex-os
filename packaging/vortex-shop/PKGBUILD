@@ -1,0 +1,38 @@
+# Vortexine's Shop: la tienda de aplicaciones de Vortexine's OS, empaquetada desde apps/shop/ de
+# este repo. Las apps salen de Flathub y se instalan para el usuario (flatpak --user): sin
+# contraseña, sin terminal y sin gastar lugar en la ISO (en la ISO solo viene la tienda).
+#
+#   cd packaging/vortex-shop && makepkg -si
+pkgname=vortex-shop
+pkgver=1.1
+pkgrel=1
+pkgdesc="Vortexine's Shop: la tienda de aplicaciones de Vortexine's OS (Flathub, sin contraseña)"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# pyside6 es Python + Qt; qt6-declarative es Qt Quick/QML (la interfaz: QtQuick, Controls.Basic y
+# Layouts); qt6-svg, para los íconos vectoriales y el logo; python-gobject, libflatpak para instalar
+# con el progreso real; flatpak, el programa mismo (y el respaldo si falla libflatpak).
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'python-gobject' 'flatpak')
+
+package() {
+    local origen="$startdir/../../apps/shop"
+    local share="$pkgdir/usr/share/vortex-shop"
+
+    install -d "$share"
+    cp -a "$origen/vortex_shop" "$share/"
+    # Sin restos de ejecutar la tienda desde el repo.
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    # Con el código ya compilado: /usr es de solo lectura para el usuario y, sin esto, Python
+    # recompilaría todo en cada arranque.
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-shop" "$pkgdir/usr/bin/vortex-shop"
+    install -Dm644 "$origen/share/applications/vortexines-shop.desktop" \
+        "$pkgdir/usr/share/applications/vortexines-shop.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortexines-shop.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortexines-shop.svg"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

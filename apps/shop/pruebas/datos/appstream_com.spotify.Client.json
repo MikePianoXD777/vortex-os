@@ -1,0 +1,295 @@
+{
+ "branding": null,
+ "bundle": {
+  "runtime": "org.freedesktop.Platform/x86_64/25.08",
+  "sdk": "org.freedesktop.Sdk/x86_64/25.08",
+  "type": "flatpak",
+  "value": "app/com.spotify.Client/x86_64/stable"
+ },
+ "categories": [
+  "Audio",
+  "Music",
+  "Player",
+  "AudioVideo"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Sin posibilidad de chatear con otros jugadores",
+     "id": "social",
+     "level": "none"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin posibilidad de gastar",
+     "id": "money",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    },
+    {
+     "description": "Sin violencia con personajes animados",
+     "id": "violence",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 3,
+   "minimumAgeText": "3"
+  }
+ },
+ "description": "<p>Access all of your favorite music, discover new songs, and share music online with your friends - all in one place.\n    Create shared playlists or share individual songs with your Facebook friends with just a click of a button.\n    Follow your favorite artists or friends to know what they are listening to, and then save the songs to your own playlists.\n      Spotify is the best way to have access to millions of songs and all the latest hits.</p>\n    ",
+ "developer_name": "Spotify",
+ "icon": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/icons/128x128/com.spotify.Client.png",
+ "icons": [
+  {
+   "height": 128,
+   "scale": null,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/icons/128x128/com.spotify.Client.png",
+   "width": 128
+  },
+  {
+   "height": 128,
+   "scale": 2,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/icons/128x128@2/com.spotify.Client.png",
+   "width": 128
+  }
+ ],
+ "id": "com.spotify.Client",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": false,
+ "keywords": null,
+ "kudos": null,
+ "launchable": {
+  "type": "desktop-id",
+  "value": "com.spotify.Client.desktop"
+ },
+ "metadata": {
+  "flathub::manifest": null,
+  "flathub::verification::login_is_organization": null,
+  "flathub::verification::login_name": null,
+  "flathub::verification::login_provider": null,
+  "flathub::verification::method": null,
+  "flathub::verification::timestamp": null,
+  "flathub::verification::verified": null,
+  "flathub::verification::website": null
+ },
+ "mimetypes": null,
+ "name": "Spotify",
+ "project_license": "LicenseRef-proprietary=https://www.spotify.com/us/legal/end-user-agreement/",
+ "provides": [
+  "com.spotify.Client.desktop",
+  "x-scheme-handler/spotify"
+ ],
+ "recommends": null,
+ "releases": [
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1786492800",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.2.95.453.g0eeebbed"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1781481600",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.2.92.147.g5b8f9367"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1779408000",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.2.89.539.gfb3c63a3"
+  }
+ ],
+ "requires": null,
+ "screenshots": [
+  {
+   "caption": "Artist",
+   "default": true,
+   "sizes": [
+    {
+     "height": "1080",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_orig.png",
+     "width": "1920"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-1_224x126@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Playlist",
+   "default": null,
+   "sizes": [
+    {
+     "height": "1080",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_orig.png",
+     "width": "1920"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-2_224x126@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Podcast",
+   "default": null,
+   "sizes": [
+    {
+     "height": "1080",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_orig.png",
+     "width": "1920"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-3_224x126@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Fullscreen",
+   "default": null,
+   "sizes": [
+    {
+     "height": "1080",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_orig.png",
+     "width": "1920"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "126",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/com/spotify/Client/2be38d678bbcc0e04cec0c19c60a80fe/screenshots/image-4_224x126@1.png",
+     "width": "224"
+    }
+   ]
+  }
+ ],
+ "summary": "Online music streaming service",
+ "supports": null,
+ "translation": null,
+ "type": "desktop-application",
+ "urls": {
+  "bugtracker": "https://github.com/flathub/com.spotify.Client/issues",
+  "contact": null,
+  "contribute": null,
+  "donation": null,
+  "faq": null,
+  "help": "https://community.spotify.com/t5/Desktop-Linux/bd-p/desktop_linux",
+  "homepage": "https://www.spotify.com",
+  "translate": null,
+  "vcs_browser": null
+ }
+}
