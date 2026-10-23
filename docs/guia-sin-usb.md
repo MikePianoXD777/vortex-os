@@ -9,8 +9,7 @@ Vortexine's OS y **6 GB** para el instalador (que se borran al final).
 
 Necesitas:
 
-- La ISO de Vortexine's OS ya unida: `vortexines-os-1.0.iso` (ver «Descargar» en la página de la
-  versión).
+- Unos 9 GB libres en C: para bajar la ISO (se borran al final).
 - Internet durante la instalación.
 - Una hora más o menos.
 
@@ -18,6 +17,41 @@ Necesitas:
 > de esto borra tus archivos de Windows, pero en las particiones hay que ir con calma.
 
 ---
+
+## 0. Bajar la ISO y unirla
+
+1. Entra a la página de la versión 1.0:
+   <https://github.com/MikePianoXD777/vortex-os/releases/tag/v1.0.0>
+2. Abajo, en **Assets**, da clic y descarga estos 3 archivos (quedan en tu carpeta **Descargas**):
+   - `vortexines-os-1.0.iso.parte0` (2 GB)
+   - `vortexines-os-1.0.iso.parte1` (2 GB)
+   - `vortexines-os-1.0.iso.sha256` (chiquito)
+
+   La ISO viene en 2 partes porque GitHub no deja subir archivos de más de 2 GB. Espera a que
+   terminen las dos.
+3. **Únelas.**
+   1. Abre la carpeta **Descargas**.
+   2. Da clic en la barra de dirección de arriba (donde dice «Descargas»), escribe **cmd** y Enter.
+      Se abre una ventana negra ya en esa carpeta.
+   3. Copia y pega este comando y presiona Enter:
+
+      ```
+      copy /b vortexines-os-1.0.iso.parte0 + vortexines-os-1.0.iso.parte1 vortexines-os-1.0.iso
+      ```
+
+      Tarda un minuto. Al final dice «1 archivos copiados» y en Descargas aparece
+      `vortexines-os-1.0.iso` (unos 4 GB).
+4. **Revisa que quedó bien.** En la misma ventana negra pega esto y Enter:
+
+   ```
+   certutil -hashfile vortexines-os-1.0.iso SHA256
+   ```
+
+   Debe salir exactamente:
+   `0c75808c3fba597bdf43a2ae51dc0551b472de605ca80cf43a3c26c2927bb088`
+   (también está dentro de `vortexines-os-1.0.iso.sha256`; ábrelo con el Bloc de notas).
+   Si no es igual, la descarga se cortó: borra las partes, bájalas otra vez y vuelve a unirlas.
+5. Ya puedes borrar las dos partes (`.parte0` y `.parte1`) para liberar espacio. La ISO se queda.
 
 ## 1. Preparar Windows
 
