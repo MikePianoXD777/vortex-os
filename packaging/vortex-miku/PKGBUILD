@@ -22,7 +22,8 @@ license=('MIT')
 # (trae ffmpeg y ggml); pipewire trae pw-record (el micrófono) y pw-play (el altavoz).
 depends=('python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland' 'python-numpy' 'python-onnxruntime-cpu'
          'whisper-cpp' 'pipewire')
-optdepends=("claude-code: el cerebro de Miku (en Vortexine's se activa con «vortex claude activar»)")
+optdepends=("claude-code: el cerebro de Miku (en Vortexine's se activa con «vortex claude activar»)"
+            'libsecret: guarda la clave de ElevenLabs en el llavero (sin él, en un archivo 0600)')
 source=("three-0.180.0.tgz::https://registry.npmjs.org/three/-/three-0.180.0.tgz"
         "three-vrm-3.5.5.tgz::https://registry.npmjs.org/@pixiv/three-vrm/-/three-vrm-3.5.5.tgz"
         "whisper.cpp-MIT.txt::https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.9.5/LICENSE")

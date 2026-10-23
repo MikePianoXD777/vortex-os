@@ -22,6 +22,12 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   justo debajo de la barra. No te quita el teclado al abrirse.
 - **Comandos:** `vortex miku` (abre o cierra), `vortex miku estado`, `vortex miku voz [ID]` y
   `vortex miku modelo RUTA.vrm`. Las opciones quedan en `~/.config/vortex/miku.json`.
+- **Voz natural con ElevenLabs (opcional):** `vortex-miku elevenlabs VOICE_ID` usa una voz que elijas en
+  [elevenlabs.io](https://elevenlabs.io) (Voice Library o Voice Design), con emociones de verdad: Claude pone
+  etiquetas como `[sighs]` o `[whispers]` que cambian cómo lo dice (y la cara del 3D), y no salen en pantalla.
+  Usa el modelo `eleven_v4_turbo` (o `eleven_v3` si tu cuenta no lo tiene). La clave se pide una vez, sin
+  mostrarse, y queda en el llavero. Si no hay internet o se acaban los créditos, Miku sigue con la voz local.
+  `vortex-miku elevenlabs quitar` la borra y vuelve a la F1.
 - **`vortex actualizar` más listo:** sigue con el código recién bajado (antes usaba el de antes del
   pull) y reconstruye el shell, la tienda o Miku cuando cambia su paquete, o los instala si faltan;
   también pone al día la config de Hyprland (`~/.config/hypr/hyprland.lua` y `atajos.lua`, con
@@ -41,7 +47,8 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
 
 ## Privacidad
 
-El micrófono solo escucha con la ventana de Miku abierta y el audio no se guarda. La pantalla solo
+El micrófono solo escucha con la ventana de Miku abierta y el audio no se guarda. Con la voz de ElevenLabs,
+el texto de lo que Miku dice (no tu voz) se manda a ElevenLabs para convertirlo en audio. La pantalla solo
 la ve cuando se lo pides, y cada vez sale una notificación. `vortex claude pausa` le corta el acceso.
 
 ## Créditos

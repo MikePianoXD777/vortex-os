@@ -89,13 +89,13 @@ def main() -> int:
 
     voz.sintetizar("Prueba.")                           # calienta
     t0 = time.monotonic()
-    x, sr = voz.sintetizar(FRASE)
+    x, sr, _ = voz.sintetizar(FRASE)
     informe("voz normal (sin avatar)", x, sr, salida / "10-f1-normal.ogg", time.monotonic() - t0, voz.estilo)
     a_ogg(x, sr, salida / "10-f1-normal.ogg")
     for letra, ajustes in VARIANTES.items():
         v = Voz(voces.VOZ_DEFECTO, True, {k: val for k, val in ajustes.items() if k != "nombre"})
         t0 = time.monotonic()
-        x, sr = v.sintetizar(FRASE)
+        x, sr, _ = v.sintetizar(FRASE)
         ruta = salida / f"11-miku-{letra}.ogg"
         a_ogg(x, sr, ruta)
         informe(f"Miku {letra} ({ajustes['nombre']})", x, sr, ruta, time.monotonic() - t0, {k: val for k, val in ajustes.items() if k != "nombre"})

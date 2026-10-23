@@ -68,6 +68,14 @@
         "sha256": "45966e73316415626cf41a7d1c6f3b4c70dbc1ba2bee5c1978ef0ce33244fc8d"
       },
       "licencia": "BigScience OpenRAIL-M"
+    },
+    {
+      "id": "elevenlabs",
+      "nombre": "ElevenLabs (natural, con emociones)",
+      "descripcion": "La voz que elijas en elevenlabs.io (Voice Library o Voice Design), con emociones. Va por internet y usa tu cuenta: ponla con «vortex-miku elevenlabs». Si falla, Miku habla con la F1.",
+      "motor": "elevenlabs",
+      "incluida": true,
+      "licencia": "La de tu cuenta de ElevenLabs (el plan gratis es solo para uso personal y no comercial)"
     }
   ]
 }

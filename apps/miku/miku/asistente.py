@@ -21,7 +21,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
 from . import cerebro as modulo_cerebro
-from . import config, descargas, oido, rutas, voces
+from . import config, descargas, elevenlabs, oido, rutas, voces
 
 # Estados que la ventana muestra con su indicador.
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
@@ -35,8 +35,24 @@ _RE_TRISTE = re.compile(r"\b(lo siento|perd[oó]n|no puedo|no pude|error|problem
 _RE_ALEGRE = re.compile(r"[!¡]|\b(genial|qué bien|me alegra|me encanta|me gusta|claro que s[ií]|listo|de nada)\b", re.I)
 
 
+_TRISTES = {"sighs", "sad", "exhales", "crying", "softly", "whispers"}
+_ALEGRES = {"laughs", "laughs softly", "giggles", "excited", "happy"}
+_SORPRESA = {"surprised", "curious", "nervous", "hesitates"}
+
+
 def emocion_de(frase: str) -> tuple[str, float]:
-    """Una emoción suave para la frase que va a decir (Miku es apagada: nunca pasa de una sonrisa leve)."""
+    """Una emoción suave para la frase que va a decir (Miku es apagada: nunca pasa de una sonrisa leve).
+
+    Si la frase trae etiquetas de ElevenLabs ([sighs], [laughs softly]...), mandan ellas.
+    """
+    etiquetas = set(elevenlabs.etiquetas_de(frase))
+    if etiquetas & _ALEGRES:
+        return "happy", 0.45
+    if etiquetas & _SORPRESA:
+        return "surprised", 0.3
+    if etiquetas & _TRISTES:
+        return "sad", 0.4
+    frase = elevenlabs.quitar_etiquetas(frase)
     if _RE_TRISTE.search(frase):
         return "sad", 0.3
     if _RE_ALEGRE.search(frase):
@@ -80,6 +96,8 @@ class Asistente(QObject):
         self.estado_actual = REPOSO
         self.oido = oido.Oido(silencio=cfg["silencio"], espera=ESPERA_PRIMERA)
         self.cerebro = modulo_cerebro.Cerebro(avatar, lambda tipo, **d: self._evento_cerebro.emit(tipo, d))
+        if (voces.buscar(cfg["voz"]) or {}).get("motor") == "elevenlabs":
+            self.cerebro.persona += "\n\n" + elevenlabs.PERSONA
         self.divisor = modulo_cerebro.DivisorFrases()
         self._acumulado = ""
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
@@ -239,6 +257,8 @@ class Asistente(QObject):
                 self._voz_lista = True
             elif "wav" in m:
                 texto, turno = self._pedidos.pop(m.get("id"), ("", -1))      # -1: pedido descartado, no suena
+                if m.get("aviso"):
+                    self._avisar_una_vez("voz-respaldo", m["aviso"])
                 self._cola.append((m["wav"], float(m.get("seg", 0)), m.get("visemas") or [], texto, turno))
                 self._sonar_siguiente()
             elif m.get("error") and m.get("id") is None:
@@ -440,7 +460,7 @@ class Asistente(QObject):
             return
         if tipo == "texto":
             self._acumulado += datos["delta"]
-            self.respuesta.emit(self._acumulado.strip(), False)
+            self.respuesta.emit(elevenlabs.quitar_etiquetas(self._acumulado), False)
             for frase in self.divisor.alimentar(datos["delta"]):
                 self._decir(frase)
         elif tipo in ("bloque_fin", "herramienta"):
@@ -456,7 +476,7 @@ class Asistente(QObject):
             if resto:
                 self._decir(resto)
             self._cerebro_listo = True
-            self.respuesta.emit(self._acumulado.strip() or datos.get("texto", "").strip(), True)
+            self.respuesta.emit(elevenlabs.quitar_etiquetas(self._acumulado or datos.get("texto", "")), True)
             self._revisar_fin_de_turno()
         elif tipo == "claude_listo":
             self._claude_ok = True

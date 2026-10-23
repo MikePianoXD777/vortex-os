@@ -10,6 +10,8 @@
   vortex-miku licencias       créditos y licencias (el modelo 3D, la voz, el oído, three.js)
   vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
   vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
+  vortex-miku elevenlabs VOICE_ID   voz natural con emociones de ElevenLabs (pide tu clave la primera vez)
+  vortex-miku elevenlabs clave      cambia la clave · elevenlabs quitar: vuelve a la voz local (F1)
 
 La configuración está en ~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta>"}.
 Los modelos de la voz (Supertonic 3) y del oído (Whisper) no vienen en la ISO: la primera vez que se abre
@@ -38,7 +40,7 @@ def _raiz() -> Path:
 
 RAIZ = _raiz()
 sys.path.insert(0, str(RAIZ))
-from miku import config, descargas, rutas, voces  # noqa: E402  (solo biblioteca estándar)
+from miku import config, descargas, elevenlabs, rutas, voces  # noqa: E402  (solo biblioteca estándar)
 
 APP = RAIZ / "miku" / "app.py"
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
@@ -262,20 +264,24 @@ def orden_voz(args: list[str]) -> int:
     if not args:
         print("Voces de Miku (la elegida lleva *):")
         for v in catalogo:
-            if v.get("incluida"):
+            if v.get("motor") == "elevenlabs":
+                estado = "lista" if voces.disponible(v) else "ponla con: vortex-miku elevenlabs VOICE_ID"
+            elif v.get("incluida"):
                 estado = "lista" if voces.disponible(v) else "se baja con el modelo la primera vez que abras a Miku"
             else:
                 estado = "lista" if voces.disponible(v) else "se baja al elegirla (~290 KB)"
             print(f"{'*' if v['id'] == actual else ' '} {v['id']:<14} {v['nombre']}  [{estado}]")
             if v.get("descripcion"):
                 print(f"    {v['descripcion']}")
-        print("\nTodas son voces de Supertonic 3 (licencia BigScience OpenRAIL-M).\nElige una con: vortex-miku voz ID")
+        print("\nLas supertonic-* son locales (Supertonic 3, licencia BigScience OpenRAIL-M); elevenlabs va por internet.\nElige una con: vortex-miku voz ID")
         return 0
     if len(args) != 1:
         return error("uso: vortex-miku voz [ID]", 2)
     voz = voces.buscar(args[0])
     if voz is None:
         return error(f"no existe la voz «{args[0]}». Mira las que hay con: vortex-miku voz")
+    if voz.get("motor") == "elevenlabs" and not voces.disponible(voz):
+        return error("para usar ElevenLabs primero pon tu voz y tu clave con: vortex-miku elevenlabs VOICE_ID")
     if not voz.get("incluida"):
         try:
             voces.descargar_estilo(voz, progreso=lambda t, f: None)
@@ -325,7 +331,8 @@ def orden_decir(args: list[str]) -> int:
     if not texto:
         return error("uso: vortex-miku decir \"texto\" [-o archivo.wav]", 2)
     cfg = config.cargar()
-    if not voces.modelo_listo():
+    nube = (voces.buscar(cfg["voz"]) or {}).get("motor") == "elevenlabs"
+    if not nube and not voces.modelo_listo():
         return error("el modelo de voz aún no está bajado. Bájalo con: vortex-miku preparar")
     destino = salida or str(rutas.temporales() / f"decir-{os.getpid()}.wav")
     r = subprocess.run([sys.executable, "-I", str(RAIZ / "miku" / "voz_worker.py"), "--voz", cfg["voz"],
@@ -344,6 +351,67 @@ def orden_decir(args: list[str]) -> int:
             return error("no encuentro con qué reproducir sonido (pw-play).")
     finally:
         Path(destino).unlink(missing_ok=True)
+    return 0
+
+
+def _comprobar_elevenlabs(voz_id: str, clave: str) -> str:
+    """Revisa la clave y la voz sin gastar créditos (GET de la voz). Devuelve el nombre de la voz."""
+    import json
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(f"{elevenlabs.API}/voices/{urllib.request.quote(voz_id, safe='')}", headers={"xi-api-key": clave})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read() or b"{}").get("name", "") or voz_id
+    except urllib.error.HTTPError as e:
+        raise elevenlabs.ErrorVoz(elevenlabs._explicar(e.code, e.read())) from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise elevenlabs.ErrorVoz(f"No pude llegar a ElevenLabs (¿sin internet?): {getattr(e, 'reason', e)}") from None
+
+
+def _pedir_clave() -> str:
+    import getpass
+    print("Tu clave de la API de ElevenLabs: elevenlabs.io → Developers → API Keys → Create (con permiso «Text to Speech»).")
+    try:
+        return getpass.getpass("Pégala aquí (no se ve al escribir) y Enter: ").strip()
+    except (EOFError, OSError):
+        return ""
+
+
+def orden_elevenlabs(args: list[str]) -> int:
+    cfg = config.cargar()
+    if not args:
+        voz_id, clave = cfg.get("elevenlabs_voz", ""), elevenlabs.leer_clave()
+        print("ElevenLabs: voz natural con emociones (va por internet, con tu cuenta).")
+        print(f"  Voice ID: {voz_id or '(sin poner)'}   clave: {'guardada' if clave else '(sin poner)'}   "
+              f"en uso: {'sí' if cfg['voz'] == 'elevenlabs' else 'no'}")
+        print("  Ponla con: vortex-miku elevenlabs VOICE_ID   (el ID está en la voz, en «My Voices» → ⋯ → Copy voice ID)")
+        return 0
+    if args[0] in ("quitar", "borrar", "off"):
+        elevenlabs.borrar_clave()
+        config.guardar({"voz": voces.VOZ_DEFECTO})
+        print("Listo: borré la clave de ElevenLabs y Miku vuelve a la voz local (F1).")
+        reabrir_si_esta_abierta()
+        return 0
+    cambiar_clave = args[0] == "clave"
+    voz_id = cfg.get("elevenlabs_voz", "") if cambiar_clave else args[0].strip()
+    if not voz_id or not all(c.isalnum() for c in voz_id):
+        return error("ese no parece un Voice ID (son ~20 letras y números). Uso: vortex-miku elevenlabs VOICE_ID")
+    clave = "" if cambiar_clave else elevenlabs.leer_clave()
+    if not clave:
+        clave = _pedir_clave()
+        if not clave:
+            return error("no escribiste ninguna clave.")
+    try:
+        nombre = _comprobar_elevenlabs(voz_id, clave)
+    except elevenlabs.ErrorVoz as e:
+        return error(str(e))
+    donde = elevenlabs.guardar_clave(clave)
+    config.guardar({"voz": "elevenlabs", "elevenlabs_voz": voz_id})
+    print(f"Listo: Miku habla con «{nombre}» de ElevenLabs. La clave quedó en {'tu llavero' if donde == 'llavero' else donde}.")
+    print("Pruébala con: vortex-miku decir \"[sighs] Hola... soy Miku.\"   (cada frase gasta créditos de tu cuenta)")
+    if reabrir_si_esta_abierta():
+        print("Miku estaba abierta: la volví a abrir con la voz nueva.")
     return 0
 
 
@@ -372,6 +440,8 @@ def main(argv: list[str]) -> int:
         return 0
     if orden == "decir":
         return orden_decir(args)
+    if orden == "elevenlabs":
+        return orden_elevenlabs(args)
     return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)
 
 

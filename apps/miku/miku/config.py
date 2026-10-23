@@ -1,4 +1,4 @@
-"""~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta opcional>"}.
+"""~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta opcional>", "elevenlabs_voz": "<Voice ID>"}.
 
 Lo que falte toma su valor por defecto y un JSON inválido no truena: se usan los valores por defecto
 (y al guardar no se pierden las claves que no conocemos).
@@ -16,6 +16,8 @@ DEFECTOS = {
     "modelo": "",                   # ruta a otro .vrm (vacío = el de siempre)
     "seguir_escuchando": True,      # tras contestar, vuelve a escuchar unos segundos
     "silencio": 1.5,                # segundos callada que cierran tu turno
+    "elevenlabs_voz": "",           # Voice ID de ElevenLabs (con la voz «elevenlabs»); la clave va en el llavero
+    "elevenlabs_modelo": "",        # vacío = eleven_v4_turbo
 }
 
 
@@ -44,7 +46,7 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg = dict(DEFECTOS)
     cfg["avatar"] = _como_bool(crudo.get("avatar"), DEFECTOS["avatar"])
     cfg["seguir_escuchando"] = _como_bool(crudo.get("seguir_escuchando"), DEFECTOS["seguir_escuchando"])
-    for clave in ("voz", "modelo"):
+    for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo"):
         v = crudo.get(clave)
         if isinstance(v, str) and v.strip():
             cfg[clave] = v.strip()

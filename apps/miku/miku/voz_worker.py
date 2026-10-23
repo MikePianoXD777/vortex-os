@@ -6,6 +6,7 @@ Habla con la app por líneas de JSON:
   sale    {"listo": true, "voz": "supertonic-f1"}     al cargar el modelo
           {"id": 1, "wav": "/run/user/1000/vortex-miku/voz-1.wav", "seg": 1.8, "visemas": [[0,0,0,0,0], ...]}
           {"id": 1, "error": "texto del problema"}
+          (con «aviso» si ElevenLabs falló y la frase salió con la voz de respaldo, Supertonic)
 «visemas» tiene un cuadro cada 1/30 s con [aa, ih, ou, ee, oh] de 0 a 100: es lo que mueve la boca.
 
 También sirve para sacar una frase a un archivo (así se prueban las voces, sin reproducir nada):
@@ -22,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from miku import audio, motor_voz, rutas, voces  # noqa: E402
+from miku import audio, config, elevenlabs, motor_voz, rutas, voces  # noqa: E402
 
 
 def morir_con_el_padre() -> None:
@@ -42,6 +43,18 @@ class Voz:
         self.voz = voces.buscar(id_voz)
         if self.voz is None:
             raise ValueError(f"No existe la voz «{id_voz}». Mira las que hay con: vortex-miku voz")
+        self.nube = None            # ElevenLabs
+        self.motor = None           # Supertonic (en ElevenLabs, solo de respaldo si está bajado)
+        if self.voz.get("motor") == "elevenlabs":
+            self.nube = elevenlabs.Voz(config.cargar())
+            self.nube_pausada_hasta = 0.0
+            respaldo = voces.buscar(voces.VOZ_DEFECTO)
+            if respaldo and voces.disponible(respaldo):
+                self.voz_respaldo = respaldo
+            else:
+                self.voz_respaldo = None
+            self.estilo = {}
+            return
         if not voces.disponible(self.voz):
             raise FileNotFoundError(f"La voz «{id_voz}» no está instalada. Instálala con: vortex-miku voz {id_voz}")
         self.estilo = motor_voz.estilo_de(self.voz, miku)
@@ -49,14 +62,35 @@ class Voz:
             self.estilo.update(ajustes)
         self.motor = motor_voz.cargar(self.voz)
 
-    def sintetizar(self, texto: str):
-        """Devuelve (audio float32, tasa) ya con el estilo aplicado."""
-        hablado = motor_voz.texto_hablado(texto)
+    def _supertonic(self, texto: str):
+        hablado = motor_voz.texto_hablado(elevenlabs.quitar_etiquetas(texto))
         if not hablado:
             raise ValueError("no hay nada que decir")
         e = self.estilo
         x, sr = self.motor.sintetizar(hablado, e.get("velocidad", 1.0))
         return motor_voz.procesar(x, sr, e), sr
+
+    def sintetizar(self, texto: str):
+        """Devuelve (audio float32, tasa) ya con el estilo aplicado, y un aviso (o "") si hubo que usar el respaldo."""
+        if self.nube is None:
+            return (*self._supertonic(texto), "")
+        aviso = ""
+        if time.monotonic() >= self.nube_pausada_hasta:
+            try:
+                x, sr = self.nube.sintetizar(texto)
+                return audio.nivelar(x, sr, rms_db=-22.0, relacion=1.6), sr, ""
+            except elevenlabs.ErrorVoz as e:
+                if self.voz_respaldo is None:
+                    raise
+                # Sin red o sin créditos no se reintenta en cada frase: un minuto con la voz local.
+                self.nube_pausada_hasta = time.monotonic() + 60.0
+                aviso = f"{e} Mientras, hablo con la voz de siempre."
+        if self.voz_respaldo is None:
+            raise elevenlabs.ErrorVoz("ElevenLabs falló hace un momento y no hay voz local de respaldo.")
+        if self.motor is None:              # se carga solo la primera vez que hace falta
+            self.motor = motor_voz.cargar(self.voz_respaldo)
+            self.estilo = motor_voz.estilo_de(self.voz_respaldo, False)
+        return (*self._supertonic(texto), aviso)
 
 
 def servir(voz: Voz, id_voz: str) -> None:
@@ -80,13 +114,16 @@ def servir(voz: Voz, id_voz: str) -> None:
         n = pedido.get("id")
         try:
             t0 = time.monotonic()
-            x, sr = voz.sintetizar(str(pedido.get("texto", "")))
+            x, sr, aviso = voz.sintetizar(str(pedido.get("texto", "")))
             ruta = carpeta / f"voz-{os.getpid()}-{next(contador)}.wav"
             fd = os.open(ruta, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "wb") as f:
                 f.write(audio.a_wav(x, sr))
-            enviar({"id": n, "wav": str(ruta), "seg": round(len(x) / sr, 3), "visemas": audio.visemas(x, sr),
-                    "tardo": round(time.monotonic() - t0, 2)})
+            m = {"id": n, "wav": str(ruta), "seg": round(len(x) / sr, 3), "visemas": audio.visemas(x, sr),
+                 "tardo": round(time.monotonic() - t0, 2)}
+            if aviso:
+                m["aviso"] = aviso
+            enviar(m)
         except Exception as e:  # una frase mala no debe tumbar la voz
             enviar({"id": n, "error": f"{type(e).__name__}: {e}"})
 
@@ -113,7 +150,9 @@ def main() -> int:
             print(json.dumps({"error": str(e)}, ensure_ascii=False), flush=True)
         return 1
     if a.salida:
-        x, sr = voz.sintetizar(" ".join(a.texto))
+        x, sr, aviso = voz.sintetizar(" ".join(a.texto))
+        if aviso:
+            print(f"vortex-miku: {aviso}", file=sys.stderr)
         Path(a.salida).write_bytes(audio.a_wav(x, sr))
         return 0
     servir(voz, a.voz)

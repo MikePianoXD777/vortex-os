@@ -1,4 +1,4 @@
-"""Catálogo de voces (voces.json): todas son voces preestablecidas de Supertonic 3 (F1 a F5).
+"""Catálogo de voces (voces.json): las preestablecidas de Supertonic 3 (F1 a F5), locales, y ElevenLabs (nube).
 
 La F1 es la de fábrica y se baja junto con el modelo la primera vez que se abre a Miku (descargas.py);
 las otras cuatro son un archivito de ~290 KB que se baja al elegirlas con «vortex-miku voz ID».
@@ -40,7 +40,10 @@ def modelo_listo() -> bool:
 
 
 def disponible(voz: dict) -> bool:
-    """¿Se puede hablar ya con esta voz? Necesita el modelo y el archivo de su estilo."""
+    """¿Se puede hablar ya con esta voz? Supertonic necesita el modelo y su estilo; ElevenLabs, clave y Voice ID."""
+    if voz.get("motor") == "elevenlabs":
+        from . import config, elevenlabs
+        return bool(config.cargar().get("elevenlabs_voz")) and bool(elevenlabs.leer_clave())
     return modelo_listo() and archivo_estilo(voz).is_file()
 
 
