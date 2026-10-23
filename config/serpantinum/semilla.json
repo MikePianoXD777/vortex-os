@@ -2,7 +2,7 @@
   "general": {
     "language": "es",
     "quickactions": false,
-    "uiScale": 0.88
+    "uiScale": 0.85
   },
   "notifications": {
     "dnd": false

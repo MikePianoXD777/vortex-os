@@ -165,6 +165,12 @@ fi
 run mkdir -p "$HOME/.local/state/serpantinum"
 run touch "$HOME/.local/state/serpantinum/first_launch.done"
 
+# Letra de las apps GTK al 90 %, a tono con el shell más compacto (1.2). Si no hay sesión de
+# D-Bus todavía, se salta sin error.
+if command -v gsettings >/dev/null; then
+  run gsettings set org.gnome.desktop.interface text-scaling-factor 0.9 2>/dev/null || true
+fi
+
 # Terminal (kitty) con los colores que genera matugen a partir del fondo.
 [[ -e "$HOME/.config/kitty/kitty.conf" ]] || copiar_config "$serpantinum/config/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 
