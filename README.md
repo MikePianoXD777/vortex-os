@@ -51,12 +51,17 @@ El teclado que eliges en el instalador se aplica también al escritorio del live
 y la frase de cifrado se escriban con el teclado que vas a usar (el instalador abre con **latam** si el
 idioma es el español de Latinoamérica), y el shell queda en el idioma del sistema que elegiste.
 
-> **Secure Boot:** la ISO y el sistema instalado todavía no están firmados (no llevan shim ni kernel
-> firmado), así que con Secure Boot activo el firmware los rechaza («Security Violation», «Access
-> Denied»). **Desactívalo en la BIOS/UEFI antes de arrancar la ISO** (suele estar en Seguridad o
-> Arranque; se entra con F2, F10, F12, Supr o Esc al encender, y en algunas laptops con un botón
-> aparte). Si el live llega a abrirse con Secure Boot activo (p. ej. desde Ventoy), el instalador lo
-> avisa antes de tocar el disco. Firmarlo (shim + llave propia) sigue pendiente.
+> **Secure Boot, sin tocar la BIOS:** la ISO arranca con shim (firmado por Microsoft, como Fedora y
+> Ubuntu). La primera vez que arranca el USB con Secure Boot activo sale **MokManager** (pantalla
+> azul): «Enroll key from disk» → ARCHISO_EFI → EFI → `vortexines.cer` → Continue → Yes → Reboot.
+> Al instalar, cada PC recibe su propia llave (`/etc/vortex/secureboot`, solo root) con la que se
+> firman systemd-boot y los kernels, también en cada actualización (hook de pacman). En el primer
+> arranque, MokManager pide aceptarla una vez: Enroll MOK → Continue → Yes → `1234` → Reboot. Estado:
+> `sudo vortex-firmar estado`. Si activas Secure Boot después de instalar: `sudo vortex-firmar inscribir`.
+>
+> **Junto a Windows (dual boot):** la guía paso a paso para quien nunca ha instalado Linux está en
+> [docs/guia-dual-boot.md](docs/guia-dual-boot.md). Desde Vortexine's, «Reiniciar en Windows» (o
+> `vortex windows`) entra una vez a Windows.
 
 ```bash
 iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
