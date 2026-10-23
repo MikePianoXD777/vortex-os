@@ -104,6 +104,9 @@ Necesitas:
   3. **Yes**.
   4. Contraseña: **1234**.
   5. **Reboot**.
+- Si en vez de eso dice «Verification failed» y abre MokManager sin «Enroll MOK»: **Enroll key from
+  disk** → la partición de 1 GB → **EFI** → **vortex-os** → **llave-de-esta-pc.cer** → Continue → Yes →
+  Reboot.
 - Arranca **Vortexine's OS**. Los drivers de la NVIDIA ya se instalaron solos. Si no había
   internet, se instalan solos la primera vez que haya red, y te avisa que reinicies.
 

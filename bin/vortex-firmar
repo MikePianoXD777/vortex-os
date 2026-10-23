@@ -98,6 +98,9 @@ preparar() {
   done
   install -m 644 "$SHIM/shimx64.efi" "$ESP/EFI/vortex-os/shimx64.efi"
   install -m 644 "$SHIM/shimx64.efi" "$ESP/EFI/BOOT/BOOTX64.EFI"
+  # El certificado (público) a la vista en la partición EFI: si MokManager sale sin la petición
+  # (p. ej. se activó Secure Boot después), «Enroll key from disk» → EFI → vortex-os → este archivo.
+  install -m 644 "$LLAVE/MOK.cer" "$ESP/EFI/vortex-os/llave-de-esta-pc.cer"
   firmar || return 1
   # Entrada de arranque «Vortexine's OS» → shim, la primera en el orden.
   if [[ -z "$RAIZ" ]] && command -v efibootmgr >/dev/null; then
