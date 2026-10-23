@@ -1,0 +1,126 @@
+/* Miku: ventana transparente. Lo único opaco es el personaje y las tarjetas de cristal. Los colores salen
+   de la paleta del fondo de pantalla (Python los pone con miku.tema(); aquí van los de Vortexine's de
+   respaldo) y las esquinas son de 18 px, como en el resto de las apps de Vortexine's. */
+:root {
+  --cristal: rgba(11, 13, 26, 0.90);
+  --campo: #161a36;
+  --borde: #232850;
+  --borde-campo: #2c3366;
+  --texto: #e8ebff;
+  --tenue: #a3aad6;
+  --acento: #9ec5ff;
+  --acento-hover: #b8d6ff;
+  --sobre-acento: #0b0d1a;
+  --relleno: #1f2552;
+  --rojo: #ff9db0;
+  --radio: 18px;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--texto);
+  font: 14px/1.45 "Google Sans Flex", "Noto Sans", "Cantarell", system-ui, sans-serif;
+  user-select: none; -webkit-user-select: none;
+}
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: transparent; }
+[hidden] { display: none !important; }
+
+.tarjeta {
+  background: var(--cristal); border: 1px solid var(--borde); border-radius: var(--radio);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+
+/* Botones de arriba a la derecha */
+#barra { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; z-index: 5; }
+#barra button {
+  width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 1px solid var(--borde);
+  background: var(--cristal); color: var(--tenue); cursor: pointer; display: grid; place-items: center;
+}
+#barra button:hover { color: var(--texto); border-color: var(--borde-campo); }
+#barra svg, #mic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Globo de texto, arriba */
+#globo {
+  position: absolute; top: 50px; left: 16px; right: 16px; max-height: 210px; padding: 12px 14px 12px;
+  overflow-y: auto; user-select: text; -webkit-user-select: text;
+}
+#globo::after {         /* colita hacia el personaje */
+  content: ""; position: absolute; bottom: -8px; left: 50%; width: 0; height: 0; transform: translateX(-50%);
+  border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 9px solid var(--cristal);
+}
+#tu { color: var(--tenue); font-size: 12px; margin-bottom: 4px; font-style: italic; }
+#tu:empty { display: none; }
+#texto { white-space: pre-wrap; word-wrap: break-word; }
+#texto.aviso { color: var(--tenue); }
+#texto.pensando::after { content: "…"; animation: parpadeo 1s steps(3, end) infinite; }
+#globo::-webkit-scrollbar { width: 6px; }
+#globo::-webkit-scrollbar-thumb { background: var(--borde-campo); border-radius: 3px; }
+
+/* Primera vez: bajando la voz y el oído (progreso) */
+#prep { margin-top: 8px; }
+#prep-titulo { color: var(--texto); }
+#prep-barra { height: 8px; margin: 8px 0 4px; border-radius: 4px; background: var(--relleno); overflow: hidden; }
+#prep-relleno { height: 100%; width: 0; border-radius: 4px; background: var(--acento); transition: width 200ms linear; }
+#prep-detalle { color: var(--tenue); font-size: 12px; }
+
+/* Botones bajo la respuesta (Activar Claude, Iniciar sesión) */
+#acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+#acciones button {
+  height: 34px; padding: 0 16px; border: 0; border-radius: 16px; background: var(--acento); color: var(--sobre-acento);
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+#acciones button:hover { background: var(--acento-hover); }
+
+/* Crédito del modelo (la licencia del modelo pide crédito) */
+#credito {
+  position: absolute; top: 48px; left: 16px; right: 16px; padding: 12px 14px; font-size: 12px; color: var(--tenue);
+  white-space: pre-wrap; word-break: break-word; user-select: text; -webkit-user-select: text; z-index: 4; max-height: 330px; overflow-y: auto;
+}
+
+/* Cuando no hay modelo 3D */
+#sin-modelo { position: absolute; left: 16px; right: 16px; bottom: 150px; padding: 14px; text-align: center; color: var(--tenue); }
+#sin-modelo code { color: var(--acento); font-size: 12px; user-select: text; -webkit-user-select: text; }
+
+/* Abajo: estado, escribir y micrófono */
+#abajo { position: absolute; left: 16px; right: 16px; bottom: 10px; }
+#estado {
+  display: inline-flex; align-items: center; gap: 8px; padding: 3px 11px 3px 9px; margin-bottom: 6px; border-radius: 999px;
+  background: var(--cristal); border: 1px solid var(--borde); font-size: 12px; color: var(--tenue);
+}
+#punto { width: 9px; height: 9px; border-radius: 50%; background: var(--tenue); }
+#estado.escuchando { color: var(--texto); }
+#estado.escuchando #punto { background: var(--rojo); animation: latido 1.1s ease-in-out infinite; }
+#estado.transcribiendo #punto, #estado.pensando #punto, #estado.viendo #punto { background: var(--acento); animation: latido 0.8s ease-in-out infinite; }
+#estado.hablando #punto { background: var(--acento); }
+
+#form { display: flex; gap: 8px; align-items: center; }
+#entrada {
+  flex: 1; height: 42px; padding: 0 14px; border-radius: 20px; border: 1px solid var(--borde-campo); background: var(--campo);
+  color: var(--texto); font: inherit; outline: none; user-select: text; -webkit-user-select: text;
+}
+#entrada::placeholder { color: var(--tenue); }
+#entrada:focus { border-color: var(--acento); }
+
+#mic {
+  position: relative; width: 42px; height: 42px; padding: 0; border-radius: 50%; border: 1px solid var(--borde);
+  background: var(--campo); color: var(--texto); cursor: pointer; display: grid; place-items: center; flex: none;
+}
+#mic:hover { border-color: var(--acento); }
+#mic.activo { background: var(--rojo); border-color: var(--rojo); color: var(--sobre-acento); }
+#anillo {      /* crece con el volumen del micrófono */
+  position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--rojo); opacity: 0;
+  transform: scale(calc(1 + var(--nivel, 0) * 0.45)); transition: transform 60ms linear, opacity 120ms;
+}
+#mic.activo #anillo { opacity: 0.8; }
+
+#pie-caja { margin-top: 5px; text-align: center; }
+#pie {      /* el crédito del modelo, pequeño pero legible sobre cualquier fondo */
+  display: inline-block; padding: 1px 9px; border-radius: 8px; font-size: 10px; color: var(--tenue);
+  background: var(--cristal); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#pie:empty { display: none; }
+
+@keyframes latido { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+@keyframes parpadeo { 0% { opacity: 0.2; } 100% { opacity: 1; } }

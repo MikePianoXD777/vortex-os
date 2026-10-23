@@ -1,0 +1,46 @@
+Miku, la asistente de voz de Vortexine's OS: créditos y licencias
+==================================================================
+
+La app (vortex-miku) es parte de Vortexine's OS y va con la licencia del proyecto (MIT).
+Usa, sin modificarlas, las piezas de abajo. Los textos completos de las licencias están en
+/usr/share/licenses/vortex-miku/ (y la de la voz, también junto a sus pesos).
+
+Modelo 3D «MIKU NAKANO»
+  Autor: Vewertyg (VRoid Hub). Crédito obligatorio, sin uso comercial (personal ni corporativo),
+  sin expresión sexual; se permite modificarlo y redistribuirlo. El crédito exacto va en el archivo
+  CREDITO.txt que acompaña al modelo y se ve en la ventana de Miku (botón de información).
+  El modelo no forma parte del código: no está en el repositorio, lo pone la ISO en
+  /usr/share/vortex-miku/modelo/ (o tú con «vortex-miku modelo RUTA.vrm»).
+
+Voz: Supertonic 3 (voz preestablecida F1)
+  Supertone Inc. (https://huggingface.co/Supertone/supertonic-3).
+  Los pesos del modelo están bajo la licencia BigScience OpenRAIL-M (BigScience-OpenRAIL-M.txt):
+  se pueden usar, modificar y redistribuir, pero la licencia obliga a trasladar sus restricciones de
+  uso a quien reciba el modelo y a entregarle una copia de la licencia. Resumen de lo que NO se
+  puede hacer con la voz (el Anexo A manda): violar leyes; dañar o explotar a menores; difundir
+  información falsa para dañar a otros ni datos personales que sirvan para dañar a alguien;
+  presentar contenido generado por una máquina sin decir que lo es; difamar o acosar; suplantar o
+  intentar suplantar a una persona sin su consentimiento (deepfakes); tomar decisiones totalmente
+  automáticas que perjudiquen los derechos de una persona; discriminar; aprovecharse de grupos
+  vulnerables; dar consejo médico o interpretar resultados médicos; usarla en justicia,
+  policía, migración o asilo. Miku es una asistente de IA y su voz es una voz preestablecida del
+  modelo, no la de una persona real.
+  El motor de inferencia de la app es un port compacto de supertonic-py 1.3.1 (licencia MIT,
+  © 2025 Supertone Inc.: supertonic-MIT.txt).
+  Los modelos no vienen en la ISO: se bajan la primera vez que abres a Miku (~560 MB) desde
+  Hugging Face, fijados a un commit y comprobados con sha256.
+
+Oído: Whisper
+  Modelo Whisper small cuantizado (ggml-small-q5_1) de OpenAI (licencia MIT), convertido a ggml por
+  Georgi Gerganov (https://huggingface.co/ggerganov/whisper.cpp). Se ejecuta con whisper.cpp
+  (licencia MIT, © The ggml authors: whisper.cpp-MIT.txt), del paquete whisper-cpp de Arch.
+  Todo el reconocimiento se hace en tu computadora; el audio no se guarda ni se manda a ningún lado.
+
+Cerebro: Claude
+  Claude (Anthropic) por tu propia cuenta, con Claude Code (viene apagado: se activa con
+  «vortex claude activar»). Miku solo puede usar las herramientas de «vortex» para MIRAR (pantalla,
+  ventanas, estado del sistema); no puede ejecutar nada.
+
+3D en pantalla
+  three.js (licencia MIT, © three.js authors: three.js-MIT.txt) y @pixiv/three-vrm (licencia MIT,
+  © pixiv Inc.: three-vrm-MIT.txt), dentro de QtWebEngine (Qt, LGPL).
