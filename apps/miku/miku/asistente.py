@@ -444,6 +444,8 @@ class Asistente(QObject):
             for frase in self.divisor.alimentar(datos["delta"]):
                 self._decir(frase)
         elif tipo in ("bloque_fin", "herramienta"):
+            if self._acumulado and not self._acumulado.endswith((" ", "\n")):
+                self._acumulado += " "            # entre un bloque de texto y el siguiente («Déjame ver.» y lo que ve)
             resto = self.divisor.vaciar()
             if resto:
                 self._decir(resto)

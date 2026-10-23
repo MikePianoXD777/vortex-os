@@ -7,6 +7,7 @@
   vortex-miku estado          avatar=on|off y abierta=si|no
   vortex-miku modelo RUTA.vrm usa otro modelo 3D (un VRM)
   vortex-miku voz [ID]        sin ID lista las voces; con ID elige una (si hace falta, baja su archivito)
+  vortex-miku licencias       créditos y licencias (el modelo 3D, la voz, el oído, three.js)
   vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
   vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
 
@@ -363,6 +364,12 @@ def main(argv: list[str]) -> int:
         return orden_voz(args)
     if orden == "preparar":
         return orden_preparar()
+    if orden in ("licencias", "creditos", "créditos"):
+        try:
+            print((rutas.LICENCIAS / "CREDITOS.txt").read_text(encoding="utf-8"))
+        except OSError:
+            return error("no encuentro el archivo de créditos. Reinstala vortex-miku.")
+        return 0
     if orden == "decir":
         return orden_decir(args)
     return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)

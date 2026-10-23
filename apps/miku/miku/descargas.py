@@ -17,6 +17,8 @@ import hashlib
 import json
 import os
 import shutil
+import socket
+import ssl
 import threading
 import time
 import urllib.error
@@ -265,11 +267,21 @@ class Descarga:
 
 
 def _resumen_error(e: Exception) -> str:
+    """Por qué falló, en pocas palabras y en español (nunca el texto crudo del sistema)."""
     if isinstance(e, urllib.error.HTTPError):
         return f"el servidor respondió {e.code}"
-    if isinstance(e, urllib.error.URLError):
-        return str(e.reason)[:80]
-    return type(e).__name__
+    causa = e.reason if isinstance(e, urllib.error.URLError) else e
+    if isinstance(causa, socket.gaierror):
+        return "no encuentro el servidor"
+    if isinstance(causa, (TimeoutError, socket.timeout)):
+        return "el servidor tardó demasiado"
+    if isinstance(causa, ConnectionRefusedError):
+        return "el servidor rechazó la conexión"
+    if isinstance(causa, (ConnectionError, ssl.SSLError)):
+        return "se cortó la conexión"
+    if isinstance(causa, str) and causa.startswith("redirección"):
+        return causa
+    return "sin conexión"
 
 
 def bajar_archivo(paquete_dest: Path, a: dict, progreso=None) -> None:

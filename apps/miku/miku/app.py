@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from miku import config, rutas  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "1.3.0"
+APP_ID = "vortex-miku"       # el app_id/clase de Wayland: lo que casan las reglas de Hyprland (class = "vortex-miku")
 
 
 def tomar_candado():
@@ -71,6 +72,18 @@ def crear(cfg: dict, avatar: bool, nota: str, modelo: Path | None):
     return asistente, ventana, cerrar
 
 
+def crear_aplicacion():
+    """La QApplication con el app_id correcto. setDesktopFileName tiene que ir ANTES de crearla: es de donde sale la clase de Wayland."""
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtWidgets import QApplication
+
+    QGuiApplication.setDesktopFileName(APP_ID)
+    app = QApplication(sys.argv[:1])
+    app.setApplicationName(APP_ID)
+    app.setQuitOnLastWindowClosed(True)
+    return app
+
+
 def main() -> int:
     candado = tomar_candado()
     if candado is None:
@@ -81,14 +94,8 @@ def main() -> int:
         # QtWebEngine tiene que importarse antes de crear la QApplication.
         from PySide6 import QtWebEngineWidgets  # noqa: F401
     from PySide6.QtCore import QTimer
-    from PySide6.QtGui import QGuiApplication
-    from PySide6.QtWidgets import QApplication
 
-    # El app_id de Wayland sale de aquí: es lo que casan las reglas de Hyprland (class = "vortex-miku").
-    QGuiApplication.setDesktopFileName("vortex-miku")
-    app = QApplication(sys.argv[:1])
-    app.setApplicationName("vortex-miku")
-    app.setQuitOnLastWindowClosed(True)
+    app = crear_aplicacion()
 
     modelo = rutas.ruta_modelo(cfg) if avatar else None
     asistente, ventana, cerrar = crear(cfg, avatar, nota, modelo)

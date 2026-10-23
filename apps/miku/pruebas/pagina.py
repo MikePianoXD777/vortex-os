@@ -21,8 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PySide6 import QtWebEngineWidgets  # noqa: E402,F401  (antes de crear la QApplication)
 from PySide6.QtGui import QImage  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtGui import QGuiApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402,F401
 
+from miku import app as miku_app  # noqa: E402
 from miku import rutas  # noqa: E402
 from miku.ui_avatar import VentanaAvatar  # noqa: E402
 from pruebas.falso import AsistenteFalso  # noqa: E402
@@ -40,7 +42,8 @@ def main() -> int:
         if not cond:
             fallos.append(nombre)
 
-    app = QApplication(sys.argv[:1])
+    app = miku_app.crear_aplicacion()
+    comprobar("el app_id de Wayland es «vortex-miku» (lo que casan las reglas de Hyprland)", QGuiApplication.desktopFileName() == "vortex-miku", QGuiApplication.desktopFileName())
     asistente = AsistenteFalso()
     cerrado = []
     # En el modo «sin-modelo» se prueba además la escala de la interfaz (general.uiScale = 0.85).
@@ -236,4 +239,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     codigo = main()
+    sys.stdout.flush()
     os._exit(codigo)   # QtWebEngine tarda en cerrar sus procesos; la prueba ya terminó

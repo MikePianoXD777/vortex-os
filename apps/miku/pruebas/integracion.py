@@ -41,8 +41,7 @@ def main() -> int:
     cfg = config.cargar()
     cfg["seguir_escuchando"] = False
     avatar = modo == "avatar"
-    QGuiApplication.setDesktopFileName("vortex-miku")
-    app = QApplication(sys.argv[:1])
+    app = miku_app.crear_aplicacion()
     modelo = rutas.ruta_modelo(cfg) if avatar else None
     asistente, ventana, cerrar = miku_app.crear(cfg, avatar, "", modelo)
     t0 = time.monotonic()
