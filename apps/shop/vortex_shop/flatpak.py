@@ -195,6 +195,7 @@ class _TransaccionGi:
         self.pesos = {}
         self.total = 1.0
         self.hecho = 0.0
+        self.num_op = 0             # cuántas operaciones van empezadas (app, runtime, extensiones)
         self.error = None
         self.tr = gi[0].Transaction.new_for_installation(instalacion, None)
         self.tr.set_no_interaction(True)
@@ -220,13 +221,22 @@ class _TransaccionGi:
     def _fraccion(self, ref, fraccion):
         return min(99, int((self.hecho + self.pesos.get(ref, 1.0) * fraccion) / self.total * 100))
 
+    def _preparando(self):
+        # La primera pieza dice «Preparando…»; las siguientes (runtime, extensiones) dicen en cuál
+        # va, para que el texto no regrese a «Preparando…» a mitad de la instalación.
+        total = len(self.pesos)
+        if self.num_op <= 1 or total <= 1:
+            return "Preparando…"
+        return "Instalando %d de %d…" % (self.num_op, total)
+
     def _al_empezar(self, tr, op, progreso):
         ref = op.get_ref()
+        self.num_op += 1
         quitando = op.get_operation_type() == self.gi[0].TransactionOperationType.UNINSTALL
         if quitando:
             self.avance(self._fraccion(ref, 0), "Quitando…")
         else:
-            self.avance(self._fraccion(ref, 0), "Preparando…")
+            self.avance(self._fraccion(ref, 0), self._preparando())
         try:
             progreso.set_update_frequency(250)
         except Exception:       # noqa: BLE001
@@ -236,7 +246,7 @@ class _TransaccionGi:
             if quitando:
                 return
             if prog.get_is_estimating():
-                self.avance(self._fraccion(ref, 0), "Preparando…")
+                self.avance(self._fraccion(ref, 0), self._preparando())
                 return
             por_ciento = prog.get_progress()
             if por_ciento >= 100:
