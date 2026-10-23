@@ -15,6 +15,15 @@ QLabel, QCheckBox, QRadioButton, QGroupBox {
 #sidebarApp, #sidebarMenuApp, #logoApp {
     background-color: #11142a;
 }
+/* Diapositivas: sin marco claro alrededor. */
+#slideshow, QQuickWidget {
+    background-color: #0b0d1a;
+}
+/* Leyendas bajo la barra de particiones (las pinta el propio widget con el color del texto). */
+PartitionLabelsView, PartitionBarsView, PartitionPage, PartitionViewStep {
+    color: #e8ebff;
+    background-color: transparent;
+}
 QToolTip {
     background-color: #161a36;
     color: #e8ebff;

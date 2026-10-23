@@ -42,7 +42,14 @@ secure_boot_activo() {
 if secure_boot_activo; then
   aviso_sb="Secure Boot está activado y Vortexine's OS lo soporta, sin tocar la BIOS. Al terminar y reiniciar saldrá una pantalla azul (MokManager) una sola vez: elige «Enroll MOK», luego «Continue», «Yes», escribe 1234 y elige «Reboot»."
   echo "vortex-instalador: $aviso_sb" >&2
-  notify-send -u critical -t 0 -a "Vortexine's OS" "Secure Boot" "$aviso_sb" 2>/dev/null || true
+  # El servidor de notificaciones (el shell) puede tardar en aparecer después del escritorio: se
+  # reintenta en segundo plano hasta 90 s, sin retrasar el instalador.
+  (
+    for _ in $(seq 45); do
+      notify-send -u critical -t 0 -a "Vortexine's OS" "Secure Boot" "$aviso_sb" 2>/dev/null && exit 0
+      sleep 2
+    done
+  ) &
 fi
 
 # En español por defecto (el live usa LANG=C.UTF-8); en la primera pantalla se elige otro idioma.
