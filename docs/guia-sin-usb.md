@@ -242,8 +242,16 @@ Ya no se necesita la partición de 6 GB:
 
 - **Windows pide la clave de BitLocker:** escríbela (la guardaste en el paso 1). Pasa a veces al
   cambiar el arranque.
-- **«Reducir volumen» deja menos espacio del que pediste:** Windows no puede mover algunos archivos.
-  Reduce lo que deje (si son al menos 60 GB, alcanza) y ajusta los números.
+- **«Reducir volumen» deja menos espacio del que pediste:** Windows no puede mover algunos archivos
+  (casi siempre puntos de restauración). Prueba esto, en «Símbolo del sistema» como administrador,
+  y reinicia:
+  - `vssadmin delete shadows /for=C: /all /quiet` (borra los puntos de restauración);
+  - `powercfg /h off` (apaga la hibernación; después se regresa con `powercfg /h on`).
+
+  **No quites el archivo de paginación** (memoria virtual): en una HP Victus eso dejó a Windows sin
+  poder usar el PIN al reiniciar. Si aun así no deja reducir lo suficiente (al menos 60 GB), es
+  mejor conseguir una USB o una microSD de 8 GB y usar la guía con USB
+  ([guia-dual-boot.md](guia-dual-boot.md)).
 - **No aparece «FAT32» al formatear:** el tamaño debe ser de 32 GB o menos (aquí son 6 GB).
 - **En el paso 5 sale «Acceso denegado»:** el «Símbolo del sistema» no está como administrador.
 - **Quiero quitar Vortexine's:**
