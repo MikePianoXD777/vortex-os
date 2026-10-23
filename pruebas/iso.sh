@@ -98,6 +98,148 @@ if u.get("doAutologin") is not False:
     mal.append("users_vortex.conf: la casilla debe empezar sin marcar (doAutologin: false)")
 if u.get("autologinGroup") != "autologin":
     mal.append("users_vortex.conf: autologinGroup debe ser autologin")
+
+# --- Instalación con pacman: orden de los pasos, actualización completa y espejos de CachyOS ---
+import tempfile, stat, shlex
+cal = raiz + "/iso/airootfs/etc/calamares"
+def cargar(n):
+    return yaml.safe_load(open(f"{cal}/{n}", encoding="utf-8"))
+def comandos(n):
+    # (comando, ¿lleva «-»?) de cada línea del script, con el «-» ya quitado (como hace Calamares).
+    out = []
+    for it in cargar(n)["script"]:
+        c = it["command"] if isinstance(it, dict) else it
+        out.append((c[1:] if c.startswith("-") else c, c.startswith("-")))
+    return out
+# Calamares sustituye todo «$nombre» y «${nombre}» de los comandos de shellprocess (también entre
+# comillas simples) y, si no conoce la variable, el paso entero falla sin correr nada: solo
+# ${ROOT}, ${USER} y ${gs[...]} son suyas.
+for f in sorted(glob.glob(raiz + "/iso/airootfs/etc/calamares/modules/shellprocess_*.conf")):
+    for c, _ in comandos(os.path.relpath(f, cal)):
+        for v in re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)", c):
+            if v not in ("ROOT", "USER", "gs"):
+                mal.append(f"{os.path.basename(f)}: usa ${v}, que Calamares no conoce (el paso fallaría)")
+st = cargar("settings.conf")
+ejec = next(x["exec"] for x in st["sequence"] if "exec" in x)
+for paso in ("shellprocess@vortex-pacman", "shellprocess@vortex-actualizar", "packages@vortex", "shellprocess@vortex-final"):
+    if paso not in ejec:
+        mal.append(f"settings.conf: falta {paso} en la secuencia exec")
+if all(p in ejec for p in ("shellprocess@vortex-pacman", "shellprocess@vortex-actualizar", "packages@vortex")):
+    if not ejec.index("shellprocess@vortex-pacman") < ejec.index("shellprocess@vortex-actualizar") < ejec.index("packages@vortex"):
+        mal.append("settings.conf: el orden tiene que ser vortex-pacman, vortex-actualizar, packages@vortex")
+inst = [i for i in st["instances"] if i["id"] == "vortex-actualizar"]
+if len(inst) != 1 or inst[0]["module"] != "shellprocess" or not os.path.exists(f"{cal}/modules/{inst[0]['config']}"):
+    mal.append("settings.conf: la instancia vortex-actualizar (shellprocess) debe existir y apuntar a un archivo real")
+if cargar("modules/packages_vortex.conf").get("update_db") is not False:
+    mal.append("packages_vortex.conf: update_db debe ser false (el -Sy a secas es una actualización parcial; sincroniza vortex-actualizar)")
+# Ningún script de shellprocess usa ${...} que Calamares no conozca (si falta, falla todo el paso).
+for f in sorted(glob.glob(cal + "/modules/shellprocess_vortex-*.conf")):
+    for c, _ in comandos("modules/" + os.path.basename(f)):
+        for v in re.findall(r"\$\{([^}]*)\}", c):
+            if v not in ("ROOT", "USER") and not v.startswith("gs["):
+                mal.append(f"{os.path.basename(f)}: ${{{v}}} no lo sustituye Calamares")
+
+def correr(cmd, path, **kw):
+    env = dict(os.environ, PATH=path)
+    return subprocess.run(["/bin/sh", "-c", cmd], capture_output=True, text=True, env=env, **kw)
+
+# vortex-actualizar: dentro del disco nuevo, tolerante, solo con red, llaveros y después -Syu.
+act = cargar("modules/shellprocess_vortex-actualizar.conf")
+if act.get("dontChroot") is not False:
+    mal.append("shellprocess_vortex-actualizar.conf: tiene que correr en el chroot (dontChroot: false)")
+(cmd_act, tolerante), = comandos("modules/shellprocess_vortex-actualizar.conf")
+if not tolerante:
+    mal.append("vortex-actualizar: el comando debe llevar «-» (que un fallo de red no aborte la instalación)")
+with tempfile.TemporaryDirectory() as t:
+    bin_ = t + "/bin"; os.mkdir(bin_)
+    def falso(nombre, cuerpo):
+        open(f"{bin_}/{nombre}", "w").write("#!/bin/sh\n" + cuerpo + "\n")
+        os.chmod(f"{bin_}/{nombre}", 0o755)
+    log = t + "/llamadas.log"
+    falso("pacman", f'echo "pacman $*" >>{log}; [ -z "$PACMAN_FALLA_PRIMERO" ] || [ "$1" != -Sy ]')
+    for red, falla_primero, esperado in (
+        (0, "", ["pacman -Sy --noconfirm --noprogressbar --needed archlinux-keyring cachyos-keyring", "pacman -Syu --noconfirm --noprogressbar"]),
+        (0, "1", ["pacman -Sy --noconfirm --noprogressbar --needed archlinux-keyring cachyos-keyring", "pacman -Syu --noconfirm --noprogressbar"]),
+        (1, "", []),
+    ):
+        falso("curl", f'echo "curl $*" >>{log}; exit {red}')
+        open(log, "w").close()
+        r = subprocess.run(["/bin/sh", "-c", cmd_act], capture_output=True, text=True,
+                           env=dict(os.environ, PATH=bin_ + ":/usr/bin:/bin", PACMAN_FALLA_PRIMERO=falla_primero))
+        llamadas = [l for l in open(log).read().splitlines() if not l.startswith("curl")]
+        if llamadas != esperado:
+            mal.append(f"vortex-actualizar (red={'sí' if red == 0 else 'no'}, falla el 1.º={bool(falla_primero)}): pacman recibió {llamadas!r}, esperaba {esperado!r}")
+        if red == 1 and r.returncode != 0:
+            mal.append("vortex-actualizar sin red: debe salir bien sin hacer nada")
+
+# vortex-pacman: cdn.cachyos.org y mirror.cachyos.org primero en las tres listas de CachyOS.
+LISTA = """## CDN77 (World Wide Datacenters)
+Server = https://cdn77.cachyos.org/repo/$ARCH/$repo
+## Rerouted to mirror
+# Server = https://cdn.cachyos.org/repo/$ARCH/$repo
+## Germany, disabled due Netcup issues:
+# Server = https://mirror.cachyos.org/repo/$ARCH/$repo
+## USA Mirror much thanks to corpdecker!
+Server = https://us.cachyos.org/repo/$ARCH/$repo
+Server = https://mirror.lesviallon.fr/cachy/repo/$ARCH/$repo
+"""
+def local(c, t):
+    # El comando de Calamares, con ${ROOT} = t y el script del repo en vez del de la imagen.
+    return c.replace("${ROOT}", shlex.quote(t)).replace("/usr/local/bin/vortex-post-instalacion",
+        shlex.quote(raiz + "/iso/airootfs/usr/local/bin/vortex-post-instalacion"))
+cmds = [c for c, _ in comandos("modules/shellprocess_vortex-pacman.conf") if "vortex-post-instalacion espejos" in c]
+if len(cmds) != 1:
+    mal.append("shellprocess_vortex-pacman.conf: tiene que haber un comando «vortex-post-instalacion espejos ${ROOT}»")
+else:
+    with tempfile.TemporaryDirectory() as t:
+        d = t + "/etc/pacman.d"; os.makedirs(d)
+        arch = {"cachyos-mirrorlist": "arch", "cachyos-v3-mirrorlist": "arch_v3", "cachyos-v4-mirrorlist": "arch_v4"}
+        for n, a in arch.items():
+            open(f"{d}/{n}", "w").write(LISTA.replace("$ARCH", "$" + a))
+        os.chmod(f"{d}/cachyos-mirrorlist", 0o600)
+        ya = "Server = https://cdn.cachyos.org/repo/$arch/$repo\nServer = https://otro.example/x\n"
+        open(f"{d}/otra-cachyos-mirrorlist", "w").write(ya)          # ya con cdn activo: no se toca
+        open(f"{d}/cachyos-mirrorlist-backup", "w").write(LISTA.replace("$ARCH", "$arch"))   # no es una lista
+        open(f"{d}/cachyos-mirrorlist.pacnew", "w").write(LISTA.replace("$ARCH", "$arch"))
+        sin = "Server = https://mirror.example.org/x\n"
+        open(f"{d}/cachyos-sin-cachy-mirrorlist", "w").write(sin)      # ningún espejo de cachyos.org
+        cmd = local(cmds[0], t)
+        r = correr(cmd, "/usr/bin:/bin")
+        if r.returncode != 0:
+            mal.append("espejos de CachyOS: el comando terminó con error: " + r.stderr.strip())
+        for n, a in arch.items():
+            lineas = [l for l in open(f"{d}/{n}").read().splitlines() if l.startswith("Server")]
+            esperado = [f"Server = https://cdn.cachyos.org/repo/${a}/$repo", f"Server = https://mirror.cachyos.org/repo/${a}/$repo",
+                        f"Server = https://cdn77.cachyos.org/repo/${a}/$repo", f"Server = https://us.cachyos.org/repo/${a}/$repo"]
+            if lineas[:4] != esperado:
+                mal.append(f"espejos de CachyOS: {n} quedó con {lineas[:4]!r}")
+            if "# Server = https://mirror.cachyos.org" not in open(f"{d}/{n}").read():
+                mal.append(f"espejos de CachyOS: {n} perdió las líneas comentadas")
+        if stat.S_IMODE(os.stat(f"{d}/cachyos-mirrorlist").st_mode) != 0o600:
+            mal.append("espejos de CachyOS: cambió los permisos de la lista")
+        if open(f"{d}/otra-cachyos-mirrorlist").read() != ya:
+            mal.append("espejos de CachyOS: tocó una lista que ya tenía cdn.cachyos.org activo")
+        if open(f"{d}/cachyos-sin-cachy-mirrorlist").read() != sin:
+            mal.append("espejos de CachyOS: tocó una lista sin ningún espejo de cachyos.org")
+        for n in ("cachyos-mirrorlist-backup", "cachyos-mirrorlist.pacnew"):
+            if open(f"{d}/{n}").read() != LISTA.replace("$ARCH", "$arch"):
+                mal.append(f"espejos de CachyOS: tocó {n}, que no es una lista de espejos")
+        if sorted(os.listdir(d)) != sorted(set(arch) | {"otra-cachyos-mirrorlist", "cachyos-mirrorlist-backup", "cachyos-mirrorlist.pacnew", "cachyos-sin-cachy-mirrorlist"}):
+            mal.append("espejos de CachyOS: dejó archivos temporales: " + repr(sorted(os.listdir(d))))
+        antes = {n: open(f"{d}/{n}").read() for n in os.listdir(d)}
+        r = correr(cmd, "/usr/bin:/bin")
+        if {n: open(f"{d}/{n}").read() for n in os.listdir(d)} != antes:
+            mal.append("espejos de CachyOS: no es idempotente (al repetirlo cambió algo)")
+    # Sin ninguna lista (el chroot no tiene cachyos-mirrorlist): no falla.
+    with tempfile.TemporaryDirectory() as t:
+        os.makedirs(t + "/etc/pacman.d")
+        if correr(local(cmds[0], t), "/usr/bin:/bin").returncode != 0:
+            mal.append("espejos de CachyOS: sin listas debe terminar bien")
+
+# TRIM semanal: en los servicios de Calamares.
+unidades = {u["name"]: u for u in cargar("modules/services-systemd_vortex.conf")["units"]}
+if unidades.get("fstrim.timer", {}).get("action") != "enable" or unidades["fstrim.timer"].get("mandatory") is not False:
+    mal.append("services-systemd_vortex.conf: fstrim.timer debe activarse (action: enable, mandatory: false)")
 print("\n".join(mal))
 sys.exit(1 if mal else 0)
 PY
@@ -109,10 +251,16 @@ if python3 -I -c 'import yaml' 2>/dev/null; then
 elif command -v uv >/dev/null && timeout 90 uv run --no-project --with pyyaml python -I -c 'import yaml' >/dev/null 2>&1; then
   python_yaml=(uv run --no-project --with pyyaml python -I)
 fi
+# sof-firmware (sonido de las laptops Intel con SOF) va en la imagen, como paquete de verdad (no comentado).
+probar "paquetes.txt: lleva sof-firmware" grep -qx 'sof-firmware' "$AQUI/iso/paquetes.txt"
+# fstrim.timer encendido en el preset que construir.sh deja en la imagen (y no solo en un comentario).
+preset_tiene() { sed -n '/10-vortex\.preset" <</,/^PRESET$/p' "$AQUI/iso/construir.sh" | grep -qx "$1"; }
+probar "construir.sh: el preset de la imagen enciende fstrim.timer" preset_tiene 'enable fstrim.timer'
+probar "(y el preset sigue apagando networkd: se está leyendo el bloque correcto)" preset_tiene 'disable systemd-networkd.service'
 if ((${#python_yaml[@]})); then
   yaml_rc=1
   "${python_yaml[@]}" "$T/yaml.py" "$AQUI" >"$T/yaml.out" 2>&1 && yaml_rc=0
-  probar "YAML de Calamares válido; Claude marcado por defecto; paquetes vortex-* existen; casilla de autologin" test "$yaml_rc" -eq 0
+  probar "YAML de Calamares válido; Claude por defecto; paquetes vortex-*; autologin; actualización completa antes de las apps; espejos de CachyOS; fstrim" test "$yaml_rc" -eq 0
   sed 's/^/      /' "$T/yaml.out"
 else
   salto "sin pyyaml (ni uv con red para traerlo): se salta la validación del YAML de Calamares"
@@ -328,7 +476,7 @@ nuevo_pkgbuild() { # nuevo_pkgbuild DIR PKGREL [DEPENDS] [pkgver()]
 }
 armar() { # armar DIR [opciones de makepkg]
   local d="$1"; shift
-  (cd "$d" && PKGDEST="$P/repo" BUILDDIR="$P/build" makepkg -f --nodeps "$@" >/dev/null 2>&1)
+  (cd "$d" && PKGDEST="$P/repo" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps "$@" >/dev/null 2>&1)
 }
 nuevo_pkgbuild "$P/f1" 1; armar "$P/f1"
 probar "mismo PKGBUILD y el repo ya lo tiene: no se recompila" ya_en_repo "$P/f1" "$P/repo"
@@ -339,10 +487,17 @@ nuevo_pkgbuild "$P/f3" 1 bash pkgver
 probar "con pkgver() (paquetes -git) siempre se compila" bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/f3' '$P/repo'"
 mkdir -p "$P/repo-vacio"
 probar "repo sin el archivo: se compila" bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/f1' '$P/repo-vacio'"
+# Un paquete que no salió de la config genérica (de antes, o compilado a mano con el makepkg.conf del
+# constructor: en CachyOS, -march=native) no se reutiliza aunque la versión sea la misma.
+rm -rf "$P/repo5"; mkdir -p "$P/repo5"
+(cd "$P/f1" && PKGDEST="$P/repo5" BUILDDIR="$P/build" PACKAGER="Unknown Packager" makepkg -f --nodeps >/dev/null 2>&1)
+probar "(el paquete de la misma versión compilado con otro packager está en el repo)" test -f "$P/repo5/falso-1.0-1-any.pkg.tar.zst"
+probar "misma versión pero no compilado con la config genérica (packager ajeno): se compila" \
+  bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/f1' '$P/repo5'"
 # Compilado contra una biblioteca que el sistema ya cambió (soname distinto): no se reutiliza.
 rm -rf "$P/repo2"; mkdir -p "$P/repo2"
 nuevo_pkgbuild "$P/f4" 1 "bash libvortex-que-no-existe.so=9-64"
-(cd "$P/f4" && PKGDEST="$P/repo2" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
+(cd "$P/f4" && PKGDEST="$P/repo2" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps >/dev/null 2>&1)
 probar "sus dependencias ya no se cumplen (soname cambiado): se compila" bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/f4' '$P/repo2'"
 
 # El caso real: un makepkg normal NO escribe sonames en el .PKGINFO (solo lo que el PKGBUILD declare,
@@ -370,9 +525,9 @@ if command -v cc >/dev/null && command -v readelf >/dev/null; then
   }
   rm -rf "$P/repo3" "$P/repo4"; mkdir -p "$P/repo3" "$P/repo4"
   elf_pkgbuild "$P/e1" con-biblioteca
-  (cd "$P/e1" && PKGDEST="$P/repo3" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
+  (cd "$P/e1" && PKGDEST="$P/repo3" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps >/dev/null 2>&1)
   elf_pkgbuild "$P/e2"
-  (cd "$P/e2" && PKGDEST="$P/repo4" BUILDDIR="$P/build" makepkg -f --nodeps >/dev/null 2>&1)
+  (cd "$P/e2" && PKGDEST="$P/repo4" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps >/dev/null 2>&1)
   probar "(su .PKGINFO no declara el soname: pacman -T no lo vería)" bash -c "! bsdtar -xOf '$P'/repo4/falso-1.0-1-any.pkg.tar.zst .PKGINFO | grep -q libvortex-prueba"
   probar "(y pacman -T de sus dependencias pasa)" bash -c "bsdtar -xOf '$P'/repo4/falso-1.0-1-any.pkg.tar.zst .PKGINFO | sed -n 's/^depend = //p' | xargs pacman -T >/dev/null"
   probar "pide una biblioteca que trae el propio paquete: no hace falta compilar" bash -c "source '$AQUI/iso/paquetes.sh'; ya_en_repo '$P/e1' '$P/repo3'"
@@ -381,6 +536,61 @@ if command -v cc >/dev/null && command -v readelf >/dev/null; then
 else
   salto "sin compilador de C ni readelf: se salta la prueba de bibliotecas (NEEDED) de ya_en_repo"
 fi
+
+# Compilar para un x86-64 genérico aunque el makepkg.conf del constructor sea el de CachyOS
+# (-march=native, rust.conf con target-cpu=native). Se prueba con makepkg de verdad: un PKGBUILD cuyo
+# build() anota las banderas que recibe, y una config «de CachyOS» fingida (la de este equipo más las
+# banderas nativas al final, escritas de varias formas) para no depender de cómo sea la de quien corra
+# la prueba.
+Mk="$P/mk"; mkdir -p "$Mk/sin-rust" "$Mk/pk"
+cat /etc/makepkg.conf >"$Mk/makepkg.conf"
+cat >>"$Mk/makepkg.conf" <<'MK'
+CFLAGS="-march=native -mtune=native -O3 -pipe \
+        -fstack-clash-protection"
+CXXFLAGS="$CFLAGS -Wp,-D_GLIBCXX_ASSERTIONS"
+MK
+mkdir -p "$Mk/makepkg.conf.d"
+echo 'RUSTFLAGS="-C opt-level=3 -C target-cpu=native"' >"$Mk/makepkg.conf.d/rust.conf"
+echo 'RUSTFLAGS+=" -Ctarget-cpu=x86-64-v3"' >"$Mk/makepkg.conf.d/sobre.conf"
+cat /etc/makepkg.conf >"$Mk/sin-rust/makepkg.conf"
+cat >"$Mk/pk/PKGBUILD" <<'PKG'
+pkgname=falso
+pkgver=1.0
+pkgrel=1
+arch=(any)
+build() { printf '%s\n%s\n%s\n' "$CFLAGS" "$CXXFLAGS" "${RUSTFLAGS:-}" >"$startdir/banderas.txt"; }
+package() { install -Dm644 /dev/null "$pkgdir/usr/share/falso/x"; }
+PKG
+banderas() { # banderas CONFIG [VAR=valor ...]: build() de un paquete con esa config, vía makepkg_generico
+  local conf="$1"; shift
+  rm -rf "$Mk/pk/banderas.txt" "$Mk/pk/out" "$Mk/pk/b"
+  ( cd "$Mk/pk" && env "$@" VORTEX_MAKEPKG_CONF="$conf" PKGDEST="$Mk/pk/out" BUILDDIR="$Mk/pk/b" \
+      bash -c "source '$AQUI/iso/paquetes.sh'; makepkg_generico -f --nodeps" >"$T/mk.out" 2>&1 )
+}
+# Control: con el makepkg normal esa config sí compila para la CPU de quien construye (si no, la
+# prueba de abajo no probaría nada).
+(cd "$Mk/pk" && rm -rf banderas.txt && PKGDEST="$Mk/pk/out0" BUILDDIR="$Mk/pk/b0" makepkg --config "$Mk/makepkg.conf" -f --nodeps >/dev/null 2>&1)
+probar "(control: con la config del constructor, makepkg pasa -march=native y target-cpu=native)" \
+  bash -c "grep -q -- '-march=native' '$Mk/pk/banderas.txt' && grep -q 'target-cpu=native' '$Mk/pk/banderas.txt'"
+banderas "$Mk/makepkg.conf" PACKAGER=Mike
+probar "makepkg_generico compila" test -f "$Mk/pk/banderas.txt"
+probar "CFLAGS y CXXFLAGS: -march=x86-64, sin native ni mtune=native" \
+  bash -c "! grep -qE 'native|x86-64-v' <(sed -n 1,2p '$Mk/pk/banderas.txt') && [[ \$(sed -n 1,2p '$Mk/pk/banderas.txt' | grep -c -- '-march=x86-64 ') == 2 ]]"
+probar "CFLAGS: sigue con el resto de las banderas (-O3, -pipe, stack-clash)" \
+  bash -c "sed -n 1p '$Mk/pk/banderas.txt' | grep -q -- '-O3 -pipe.*-fstack-clash-protection'"
+probar "RUSTFLAGS: target-cpu=x86-64 (sin native ni v3, lo que ponga rust.conf u otro .conf de makepkg.conf.d)" \
+  bash -c "sed -n 3p '$Mk/pk/banderas.txt' | grep -q 'opt-level=3' && ! sed -n 3p '$Mk/pk/banderas.txt' | grep -qE 'native|v3' && sed -n 3p '$Mk/pk/banderas.txt' | grep -q 'target-cpu=x86-64'"
+probar "el paquete lleva el packager genérico aunque quien construye tenga PACKAGER en el entorno" \
+  bash -c "bsdtar -xOf '$Mk/pk/out/falso-1.0-1-any.pkg.tar.zst' .PKGINFO | grep -qx 'packager = $PACKAGER_GENERICO'"
+banderas "$Mk/sin-rust/makepkg.conf" RUSTFLAGS='-C target-cpu=native'
+probar "RUSTFLAGS heredado del entorno: también se vuelve genérico" \
+  bash -c "! sed -n 3p '$Mk/pk/banderas.txt' | grep -q native && sed -n 3p '$Mk/pk/banderas.txt' | grep -q 'target-cpu=x86-64'"
+banderas "$Mk/sin-rust/makepkg.conf" -u RUSTFLAGS
+probar "sin RUSTFLAGS en ninguna parte: queda target-cpu=x86-64 explícito (para que ~/.cargo/config.toml no lo cambie)" \
+  bash -c "grep -qx -- '-C target-cpu=x86-64' <(sed -n 3p '$Mk/pk/banderas.txt')"
+banderas "$Mk/no-existe.conf"
+probar "sin makepkg.conf que leer: falla con un aviso, no compila" bash -c "grep -q 'No puedo leer' '$T/mk.out' && [[ ! -e '$Mk/pk/banderas.txt' ]]"
+rm -rf "$Mk"
 
 # construir_aur de punta a punta con un «AUR» local (repos git) y un solo paquete falso.
 export GIT_AUTHOR_NAME=prueba GIT_AUTHOR_EMAIL=p@p GIT_COMMITTER_NAME=prueba GIT_COMMITTER_EMAIL=p@p

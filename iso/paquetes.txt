@@ -9,6 +9,11 @@ base-devel
 linux
 linux-cachyos
 linux-firmware
+# Las laptops Intel desde ~2019 (Ice Lake, Tiger Lake, Alder Lake, Meteor Lake...) usan SOF: sin su
+# firmware no hay tarjeta de sonido («Dummy Output»). linux-firmware no lo trae ni lo pide por
+# dependencia. install.sh lo instalaba solo con audio Intel; aquí no hay cómo saber el equipo (la
+# imagen es la misma para todos), y para el resto es inofensivo (unos 55 MB).
+sof-firmware
 amd-ucode
 intel-ucode
 mkinitcpio
