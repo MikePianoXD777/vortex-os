@@ -71,6 +71,8 @@ noto-fonts-emoji
 xdg-user-dirs
 firefox
 thunar
+hyprpicker
+btop
 grim
 slurp
 wl-clipboard

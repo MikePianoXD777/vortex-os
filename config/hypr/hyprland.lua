@@ -1,6 +1,7 @@
 -- Vortex OS: config de Hyprland (~/.config/hypr/hyprland.lua).
 -- Carga los módulos de Serpantinum desde el sistema (/usr/share/serpantinum), así sus
--- actualizaciones llegan solas, y encima pone lo de Vortex. Tus cambios van en
+-- actualizaciones llegan solas, y encima pone lo de Vortex: los atajos de teclado
+-- (atajos.lua, al lado de este archivo) y lo demás de este archivo. Tus cambios van en
 -- ~/.config/vortex/hypr-mio.lua (se carga al final y gana sobre todo lo demás).
 local home = os.getenv("HOME")
 local serp = "/usr/share/serpantinum/compositors/hyprland"
@@ -11,28 +12,59 @@ local reemplazados = {
     ["SUPER + A"] = true, -- autohide de la barra → Claude (va a SUPER + SHIFT + A)
     ["SUPER + E"] = true, -- nautilus
 }
+
+-- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
+-- falta o falla, el escritorio arranca igual con los atajos de Serpantinum y un aviso.
+require("config/variables")
+-- Aviso de que los atajos no cargaron. notify-send solo no basta: el servidor de notificaciones
+-- es el propio shell, que arranca en este mismo evento, y si notify-send corre antes falla en
+-- silencio. Por eso el aviso sale primero por Hyprland (no depende del shell) y después por
+-- notify-send, que reintenta hasta que el shell esté arriba. Con un solo renglón del motivo: el
+-- error de require lista todas las rutas probadas.
+local function avisar_atajos(motivo)
+    motivo = tostring(motivo):match("[^\n]*"):gsub("[^%w%s%.:/_%-]", ""):sub(1, 160)
+    local texto = "Vortex: no se pudieron cargar los atajos de ~/.config/hypr/atajos.lua " ..
+        "(prueba vortex configurar-usuario). " .. motivo
+    hl.on("hyprland.start", function()
+        pcall(function() hl.notification.create({ text = texto, timeout = 20000, color = "rgba(ff5555ff)" }) end)
+        hl.exec_cmd("sh -c 'for i in $(seq 1 40); do notify-send -u critical \"Vortex: atajos\" \"" ..
+            texto .. "\" && exit 0; sleep 1; done'")
+    end)
+end
+local ok_atajos, atajos = pcall(require, "atajos")
+-- Con un atajos.lua que no compila, require de Hyprland anota el error y devuelve algo vacío.
+if not (ok_atajos and type(atajos) == "table" and atajos.reemplaza and atajos.registrar) then
+    ok_atajos = false
+    avisar_atajos(atajos)
+    atajos = { reemplaza = function() return false end, registrar = function() end }
+end
+
 local bind_original = hl.bind
 hl.bind = function(teclas, accion, opciones)
-    if reemplazados[teclas] then return end
+    if reemplazados[teclas] or atajos.reemplaza(teclas) then return end
     return bind_original(teclas, accion, opciones)
 end
 
-require("config/variables")
+-- Comando que arranca el shell. Avisos del shell que no son errores: Qt avisa que la app ya
+-- estaba registrada con el portal (el primer registro sí funcionó) y, sin adaptador
+-- Bluetooth, que no existe org.bluez. Se silencian solo esas categorías y solo para el shell.
+-- textinput: al cerrar un panel con un campo de texto, Qt avisa que desactiva la
+-- entrada de texto de una superficie cuando el foco ya pasó a otra («disableSurface
+-- … is focused»); es ruido del protocolo text-input-v3, la escritura funciona igual.
+local function comando_shell()
+    local reglas = "qt.qpa.services.warning=false;qt.qpa.wayland.textinput.warning=false"
+    local bt = io.open("/sys/class/bluetooth/hci0/address")
+    if bt then bt:close() else reglas = reglas .. ";quickshell.dbus.objectmanager.warning=false" end
+    return "QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start"
+end
+if ok_atajos then atajos.comando_shell = comando_shell end
+
 require("config/env")
 -- No se carga config/autostart: activa EasyEffects en cada inicio de sesión.
 hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    -- Avisos del shell que no son errores: Qt avisa que la app ya estaba registrada
-    -- con el portal (el primer registro sí funcionó) y, sin adaptador Bluetooth, que
-    -- no existe org.bluez. Se silencian solo esas categorías y solo para el shell.
-    -- textinput: al cerrar un panel con un campo de texto, Qt avisa que desactiva la
-    -- entrada de texto de una superficie cuando el foco ya pasó a otra («disableSurface
-    -- … is focused»); es ruido del protocolo text-input-v3, la escritura funciona igual.
-    local reglas = "qt.qpa.services.warning=false;qt.qpa.wayland.textinput.warning=false"
-    local bt = io.open("/sys/class/bluetooth/hci0/address")
-    if bt then bt:close() else reglas = reglas .. ";quickshell.dbus.objectmanager.warning=false" end
-    hl.exec_cmd("QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start")
+    hl.exec_cmd(comando_shell())
     -- Primer inicio: pone el primer fondo de Vortex si todavía no hay ninguno.
     hl.exec_cmd("vortex primer-inicio")
     -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
@@ -51,7 +83,9 @@ hl.config({
     ecosystem = { no_update_news = true, no_donation_nag = true },
     -- Los juegos con la regla «immediate» pueden ir sin vsync (menos latencia).
     general = { allow_tearing = true },
-    misc = { font_family = "Sans" },
+    -- allow_session_lock_restore: sin esto Hyprland rechaza el bloqueo nuevo si el shell murió con
+    -- la pantalla bloqueada y Super+Alt+L (recuperar el bloqueo) no puede hacer nada.
+    misc = { font_family = "Sans", allow_session_lock_restore = true },
 })
 
 -- Teclado del sistema (lo guarda el instalador; Serpantinum fija «us»).
@@ -70,5 +104,9 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd("vortex claude"))
 hl.bind("SUPER + SHIFT + A", hl.dsp.event("serpantinum:toggle autohide"))
 hl.bind("SUPER + G", hl.dsp.exec_cmd("vortex modo-juego alternar"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd("thunar"))
+
+-- Atajos de teclado de Mike (atajos.lua).
+local ok_registro, fallo_registro = pcall(atajos.registrar)
+if not ok_registro then avisar_atajos(fallo_registro) end
 
 pcall(dofile, home .. "/.config/vortex/hypr-mio.lua")

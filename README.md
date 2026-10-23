@@ -61,15 +61,101 @@ Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, 
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
 pantalla); en laptops sí.
 
-### Atajos de Vortex
+### Atajos de teclado
+
+Son los mismos que usaba el autor en CachyOS con Caelestia, con cada acción llevada a su equivalente en
+Serpantinum. Viven en `~/.config/hypr/atajos.lua` (junto a `hyprland.lua`); lo tuyo va en
+`~/.config/vortex/hypr-mio.lua`, que se carga al final. Los atajos de Serpantinum que chocaban con estos se
+quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Super+W); los demás siguen igual.
+
+**Shell y paneles**
 
 | Atajo | Qué hace |
 |---|---|
+| Super (solo) / Super+Espacio | lanzador |
+| Super+N | notificaciones |
+| Super+B / Ctrl+Alt+Supr | panel de sistema: bloquear, dormir, hibernar, reiniciar, apagar, cerrar sesión |
+| Super+H | Ajustes |
+| Super+K | calendario, reloj y clima |
+| Super+. | selector de emojis (la pestaña Emojis del lanzador: al elegir uno se copia). El lanzador recuerda la última pestaña: Super abrirá en Emojis hasta que vuelvas a Aplicaciones con Tab |
+| Super+V / Super+Alt+V | historial del portapapeles (Supr borra la entrada elegida) |
+| Ctrl+Alt+V | volumen y dispositivos de audio |
+| Super+Shift+N / Super+Shift+W / Super+Alt+M | red / fondos / música (paneles que cedieron su atajo de siempre) |
+| Super+Shift+A | esconder/mostrar la barra |
+| Ctrl+Alt+C | borrar todas las notificaciones |
+| Super+L | bloquear |
+| Super+Shift+L | dormir: bloquea y suspende (con hibernación diferida si el equipo puede) |
+| Super+Alt+L | recuperar el bloqueo si el shell murió con la pantalla bloqueada |
+| Ctrl+Super+Shift+R / Ctrl+Super+Alt+R | cerrar el shell / reiniciarlo |
+
+**Apps**
+
+| Atajo | Qué hace |
+|---|---|
+| Super+T (o Super+Enter) | terminal (kitty) |
+| Super+W | Firefox |
+| Super+E | archivos (Thunar) |
+| Super+C | editor (Zed) |
 | Super+A | habla con Claude |
 | Super+G | modo juego a mano |
-| Super+Shift+A | esconder/mostrar la barra |
-| Super+E | archivos (Thunar) |
-| Super+S / N / B / M / W / D / H | calendario, red, sistema, música, fondos, lanzador, Ajustes |
+
+**Escritorios**
+
+| Atajo | Qué hace |
+|---|---|
+| Super+1…0 | ir al escritorio 1 a 10 (dentro de su grupo de 10) |
+| Super+Alt+1…0 (o Super+Shift+1…0) | mandar la ventana a ese escritorio (también dentro de su grupo de 10) |
+| Ctrl+Super+←/→, Super+Re Pág/Av Pág, Super+rueda | escritorio anterior/siguiente |
+| Ctrl+Super+1…0 | saltar al mismo escritorio de otro grupo de 10 |
+| Ctrl+Super+Alt+1…0 | mandar la ventana a ese grupo |
+| Ctrl+Super+rueda | grupo anterior/siguiente |
+| Ctrl+Super+Shift+←/→, Super+Alt+Re Pág/Av Pág, Super+Alt+rueda | mandar la ventana al escritorio anterior/siguiente |
+| Super+S | escritorio especial (cajón de ventanas escondidas) |
+| Super+Alt+S o Ctrl+Super+Shift+↑ / Ctrl+Super+Shift+↓ | mandar la ventana al especial / sacarla |
+| Super+M / Super+D / Super+R | especial de música (Spotify) / chat (Discord) / tareas (Todoist): abre la app si hace falta |
+| Ctrl+Shift+Esc | monitor del sistema (btop en un especial) |
+
+**Ventanas**
+
+| Atajo | Qué hace |
+|---|---|
+| Super+flechas / Super+Shift+flechas | enfocar / mover la ventana |
+| Ctrl+Super+↑ / Ctrl+Super+↓ | mover la ventana hacia arriba / abajo (de Serpantinum; Ctrl+Super+←/→ cambian de escritorio) |
+| Super+- / Super+= | achicar / agrandar el ancho |
+| Super+Shift+- / Super+Shift+= | achicar / agrandar el alto |
+| Super+Alt+flechas | achicar y agrandar con las flechas |
+| Super+clic izq. o der., Super+Z / Super+X | mover / redimensionar con el ratón |
+| Super+Q | cerrar |
+| Super+F / Super+Alt+F | pantalla completa / maximizar |
+| Super+Alt+Espacio | flotante o en mosaico |
+| Super+P | fijar en todos los escritorios |
+| `Super+Alt+\` | imagen en imagen (flotante, chica, en la esquina) |
+| `Ctrl+Super+\` / `Ctrl+Super+Alt+\` | centrar / tamaño normal (55 × 70 %) y centrar |
+| Alt+Tab (con Shift, al revés) | ciclar ventanas |
+| Ctrl+Alt+Tab | ciclar los grupos |
+| Super+, / Super+U / Super+Shift+, | agrupar en pestañas / sacar del grupo / bloquear el grupo |
+
+**Capturas, grabación y sonido**
+
+| Atajo | Qué hace |
+|---|---|
+| Impr / Super+Shift+S | captura de una región (se copia y se guarda) |
+| Super+Impr / Alt+Impr | captura de toda la pantalla / de la ventana activa |
+| Shift+Impr / Super+Shift+Impr | región / pantalla completa, abriendo el editor de capturas |
+| Ctrl+Alt+R / Super+Alt+R | grabar la pantalla sin sonido / con el sonido del equipo (otra vez para parar) |
+| Super+Shift+Alt+R | grabar una región |
+| Super+Shift+C | gotero de colores |
+| Teclas de volumen | subir/bajar 10 % (quitan el silencio); Super+Shift+M o la tecla de silencio lo alterna |
+| Ctrl+Super+Espacio / = / - / Retroceso | reproducir-pausar / siguiente / anterior / parar |
+| Ctrl+Shift+Alt+V | escribir lo último del portapapeles (necesita `ydotool` y su servicio) |
+| Super+Alt+F12 | notificación de prueba |
+
+Lo que Caelestia tenía y Vortex no: el «mostrar todos los paneles» (Super+K abre el calendario, que es lo
+más parecido).
+
+Las pruebas de los atajos corren sin VM ni sesión de Hyprland, en una carpeta temporal: `pruebas/atajos.sh`
+(`Hyprland --verify-config`, la lógica de cada atajo con un Hyprland falso, los comandos de shell ejecutados de
+verdad y el respaldo si `atajos.lua` falta o falla). Falta probarlos en una sesión real (VM).
 
 ### Gestor de recursos
 
@@ -145,7 +231,7 @@ bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
 iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
 vm/                  VM de pruebas con QEMU, mediciones y previews
-pruebas/             pruebas que corren sin VM (gestor de recursos)
+pruebas/             pruebas que corren sin VM (gestor de recursos y atajos)
 ```
 
 ## Probar en una máquina virtual
