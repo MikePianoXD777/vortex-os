@@ -4,6 +4,7 @@
 #   vortex-post-instalacion kernel          antes de generar el initramfs
 #   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
 #   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortex OS»)
+#   vortex-post-instalacion inicio-automatico USUARIO   entra solo al escritorio (lo llama «final»)
 #
 # La imagen del USB es Vortex completo, pero trae piezas que solo sirven para arrancar desde
 # el USB (hooks de archiso, el usuario live, el instalador). Aquí se quitan y se hace lo que
@@ -72,7 +73,44 @@ paso_final() {
   if [[ -n "$usuario" ]] && id "$usuario" >/dev/null 2>&1; then
     getent group gamemode >/dev/null && usermod -aG gamemode "$usuario"
   fi
+
+  # --- Inicio de sesión automático, si marcó la casilla de la pantalla «Usuarios» ---
+  paso_inicio_automatico "$usuario"
   log "listo"
+}
+
+# La casilla «Iniciar sesión automáticamente» de Calamares (módulo users) no llega a greetd por
+# sí sola, y shellprocess no puede leerla de forma segura: ${gs[autoLoginUser]} solo existe con la
+# casilla marcada, y una variable que falta hace fallar todo el paso (se cancelaría la instalación
+# de quien no la marcó); los booleanos tampoco se pueden leer con ${gs[...]}. Lo que sí deja es
+# el grupo de users_vortex.conf (autologinGroup): con la casilla marcada, Calamares crea el grupo
+# «autologin» y mete en él a ese usuario; sin marcarla no hace ninguna de las dos cosas. Así que
+# aquí se mira si el usuario es de ese grupo, y entonces greetd (que ya trae vortex-sesion en
+# la sesión normal) recibe un [initial_session] para él. Al cerrar la sesión vuelve tuigreet.
+# Es lo mismo que hace vortex-live para el usuario del live.
+paso_inicio_automatico() {
+  local usuario="${1:-}" grupo="${VORTEX_GRUPO_AUTOLOGIN:-autologin}"
+  local raiz="${VORTEX_RAIZ:-}" cfg tmp
+  cfg="$raiz/etc/greetd/config.toml"
+  [[ -n "$usuario" ]] || return 0
+  getent group "$grupo" >/dev/null 2>&1 || return 0   # nadie marcó la casilla
+  id -nG "$usuario" 2>/dev/null | tr ' ' '\n' | grep -qx -- "$grupo" || return 0
+  # El nombre va dentro de un archivo TOML: solo los caracteres que permite useradd.
+  if [[ ! "$usuario" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+    log "nombre de usuario no válido para greetd ($usuario): no activo el inicio automático"
+    return 1
+  fi
+  if [[ ! -f "$cfg" ]]; then
+    log "no hay $cfg: no activo el inicio automático"
+    return 1
+  fi
+  # Quita un [initial_session] anterior (hasta la siguiente cabecera) y agrega el de este usuario.
+  tmp="$(mktemp)" || return 1
+  awk '/^\[initial_session\][[:space:]]*$/ { salta = 1; next } /^\[/ { salta = 0 } !salta' "$cfg" >"$tmp"
+  printf '\n[initial_session]\ncommand = "vortex-sesion"\nuser = "%s"\n' "$usuario" >>"$tmp"
+  cat "$tmp" >"$cfg"   # cat y no mv: conserva dueño y permisos
+  rm -f "$tmp"
+  log "inicio de sesión automático para $usuario (greetd)"
 }
 
 paso_arranque() {
@@ -120,5 +158,6 @@ case "${1:-}" in
   kernel) paso_kernel ;;
   final) shift; paso_final "$@" ;;
   arranque) paso_arranque ;;
-  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque" >&2; exit 1 ;;
+  inicio-automatico) shift; paso_inicio_automatico "$@" ;;
+  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | inicio-automatico USUARIO" >&2; exit 1 ;;
 esac

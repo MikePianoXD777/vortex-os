@@ -35,12 +35,19 @@ hiciera falta.
 O con la **ISO de Vortex** (en pruebas): arranca en el escritorio de Vortex para probarlo, y el
 instalador gráfico («Instalar Vortex OS», se abre solo) te guía: idioma, teclado, disco y usuario, y
 eliges tus apps y juegos con casillas (Steam, Sober, Prism Launcher, el lanzador de Genshin, Heroic, Zoom,
-Discord, OBS, Vortex Studio...). Se instala sin internet; las apps sí la necesitan.
+Discord, OBS, Vortex Studio...). Se instala sin internet; las apps sí la necesitan. «Claude» (el
+asistente de Super+A) viene marcado: se le instala Claude Code a cada usuario en su primer inicio con
+internet, en segundo plano. Y en la pantalla de usuario hay una casilla para entrar al escritorio sin
+pedir la contraseña.
 
 ```bash
 iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
 sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso y el repo de CachyOS)
 ```
+
+`iso/paquetes.sh` no vuelve a compilar los paquetes del AUR (Calamares tarda ~10 min) si el repo ya tiene esa
+misma versión; `VORTEX_PAQUETES_FORZAR=1` los compila de todos modos. Las piezas de la ISO se prueban sin
+construirla: `pruebas/iso.sh`.
 
 ## Qué trae
 
@@ -206,6 +213,12 @@ vez para enviar. Es el dictado de Claude Code (`/voice`), ya activado en españo
 Claude.ai, la voz se transcribe en los servidores de Anthropic y no gasta tokens. Para cambiar el modo:
 `/voice hold` (mantener Espacio) o `/voice off`.
 
+**Instalar Claude:** `install.sh` lo hace en el paso de Claude. Con la ISO es una casilla del instalador
+(paquete `vortex-claude`, que deja la marca `/etc/vortex/claude`): en el primer inicio de cada usuario,
+`vortex-sesion` corre `vortex claude instalar --al-entrar` en segundo plano; espera a que haya red (si no
+hay, lo reintenta en el próximo inicio) y al terminar avisa con una notificación. A mano:
+`vortex claude instalar`.
+
 ## ¿Cuánto más ligero?
 
 Los objetivos se miden con `vortex bench`, no se prometen a ojo. En la VM se mide con un arranque en frío por
@@ -249,7 +262,7 @@ bin/vortex-gestor    gestor de recursos automático (con src/vortex-eventos.c, s
 bin/vortex-bench     medidor de ligereza
 bin/vortex-otaku     modo otaku (easter egg): fondo de Wallhaven + toque de personalización
 bin/vortex-mcp       servidor MCP para Claude
-iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
+iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]; sus pruebas: pruebas/iso.sh
 vm/                  VM de pruebas con QEMU, mediciones y previews
 pruebas/             pruebas que corren sin VM (gestor de recursos, atajos y modo otaku)
 ```

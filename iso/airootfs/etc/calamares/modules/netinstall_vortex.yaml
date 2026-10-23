@@ -1,6 +1,8 @@
 # Apps y juegos que se eligen en el instalador. Los de los repos se instalan al momento (con
 # internet); los de Flatpak (Sober, Zoom, el lanzador de Genshin, Heroic, Spotify) se bajan
-# en el primer arranque con red (vortex-flatpaks.service). Ninguno gasta RAM si no lo abres.
+# en el primer arranque con red (vortex-flatpaks.service). Claude (vortex-claude) deja una marca
+# y bin/vortex-sesion le instala Claude Code a cada usuario en su primer inicio con red.
+# Ninguno gasta RAM si no lo abres.
 - name: "Juegos"
   description: "Tiendas y lanzadores de juegos"
   expanded: true
@@ -44,6 +46,10 @@
       description: "El editor de video de la Vortex Suite"
       selected: true
       packages: [ vortex-studio ]
+    - name: "Claude (asistente, Super+A, le hablas con el micrófono)"
+      description: "Claude Code integrado al escritorio: Super+A lo abre y le hablas con el micrófono (toca Espacio). Puede ver tu pantalla solo cuando se lo pides y te avisa. Se baja en tu primer inicio de sesión con internet; necesita tu cuenta de Claude"
+      selected: true
+      packages: [ vortex-claude ]
     - name: "Discord"
       description: "Chat de voz y texto"
       selected: false

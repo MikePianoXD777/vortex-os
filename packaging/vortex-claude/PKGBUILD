@@ -1,0 +1,23 @@
+# «Claude» en el instalador gráfico (Super+A; le hablas con el micrófono). El paquete solo deja
+# una marca, /etc/vortex/claude: en el primer inicio de cada usuario, bin/vortex-sesion ve la marca
+# y lanza en segundo plano «vortex claude instalar --al-entrar», que baja Claude Code con red
+# (si no hay, lo reintenta en el próximo inicio), registra el servidor MCP «vortex» y deja la voz
+# en español. Quitar el paquete corta eso para quien no lo haya instalado todavía; no borra el
+# Claude Code que ya tiene cada usuario en su ~/.local/bin.
+pkgname=vortex-claude
+pkgver=1
+pkgrel=1
+pkgdesc='Claude, el asistente de Vortex OS (Super+A, con micrófono): se instala para cada usuario en su primer inicio con red'
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# curl y jq: el instalador de Claude Code y los ajustes de voz; sox: respaldo para grabar la voz.
+depends=('curl' 'jq' 'sox')
+
+package() {
+  install -Dm644 /dev/stdin "$pkgdir/etc/vortex/claude" <<'MARCA'
+# Vortex OS: «Claude» elegido en el instalador. Con esta marca, bin/vortex-sesion instala Claude Code
+# para cada usuario en su primer inicio con red (vortex claude instalar). Borra el archivo para que
+# no lo haga más.
+MARCA
+}

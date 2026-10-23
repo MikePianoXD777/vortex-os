@@ -2,7 +2,8 @@
 # vortex-sesion: inicio de sesión de Vortex OS (lo lanza greetd en lugar de start-hyprland).
 # La primera vez de cada usuario le deja la config de Vortex («vortex configurar-usuario»:
 # Hyprland, teclado, fondos, ajustes del shell) y después entra al escritorio. En el live
-# (/etc/vortex/live) además abre el instalador cuando el escritorio ya está arriba.
+# (/etc/vortex/live) además abre el instalador cuando el escritorio ya está arriba; y si se
+# eligió Claude al instalar (/etc/vortex/claude), le instala Claude Code en segundo plano.
 estado="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
 mkdir -p "$estado"
 if [[ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/version" ]]; then
@@ -10,5 +11,12 @@ if [[ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/version" ]]; then
 fi
 if [[ -e /etc/vortex/live ]] && command -v vortex-instalador >/dev/null; then
   vortex-instalador --al-entrar >"$estado/instalador.log" 2>&1 &
+fi
+# Vortex: Claude Code para este usuario. Si en el instalador se eligió «Claude», el paquete
+# vortex-claude dejó la marca /etc/vortex/claude: aquí se instala en segundo plano, con la
+# prioridad más baja y esperando a que el escritorio arranque y haya red, para no retrasar la
+# entrada. Sin red (o si falla) no deja su marca (claude-listo) y se reintenta en el próximo inicio.
+if [[ -e /etc/vortex/claude && ! -e "$estado/claude-listo" ]] && command -v vortex >/dev/null; then
+  nice -n 19 vortex claude instalar --al-entrar >"$estado/claude.log" 2>&1 </dev/null &
 fi
 exec start-hyprland </dev/null
