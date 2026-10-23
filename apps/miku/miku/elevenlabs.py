@@ -113,7 +113,8 @@ def _explicar(codigo: int, cuerpo: bytes) -> str:
     if codigo == 401:
         return "ElevenLabs no aceptó la clave (¿la copiaste completa y tiene permiso de «Text to Speech»?). Ponla otra vez con: vortex-miku elevenlabs"
     if codigo == 402 or "quota" in detalle.lower() or "credits" in detalle.lower():
-        return "Se acabaron los créditos de ElevenLabs de este mes."
+        return ("ElevenLabs no dejó usar esa voz: se acabaron los créditos del mes o tu plan no permite voces de la "
+                "Voice Library por la API (el gratis a veces no). Prueba con una voz hecha en Voice Design.")
     if codigo == 404:
         return "ElevenLabs no encuentra esa voz (revisa el Voice ID, y que la voz esté en «My Voices»)."
     if codigo == 429:
