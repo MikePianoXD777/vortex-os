@@ -1,0 +1,29 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+singleton Nav 1.0 Nav.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+Barra 1.0 Barra.qml
+IconoApp 1.0 IconoApp.qml
+Sello 1.0 Sello.qml
+AccionApp 1.0 AccionApp.qml
+Tarjeta 1.0 Tarjeta.qml
+FilaApp 1.0 FilaApp.qml
+Esqueleto 1.0 Esqueleto.qml
+Rejilla 1.0 Rejilla.qml
+Pagina 1.0 Pagina.qml
+EstadoPantalla 1.0 EstadoPantalla.qml
+Seccion 1.0 Seccion.qml
+Esquinas 1.0 Esquinas.qml
+Carrusel 1.0 Carrusel.qml
+Dialogo 1.0 Dialogo.qml
+ItemLateral 1.0 ItemLateral.qml
+BarraLateral 1.0 BarraLateral.qml
+Aviso 1.0 Aviso.qml
+PaginaInicio 1.0 PaginaInicio.qml
+PaginaCategoria 1.0 PaginaCategoria.qml
+PaginaBusqueda 1.0 PaginaBusqueda.qml
+PaginaDetalle 1.0 PaginaDetalle.qml
+PaginaInstaladas 1.0 PaginaInstaladas.qml
+PaginaActualizaciones 1.0 PaginaActualizaciones.qml
+Flecha 1.0 Flecha.qml
