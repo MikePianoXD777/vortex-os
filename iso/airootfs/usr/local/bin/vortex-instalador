@@ -14,6 +14,11 @@ if [[ "${1:-}" == --al-entrar ]]; then
   done
   sleep 5   # que el shell termine de aparecer antes de abrir la ventana
 fi
+# Lo lanza vortex-sesion antes de que arranque el escritorio: el bus de la sesión (para las
+# notificaciones) no lo exporta PAM sino systemd, en $XDG_RUNTIME_DIR/bus.
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$runtime/bus" ]]; then
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus"
+fi
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
   WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && ls wayland-* 2>/dev/null | grep -v '\.lock$' | head -n1)"
 fi
@@ -56,11 +61,19 @@ teclado_inicial() {
     es_ES) teclado=es ;;
     *) return 0 ;;
   esac
-  actual="$(localectl status 2>/dev/null | awk -F': *' '/X11 Layout/ {print $2; exit}')"
-  [[ -z "$actual" || "$actual" == "(unset)" || "$actual" == "n/a" ]] || return 0
+  # Solo la primera vez que se abre en este arranque (marca en $XDG_RUNTIME_DIR): si se cierra y se
+  # vuelve a abrir, se queda la distribución que se eligió. El live trae «us» de fábrica, así que no
+  # sirve mirar si localed ya tiene una.
+  local marca="$runtime/vortex-teclado-inicial"
+  [[ -e "$marca" ]] && return 0
+  : >"$marca" 2>/dev/null || true
   # --no-convert: solo la distribución X11; la consola del live no se toca. Con sudo porque
   # polkit pediría una contraseña (no hay agente) para cambiar el teclado del sistema.
   sudo -n localectl --no-convert set-x11-keymap "$teclado" pc105 2>/dev/null || true
+  # Calamares lee la distribución actual del escritorio (Xwayland), no de localed: se pone ya en
+  # Hyprland, sin esperar a que vortex-teclado-live vea el cambio de localed.
+  hyprctl eval "hl.config({ input = { kb_layout = \"$teclado\", kb_variant = \"\" } })" >/dev/null 2>&1 || true
+  sleep 1
 }
 teclado_inicial
 

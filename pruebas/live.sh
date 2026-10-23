@@ -266,6 +266,8 @@ chmod +x "$T/inst/shim"/*
 instalar() { # instalar LAYOUT_X11 [VAR=valor ...]: corre el instalador y deja sus anotaciones en inst/
   local x11="$1"; shift
   rm -f "$T/inst/sudo.log" "$T/inst/notify.log"
+  # Cada corrida es un arranque nuevo del live, salvo con MANTENER=1 (se vuelve a abrir).
+  [[ "${MANTENER:-0}" == 1 ]] || rm -f "$T/inst/run/vortex-teclado-inicial"
   echo "$x11" >"$T/inst/x11"
   env -i PATH="$T/inst/shim:/usr/bin:/bin" HOME="$T" XDG_RUNTIME_DIR="$T/inst/run" WAYLAND_DISPLAY=wayland-1 \
     "$@" bash "$INSTALADOR" >"$T/inst/out" 2>&1
@@ -282,8 +284,10 @@ probar "es_ES: es (España)" contiene "$T/inst/sudo.log" "$fijo es pc105"
 instalar "n/a" VORTEX_INSTALADOR_IDIOMA=en_US.UTF-8
 probar "otro idioma: no toca el teclado" no_contiene "$T/inst/sudo.log" "set-x11-keymap"
 probar "otro idioma: Calamares abre igual" contiene "$T/inst/sudo.log" "LANG=en_US.UTF-8"
-instalar "de"
-probar "si ya hay una distribución elegida no la pisa" no_contiene "$T/inst/sudo.log" "set-x11-keymap"
+instalar "us"
+probar "el live trae us de fábrica: igual deja latam" contiene "$T/inst/sudo.log" "$fijo latam pc105"
+MANTENER=1 instalar "de"
+probar "al abrirlo otra vez en el mismo arranque no pisa la que se eligió" no_contiene "$T/inst/sudo.log" "set-x11-keymap"
 probar "pero Calamares abre" contiene "$T/inst/sudo.log" "calamares"
 
 # Secure Boot: la variable EFI son 4 bytes de atributos y luego el valor.
