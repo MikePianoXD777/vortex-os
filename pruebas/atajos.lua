@@ -212,8 +212,9 @@ do
         ok("flotante y fija en todos los escritorios", miku.float == true and miku.pin == true)
         ok("sin borde, sombra, blur ni esquinas redondeadas",
             miku.border_size == 0 and miku.no_shadow == true and miku.no_blur == true and miku.rounding == 0)
+        ok("opaca al 100 % (gana a la regla de todas las ventanas al 95 %)", miku.opacity == "1.0 override")
         ok("no roba el teclado al abrirse", miku.no_initial_focus == true and miku.no_focus == true)
-        ok("pegada al borde derecho, debajo de la barra (move = «monitor_w-window_w-N Y»)",
+        ok("pegada al borde derecho, debajo de la barra (move = «monitor_w-window_w-N Y»; 7 de gaps_out y 41 = barra de 34 + 7)",
             type(miku.move) == "string" and miku.move:match("^monitor_w%-window_w%-%d+ %d+$") ~= nil, miku.move)
         ok("sin «size»: la app fija su tamaño (460x760 con el 3D, 420x240 sin él)", miku.size == nil)
     end

@@ -8,8 +8,9 @@
 # copiado tal cual. Comprueba: de fábrica está encendido (Miku en 3D); apagar y encender cambian
 # el archivo y el interruptor; mientras corre queda quieto («Cambiando…») y un segundo clic no hace
 # nada; con "avatar": false guardado arranca apagado; cerrar Ajustes a mitad no mata al comando;
-# y, si falta vortex-miku o no contesta bien, lo dice en la descripción y avisa con una
-# notificación en vez de callar.
+# si falta vortex-miku o no contesta bien, lo dice en la descripción y avisa con una notificación
+# en vez de callar; y, si Claude está apagado («vortex claude activado» sale con 1), la descripción
+# lo dice (Miku piensa con Claude) sin tocar el interruptor.
 #
 #   pruebas/miku-qml.sh
 set -uo pipefail
@@ -28,7 +29,7 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/vortex-miku-qml.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 
 echo "== Armando el shell de prueba"
-mkdir -p "$T/stub/guide/general" "$T/stub/reusables/guide" "$T/bin" "$T/bin-roto" "$T/bin-notif"
+mkdir -p "$T/stub/guide/general" "$T/stub/reusables/guide" "$T/bin" "$T/bin-roto" "$T/bin-notif" "$T/bin-claude-si" "$T/bin-claude-no"
 cp "$SECCION" "$T/stub/guide/general/GeneralAssistantSection.qml"
 printf 'singleton I18n 1.0 I18n.qml\nsingleton ThemeBackend 1.0 ThemeBackend.qml\n' >"$T/stub/qmldir"
 printf 'pragma Singleton\nimport QtQuick\nQtObject { function t(k) { return k; } }\n' >"$T/stub/I18n.qml"
@@ -150,13 +151,19 @@ echo "avatar=quizá"
 exit 1
 EOF
 printf '#!/usr/bin/env bash\necho "notify-send: $*" >>"$QS_LOG"\n' >"$T/bin-notif/notify-send"
-chmod +x "$T/bin/vortex-miku" "$T/bin-roto/vortex-miku" "$T/bin-notif/notify-send"
+# «vortex» falso: solo «vortex claude activado» (0 = activado, 1 = apagado), para no depender del
+# vortex de este PC.
+printf '#!/usr/bin/env bash\n[[ "$1 $2" == "claude activado" ]] && { echo si; exit 0; }\nexit 2\n' >"$T/bin-claude-si/vortex"
+printf '#!/usr/bin/env bash\n[[ "$1 $2" == "claude activado" ]] && { echo no; exit 1; }\nexit 2\n' >"$T/bin-claude-no/vortex"
+chmod +x "$T/bin/vortex-miku" "$T/bin-roto/vortex-miku" "$T/bin-notif/notify-send" "$T/bin-claude-si/vortex" "$T/bin-claude-no/vortex"
 
 # corre ESCENARIO [json-inicial]; deja su salida en $T/ESCENARIO/{salida,cmd}.log
 correr() {
-  local esc="$1" r="$T/$1" ruta="$T/bin:$T/bin-notif:$PATH"
-  [[ "$esc" == falta ]] && ruta="$T/bin-notif:$PATH"
-  [[ "$esc" == roto ]] && ruta="$T/bin-roto:$T/bin-notif:$PATH"
+  local esc="$1" r="$T/$1" claude="$T/bin-claude-si" ruta
+  [[ "$esc" == claude-apagado ]] && claude="$T/bin-claude-no"
+  ruta="$T/bin:$claude:$T/bin-notif:$PATH"
+  [[ "$esc" == falta ]] && ruta="$claude:$T/bin-notif:$PATH"
+  [[ "$esc" == roto ]] && ruta="$T/bin-roto:$claude:$T/bin-notif:$PATH"
   mkdir -p "$r/home" "$r/rt" "$r/cfg" "$r/cache" "$r/state"
   chmod 700 "$r/rt"
   if [[ -n "${2:-}" ]]; then
@@ -184,6 +191,13 @@ probar "apagar llamó a «vortex-miku avatar off» y lo dejó guardado" \
   "grep -q 'arranca: avatar off' '$T/normal/cmd.log' && grep -q 'termina: avatar off' '$T/normal/cmd.log'"
 probar "encender llama a «avatar on» y vuelve a encendido" \
   "grep -q 'arranca: avatar on' '$T/normal/cmd.log' && grep -q 'T fin avatarOn=true available=true busy=false checked=true enabled=true' '$S'"
+
+echo "== Claude apagado"
+correr claude-apagado
+probar "la descripción de Miku avisa que Claude está apagado y el interruptor sigue usable" \
+  "grep -q 'T tick avatarOn=true available=true busy=false checked=true enabled=true desc=guide.general.assistant.desc guide.general.assistant.claude_off' '$T/claude-apagado/salida.log'"
+probar "con Claude activado la descripción no lo menciona" \
+  "! grep -q 'claude_off' '$T/normal/salida.log'"
 
 echo "== Con \"avatar\": false guardado arranca apagado"
 correr inicial-off '{"voz": "x", "avatar": false}'

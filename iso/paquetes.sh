@@ -181,6 +181,12 @@ principal() {
   echo "==> Se compila con banderas de un x86-64 genérico (no las de ${VORTEX_MAKEPKG_CONF:-/etc/makepkg.conf})"
 
   for d in "${PROPIOS[@]}"; do
+    # vortex-miku (el asistente) puede faltar mientras su rama no entre: sin su PKGBUILD se avisa y
+    # se sigue (con cualquier otro paquete propio, la falta sí es un error).
+    if [[ "$d" == vortex-miku && ! -f "$RAIZ/packaging/$d/PKGBUILD" ]]; then
+      echo "==> $d: no hay packaging/$d/PKGBUILD, se omite (¡la ISO lo pide en paquetes.txt!)" >&2
+      continue
+    fi
     echo "==> $d"
     (cd "$RAIZ/packaging/$d" && makepkg_generico -s --noconfirm --needed -f)
     rm -rf "$RAIZ/packaging/$d/"{pkg,src}

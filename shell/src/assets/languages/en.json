@@ -250,9 +250,10 @@
       },
       "assistant": {
         "title": "Miku in 3D",
-        "desc": "Super + O opens and closes Miku, your voice assistant. On, her 3D model appears beside the screen; off, only the voice stays and it uses less RAM",
+        "desc": "Super + O opens and closes Miku, your voice assistant. On, her 3D model appears beside the screen; off, only the voice stays and it uses less RAM. Needs Claude turned on (the section above)",
         "working": "Switching…",
-        "missing": "The assistant is not installed (vortex-miku package)"
+        "missing": "The assistant is not installed (vortex-miku package)",
+        "claude_off": "Claude is off: turn it on in the section above, or Miku will not be able to answer"
       }
     },
     "display": {

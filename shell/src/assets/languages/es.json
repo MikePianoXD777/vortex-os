@@ -251,9 +251,10 @@
       },
       "assistant": {
         "title": "Miku en 3D",
-        "desc": "Super + O abre y cierra a Miku, tu asistente de voz. Encendido, su modelo 3D sale al lado de la pantalla; apagado, queda solo la voz y gasta menos RAM",
+        "desc": "Super + O abre y cierra a Miku, tu asistente de voz. Encendido, su modelo 3D sale al lado de la pantalla; apagado, queda solo la voz y gasta menos RAM. Necesita Claude activado (la sección de arriba)",
         "working": "Cambiando…",
-        "missing": "El asistente no está instalado (paquete vortex-miku)"
+        "missing": "El asistente no está instalado (paquete vortex-miku)",
+        "claude_off": "Claude está apagado: actívalo en la sección de arriba, si no Miku no podrá contestar"
       }
     },
     "display": {

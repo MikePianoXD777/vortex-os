@@ -89,7 +89,7 @@ arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin const
 | Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |
 | Pantallas | `vortex-pantallas` | cada monitor a su resolución máxima y su frecuencia más alta (144, 165, 200, 240 Hz), al entrar y al conectarlo; respeta lo que pongas en Ajustes → Pantalla o en `hypr-mio.lua` |
 | Tienda de apps | **Vortexine's Shop** (`vortex-shop`) | todo Flathub a un clic, sin terminal ni contraseñas; las apps no vienen en la ISO |
-| Asistente de voz | Miku (`vortex-miku`): modelo 3D VRM + Claude Sonnet + voz y oído locales | Super+O; viene instalada y encendida, y se apaga del todo al cerrarla |
+| Asistente de voz | Miku (`vortex-miku`): modelo 3D VRM + Claude Sonnet + voz y oído locales | Super+O; viene instalada y encendida (necesita Claude activado) y se apaga del todo al cerrarla |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
@@ -150,7 +150,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+C | editor (Zed) |
 | Super+A | habla con Claude (si lo activaste) |
 | Super+I | Vortexine's Shop: la tienda de apps |
-| Super+O | Miku, el asistente de voz: la abre (y se pone a escuchar) o la cierra del todo |
+| Super+O | Miku, el asistente de voz: la abre (y se pone a escuchar) o la cierra del todo (necesita Claude activado) |
 | Super+G | modo juego a mano |
 
 **Escritorios**
@@ -272,14 +272,17 @@ hay, lo reintenta en el próximo inicio) y al terminar avisa con una notificaci�
 ### Miku, el asistente de voz
 
 Viene instalada y encendida en la ISO (paquete `vortex-miku`; `install.sh` la pregunta, y `--sin-miku` la
-omite). **Super+O** la abre —sale pegada al borde derecho, debajo de la barra, y se pone a escuchar— y
+omite). **Necesita Claude activado** (Ajustes → General → Claude), porque Claude es su cerebro: con Claude
+apagado, ella te lo dice. **Super+O** la abre —sale pegada al borde derecho, debajo de la barra, y se pone a escuchar— y
 **Super+O otra vez la cierra del todo**: sin ventana no queda ningún proceso (ni la voz, ni el oído, ni
 Claude), así que no gasta RAM cuando no la usas.
 
 - **Qué es:** Miku Nakano en 3D (un modelo VRM) con **Claude Sonnet** de cerebro, que puede ver tu pantalla,
-  y una voz de IA genérica (no imita a ninguna persona). El oído (Whisper) y la voz (Kokoro) corren en tu
-  PC, sin internet; lo único que sale es lo que ella piensa, que pasa por Claude con tu cuenta (como Super+A).
-- **Solo voz:** en **Ajustes > General > Miku en 3D** (o `vortex miku avatar off`) se apaga el 3D y queda un
+  y una voz de IA genérica (no imita a ninguna persona). El oído (whisper.cpp) y la voz (Supertonic 3)
+  corren en tu PC; lo único que sale es lo que ella piensa, que pasa por Claude con tu cuenta (como Super+A).
+  Los modelos de voz y de oído **no vienen en la ISO**: se bajan la primera vez que la abres (necesita
+  internet esa vez) y quedan en tu usuario.
+- **Solo voz:** en **Ajustes → General → Miku en 3D** (o `vortex miku avatar off`) se apaga el 3D y queda un
   panel chico de asistente de voz, que gasta bastante menos RAM. `vortex miku avatar on` lo vuelve a encender.
   (En un sistema ya instalado, el interruptor y `vortex miku` llegan con `vortex actualizar --forzar`.)
 - **Privacidad:** el micrófono solo escucha mientras su ventana está abierta, y el audio no se guarda. La
@@ -367,12 +370,11 @@ vm/preview.sh foto escritorio         # capturas y clips para mostrar Vortex
   Miku Nakano es un personaje de «Gotoubun no Hanayome»; este repo no incluye el modelo ni imágenes suyas.
 - **3D en pantalla:** [three.js](https://threejs.org) 0.180.0 y [@pixiv/three-vrm](https://github.com/pixiv/three-vrm)
   3.5.5 (MIT), dentro de Qt WebEngine.
-- **Voz:** [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad, Apache-2.0) con
-  [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT), onnxruntime (MIT) y
-  [espeak-ng](https://github.com/espeak-ng/espeak-ng) (GPL-3.0) para los fonemas. Es una voz de IA genérica:
-  no clona ni imita a ninguna persona.
+- **Voz:** [Supertonic 3](https://github.com/supertone-inc/supertonic) de Supertone (modelo con licencia
+  OpenRAIL-M, que permite su uso y redistribución con sus restricciones de uso), con ONNX Runtime (MIT). Es
+  una voz de IA genérica: no clona ni imita a ninguna persona. Se baja la primera vez que se usa.
 - **Oído:** [Whisper](https://github.com/openai/whisper) de OpenAI (MIT) con
-  [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT).
+  [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT). El modelo se baja la primera vez que se usa.
 - **Cerebro:** Claude, de Anthropic, con tu cuenta.
 
 ## Licencia

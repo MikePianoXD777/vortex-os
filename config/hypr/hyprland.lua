@@ -133,11 +133,15 @@ hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = t
 -- flotante sin marco que el atajo abre y cierra. Wayland no deja que la app se coloque ni se
 -- ponga encima, así que eso lo hacen estas reglas: fija en todos los escritorios (pin), sin
 -- borde, sombra, blur ni animación (el fondo de la ventana es transparente: el contorno del
--- personaje no debe llevar nada alrededor), sin quitarte el teclado al abrirse ni al darle clic,
--- y pegada al borde derecho justo debajo de la barra (que mide 44 px arriba: 40 de barra y 4 de
--- margen; 52 deja 8 de aire). No lleva «size»: la app fija su tamaño (460x760 con el 3D, 420x240
--- sin él) y lo cambia al reabrirse. Si la barra está en otro lado o es más gruesa, cambia el
--- segundo número de «move» (o muévela a mano: hyprctl dispatch movewindowpixel).
+-- personaje no debe llevar nada alrededor), opaca al 100 % (si no, la regla de arriba de «todas
+-- las ventanas al 95 %» la volvería un poco transparente), sin quitarte el teclado al abrirse ni
+-- al darle clic, y pegada al borde derecho justo debajo de la barra, a la misma distancia que
+-- cualquier ventana (gaps_out = 7). La barra mide 34 px (40 al 85 % del shell de la 1.2), así que
+-- la ventana arranca en 34 + 7 = 41. El redondeo lo dibuja la app (18, como todo lo demás): aquí
+-- 0, para que Hyprland no recorte el contorno del personaje. No lleva «size»: la app fija su
+-- tamaño (460x760 con el 3D, 420x240 sin él) y lo cambia al reabrirse. Si cambias el tamaño del
+-- shell (general.uiScale) o el alto de la barra, cambia el segundo número de «move» (o muévela a
+-- mano: hyprctl dispatch movewindowpixel).
 hl.window_rule({
     name = "vortex-miku",
     match = { class = "^vortex-miku$" },
@@ -149,9 +153,10 @@ hl.window_rule({
     no_blur = true,
     no_dim = true,
     no_anim = true,
+    opacity = "1.0 override",
     border_size = 0,
     rounding = 0,
-    move = "monitor_w-window_w-12 52",
+    move = "monitor_w-window_w-7 41",
 })
 
 -- Atajos de Vortex.

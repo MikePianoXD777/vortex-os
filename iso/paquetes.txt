@@ -129,10 +129,16 @@ vortex-shop
 # no se pierda de la ISO si algún día cambian sus dependencias.
 pyside6
 wl-gammarelay-rs
-# Miku, el asistente de voz (Super+O): viene instalado y encendido. Trae su voz y su oído (modelos
-# incluidos: funciona sin internet) y sus dependencias (pyside6, qt6-webengine, whisper-cpp,
-# espeak-ng...). El modelo 3D no va en el paquete: iso/construir.sh lo pone (iso/miku-modelo.sh).
+# Miku, el asistente de voz (Super+O): viene instalada y encendida. Trae la app, su voz (Supertonic 3) y
+# su oído (whisper.cpp), pero los MODELOS de voz y de oído NO van en la ISO: la app los baja la primera
+# vez que se usan (el modelo 3D lo pone iso/construir.sh desde VORTEX_MIKU_MODELO). Ya los pide el
+# paquete; van explícitos para que no se pierdan de la ISO si algún día cambian sus dependencias.
+# Se pide python-onnxruntime-cpu y no «python-onnxruntime»: ese nombre lo ofrecen también las variantes
+# cuda y rocm (gigas) y pacman, sin preguntar, no tiene por qué escoger la de CPU.
 vortex-miku
+qt6-webengine
+whisper-cpp
+python-onnxruntime-cpu
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el

@@ -86,6 +86,10 @@ probar "la ayuda de vortex lista «miku» y Super+O" bash -c '"$1" ayuda | grep 
 echo "== ISO"
 probar "iso/paquetes.sh construye vortex-miku (PROPIOS)" bash -c 'grep -E "^PROPIOS=\(.*\bvortex-miku\b" "$1" >/dev/null' _ "$AQUI/iso/paquetes.sh"
 probar "iso/paquetes.txt trae vortex-miku instalado en la base" bash -c 'sed "s/#.*//" "$1" | grep -qx "vortex-miku"' _ "$AQUI/iso/paquetes.txt"
+for p in qt6-webengine whisper-cpp python-onnxruntime-cpu; do
+  probar "iso/paquetes.txt trae $p (lo que usa el asistente, de los repos)" bash -c 'sed "s/#.*//" "$1" | grep -qx "$2"' _ "$AQUI/iso/paquetes.txt" "$p"
+done
+probar "los modelos de voz y de oído no van en la ISO (se bajan al primer uso)" bash -c 'grep -qi "NO van en la ISO" "$1"' _ "$AQUI/iso/paquetes.txt"
 if [[ -f "$AQUI/packaging/vortex-miku/PKGBUILD" ]]; then
   nombres="$(bash -c 'source "$1" >/dev/null 2>&1; printf "%s\n" "${pkgname[@]}"' _ "$AQUI/packaging/vortex-miku/PKGBUILD")"
   probar "packaging/vortex-miku/PKGBUILD define el paquete vortex-miku" bash -c 'grep -qx vortex-miku <<<"$1"' _ "$nombres"
@@ -163,7 +167,7 @@ probar "construir.sh carga iso/miku-modelo.sh y pone el modelo antes de mkarchis
   c="$1/iso/construir.sh"
   a="$(grep -n "^source \"\$AQUI/miku-modelo.sh\"" "$c" | cut -d: -f1)"
   b="$(grep -n "^miku_poner_modelo \"\$raiz\"" "$c" | cut -d: -f1)"
-  m="$(grep -n "^mkarchiso " "$c" | cut -d: -f1)"
+  m="$(grep -n "^\"\$mkarchiso_bin\" " "$c" | cut -d: -f1)"
   [[ -n "$a" && -n "$b" && -n "$m" ]] && ((a < b && b < m))' _ "$AQUI"
 probar "construir.sh deja los archivos del modelo 0:0:644 en profiledef.sh" contiene "$AQUI/iso/construir.sh" 'file_permissions+=([\"$archivo\"]=\"0:0:644\")'
 # El bucle de construir.sh que escribe los permisos en profiledef.sh, ejecutado tal cual, y el
@@ -187,6 +191,7 @@ probar "install.sh --ayuda ya no imprime la línea «set -Eeuo»" bash -c '! "$1
 
 # El paso, con un repo falso, un makepkg de mentira (anota dónde y cómo corrió) y un HOME temporal.
 mkdir -p "$T/repo/packaging/vortex-miku" "$T/bin-makepkg" "$T/home-install"
+touch "$T/repo/packaging/vortex-miku/PKGBUILD"
 cat >"$T/bin-makepkg/makepkg" <<'EOF'
 #!/usr/bin/env bash
 echo "makepkg en $PWD: $*" >>"$T_LOG"
@@ -210,6 +215,13 @@ probar "…dice que quedó instalada y explica Super+O" bash -c '[[ "$1" == *"Mi
 salida="$(paso_miku VORTEX_MIKU=1 VORTEX_DRY_RUN=1)"
 probar "en modo prueba (--prueba) solo muestra el comando, no lo corre" bash -c '[[ "$1" == *"makepkg -sif --noconfirm"* && "$1" == *"packaging/vortex-miku"* && ! -s "$2" ]]' _ "$salida" "$T/install.log"
 
+# Si la rama del asistente todavía no trae su paquete (no hay PKGBUILD), avisa y sigue.
+: >"$T/install.log"
+mv "$T/repo/packaging/vortex-miku/PKGBUILD" "$T/PKGBUILD.guardado"
+salida="$(paso_miku VORTEX_MIKU=1 VORTEX_DRY_RUN=0)"
+mv "$T/PKGBUILD.guardado" "$T/repo/packaging/vortex-miku/PKGBUILD"
+probar "sin packaging/vortex-miku/PKGBUILD avisa, no corre makepkg y la instalación sigue" bash -c '[[ "$1" == *"no trae packaging/vortex-miku"* && ! -s "$2" && "$1" == *"sigue: rc=0"* ]]' _ "$salida" "$T/install.log"
+
 : >"$T/install.log"
 salida="$(paso_miku VORTEX_MIKU=0 VORTEX_DRY_RUN=0)"
 probar "con --sin-miku se omite y no corre makepkg" bash -c '[[ "$1" == *"Miku: omitida"* && ! -s "$2" ]]' _ "$salida" "$T/install.log"
@@ -228,7 +240,7 @@ probar "si makepkg falla, avisa cómo reintentar y la instalación sigue (rc=0)"
 echo "== README"
 probar "el README habla de Super+O y del interruptor de Ajustes" bash -c 'grep -q "Super+O" "$1" && grep -q "Miku en 3D" "$1"' _ "$AQUI/README.md"
 probar "…y da el crédito del modelo (autor y VRoid Hub)" bash -c 'grep -q "Vewertyg" "$1" && grep -qi "vroid" "$1"' _ "$AQUI/README.md"
-probar "…y de three.js y three-vrm" bash -c 'grep -q "three.js" "$1" && grep -q "three-vrm" "$1"' _ "$AQUI/README.md"
+probar "…y de three.js, three-vrm, Supertonic y whisper.cpp" bash -c 'grep -q "three.js" "$1" && grep -q "three-vrm" "$1" && grep -q "Supertonic" "$1" && grep -q "whisper.cpp" "$1"' _ "$AQUI/README.md"
 
 echo
 if ((FALLOS)); then
