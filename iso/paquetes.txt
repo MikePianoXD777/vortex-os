@@ -86,6 +86,7 @@ thunar
 hyprpicker
 btop
 nvtop
+fastfetch
 # AppImage (casi todas usan FUSE 2)
 fuse2
 grim

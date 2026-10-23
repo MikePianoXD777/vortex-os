@@ -57,9 +57,19 @@ firmar() {
 
 sb_activo() { mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled'; }
 
+# ¿MokManager ya aceptó la llave de esta PC? Por «mokutil --test-key» y, por si acaso, buscando su
+# nombre (CN) en la lista de llaves aceptadas.
+llave_aceptada() {
+  mokutil --test-key "$LLAVE/MOK.cer" 2>&1 | grep -qi 'already enrolled' && return 0
+  local cn
+  cn="$(openssl x509 -in "$LLAVE/MOK.crt" -noout -subject -nameopt multiline 2>/dev/null | sed -n 's/^ *commonName *= *//p')"
+  [[ -n "$cn" ]] && mokutil --list-enrolled 2>/dev/null | grep -qF "$cn"
+}
+
 inscribir() {
   hay_llave || { log "no hay llave en $LLAVE"; return 1; }
-  if mokutil --test-key "$LLAVE/MOK.cer" 2>&1 | grep -qi 'already enrolled'; then
+  if llave_aceptada; then
+    rm -f "$LLAVE/pendiente"
     log "la llave ya está aceptada"
     return 0
   fi
@@ -131,7 +141,8 @@ estado() {
   if [[ ! -d /sys/firmware/efi ]]; then echo "PC con BIOS (sin Secure Boot)"; return 0; fi
   if sb_activo; then echo "Secure Boot: activo"; else echo "Secure Boot: apagado"; fi
   if hay_llave; then
-    if mokutil --test-key "$LLAVE/MOK.cer" 2>&1 | grep -qi 'already enrolled'; then
+    if llave_aceptada; then
+      rm -f "$LLAVE/pendiente" 2>/dev/null
       echo "Llave de esta PC: aceptada"
     elif [[ -e "$LLAVE/pendiente" ]]; then
       echo "Llave de esta PC: pendiente (al reiniciar, MokManager: Enroll MOK → Continue → Yes → $CLAVE_MOK)"

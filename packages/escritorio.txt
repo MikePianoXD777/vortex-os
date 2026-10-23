@@ -11,4 +11,5 @@ thunar                 # archivos (SUPER+E), mucho más liviano que Nautilus
 hyprpicker             # gotero de colores (SUPER+SHIFT+C)
 btop                   # monitor del sistema (CTRL+SHIFT+Esc)
 nvtop                  # monitor de la GPU (NVIDIA, AMD, Intel)
+fastfetch              # datos del sistema en la terminal
 fuse2                  # para abrir AppImage
