@@ -1,9 +1,13 @@
 {
   "general": {
     "language": "es",
-    "quickactions": false
+    "quickactions": false,
+    "uiScale": 0.88
   },
   "notifications": {
     "dnd": false
+  },
+  "theme": {
+    "borderRadius": 18
   }
 }

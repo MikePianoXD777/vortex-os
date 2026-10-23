@@ -44,11 +44,11 @@ UA="vortex-otaku (Vortexine's OS; https://github.com/MikePianoXD777/vortex-os)"
 # El toque de personalización: algo suave y que no rompa nada (la fuente viene en el
 # paquete del shell, así que siempre está). Ajustes > Tema los vuelve a cambiar cuando quieras.
 TEMA_FUENTE="Google Sans Flex"
-TEMA_RADIO=16
+TEMA_RADIO=24
 # Si antes no había fuente o bordes en los ajustes, se vuelve a lo que el shell usa por defecto
 # (ThemeBackend.qml): borrar la clave no le diría nada a un shell que ya está corriendo.
 TEMA_FUENTE_DEFECTO="Adwaita Mono"
-TEMA_RADIO_DEFECTO=8
+TEMA_RADIO_DEFECTO=18
 
 # Del JSON de Wallhaven: id, página y archivo de las imágenes horizontales (jpg o png),
 # solo si salen de wallhaven.cc o un subdominio suyo, con el punto de por medio (evilwallhaven.cc

@@ -64,8 +64,8 @@ QtObject {
     Behavior on flotante { ColorAnimation { duration: raiz.duracion } }
 
     // Medidas
-    readonly property int radioTarjeta: 18
-    readonly property int radioGrande: 24
-    readonly property int radioCampo: 16
+    readonly property int radioTarjeta: 22
+    readonly property int radioGrande: 28
+    readonly property int radioCampo: 18
     readonly property int anchoLateral: 244
 }

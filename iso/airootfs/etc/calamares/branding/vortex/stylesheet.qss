@@ -28,7 +28,7 @@ QToolTip {
     background-color: #161a36;
     color: #e8ebff;
     border: 1px solid #2c3366;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 6px 10px;
 }
 
@@ -72,7 +72,7 @@ QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {
     background-color: #161a36;
     color: #e8ebff;
     border: 1px solid #2c3366;
-    border-radius: 12px;
+    border-radius: 16px;
     padding: 7px 12px;
     selection-background-color: #9ec5ff;
     selection-color: #0b0d1a;
@@ -98,7 +98,7 @@ QListView, QTreeView, QTableView {
     background-color: #141833;
     alternate-background-color: #161a36;
     border: 1px solid #232850;
-    border-radius: 14px;
+    border-radius: 18px;
     padding: 6px;
     selection-background-color: #1a2047;
     selection-color: #e8ebff;
@@ -106,7 +106,7 @@ QListView, QTreeView, QTableView {
 }
 QListView::item, QTreeView::item {
     min-height: 30px;
-    border-radius: 8px;
+    border-radius: 12px;
 }
 QListView::item:hover, QTreeView::item:hover {
     background-color: #1a2047;
@@ -124,7 +124,7 @@ QHeaderView::section {
 QCheckBox::indicator, QTreeView::indicator, QListView::indicator {
     width: 18px;
     height: 18px;
-    border-radius: 6px;
+    border-radius: 7px;
     border: 2px solid #4a5390;
     background-color: #141833;
 }
@@ -140,7 +140,7 @@ QTreeView::indicator:indeterminate {
 QRadioButton::indicator {
     width: 18px;
     height: 18px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 2px solid #4a5390;
     background-color: #141833;
 }
@@ -150,7 +150,7 @@ QRadioButton::indicator:checked {
 }
 QGroupBox {
     border: 1px solid #232850;
-    border-radius: 14px;
+    border-radius: 18px;
     margin-top: 14px;
     padding: 12px;
 }

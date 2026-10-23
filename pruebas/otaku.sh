@@ -176,7 +176,7 @@ probar "pone el fondo con la IPC del shell en cada monitor" \
   "grep -q -E '^$CALL DP-1 $FONDOS_ESP/otaku/wallhaven-[a-z]+\\.(jpg|png) fade\$' '$T/ipc.log' && grep -q -E '^$CALL HDMI-A-1 ' '$T/ipc.log'"
 probar "guarda el fondo de antes y los ajustes de antes" \
   "[[ \"\$(jq -c . '$ANTES')\" == '{\"fondos\":{\"DP-1\":\"$FONDOS_ESP/vortex-azul.jpg\"},\"tema\":{\"fontFamily\":\"Adwaita Mono\",\"borderRadius\":8}}' ]]"
-probar "ajustes: fuente y bordes nuevos" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 16 ]]"
+probar "ajustes: fuente y bordes nuevos" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 24 ]]"
 probar "ajustes: lo demás sigue igual" \
   "[[ \"\$(ajuste .theme.activePreset)\" == Matugen && \"\$(ajuste .general.language)\" == es && \"\$(ajuste .wallpaperDir)\" == '$FONDOS_ESP' ]]"
 probar "el settings.json sigue con los mismos permisos y sin temporales" \
@@ -232,7 +232,7 @@ nueva_sesion
 touch "$T/ipc-falla"
 salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "on no se rompe: sale bien y avisa" "((rc == 0)) && grep -q 'el shell no responde' '$T/salida'"
-probar "igual guarda el estado y aplica los ajustes" "[[ -f '$MARCA' && -f '$ANTES' && \"\$(ajuste .theme.borderRadius)\" == 16 ]] && ((\$(numero_fondos) == 5))"
+probar "igual guarda el estado y aplica los ajustes" "[[ -f '$MARCA' && -f '$ANTES' && \"\$(ajuste .theme.borderRadius)\" == 24 ]] && ((\$(numero_fondos) == 5))"
 salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "off tampoco: devuelve los ajustes y dice cómo poner el fondo" \
   "((rc == 0)) && [[ \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]] && grep -q \"vortex fondo '$FONDOS_ESP/vortex-azul.jpg'\" '$T/salida'"
@@ -244,9 +244,9 @@ nueva_sesion
 printf '{\n  "general": {\n    "language": "es"\n  }\n}\n' >"$H/.config/serpantinum/settings.json"
 cp "$H/.config/serpantinum/settings.json" "$T/settings-original.json"
 otaku on >/dev/null
-probar "on crea theme con la fuente y los bordes" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 16 ]]"
+probar "on crea theme con la fuente y los bordes" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 24 ]]"
 otaku off >/dev/null
-probar "off deja la fuente y los bordes que el shell usa por defecto (borrar la clave no se notaría en un shell abierto)" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Adwaita Mono' && \"\$(ajuste .theme.borderRadius)\" == 8 && \"\$(ajuste .general.language)\" == es ]]"
+probar "off deja la fuente y los bordes que el shell usa por defecto (borrar la clave no se notaría en un shell abierto)" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Adwaita Mono' && \"\$(ajuste .theme.borderRadius)\" == 18 && \"\$(ajuste .general.language)\" == es ]]"
 
 echo "== Ajustes rotos o inexistentes"
 nueva_sesion
