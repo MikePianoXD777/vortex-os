@@ -5,7 +5,10 @@
 #      respuestas reales guardadas (búsqueda, categorías, fichas, caché, sin red, timeouts, descripciones
 #      a texto, ids raros) y flatpak.py contra un «flatpak» FALSO (instalar con progreso, quitar, listar,
 #      actualizar, errores en español, apps del sistema) y contra una libflatpak falsa;
-#   3. el lanzador (apps/shop/vortex-shop): encuentra el código y pasa los argumentos;
+#   3. la interfaz (Qt Quick sin pantalla): cola, instancia única, colores, capturas y una prueba de
+#      integración con el motor real contra el Flathub y el flatpak falsos (buscar, detalle, instalar,
+#      abrir y quitar con clics de verdad). VORTEX_TIENDA_SIN_UI=1 la salta;
+#   3b. el lanzador (apps/shop/vortex-shop): encuentra el código y pasa los argumentos;
 #   4. el paquete: makepkg --verifysource, --nobuild y un paquete armado en una carpeta temporal (sin
 #      instalarlo ni usar sudo), con lo que debe llevar;
 #   5. una prueba REAL de solo lectura contra la API de Flathub (búsqueda «minecraft», la ficha de Prism
@@ -64,6 +67,36 @@ else
   tail -n 40 "$T/motor.log" | sed 's/^/        /'
 fi
 
+echo "== Interfaz (Qt Quick sin pantalla: QT_QPA_PLATFORM=offscreen)"
+# Necesita PySide6. Si el sistema no lo trae, se usa (o se arma) un venv en ~/.cache/vortex-shop-pruebas.
+# VORTEX_TIENDA_SIN_UI=1 la salta.
+PY_UI=""
+if [[ -n "${VORTEX_TIENDA_SIN_UI:-}" ]]; then
+  echo "  --  VORTEX_TIENDA_SIN_UI: se salta"
+elif python3 -c 'import PySide6.QtQuick' 2>/dev/null; then
+  PY_UI=python3
+else
+  VENV_UI="${XDG_CACHE_HOME:-$HOME/.cache}/vortex-shop-pruebas"
+  if [[ ! -x "$VENV_UI/bin/python" ]]; then
+    python3 -m venv "$VENV_UI" >/dev/null 2>&1 && "$VENV_UI/bin/pip" install -q PySide6-Essentials >/dev/null 2>&1
+  fi
+  [[ -x "$VENV_UI/bin/python" ]] && "$VENV_UI/bin/python" -c 'import PySide6.QtQuick' 2>/dev/null && PY_UI="$VENV_UI/bin/python"
+  [[ -n "$PY_UI" ]] || echo "  --  sin PySide6 (ni en el sistema ni en $VENV_UI): se salta la interfaz"
+fi
+if [[ -n "$PY_UI" ]]; then
+  export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+  for prueba in ui_cola ui_instancia ui_tema ui_capturas ui_integracion; do
+    # ui_tema y ui_capturas guardan capturas: a la carpeta temporal, no a tu ~/Vídeos.
+    if "$PY_UI" "$TIENDA/pruebas/$prueba.py" "$T/capturas-$prueba" >"$T/$prueba.log" 2>&1; then
+      bien "$prueba.py: $(grep -c '^ok' "$T/$prueba.log") comprobaciones"
+    else
+      mal "$prueba.py falló (mira $T/$prueba.log):"
+      grep -E '^FALLA|Traceback|Error' "$T/$prueba.log" | head -n 8 | sed 's/^/        /'
+    fi
+  done
+  unset QT_QPA_PLATFORM QT_QUICK_BACKEND
+fi
+
 echo "== Lanzador"
 LAN="$T/lanzador"
 mkdir -p "$LAN/copia" "$LAN/codigo/vortex_shop" "$LAN/vacio"
@@ -113,6 +146,9 @@ if command -v makepkg >/dev/null && [[ $EUID -ne 0 ]]; then
     lista="$(bsdtar -tf "$pkg")"
     for archivo in usr/bin/vortex-shop usr/share/vortex-shop/vortex_shop/__init__.py \
       usr/share/vortex-shop/vortex_shop/catalogo.py usr/share/vortex-shop/vortex_shop/flatpak.py \
+      usr/share/vortex-shop/vortex_shop/__main__.py usr/share/vortex-shop/vortex_shop/puente.py \
+      usr/share/vortex-shop/vortex_shop/colores.py usr/share/vortex-shop/vortex_shop/qml/Main.qml \
+      usr/share/vortex-shop/vortex_shop/qml/qmldir usr/share/vortex-shop/vortex_shop/qml/vortex-os.svg \
       usr/share/applications/vortexines-shop.desktop usr/share/icons/hicolor/scalable/apps/vortexines-shop.svg \
       usr/share/licenses/vortex-shop/LICENSE; do
       probar "el paquete lleva $archivo" "grep -qx '$archivo' <<<\"\$lista\""
@@ -121,7 +157,7 @@ if command -v makepkg >/dev/null && [[ $EUID -ne 0 ]]; then
       "! grep -E 'pruebas/|\.tmp$|/pkg/|/src/' <<<\"\$lista\" >/dev/null"
     info="$(bsdtar -xOf "$pkg" .PKGINFO)"
     probar "arch=any" "grep -qx 'arch = any' <<<\"\$info\""
-    for dependencia in python pyside6 python-gobject flatpak; do
+    for dependencia in python pyside6 qt6-declarative qt6-svg python-gobject flatpak; do
       probar "depende de $dependencia" "grep -qx 'depend = $dependencia' <<<\"\$info\""
     done
     probar "el lanzador instalado es el mismo del repo y ejecutable" \

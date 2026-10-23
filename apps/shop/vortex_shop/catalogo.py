@@ -17,7 +17,7 @@ Endpoints que se usan (todos verificados contra la API real; los de lista exigen
 El idioma se pide con «locale» y Flathub traduce lo que tenga traducido (nombre y resumen de las
 apps que lo tienen; si no, viene en inglés). Solo biblioteca estándar.
 
-Red: timeouts de 12 s, User-Agent «vortexines-shop/1.0» y caché en disco (~/.cache/vortexines-shop/,
+Red: timeouts de 12 s, User-Agent «vortexines-shop/VERSIÓN» y caché en disco (~/.cache/vortexines-shop/,
 un JSON por petición): vale 1 h para listas y búsquedas, 24 h para fichas. Si no hay red y hay caché,
 se usa aunque esté vieja; si no hay nada, SinRed. Para probar sin internet, VORTEX_SHOP_API apunta
 a otro servidor con la misma forma (pruebas/tienda.sh levanta uno falso).

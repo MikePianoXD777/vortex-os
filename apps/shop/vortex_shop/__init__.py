@@ -5,7 +5,7 @@ no ocupan lugar en la ISO. Este paquete es el motor (catalogo.py: qué hay en Fl
 instalar, quitar y actualizar); la interfaz (QML) vive en __main__.py, puente.py y qml/.
 """
 
-VERSION = "1.0"
+VERSION = "1.1"
 NOMBRE = "Vortexine's Shop"
 # Lo que la tienda dice ser en la red (cabecera User-Agent de las peticiones a Flathub).
 AGENTE = "vortexines-shop/" + VERSION

@@ -4,16 +4,16 @@
 #
 #   cd packaging/vortex-shop && makepkg -si
 pkgname=vortex-shop
-pkgver=1.0
+pkgver=1.1
 pkgrel=1
 pkgdesc="Vortexine's Shop: la tienda de aplicaciones de Vortexine's OS (Flathub, sin contraseña)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
-# pyside6 trae Qt Quick (qt6-declarative) para la interfaz; python-gobject, libflatpak para instalar
-# con el progreso real; flatpak, el programa mismo (y el respaldo si falla libflatpak); qt6-svg,
-# para los íconos vectoriales de la interfaz.
-depends=('python' 'pyside6' 'python-gobject' 'flatpak' 'qt6-svg')
+# pyside6 es Python + Qt; qt6-declarative es Qt Quick/QML (la interfaz: QtQuick, Controls.Basic y
+# Layouts); qt6-svg, para los íconos vectoriales y el logo; python-gobject, libflatpak para instalar
+# con el progreso real; flatpak, el programa mismo (y el respaldo si falla libflatpak).
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'python-gobject' 'flatpak')
 
 package() {
     local origen="$startdir/../../apps/shop"

@@ -70,7 +70,7 @@ class Falso(http.server.BaseHTTPRequestHandler):
         if modo == "lento":
             time.sleep(3)
         ruta = url.path
-        if self.headers.get("User-Agent") != "vortexines-shop/1.0":
+        if not (self.headers.get("User-Agent") or "").startswith("vortexines-shop/"):
             return self._responder(403, {"detail": "User-Agent no esperado: %s" % self.headers.get("User-Agent")})
 
         if ruta.startswith("/collection/"):

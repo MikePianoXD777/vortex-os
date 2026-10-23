@@ -15,7 +15,7 @@ import urllib.request
 API = "https://flathub.org/api/v2"
 AQUI = os.path.dirname(os.path.abspath(__file__))
 DESTINO = os.path.join(AQUI, "datos")
-CABECERAS = {"User-Agent": "vortexines-shop/1.0", "Content-Type": "application/json"}
+CABECERAS = {"User-Agent": "vortexines-shop/1.1", "Content-Type": "application/json"}
 
 # Fichas que sirve el servidor falso (las demás recomendadas devuelven 404, como si ya no existieran).
 FICHAS = ["org.prismlauncher.PrismLauncher", "com.valvesoftware.Steam", "org.mozilla.firefox",
