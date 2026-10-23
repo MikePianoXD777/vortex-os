@@ -4,6 +4,7 @@
 #   vortex-post-instalacion kernel          antes de generar el initramfs
 #   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
 #   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortex OS»)
+#   vortex-post-instalacion espejos RAIZ    antes de instalar las apps, desde el USB (RAIZ = el disco nuevo)
 #   vortex-post-instalacion inicio-automatico USUARIO   entra solo al escritorio (lo llama «final»)
 #
 # La imagen del USB es Vortex completo, pero trae piezas que solo sirven para arrancar desde
@@ -154,10 +155,40 @@ paso_arranque() {
   return 0
 }
 
+# Espejos de CachyOS en el disco nuevo (lo corre el paso «Preparando el gestor de paquetes», desde
+# el USB y no en el chroot). El cachyos-mirrorlist del paquete empieza por cdn77 y us, que a veces
+# van atrasados (404 en paquetes nuevos, p. ej. proton-cachyos-slr de Steam o los drivers de chwd),
+# y deja cdn.cachyos.org y mirror.cachyos.org comentados. Aquí se ponen primero, igual que hace
+# install/10-repos.sh fuera de CachyOS. Se hace al instalar y no en la imagen porque es donde
+# importa: el live no baja nada de [cachyos]. Es idempotente: si cdn.cachyos.org ya está activo en
+# una lista, no la toca. Es un subcomando y no un script dentro del YAML porque Calamares sustituye
+# todo «$nombre» del comando por una variable suya (y si no la conoce, no corre ninguno de los
+# comandos del paso): un bucle de shell con variables no puede ir en shellprocess.
+paso_espejos() {
+  local raiz="${1:-${VORTEX_RAIZ:-}}" lista ruta
+  if [[ -z "$raiz" ]]; then
+    log "espejos: falta la raíz del sistema nuevo"
+    return 1
+  fi
+  for lista in "$raiz"/etc/pacman.d/cachyos*-mirrorlist; do
+    [[ -f "$lista" ]] || continue
+    grep -q '^Server = https://cdn.cachyos.org' "$lista" && continue
+    ruta="$(sed -n 's|^Server = https://[a-z0-9]*\.cachyos\.org\(/.*\)$|\1|p' "$lista" | head -n 1)"
+    [[ -n "$ruta" ]] || continue
+    # cat y no mv: conserva dueño y permisos de la lista.
+    if awk -v r="$ruta" '/^Server/ && !hecho { print "Server = https://cdn.cachyos.org" r; print "Server = https://mirror.cachyos.org" r; hecho = 1 } { print }' "$lista" >"$lista.vortex"; then
+      cat "$lista.vortex" >"$lista"
+    fi
+    rm -f "$lista.vortex"
+  done
+  return 0
+}
+
 case "${1:-}" in
   kernel) paso_kernel ;;
   final) shift; paso_final "$@" ;;
   arranque) paso_arranque ;;
+  espejos) shift; paso_espejos "$@" ;;
   inicio-automatico) shift; paso_inicio_automatico "$@" ;;
-  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | inicio-automatico USUARIO" >&2; exit 1 ;;
+  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | espejos RAIZ | inicio-automatico USUARIO" >&2; exit 1 ;;
 esac

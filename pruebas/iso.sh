@@ -100,7 +100,7 @@ if u.get("autologinGroup") != "autologin":
     mal.append("users_vortex.conf: autologinGroup debe ser autologin")
 
 # --- Instalación con pacman: orden de los pasos, actualización completa y espejos de CachyOS ---
-import tempfile, stat
+import tempfile, stat, shlex
 cal = raiz + "/iso/airootfs/etc/calamares"
 def cargar(n):
     return yaml.safe_load(open(f"{cal}/{n}", encoding="utf-8"))
@@ -111,6 +111,14 @@ def comandos(n):
         c = it["command"] if isinstance(it, dict) else it
         out.append((c[1:] if c.startswith("-") else c, c.startswith("-")))
     return out
+# Calamares sustituye todo «$nombre» y «${nombre}» de los comandos de shellprocess (también entre
+# comillas simples) y, si no conoce la variable, el paso entero falla sin correr nada: solo
+# ${ROOT}, ${USER} y ${gs[...]} son suyas.
+for f in sorted(glob.glob(raiz + "/iso/airootfs/etc/calamares/modules/shellprocess_*.conf")):
+    for c, _ in comandos(os.path.relpath(f, cal)):
+        for v in re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)", c):
+            if v not in ("ROOT", "USER", "gs"):
+                mal.append(f"{os.path.basename(f)}: usa ${v}, que Calamares no conoce (el paso fallaría)")
 st = cargar("settings.conf")
 ejec = next(x["exec"] for x in st["sequence"] if "exec" in x)
 for paso in ("shellprocess@vortex-pacman", "shellprocess@vortex-actualizar", "packages@vortex", "shellprocess@vortex-final"):
@@ -175,9 +183,13 @@ Server = https://cdn77.cachyos.org/repo/$ARCH/$repo
 Server = https://us.cachyos.org/repo/$ARCH/$repo
 Server = https://mirror.lesviallon.fr/cachy/repo/$ARCH/$repo
 """
-cmds = [c for c, _ in comandos("modules/shellprocess_vortex-pacman.conf") if "cachyos*-mirrorlist" in c]
+def local(c, t):
+    # El comando de Calamares, con ${ROOT} = t y el script del repo en vez del de la imagen.
+    return c.replace("${ROOT}", shlex.quote(t)).replace("/usr/local/bin/vortex-post-instalacion",
+        shlex.quote(raiz + "/iso/airootfs/usr/local/bin/vortex-post-instalacion"))
+cmds = [c for c, _ in comandos("modules/shellprocess_vortex-pacman.conf") if "vortex-post-instalacion espejos" in c]
 if len(cmds) != 1:
-    mal.append("shellprocess_vortex-pacman.conf: tiene que haber un comando que reordene cachyos*-mirrorlist")
+    mal.append("shellprocess_vortex-pacman.conf: tiene que haber un comando «vortex-post-instalacion espejos ${ROOT}»")
 else:
     with tempfile.TemporaryDirectory() as t:
         d = t + "/etc/pacman.d"; os.makedirs(d)
@@ -191,7 +203,7 @@ else:
         open(f"{d}/cachyos-mirrorlist.pacnew", "w").write(LISTA.replace("$ARCH", "$arch"))
         sin = "Server = https://mirror.example.org/x\n"
         open(f"{d}/cachyos-sin-cachy-mirrorlist", "w").write(sin)      # ningún espejo de cachyos.org
-        cmd = cmds[0].replace("${ROOT}", t)
+        cmd = local(cmds[0], t)
         r = correr(cmd, "/usr/bin:/bin")
         if r.returncode != 0:
             mal.append("espejos de CachyOS: el comando terminó con error: " + r.stderr.strip())
@@ -221,7 +233,7 @@ else:
     # Sin ninguna lista (el chroot no tiene cachyos-mirrorlist): no falla.
     with tempfile.TemporaryDirectory() as t:
         os.makedirs(t + "/etc/pacman.d")
-        if correr(cmds[0].replace("${ROOT}", t), "/usr/bin:/bin").returncode != 0:
+        if correr(local(cmds[0], t), "/usr/bin:/bin").returncode != 0:
             mal.append("espejos de CachyOS: sin listas debe terminar bien")
 
 # TRIM semanal: en los servicios de Calamares.
