@@ -18,6 +18,18 @@ Necesitas:
 
 ---
 
+> **¿Prefieres apagar Secure Boot?** También funciona, y así no sale ninguna pantalla azul
+> (MokManager): sáltate esos pasos. Antes de apagarlo:
+>
+> 1. Si Windows tiene **BitLocker**, ve a «Administrar BitLocker» → **«Suspender la protección»**.
+>    Si no, al apagar Secure Boot Windows pedirá la clave de recuperación.
+> 2. Entra a la BIOS: apaga la PC y al prenderla presiona varias veces **F2** (casi todas las
+>    laptops), **Supr** o **F1** (PCs de escritorio), o **Esc** y luego F10 (HP).
+> 3. Busca «Secure Boot» (en Seguridad, Boot o Arranque) → **Disabled** → guarda con **F10**.
+>
+> Si algún día lo vuelves a activar, antes, en Vortexine's, corre `sudo vortex-firmar inscribir` y
+> reinicia: así tu PC acepta su llave.
+
 ## 0. Bajar la ISO y unirla
 
 1. Entra a la página de la versión 1.0:
