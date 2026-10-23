@@ -77,6 +77,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+B / Ctrl+Alt+Supr | panel de sistema: bloquear, dormir, hibernar, reiniciar, apagar, cerrar sesión |
 | Super+H | Ajustes |
 | Super+K | calendario, reloj y clima |
+| Super+. | selector de emojis (la pestaña Emojis del lanzador: al elegir uno se copia). El lanzador recuerda la última pestaña: Super abrirá en Emojis hasta que vuelvas a Aplicaciones con Tab |
 | Super+V / Super+Alt+V | historial del portapapeles (Supr borra la entrada elegida) |
 | Ctrl+Alt+V | volumen y dispositivos de audio |
 | Super+Shift+N / Super+Shift+W / Super+Alt+M | red / fondos / música (paneles que cedieron su atajo de siempre) |
@@ -103,7 +104,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Atajo | Qué hace |
 |---|---|
 | Super+1…0 | ir al escritorio 1 a 10 (dentro de su grupo de 10) |
-| Super+Alt+1…0 (o Super+Shift+1…0) | mandar la ventana a ese escritorio |
+| Super+Alt+1…0 (o Super+Shift+1…0) | mandar la ventana a ese escritorio (también dentro de su grupo de 10) |
 | Ctrl+Super+←/→, Super+Re Pág/Av Pág, Super+rueda | escritorio anterior/siguiente |
 | Ctrl+Super+1…0 | saltar al mismo escritorio de otro grupo de 10 |
 | Ctrl+Super+Alt+1…0 | mandar la ventana a ese grupo |
@@ -119,6 +120,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Atajo | Qué hace |
 |---|---|
 | Super+flechas / Super+Shift+flechas | enfocar / mover la ventana |
+| Ctrl+Super+↑ / Ctrl+Super+↓ | mover la ventana hacia arriba / abajo (de Serpantinum; Ctrl+Super+←/→ cambian de escritorio) |
 | Super+- / Super+= | achicar / agrandar el ancho |
 | Super+Shift+- / Super+Shift+= | achicar / agrandar el alto |
 | Super+Alt+flechas | achicar y agrandar con las flechas |
@@ -148,8 +150,12 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Ctrl+Shift+Alt+V | escribir lo último del portapapeles (necesita `ydotool` y su servicio) |
 | Super+Alt+F12 | notificación de prueba |
 
-Lo que Caelestia tenía y Vortex no: el selector de emojis (Super+.) y el «mostrar todos los paneles»
-(Super+K abre el calendario, que es lo más parecido).
+Lo que Caelestia tenía y Vortex no: el «mostrar todos los paneles» (Super+K abre el calendario, que es lo
+más parecido).
+
+Las pruebas de los atajos corren sin VM ni sesión de Hyprland, en una carpeta temporal: `pruebas/atajos.sh`
+(`Hyprland --verify-config`, la lógica de cada atajo con un Hyprland falso, los comandos de shell ejecutados de
+verdad y el respaldo si `atajos.lua` falta o falla). Falta probarlos en una sesión real (VM).
 
 ### Gestor de recursos
 
@@ -225,7 +231,7 @@ bin/vortex-bench     medidor de ligereza
 bin/vortex-mcp       servidor MCP para Claude
 iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
 vm/                  VM de pruebas con QEMU, mediciones y previews
-pruebas/             pruebas que corren sin VM (gestor de recursos)
+pruebas/             pruebas que corren sin VM (gestor de recursos y atajos)
 ```
 
 ## Probar en una máquina virtual

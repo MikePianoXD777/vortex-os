@@ -16,11 +16,19 @@ local reemplazados = {
 -- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
 -- falta o falla, el escritorio arranca igual con los atajos de Serpantinum y un aviso.
 require("config/variables")
+-- Aviso de que los atajos no cargaron. notify-send solo no basta: el servidor de notificaciones
+-- es el propio shell, que arranca en este mismo evento, y si notify-send corre antes falla en
+-- silencio. Por eso el aviso sale primero por Hyprland (no depende del shell) y después por
+-- notify-send, que reintenta hasta que el shell esté arriba. Con un solo renglón del motivo: el
+-- error de require lista todas las rutas probadas.
 local function avisar_atajos(motivo)
-    motivo = tostring(motivo):gsub("[^%w%s%.:/_%-]", "")
+    motivo = tostring(motivo):match("[^\n]*"):gsub("[^%w%s%.:/_%-]", ""):sub(1, 160)
+    local texto = "Vortex: no se pudieron cargar los atajos de ~/.config/hypr/atajos.lua " ..
+        "(prueba vortex configurar-usuario). " .. motivo
     hl.on("hyprland.start", function()
-        hl.exec_cmd("notify-send -u critical 'Vortex: atajos' 'No se pudieron cargar los atajos de ~/.config/hypr/atajos.lua " ..
-            "(prueba vortex configurar-usuario). " .. motivo .. "'")
+        pcall(function() hl.notification.create({ text = texto, timeout = 20000, color = "rgba(ff5555ff)" }) end)
+        hl.exec_cmd("sh -c 'for i in $(seq 1 40); do notify-send -u critical \"Vortex: atajos\" \"" ..
+            texto .. "\" && exit 0; sleep 1; done'")
     end)
 end
 local ok_atajos, atajos = pcall(require, "atajos")
@@ -75,7 +83,9 @@ hl.config({
     ecosystem = { no_update_news = true, no_donation_nag = true },
     -- Los juegos con la regla «immediate» pueden ir sin vsync (menos latencia).
     general = { allow_tearing = true },
-    misc = { font_family = "Sans" },
+    -- allow_session_lock_restore: sin esto Hyprland rechaza el bloqueo nuevo si el shell murió con
+    -- la pantalla bloqueada y Super+Alt+L (recuperar el bloqueo) no puede hacer nada.
+    misc = { font_family = "Sans", allow_session_lock_restore = true },
 })
 
 -- Teclado del sistema (lo guarda el instalador; Serpantinum fija «us»).

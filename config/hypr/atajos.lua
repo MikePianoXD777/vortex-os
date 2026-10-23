@@ -7,10 +7,10 @@
 -- hyprland.lua carga este archivo antes de los atajos de Serpantinum: los de Serpantinum que
 -- chocan con uno de aquí se dejan de registrar (reemplaza) y el resto siguen como estaban.
 -- Hay atajos que ya eran iguales en Serpantinum y no se repiten: Super+Q (cerrar),
--- Super+flechas (enfocar), Super+L (bloquear), Super+Alt+F (maximizar), Super+clic
--- izquierdo/derecho (mover/redimensionar), Impr (captura de región), Super+Impr (pantalla
--- completa) y las teclas de brillo, mute, micrófono y reproducción. Los de Vortex (Super+A,
--- Super+Shift+A, Super+G, Super+E) están en hyprland.lua.
+-- Super+flechas (enfocar), Ctrl+Super+arriba/abajo (mover la ventana), Super+L (bloquear),
+-- Super+Alt+F (maximizar), Super+clic izquierdo/derecho (mover/redimensionar), Impr (captura
+-- de región), Super+Impr (pantalla completa) y las teclas de brillo, mute, micrófono y
+-- reproducción. Los de Vortex (Super+A, Super+Shift+A, Super+G, Super+E) están en hyprland.lua.
 -- Lo tuyo va en ~/.config/vortex/hypr-mio.lua (se carga al final).
 local M = {}
 
@@ -51,11 +51,6 @@ local function atajo(teclas, accion, opciones)
         return
     end
     lista[#lista + 1] = { teclas, accion, opciones }
-    reemplazados[normalizar(teclas)] = true
-end
-
--- Un atajo de Serpantinum que se quita sin poner nada en su lugar.
-local function quitar(teclas)
     reemplazados[normalizar(teclas)] = true
 end
 
@@ -101,13 +96,17 @@ local cerrar_paneles = hl.dsp.event("serpantinum:close")
 -- Escritorio N dentro del grupo de 10 escritorios del actual (Caelestia agrupa de 10 en 10:
 -- Super+1..0 va al escritorio 1..10 del grupo; Ctrl+Super+1..0 salta de grupo conservando
 -- la posición). En el primer grupo es igual que Super+número de Serpantinum. Como él, cierra
--- los paneles abiertos (evento «serpantinum:close»).
+-- los paneles abiertos (evento «serpantinum:close»). Super+Shift+número, el de Serpantinum
+-- para mandar la ventana, también va por grupo (igual que Super+Alt+número): el de siempre
+-- la mandaba al escritorio absoluto y en el grupo 2 la ventana desaparecía de la vista.
 local function wsaction(accion, rango, i)
     return function()
         local activo = hl.get_active_workspace()
         if not activo then return end
         local id = activo.id
-        local destino = (rango == "group") and ((i - 1) * 10 + (id % 10))
+        -- Posición dentro del grupo, de 1 a 10 (el 10, el 20, el 30… son la posición 10, no la 0).
+        local posicion = ((id - 1) % 10) + 1
+        local destino = (rango == "group") and ((i - 1) * 10 + posicion)
             or (math.floor((id - 1) / 10) * 10 + i)
         if destino < 1 then return end
         if accion == "move" then
@@ -119,13 +118,16 @@ local function wsaction(accion, rango, i)
     end
 end
 
--- Tamaño en % de la pantalla del monitor activo.
+-- Tamaño en % de la pantalla del monitor activo. width y height son píxeles físicos: las
+-- ventanas se miden en píxeles lógicos, así que se divide entre la escala del monitor.
 local function tamano_por_pantalla(x, y)
     local pantalla = hl.get_active_monitor()
     if pantalla and type(pantalla.width) == "number" and type(pantalla.height) == "number" then
         if not (x == 0 and y == 0) then
-            local w = (x and x > 0) and math.floor(pantalla.width * x / 100) or pantalla.width
-            local h = (y and y > 0) and math.floor(pantalla.height * y / 100) or pantalla.height
+            local escala = (type(pantalla.scale) == "number" and pantalla.scale > 0) and pantalla.scale or 1
+            local ancho, alto = pantalla.width / escala, pantalla.height / escala
+            local w = (x and x > 0) and math.floor(ancho * x / 100) or math.floor(ancho)
+            local h = (y and y > 0) and math.floor(alto * y / 100) or math.floor(alto)
             return { x = w, y = h, relative = false }
         end
     end
@@ -332,7 +334,7 @@ end)
 for i = 1, 10 do
     local tecla = i % 10 -- el 10 es la tecla 0
     atajo("SUPER + " .. tecla, wsaction("focus", "", i))
-    atajo("SUPER + ALT + " .. tecla, wsaction("move", "", i))
+    atajo({ "SUPER + ALT + " .. tecla, "SUPER + SHIFT + " .. tecla }, wsaction("move", "", i))
     atajo("CTRL + SUPER + " .. tecla, wsaction("focus", "group", i))
     atajo("CTRL + SUPER + ALT + " .. tecla, wsaction("move", "group", i))
 end
@@ -364,13 +366,11 @@ atajo("SUPER + SHIFT + Comma", hl.dsp.group.lock_active())
 
 -- Mover la ventana con las flechas (enfocar con Super+flechas es de Serpantinum). En
 -- Serpantinum mover era Ctrl+Super+flechas (izq./der. ahora cambian de escritorio) y
--- Super+Shift+flechas redimensionaba (redimensionar es Super+Alt+flechas): para no dejar
--- a medias el par arriba/abajo, también se quitan Ctrl+Super+arriba/abajo.
+-- Super+Shift+flechas redimensionaba (redimensionar es Super+Alt+flechas). Ctrl+Super+
+-- arriba/abajo no chocan con nada de Caelestia y se quedan como estaban (mover la ventana).
 for tecla, direccion in pairs({ Left = "left", Right = "right", Up = "up", Down = "down" }) do
     atajo("SUPER + SHIFT + " .. tecla, hl.dsp.window.move({ direction = direccion }))
 end
-quitar("CTRL + SUPER + Up")
-quitar("CTRL + SUPER + Down")
 
 -- Redimensionar.
 atajo_repetible({ "SUPER + Minus", "SUPER + ALT + Left" }, redimensionar(-10, 0))
@@ -426,7 +426,12 @@ atajo("SUPER + C", ejecutar("command -v zeditor >/dev/null && exec zeditor; exec
 -- Mike usaba su script «captura»: Impr = región, Super+Impr = pantalla, Alt+Impr = ventana.
 -- Las dos primeras ya son así en Serpantinum. «serpantinum screenshot» sin opciones abre el
 -- selector de región (que siempre congela la pantalla); también graba video desde su panel.
-atajo("ALT + Sys_Req", ejecutar([==[serpantinum screenshot --geometry "$(hyprctl activewindow -j | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')"]==]))
+-- Alt+Impr: sin ventana activa «hyprctl activewindow -j» da {} y jq -e no imprime nada (con
+-- -r solo saldría «null,null nullxnull», una geometría que grim no acepta): se avisa y ya.
+atajo("ALT + Sys_Req", ejecutar(
+    [==[g="$(hyprctl activewindow -j | jq -er 'select(.at) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')" || ]==] ..
+    [==[{ notify-send -u low 'Captura de la ventana' 'No hay ninguna ventana activa'; exit 0; }; ]==] ..
+    [==[exec serpantinum screenshot --geometry "$g"]==]))
 atajo({ "SUPER + SHIFT + S", "SUPER + SHIFT + ALT + S" }, ejecutar("serpantinum screenshot"))
 
 -- Grabar la pantalla (se vuelve a pulsar para parar): sin sonido, con el sonido del equipo y
@@ -477,7 +482,15 @@ atajo("SUPER + ALT + F12", ejecutar(
     [["Un aviso largo para probar cómo se corta y se ajusta\nSe cierra con clic medio o deslizándolo"]] ..
     " -a 'Shell' -A 'Test1=¡Listo!' -A 'Test2=Otra acción'"))
 
--- Sin equivalente en Vortex, no se registra: Super+. (selector de emojis; Caelestia usaba
--- fuzzel y Vortex no trae uno).
+-- Selector de emojis (Caelestia: «caelestia emoji -p», que se cierra al repetir el atajo). En
+-- Serpantinum es la pestaña «Emojis» del lanzador: al elegir uno lo copia (wl-copy) y se cierra.
+-- El lanzador vigila ~/.cache/serpantinum/launcher/last_tab.txt (0 aplicaciones, 1 archivos,
+-- 2 emojis), así que se escribe un 2 ahí y se abre. Como con cualquier cambio de pestaña, el
+-- lanzador la recuerda: Super abrirá en Emojis hasta que vuelvas a Aplicaciones con Tab.
+atajo("SUPER + Period", function()
+    hl.dispatch(ejecutar("mkdir -p ~/.cache/serpantinum/launcher && " ..
+        "echo 2 > ~/.cache/serpantinum/launcher/last_tab.txt"))
+    hl.dispatch(panel("launcher"))
+end)
 
 return M
