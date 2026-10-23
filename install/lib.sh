@@ -95,6 +95,10 @@ marcar_explicitos() {
 
 instalar_pacman() {
   (($#)) || return 0
+  local pkgs
+  mapfile -t pkgs < <(sin_variantes_instaladas "$@")
+  ((${#pkgs[@]})) || return 0
+  set -- "${pkgs[@]}"
   cambiar_jre_por_jdk "$@"
   con_reintentos srun pacman -S --needed --noconfirm "$@"
   marcar_explicitos "$@"
@@ -116,8 +120,28 @@ cambiar_jre_por_jdk() {
 
 # --removemake: borra las dependencias de compilación al terminar de construir (cmake, meson,
 # ninja, headers…), para no dejar cientos de MiB de herramientas que ya no hacen falta.
+# Si ya tienes la app en otra variante (heroic-games-launcher en vez de -bin, foo-git...), se deja
+# la tuya: con --noconfirm, pacman no quitaría la instalada y la instalación fallaría.
+sin_variantes_instaladas() {
+  local p base v
+  for p in "$@"; do
+    base="${p%-bin}"; base="${base%-git}"
+    for v in "$base" "$base-bin" "$base-git"; do
+      if [[ "$v" != "$p" ]] && pacman -Qq "$v" >/dev/null 2>&1; then
+        info "Ya tienes $v: se queda (no se instala $p)" >&2
+        continue 2
+      fi
+    done
+    printf '%s\n' "$p"
+  done
+}
+
 instalar_aur() {
   (($#)) || return 0
+  local pkgs
+  mapfile -t pkgs < <(sin_variantes_instaladas "$@")
+  ((${#pkgs[@]})) || return 0
+  set -- "${pkgs[@]}"
   con_reintentos run paru -S --needed --noconfirm --removemake "$@"
   marcar_explicitos "$@"
 }
