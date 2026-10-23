@@ -40,6 +40,17 @@ asistente de Super+A) viene marcado: se le instala Claude Code a cada usuario en
 internet, en segundo plano. Y en la pantalla de usuario hay una casilla para entrar al escritorio sin
 pedir la contraseña.
 
+El teclado que eliges en el instalador se aplica también al escritorio del live, para que la contraseña
+y la frase de cifrado se escriban con el teclado que vas a usar (el instalador abre con **latam** si el
+idioma es el español de Latinoamérica), y el shell queda en el idioma del sistema que elegiste.
+
+> **Secure Boot:** la ISO y el sistema instalado todavía no están firmados (no llevan shim ni kernel
+> firmado), así que con Secure Boot activo el firmware los rechaza («Security Violation», «Access
+> Denied»). **Desactívalo en la BIOS/UEFI antes de arrancar la ISO** (suele estar en Seguridad o
+> Arranque; se entra con F2, F10, F12, Supr o Esc al encender, y en algunas laptops con un botón
+> aparte). Si el live llega a abrirse con Secure Boot activo (p. ej. desde Ventoy), el instalador lo
+> avisa antes de tocar el disco. Firmarlo (shim + llave propia) sigue pendiente.
+
 ```bash
 iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
 sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso y el repo de CachyOS)

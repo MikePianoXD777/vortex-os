@@ -70,7 +70,20 @@ hl.on("hyprland.start", function()
     -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
     -- presión de memoria). «vortex gestor apagar» lo deshabilita.
     hl.exec_cmd("systemctl --user -q is-enabled vortex-gestor.service && systemctl --user start vortex-gestor.service")
+    -- Solo en el live (/etc/vortex/live): que el teclado del escritorio siga al que se elige en la
+    -- página «Teclado» de Calamares, que en Wayland solo se lo dice a localed. Escucha a D-Bus,
+    -- no gasta CPU; en el sistema instalado la marca ya no existe y esto no hace nada.
+    local live = io.open("/etc/vortex/live")
+    if live then
+        live:close()
+        hl.exec_cmd("vortex-teclado-live")
+    end
 end)
+-- Escala de los monitores: la de Serpantinum (1.0). No se pone scale = "auto" porque Hyprland lo
+-- calcula solo con los píxeles por pulgada y cambiaría pantallas de 1080p: 1.5 desde 140 PPI (una
+-- laptop de 15.6" o menos) y 2 si la pantalla no informa su tamaño (p. ej. algunas VMs). Quien tenga una
+-- pantalla 2.8K/4K lo pone en ~/.config/vortex/hypr-mio.lua:
+--   hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 require("config/monitors")
 require("config/settings")
 require("config/keybinds")

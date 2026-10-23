@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# vortex-teclado-live: solo en el live (/etc/vortex/live). Hace que el teclado del escritorio siga
+# al que se elige en la página «Teclado» de Calamares.
+#
+# Por qué hace falta: en Wayland Calamares no tiene cómo cambiar el teclado del compositor; solo
+# le dice a systemd-localed (org.freedesktop.locale1, SetX11Keyboard) cuál es la distribución, y
+# Hyprland no escucha a localed. Sin esto, la contraseña de «Usuarios» y la frase de cifrado de
+# los discos se escriben con el teclado US del live aunque ya se haya elegido otro (en AZERTY,
+# QWERTZ o latam cambian letras y símbolos), y luego el sistema instalado, que sí usa el elegido,
+# las rechaza.
+#
+# Cómo: se queda escuchando la señal PropertiesChanged de locale1 (gdbus monitor, que no gasta CPU
+# mientras nadie cambia nada: duerme en el bus, sin bucles con sleep) y cada vez que llega lee la
+# distribución X11 de localed y se la pone a Hyprland (hyprctl eval hl.config: en Hyprland 0.56
+# «hyprctl keyword» ya no funciona con la config en Lua). La señal se escucha por el nombre
+# del servicio, así que sigue sirviendo aunque localed se apague por inactividad y vuelva a
+# arrancar. Una sola copia a la vez.
+#
+# Variables solo para pruebas: VORTEX_RAIZ (prefijo de /etc/vortex/live), VORTEX_TECLADO_BLOQUEO
+# (archivo del candado).
+set -uo pipefail
+
+[[ -e "${VORTEX_RAIZ:-}/etc/vortex/live" ]] || exit 0
+
+# Una sola copia: si se vuelve a lanzar (p. ej. al recargar la config) la nueva sale.
+bloqueo="${VORTEX_TECLADO_BLOQUEO:-${XDG_RUNTIME_DIR:-/tmp}/vortex-teclado-live.lock}"
+exec 9>"$bloqueo"
+flock -n 9 || exit 0
+
+LOCALED=(org.freedesktop.locale1 /org/freedesktop/locale1)
+
+# hyprctl contra el Hyprland de esta sesión (o el primero si el entorno no trae la firma).
+hypr() {
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then hyprctl "$@"; else hyprctl -i 0 "$@"; fi
+}
+
+ultimo=""
+aplicar() {
+  local valores layout variante opciones lua
+  # Tres líneas «s "valor"»: distribución, variante y opciones (separadas por comas si hay varias
+  # distribuciones, p. ej. «latam,us»).
+  mapfile -t valores < <(busctl --system get-property "${LOCALED[0]}" "${LOCALED[1]}" "${LOCALED[0]}" \
+    X11Layout X11Variant X11Options 2>/dev/null | sed -n 's/^s "\(.*\)"$/\1/p')
+  layout="${valores[0]:-}" variante="${valores[1]:-}" opciones="${valores[2]:-}"
+  # Sin distribución (localed todavía no tiene ninguna) no hay nada que aplicar. Y solo caracteres
+  # de XKB: el valor termina dentro de un trozo de Lua.
+  [[ "$layout" =~ ^[A-Za-z0-9_,]+$ ]] || return 0
+  [[ "$variante" =~ ^[A-Za-z0-9_,.-]*$ ]] || variante=""
+  [[ "$opciones" =~ ^[A-Za-z0-9_:,.-]*$ ]] || opciones=""
+  # Lo mismo que ya está puesto no se vuelve a mandar (Calamares avisa varias veces por cambio).
+  [[ "$layout|$variante|$opciones" != "$ultimo" ]] || return 0
+  lua="hl.config({ input = { kb_layout = \"$layout\", kb_variant = \"$variante\""
+  # Sin opciones de localed se deja la de Hyprland (Alt+Shift para cambiar de distribución).
+  [[ -z "$opciones" ]] || lua+=", kb_options = \"$opciones\""
+  lua+=" } })"
+  if hypr eval "$lua" >/dev/null 2>&1; then
+    ultimo="$layout|$variante|$opciones"
+  else
+    echo "vortex-teclado-live: Hyprland no aceptó la distribución «$layout» (variante «$variante»)" >&2
+  fi
+}
+
+# Primero se empieza a escuchar y después se lee lo que hay: si el cambio llega entre una cosa y
+# la otra no se pierde. $! es el gdbus mismo (exec), para cerrarlo al salir.
+exec 3< <(exec gdbus monitor --system --dest "${LOCALED[0]}" --object-path "${LOCALED[1]}" 2>/dev/null)
+monitor=$!
+trap 'kill "$monitor" 2>/dev/null' EXIT
+aplicar
+while IFS= read -r linea <&3; do
+  [[ "$linea" == *PropertiesChanged* ]] && aplicar
+done
+echo "vortex-teclado-live: se cerró el monitor de D-Bus (gdbus)" >&2
+exit 1
