@@ -97,7 +97,14 @@ al apagarlo vuelve el fondo y los ajustes de antes.
 pública de [Wallhaven](https://wallhaven.cc) (solo SFW) a `Imágenes/Fondos/otaku/`, guarda de dónde
 salió cada uno en `fuentes.json` y los borra al apagar; los derechos son de sus autores. Sin red usa un
 fondo original de Vortex (audífonos estilizados, `config/fondos/otaku/generar.py`).
-Las pruebas corren sin red ni shell: `pruebas/otaku.sh`.
+Las pruebas corren sin red ni shell: `pruebas/otaku.sh` (el comando) y `pruebas/otaku-qml.sh` (el
+interruptor, con el quickshell de verdad sin pantalla).
+
+**En un sistema ya instalado:** `vortex actualizar` copia los comandos de `bin/` a `/usr/local/bin`
+(con sudo) para que el shell y lo que llama se actualicen juntos. Como el `vortex` anterior no hace
+eso, la primera vez hay que correr, desde la carpeta de Vortex,
+`sudo install -m755 bin/vortex bin/vortex-otaku /usr/local/bin/` y luego `vortex actualizar --forzar`
+(para que llegue el shell con el interruptor).
 
 ### Claude en el sistema
 
@@ -158,7 +165,7 @@ bin/vortex-otaku     modo otaku (easter egg): fondo de Wallhaven + toque de pers
 bin/vortex-mcp       servidor MCP para Claude
 iso/                 la ISO: perfil de archiso, instalador gráfico (Calamares) y repo local [vortex]
 vm/                  VM de pruebas con QEMU, mediciones y previews
-pruebas/             pruebas que corren sin VM (gestor de recursos, modo otaku)
+pruebas/             pruebas que corren sin VM (gestor de recursos, modo otaku y su interruptor)
 ```
 
 ## Probar en una máquina virtual

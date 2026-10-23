@@ -25,9 +25,17 @@ SettingsBlob {
         stateProc.running = true;
     }
 
+    // Al cerrar Ajustes el shell descarga esta sección y mata a lo que su Process tenga corriendo:
+    // sin más, cerrarla durante la descarga dejaría el modo a medias. Por eso el comando va en su
+    // propia sesión (setsid) y sin pegarse a las tuberías del Process (no lo mata un SIGPIPE):
+    // sigue solo hasta el final, y al volver a abrir Ajustes se lee la marca. Si el comando no
+    // está (un sistema que se actualizó sin reinstalar /usr/local/bin) avisa en vez de callar.
+    readonly property string runScript: 'command -v vortex-otaku >/dev/null || { notify-send -a "Vortex OS" "Modo otaku" "Falta el comando vortex-otaku. En la carpeta de Vortex: sudo install -m755 bin/vortex bin/vortex-otaku /usr/local/bin/" 2>/dev/null; exit 127; }; '
+        + 'setsid -w vortex-otaku "$1" </dev/null >/dev/null 2>&1 & wait $!'
+
     function setOtaku(on) {
         if (toggleProc.running) return;
-        toggleProc.command = ["vortex-otaku", on ? "on" : "off"];
+        toggleProc.command = ["bash", "-c", section.runScript, "vortex-otaku", on ? "on" : "off"];
         toggleProc.running = true;
         // Si el comando no pudo ni arrancar, no hay "terminó": se vuelve a leer el estado real.
         recheckTimer.restart();

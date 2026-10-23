@@ -648,8 +648,8 @@
       },
       "otaku": {
         "title": "Otaku mode",
-        "desc": "Miku Nakano wallpaper and softer corners. Downloaded when enabled; turn it off and everything goes back as it was",
-        "working": "Working… (downloading wallpapers)"
+        "desc": "Miku Nakano wallpaper, a different font and softer corners. Downloaded when enabled; turn it off and everything goes back as it was",
+        "working": "Working…"
       },
       "colors": {
         "title": "Color themes",

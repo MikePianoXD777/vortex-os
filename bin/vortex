@@ -326,6 +326,23 @@ cmd_java() {
   esac
 }
 
+# Vortex: los comandos de bin/ viven como copias en /usr/local/bin (install/30-escritorio.sh; la
+# misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
+# algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
+# El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku)
+
+instalar_comandos() {
+  local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
+  for c in "${COMANDOS_VORTEX[@]}"; do
+    [[ -f "$VORTEX_DIR/bin/$c" ]] || continue
+    if cmp -s "$VORTEX_DIR/bin/$c" "$destino/$c"; then continue; fi
+    # install borra el destino y crea otro: un vortex que se esté ejecutando sigue con el suyo.
+    sudo install -Dm755 "$VORTEX_DIR/bin/$c" "$destino/$c" \
+      || aviso "no pude actualizar $destino/$c (a mano: sudo install -Dm755 $VORTEX_DIR/bin/$c $destino/$c)"
+  done
+}
+
 cmd_actualizar() {
   if [[ -d "$VORTEX_DIR/.git" ]]; then
     # Sin red, sin repo publicado o con historia divergida el pull falla: no debe
@@ -335,6 +352,7 @@ cmd_actualizar() {
   else
     aviso "este Vortex no es un repo git; no puedo actualizarlo"
   fi
+  instalar_comandos
   paru -Syu
   # El shell viene de shell/ de este repo: se reconstruye su paquete si cambió.
   local instalado

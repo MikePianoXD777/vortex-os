@@ -658,8 +658,8 @@
       },
       "otaku": {
         "title": "Modo otaku",
-        "desc": "Fondo de Miku Nakano y bordes más suaves. Se descarga al encenderlo; al apagarlo todo vuelve como estaba",
-        "working": "Trabajando… (descargando fondos)"
+        "desc": "Fondo de Miku Nakano, otra fuente y bordes más suaves. Se descarga al encenderlo; al apagarlo todo vuelve como estaba",
+        "working": "Trabajando…"
       }
     },
     "file_picker": {

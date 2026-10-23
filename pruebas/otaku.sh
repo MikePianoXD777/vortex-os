@@ -5,7 +5,10 @@
 #   3. el comando entero con HOME temporal y curl, quickshell, hyprctl, notify-send y sleep
 #      falsos: encender con Wallhaven (respuesta de la API inventada), apagar, otro fondo,
 #      sin red (fondo de respaldo), con la IPC del shell caída, ajustes sin «theme», ajustes
-#      rotos o inexistentes y respuestas de la API que intentan mandarnos a otro servidor.
+#      rotos o inexistentes, ajustes que no se pueden escribir al apagar, restos de una pasada
+#      anterior y respuestas de la API que intentan mandarnos a otro servidor (también uno de
+#      un dominio parecido, evilwallhaven.cc);
+#   4. «vortex actualizar» deja los comandos de bin/ en el destino (uno de mentira, no /usr/local/bin).
 # Nada se baja de Internet: el curl falso sirve un JSON y «imágenes» (bytes de jpg) de mentira.
 #
 #   pruebas/otaku.sh
@@ -27,7 +30,7 @@ if command -v shellcheck >/dev/null; then
 else
   echo "  --  shellcheck no está instalado: se salta"
 fi
-for c in jq flock shuf od; do
+for c in jq flock shuf od setsid; do
   command -v "$c" >/dev/null || { echo "Falta $c para las pruebas"; exit 1; }
 done
 
@@ -63,6 +66,7 @@ case "$url" in
   https://w.wallhaven.cc/full/*/wallhaven-bbbbbb.*) exit 22 ;;
   https://w.wallhaven.cc/full/*)
     printf '\xff\xd8\xff\xe0' >"$salida"
+    [[ -e "$T/curl-lento" ]] && /usr/bin/sleep 3 # (sleep de PATH es falso) para poder cortar la pasada a medias
     head -c 70000 /dev/urandom >>"$salida"
     ;;
   *) exit 6 ;;
@@ -93,8 +97,10 @@ EOF
 chmod +x "$T"/bin/*
 export T
 
-# Respuesta de la API: 7 resultados buenos (uno, bbbbbb, falla al bajar; otro, gggggg, viene sin «url»), uno vertical, uno
-# que no es de Wallhaven, uno con un nombre sospechoso y uno sin «url».
+# Respuesta de la API: 7 resultados buenos (uno, bbbbbb, falla al bajar; otro, gggggg, viene sin «url») y,
+# ANTES de ellos para que el filtro tenga que pararlos (el tope de 5 no los salvaría): uno vertical, tres que
+# no son de Wallhaven (otro servidor, un dominio que solo termina en «wallhaven.cc» y otro que lo trae de
+# prefijo), uno con un nombre sospechoso y un gif.
 python3 - "$T/api.json" <<'EOF'
 import json, sys
 def r(i, ext="jpg", w=1920, h=1080, host="w.wallhaven.cc", tipo=None, nombre=None, url=True):
@@ -103,9 +109,10 @@ def r(i, ext="jpg", w=1920, h=1080, host="w.wallhaven.cc", tipo=None, nombre=Non
     if url:
         d["url"] = f"https://wallhaven.cc/w/{i}"
     return d
-datos = [r("aaaaaa"), r("bbbbbb"), r("gggggg", url=False), r("cccccc", "png"), r("dddddd"), r("eeeeee", "png"), r("ffffff"),
-         r("hhhhhh", w=1080, h=1920), r("iiiiii", host="evil.example.com"), r("jjjjjj", nombre="..%2f..%2fx.jpg"),
-         r("kkkkkk", tipo="image/gif", ext="gif"), r("llllll")]
+datos = [r("hhhhhh", w=1080, h=1920), r("iiiiii", host="evil.example.com"), r("mmmmmm", host="evilwallhaven.cc"),
+         r("nnnnnn", host="wallhaven.cc.evil.com"), r("jjjjjj", nombre="..%2f..%2fx.jpg"), r("kkkkkk", tipo="image/gif", ext="gif"),
+         r("aaaaaa"), r("bbbbbb"), r("gggggg", url=False), r("cccccc", "png"), r("dddddd"), r("eeeeee", "png"), r("ffffff"),
+         r("llllll")]
 json.dump({"data": datos, "meta": {"total": len(datos)}}, open(sys.argv[1], "w"))
 EOF
 
@@ -114,7 +121,7 @@ FONDOS_ESP="$H/Imágenes/Fondos"
 # Arranca una «sesión» limpia: HOME nuevo, ajustes del shell y un fondo ya puesto en DP-1.
 nueva_sesion() {
   rm -rf "$H"
-  rm -f "$T/curl.log" "$T/ipc.log" "$T/notify.log" "$T/hyprctl.log" "$T/sleep.log" "$T/sin-red" "$T/ipc-falla"
+  rm -f "$T/curl.log" "$T/ipc.log" "$T/notify.log" "$T/hyprctl.log" "$T/sleep.log" "$T/sin-red" "$T/ipc-falla" "$T/curl-lento"
   mkdir -p "$H/.config/serpantinum" "$FONDOS_ESP" "$H/.cache/serpantinum/wallpaper"
   printf 'XDG_PICTURES_DIR="$HOME/Imágenes"\n' >"$H/.config/user-dirs.dirs"
   printf 'JPG-DEL-USUARIO' >"$FONDOS_ESP/vortex-azul.jpg"
@@ -158,8 +165,9 @@ probar "la primera petición es la búsqueda SFW de Nakano Miku" \
   "[[ \"\$(head -n1 '$T/curl.log')\" == 'https://wallhaven.cc/api/v1/search?q=Nakano%20Miku&categories=010&purity=100&sorting=favorites&atleast=1920x1080' ]]"
 probar "baja 5 fondos a Imágenes/Fondos/otaku (con tilde y espacios en la ruta)" "((\$(numero_fondos) == 5))"
 probar "los que fallan (bbbbbb) se saltan y se baja el siguiente" "[[ ! -e '$FONDOS_ESP/otaku/wallhaven-bbbbbb.jpg' ]] && [[ -e '$FONDOS_ESP/otaku/wallhaven-eeeeee.png' && ! -e '$FONDOS_ESP/otaku/wallhaven-ffffff.jpg' ]]"
-probar "no pide nada fuera de wallhaven.cc ni los verticales ni los gif" \
-  "! grep -q -E 'evil|hhhhhh|kkkkkk|x\\.jpg|llllll' '$T/curl.log'"
+probar "no pide nada fuera de wallhaven.cc (ni evilwallhaven.cc ni wallhaven.cc.evil.com) ni los verticales ni los gif" \
+  "! grep -q -E 'evil|hhhhhh|kkkkkk|mmmmmm|nnnnnn|x\\.jpg|llllll' '$T/curl.log'"
+probar "sí pide a los subdominios de wallhaven.cc (w.wallhaven.cc)" "grep -q '^https://w\\.wallhaven\\.cc/full/' '$T/curl.log'"
 probar "fuentes.json guarda la URL de Wallhaven de cada fondo" \
   "[[ \"\$(jq -r '.fondos | map(.url | startswith(\"https://wallhaven.cc/w/\")) | all' '$FONDOS_ESP/otaku/fuentes.json')\" == true ]] && [[ \"\$(jq '.fondos | length' '$FONDOS_ESP/otaku/fuentes.json')\" == 5 ]]"
 probar "el que no traía «url» se arma con su id" \
@@ -263,6 +271,70 @@ probar "sin Hyprland usa «all» en la IPC" "grep -q '^$CALL all ' '$T/ipc.log'"
 otaku off >/dev/null
 probar "sin fondo anterior, off pone el de Vortex" "grep -q '^$CALL all $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
 
+echo "== Los ajustes no se pueden devolver al apagar"
+nueva_sesion
+otaku on >/dev/null
+chmod 555 "$H/.config/serpantinum" # sin permiso para crear el temporal: jq/mktemp no pueden escribir
+salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
+chmod 755 "$H/.config/serpantinum"
+probar "off avisa de que los ajustes no volvieron" "((rc == 0)) && grep -q 'no pude devolver los ajustes' '$T/salida' && grep -q 'ajustes del shell no volvieron' '$T/salida'"
+probar "…conserva lo de antes (el aviso promete ese archivo) y quita la marca" \
+  "[[ -f '$ANTES' && ! -e '$MARCA' && \"\$(jq -r '.tema.fontFamily' '$ANTES')\" == 'Adwaita Mono' ]]"
+probar "…y no promete nada falso: el fondo sí volvió y los archivos se borraron" "[[ ! -e '$FONDOS_ESP/otaku' ]] && grep -q '^$CALL DP-1 $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
+salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
+probar "otro off lo reintenta con lo guardado y ahora sí lo deja todo como estaba" \
+  "((rc == 0)) && [[ ! -e '$ANTES' && \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]] && grep -q 'todo volvió a como estaba' '$T/salida'"
+
+echo "== Restos de una pasada anterior (off con el shell caído y luego on con otra lista)"
+nueva_sesion
+touch "$T/ipc-falla"
+otaku on >/dev/null
+otaku off >/dev/null
+rm -f "$T/ipc-falla"
+probar "el off con el shell caído deja los archivos (el shell podría estar usándolos)" "((\$(numero_fondos) == 5)) && [[ ! -e '$MARCA' ]]"
+touch "$T/sin-red"
+printf 'JPG-DEL-USUARIO-EN-OTAKU' >"$FONDOS_ESP/otaku/mio.jpg"
+otaku on >/dev/null
+probar "el on sin red deja solo el fondo de respaldo (los 5 de antes se podan)" \
+  "[[ \"\$(find '$FONDOS_ESP/otaku' -maxdepth 1 -name 'wallhaven-*' | wc -l)\" == 0 && -f '$FONDOS_ESP/otaku/otaku-respaldo.jpg' ]]"
+probar "…y no toca archivos que el comando no creó" "[[ -f '$FONDOS_ESP/otaku/mio.jpg' ]]"
+otaku off >/dev/null
+probar "el off siguiente borra todo lo suyo (queda solo lo ajeno)" \
+  "[[ \"\$(ls -A '$FONDOS_ESP/otaku')\" == mio.jpg ]]"
+rm -f "$FONDOS_ESP/otaku/mio.jpg"
+nueva_sesion
+mkdir -p "$FONDOS_ESP/otaku"
+head -c 70000 /dev/urandom >"$FONDOS_ESP/otaku/wallhaven-zzzzzz.jpg"
+printf '{"fondos":[{"archivo":"wallhaven-zzzzzz.jpg"}]}' >"$FONDOS_ESP/otaku/fuentes.json"
+otaku on >/dev/null
+probar "un resto que la lista nueva ya no menciona se poda; los de la lista se quedan" \
+  "[[ ! -e '$FONDOS_ESP/otaku/wallhaven-zzzzzz.jpg' ]] && ((\$(numero_fondos) == 5))"
+otaku off >/dev/null
+probar "…y el off siguiente deja la carpeta limpia" "[[ ! -e '$FONDOS_ESP/otaku' ]]"
+
+echo "== Se corta la pasada en plena descarga (Ajustes cerrado, apagón) y se vuelve a encender"
+nueva_sesion
+touch "$T/curl-lento"
+(
+  setsid env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_STATE_HOME -u XDG_RUNTIME_DIR -u HYPRLAND_INSTANCE_SIGNATURE -u QS_SETTINGS \
+    HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent "$AQUI/bin/vortex-otaku" on >/dev/null 2>&1 &
+  echo $! >"$T/pid-corte"
+)
+for _ in $(seq 1 50); do
+  compgen -G "$FONDOS_ESP/otaku/.*.parcial" >/dev/null && break
+  /usr/bin/sleep 0.1
+done
+probar "la pasada va por la mitad (hay un .parcial y aún no hay marca)" "compgen -G '$FONDOS_ESP/otaku/.*.parcial' >/dev/null && [[ ! -e '$MARCA' ]]"
+kill -9 -- "-$(cat "$T/pid-corte")" 2>/dev/null
+/usr/bin/sleep 0.3
+rm -f "$T/curl-lento"
+salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
+probar "el siguiente on se recupera: enciende, 5 fondos y su fuentes.json" \
+  "((rc == 0)) && [[ -f '$MARCA' ]] && ((\$(numero_fondos) == 5)) && [[ \"\$(jq '.fondos | length' '$FONDOS_ESP/otaku/fuentes.json')\" == 5 ]] && ! compgen -G '$FONDOS_ESP/otaku/.*.parcial' >/dev/null"
+otaku off >/dev/null; rc=$?
+probar "…y el off deja todo como estaba" \
+  "((rc == 0)) && [[ ! -e '$FONDOS_ESP/otaku' && \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
+
 echo "== Cortado a medias"
 nueva_sesion
 mkdir -p "$H/.config/vortex"
@@ -287,6 +359,31 @@ env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent "$AQUI/bin/
 probar "«vortex otaku estado» llega al comando" "grep -q 'Modo otaku: apagado' '$T/salida'"
 env HOME="$H" "$AQUI/bin/vortex" ayuda >"$T/salida" 2>&1
 probar "la ayuda de vortex lo lista" "grep -q 'otaku' '$T/salida'"
+
+echo "== vortex actualizar deja los comandos al día"
+mkdir -p "$T/destino" "$T/repo/bin" "$T/repo/shell"
+for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku; do
+  cp "$AQUI/bin/$c" "$T/repo/bin/$c"
+done
+cp "$AQUI/install.sh" "$T/repo/install.sh"
+cp "$AQUI/shell/version.txt" "$T/repo/shell/version.txt"
+printf '#!/usr/bin/env bash\nexec "$@"\n' >"$T/bin/sudo"
+printf '#!/usr/bin/env bash\necho "paru $*" >>"$T/paru.log"\n' >"$T/bin/paru"
+printf '#!/usr/bin/env bash\necho "vortex-shell $(cat "$T/repo/shell/version.txt")-1"\n' >"$T/bin/pacman"
+chmod +x "$T/bin/sudo" "$T/bin/paru" "$T/bin/pacman"
+printf '#!/usr/bin/env bash\n# viejo\n' >"$T/destino/vortex"
+chmod 755 "$T/destino/vortex"
+salida="$(env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar 2>&1)"; rc=$?
+printf '%s\n' "$salida" >"$T/salida"
+probar "actualizar termina bien y sigue con los paquetes" "((rc == 0)) && grep -q 'paru -Syu' '$T/paru.log'"
+probar "copia los comandos que faltaban (vortex-otaku) y reemplaza los viejos (vortex)" \
+  "cmp -s '$AQUI/bin/vortex-otaku' '$T/destino/vortex-otaku' && cmp -s '$AQUI/bin/vortex' '$T/destino/vortex' && [[ -x '$T/destino/vortex-otaku' ]]"
+mtime_antes="$(stat -c %Y.%y "$T/destino/vortex-otaku")"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1
+probar "si no cambiaron, no los vuelve a copiar (ni pide sudo)" "[[ \"\$(stat -c %Y.%y '$T/destino/vortex-otaku')\" == '$mtime_antes' ]]"
+lista_instalador="$(sed -n 's/^for comando in \(.*\); do$/\1/p' "$AQUI/install/30-escritorio.sh")"
+lista_vortex="$(sed -n 's/^COMANDOS_VORTEX=(\(.*\))$/\1/p' "$AQUI/bin/vortex")"
+probar "la lista de bin/vortex es la misma que la de install/30-escritorio.sh" "[[ -n '$lista_instalador' && '$lista_instalador' == '$lista_vortex' ]]"
 
 echo
 if ((FALLOS)); then
