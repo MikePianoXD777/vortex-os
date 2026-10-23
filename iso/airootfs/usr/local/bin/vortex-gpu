@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# vortex-gpu: termina de instalar los drivers de la GPU (chwd) cuando la instalación no pudo.
+#
+# vortex-post-instalacion corre «chwd -a» dentro de la instalación; si no había red (o pacman no
+# tenía las bases sincronizadas), deja la marca /var/lib/vortex/chwd-pendiente. Este programa
+# (vortex-gpu.service, al arrancar con red) la atiende: pone al día pacman, corre «chwd -a», borra la
+# marca y avisa en el escritorio. Sin marca no hace nada; si falla (sin red otra vez), la marca
+# se queda y el servicio lo vuelve a intentar.
+set -uo pipefail
+
+MARCA="${VORTEX_GPU_MARCA:-/var/lib/vortex/chwd-pendiente}"
+log() { printf 'vortex-gpu: %s\n' "$*"; }
+
+[[ -e "$MARCA" ]] || exit 0
+command -v chwd >/dev/null || { log "no hay chwd: no hay nada que instalar"; rm -f "$MARCA"; exit 0; }
+
+# Una notificación para cada persona con sesión abierta (el servicio corre como root, sin sesión).
+avisar() {
+  local titulo="$1" texto="$2" uid usuario bus
+  while read -r uid usuario _; do
+    bus="${VORTEX_GPU_RUN_USER:-/run/user}/$uid/bus"
+    [[ -S "$bus" ]] || continue
+    runuser -u "$usuario" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=$bus" \
+      notify-send -a "Vortex OS" -i video-display "$titulo" "$texto" 2>/dev/null || true
+  done < <(loginctl list-users --no-legend 2>/dev/null)
+}
+
+# Las bases de pacman no vienen en la imagen, y actualizar todo junto (nunca «-Sy» a secas: sería una
+# actualización parcial). Primero los llaveros, por si el de la imagen es más viejo que las firmas.
+log "sincronizando pacman y actualizando el sistema"
+if ! pacman -Sy --noconfirm --needed archlinux-keyring cachyos-keyring || ! pacman -Su --noconfirm; then
+  log "pacman no pudo actualizar (¿sin red?): se reintenta"
+  exit 1
+fi
+log "instalando los drivers de la GPU (chwd -a)"
+if ! chwd -a; then
+  log "chwd no pudo instalar los drivers: se reintenta"
+  exit 1
+fi
+rm -f "$MARCA"
+log "drivers de la GPU instalados"
+# El kernel, o los módulos de la GPU, pueden haber cambiado: con un reinicio quedan en uso.
+avisar "Drivers de video instalados" "Reinicia para usarlos."
+exit 0

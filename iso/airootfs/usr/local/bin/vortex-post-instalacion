@@ -5,30 +5,147 @@
 #   vortex-post-instalacion final USUARIO   al final, antes del gestor de arranque
 #   vortex-post-instalacion arranque        después del gestor de arranque (entradas «Vortex OS»)
 #   vortex-post-instalacion inicio-automatico USUARIO   entra solo al escritorio (lo llama «final»)
+#   vortex-post-instalacion grub            el menú de GRUB, solo en BIOS (lo llama «final»)
+#   vortex-post-instalacion gpu             drivers de la GPU con chwd (lo llama «final»)
 #
 # La imagen del USB es Vortex completo, pero trae piezas que solo sirven para arrancar desde
 # el USB (hooks de archiso, el usuario live, el instalador). Aquí se quitan y se hace lo que
 # install.sh decide según el equipo: drivers de la GPU (chwd), Bluetooth y systemd-oomd.
+#
+# El arranque depende del firmware: en UEFI, systemd-boot (entradas propias, ver paso_arranque);
+# en BIOS/legacy, GRUB (systemd-boot es solo UEFI), con os-prober para ver otros sistemas.
+#
+# VORTEX_RAIZ (solo para pruebas) apunta a una raíz falsa en vez de «/».
 set -uo pipefail
 
 log() { printf 'vortex-post-instalacion: %s\n' "$*"; }
 
+# ¿Este equipo arrancó en BIOS/legacy? /sys/firmware/efi solo existe cuando el firmware es UEFI.
+# Dentro del chroot de Calamares /sys está montado (también lo necesita bootctl); si por lo que
+# sea no se ve, no se supone BIOS: el arranque UEFI, que ya está probado, queda como estaba.
+es_bios() { [[ -d "${VORTEX_RAIZ:-}/sys/firmware" && ! -d "${VORTEX_RAIZ:-}/sys/firmware/efi" ]]; }
+
+# ¿Hay una GPU NVIDIA? (chwd usa la misma consulta: clase 03xx, o sea pantalla/3D.)
+hay_nvidia() { command -v lspci >/dev/null && [[ -n "$(lspci -d '10de:*:03xx' 2>/dev/null)" ]]; }
+
+# MB que ocupa un kernel en /boot mientras se instala: su vmlinuz, un initramfs y la copia de los
+# dos que deja el gestor de arranque (kernel-install) hasta que paso_arranque la borra. Un
+# initramfs con autodetect pesa 30-50 MB (el de NVIDIA llega a 100+, pero eso viene después con
+# chwd); se cuentan 60 para quedar del lado seguro.
+MB_INITRAMFS="${VORTEX_MB_INITRAMFS:-60}"
+
+# Quita un kernel que no cabe en /boot. Se quita el paquete (si no, el hook de mkinitcpio lo
+# traería de vuelta a /boot en la próxima actualización) y su preset (si no, initcpio le armaría
+# un initramfs sin kernel). Si pacman no puede, al menos no se copia a /boot.
+quitar_kernel() {
+  local raiz="${VORTEX_RAIZ:-}" pkgbase="$1"
+  pacman ${raiz:+--root "$raiz"} -Rdd --noconfirm "$pkgbase" || log "no pude quitar el paquete $pkgbase: no lo copio a /boot"
+  rm -f "$raiz/etc/mkinitcpio.d/$pkgbase.preset"
+}
+
 paso_kernel() {
+  local raiz="${VORTEX_RAIZ:-}" boot
+  boot="$raiz/boot"
   # Sin los hooks de archiso; los pasos initcpiocfg e initcpio de Calamares arman el normal.
-  rm -f /etc/mkinitcpio.conf.d/archiso.conf
+  rm -f "$raiz/etc/mkinitcpio.conf.d/archiso.conf"
   # mkarchiso deja /boot vacío (el kernel del USB va aparte): cada kernel instalado vuelve a
   # /boot desde /usr/lib/modules, con su preset de mkinitcpio.
   local vmlinuz dir pkgbase preset
-  for vmlinuz in /usr/lib/modules/*/vmlinuz; do
+  local bases=()
+  local -A imagen=() costo=()
+  for vmlinuz in "$raiz"/usr/lib/modules/*/vmlinuz; do
     dir="${vmlinuz%/vmlinuz}"
     read -r pkgbase <"$dir/pkgbase" 2>/dev/null || continue
-    install -Dm644 "$vmlinuz" "/boot/vmlinuz-$pkgbase"
-    preset="/etc/mkinitcpio.d/$pkgbase.preset"
-    if [[ ! -e "$preset" ]]; then
-      sed "s|%PKGBASE%|$pkgbase|g" /usr/share/mkinitcpio/hook.preset | install -Dm644 /dev/stdin "$preset"
+    [[ -n "${imagen[$pkgbase]:-}" ]] || bases+=("$pkgbase")
+    imagen[$pkgbase]="$vmlinuz"
+  done
+
+  # Junto a Windows, la partición EFI que ya existe (100-260 MB) es también /boot: ahí caben los
+  # kernels con sus initramfs, pero a veces no los dos. Si no caben, el de respaldo (el de Arch)
+  # no se instala: mkinitcpio fallaría con «No space left on device» a mitad de la instalación,
+  # con la partición de Windows ya reducida. El kernel de Vortex (linux-cachyos) es el que se queda.
+  local libre necesarios=0
+  for pkgbase in "${bases[@]}"; do
+    costo[$pkgbase]=$((2 * ($(stat -c %s "${imagen[$pkgbase]}") / 1048576 + 1 + MB_INITRAMFS)))
+    necesarios=$((necesarios + costo[$pkgbase]))
+  done
+  libre="$(df -Pm "$boot" 2>/dev/null | awk 'NR == 2 {print $4}')"
+  if [[ "$libre" =~ ^[0-9]+$ ]] && ((necesarios > libre)); then
+    if [[ -n "${imagen[linux-cachyos]:-}" ]] && ((${#bases[@]} > 1)); then
+      log "AVISO: /boot tiene $libre MB libres y los kernels (${bases[*]}) piden ~$necesarios MB (¿la partición EFI de Windows es chica?): dejo solo linux-cachyos"
+      for pkgbase in "${bases[@]}"; do
+        [[ "$pkgbase" == linux-cachyos ]] || quitar_kernel "$pkgbase"
+      done
+      bases=(linux-cachyos)
+      necesarios="${costo[linux-cachyos]}"
     fi
+    if ((necesarios > libre)); then
+      log "AVISO: /boot tiene $libre MB libres y ${bases[*]} pide ~$necesarios MB: puede faltar espacio (mejor una partición EFI de 500 MB o más, o el particionado manual)"
+    fi
+  fi
+
+  for pkgbase in "${bases[@]}"; do
+    install -Dm644 "${imagen[$pkgbase]}" "$boot/vmlinuz-$pkgbase"
+    preset="$raiz/etc/mkinitcpio.d/$pkgbase.preset"
+    if [[ ! -e "$preset" ]]; then
+      sed "s|%PKGBASE%|$pkgbase|g" "$raiz/usr/share/mkinitcpio/hook.preset" | install -Dm644 /dev/stdin "$preset"
+    fi
+    # Sin la imagen «fallback» (initramfs sin autodetect, de decenas de MB más): ninguna entrada
+    # de arranque de Vortex la usa, así que solo gastaría espacio de /boot.
+    sed -i "s/^PRESETS=.*/PRESETS=('default')/" "$preset"
     log "kernel $pkgbase en /boot"
   done
+}
+
+# Lo que solo sirve para arrancar desde el USB y se desinstala del sistema instalado (los que
+# estén instalados, uno por línea). os-prober se queda en BIOS: GRUB lo usa para poner a Windows
+# (u otro Linux) en su menú; con systemd-boot (UEFI) no hace falta, el gestor ya ve Windows solo.
+paquetes_del_live() {
+  local p
+  for p in calamares ckbcomp os-prober mkinitcpio-archiso; do
+    [[ "$p" == os-prober ]] && es_bios && continue
+    pacman -Qq "$p" >/dev/null 2>&1 && echo "$p"
+  done
+}
+
+# El menú de GRUB, solo en BIOS: lo genera el módulo bootloader de Calamares (grub-install y
+# grub-mkconfig) justo después de este paso, y lee este archivo. Va en /etc/default/grub.d y no
+# en /etc/default/grub para que sobreviva a quien vuelva a correr grub-mkconfig más adelante, y
+# para no depender de cómo el módulo grubcfg reescribe /etc/default/grub (él pone root=,
+# cryptdevice= y el nombre; esto manda al final).
+#  - GRUB_DISTRIBUTOR: el título; GRUB le agrega «Linux» (en el menú sale «Vortex OS Linux»).
+#  - GRUB_TOP_LEVEL: linux-cachyos va primero y por defecto; el de Arch queda en «Advanced options».
+#  - GRUB_DISABLE_OS_PROBER=false: desde GRUB 2.12 viene apagado; sin esto Windows no sale en el menú.
+#  - GRUB_TIMEOUT=3: como el «timeout 3» de systemd-boot.
+paso_grub() {
+  local raiz="${VORTEX_RAIZ:-}"
+  es_bios || return 0
+  install -Dm644 /dev/stdin "$raiz/etc/default/grub.d/10-vortex.cfg" <<'EOF'
+# Vortex OS (vortex-post-instalacion): el menú de GRUB, que solo se usa en PC con BIOS.
+GRUB_DISTRIBUTOR='Vortex OS'
+GRUB_TOP_LEVEL='/boot/vmlinuz-linux-cachyos'
+GRUB_DISABLE_OS_PROBER=false
+GRUB_TIMEOUT=3
+EOF
+  log "BIOS: menú de GRUB en /etc/default/grub.d/10-vortex.cfg"
+}
+
+# Drivers de la GPU (NVIDIA, AMD, Intel, híbridas) con chwd, como install.sh. En el chroot de la
+# instalación puede no haber red (o las bases de pacman sin sincronizar, porque el paso de apps se
+# salta sin internet): entonces el sistema arrancaría con nouveau/mesa para siempre sin avisar. Se
+# deja la marca /var/lib/vortex/chwd-pendiente y vortex-gpu.service (en la imagen, lo enciende un
+# preset) corre «chwd -a» en cuanto haya red, avisa y borra la marca.
+paso_gpu() {
+  local raiz="${VORTEX_RAIZ:-}" marca
+  marca="$raiz/var/lib/vortex/chwd-pendiente"
+  command -v chwd >/dev/null || return 0
+  if chwd -a; then
+    rm -f "$marca"
+  else
+    install -Dm644 /dev/null "$marca"
+    log "chwd no pudo instalar los drivers de la GPU (¿sin internet?): quedan pendientes, vortex-gpu.service los instala en cuanto haya red"
+  fi
+  return 0
 }
 
 paso_final() {
@@ -45,18 +162,19 @@ paso_final() {
     /etc/vortex/live \
     /etc/systemd/system-preset/05-vortex-live.preset \
     /etc/systemd/system/systemd-firstboot.service
-  rm -rf /etc/calamares
+  rm -rf /etc/calamares /usr/lib/calamares/modules/vortex-bios
   # Calamares y lo que solo usa el arranque del USB (sus dependencias de KDE se van con él).
   local sobran=()
-  for p in calamares ckbcomp os-prober mkinitcpio-archiso; do
-    pacman -Qq "$p" >/dev/null 2>&1 && sobran+=("$p")
-  done
+  mapfile -t sobran < <(paquetes_del_live)
   ((${#sobran[@]})) && { pacman -Rns --noconfirm "${sobran[@]}" || log "no pude quitar ${sobran[*]}"; }
+  # Las carpetas de módulos de Calamares quedan vacías con su paquete fuera (si no, rmdir no hace nada).
+  rmdir /usr/lib/calamares/modules /usr/lib/calamares 2>/dev/null || true
+
+  # --- El menú de GRUB (solo en BIOS; en UEFI el arranque es systemd-boot) ---
+  paso_grub
 
   # --- Drivers de la GPU (como install.sh): NVIDIA, AMD, Intel, híbridas ---
-  if command -v chwd >/dev/null; then
-    chwd -a || log "chwd no pudo instalar los drivers (¿sin internet?): luego, «sudo chwd -a»"
-  fi
+  paso_gpu
 
   # --- Servicios según el equipo (como install/20-sistema.sh) ---
   if [[ -d /sys/class/bluetooth && -n "$(ls -A /sys/class/bluetooth 2>/dev/null)" ]]; then
@@ -122,6 +240,19 @@ paso_arranque() {
   local raiz="${VORTEX_RAIZ:-}" boot entradas opciones mid
   boot="$raiz/boot"
   entradas="$boot/loader/entries"
+  # En BIOS no hay systemd-boot: el módulo bootloader de Calamares instaló GRUB y su menú ya salió
+  # de /etc/default/grub.d/10-vortex.cfg (ver paso_grub). Aquí solo se comprueba que quedó.
+  if es_bios; then
+    if [[ ! -e "$boot/grub/i386-pc/core.img" ]]; then
+      log "AVISO: GRUB no quedó instalado en el disco (falta $boot/grub/i386-pc/core.img): el equipo puede no arrancar"
+    elif [[ ! -s "$boot/grub/grub.cfg" ]]; then
+      log "AVISO: GRUB está instalado pero falta su menú ($boot/grub/grub.cfg)"
+    else
+      log "arranque (BIOS): GRUB con $(grep -c '^[[:space:]]*menuentry ' "$boot/grub/grub.cfg") entradas"
+    fi
+    [[ -z "$raiz" ]] && rm -f /usr/local/bin/vortex-post-instalacion
+    return 0
+  fi
   [[ -d "$entradas" ]] || { log "no hay $entradas: no toco el arranque"; return 0; }
   opciones="$(cat "$raiz/etc/kernel/cmdline" 2>/dev/null || true)"
   if [[ -z "$opciones" ]]; then
@@ -141,6 +272,13 @@ paso_arranque() {
       nombre=vortex-os titulo="Vortex OS"
     else
       nombre=vortex-os-arch titulo="Vortex OS (kernel de Arch, respaldo)"
+      # chwd solo trae los módulos de NVIDIA ya compilados para los kernels linux-cachyos*, y
+      # nvidia-utils apaga nouveau: con el kernel de Arch una NVIDIA arranca sin driver de video
+      # (solo consola). La entrada sirve de rescate, pero el título lo dice para que nadie se asuste.
+      if hay_nvidia; then
+        titulo="Vortex OS (kernel de Arch, respaldo; sin driver de NVIDIA: solo consola)"
+        log "hay una NVIDIA: la entrada del kernel de Arch queda como rescate, sin driver de video"
+      fi
     fi
     printf 'title   %s\nlinux   /vmlinuz-%s\ninitrd  /initramfs-%s.img\noptions %s\n' \
       "$titulo" "$kernel" "$kernel" "$opciones" >"$entradas/$nombre.conf"
@@ -154,10 +292,15 @@ paso_arranque() {
   return 0
 }
 
-case "${1:-}" in
-  kernel) paso_kernel ;;
-  final) shift; paso_final "$@" ;;
-  arranque) paso_arranque ;;
-  inicio-automatico) shift; paso_inicio_automatico "$@" ;;
-  *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | inicio-automatico USUARIO" >&2; exit 1 ;;
-esac
+# Se puede cargar con source (pruebas/arranque.sh prueba las funciones sueltas) sin correr nada.
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  case "${1:-}" in
+    kernel) paso_kernel ;;
+    final) shift; paso_final "$@" ;;
+    arranque) paso_arranque ;;
+    inicio-automatico) shift; paso_inicio_automatico "$@" ;;
+    grub) paso_grub ;;
+    gpu) paso_gpu ;;
+    *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | inicio-automatico USUARIO | grub | gpu" >&2; exit 1 ;;
+  esac
+fi

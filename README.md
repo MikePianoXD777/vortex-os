@@ -40,6 +40,13 @@ asistente de Super+A) viene marcado: se le instala Claude Code a cada usuario en
 internet, en segundo plano. Y en la pantalla de usuario hay una casilla para entrar al escritorio sin
 pedir la contraseña.
 
+La ISO arranca e instala en PC con **UEFI** (gestor de arranque systemd-boot) y con **BIOS/legacy**
+(GRUB, que además pone a Windows en el menú). Junto a Windows, la partición EFI que ya existe a veces
+es chica (100-260 MB) y también hace de `/boot`: con poco espacio libre Vortex deja solo el kernel
+`linux-cachyos` (sin el de respaldo de Arch); con menos de ~150 MB libres, elige el particionado manual
+y crea una partición EFI nueva de 500 MB o más. Si los drivers de la GPU no se pudieron bajar durante
+la instalación (sin internet), el sistema los termina de instalar solo en cuanto haya red y avisa.
+
 ```bash
 iso/paquetes.sh                  # como usuario: arma el repo local [vortex] (shell, Vortex Studio...)
 sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archiso y el repo de CachyOS)
