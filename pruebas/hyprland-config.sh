@@ -16,6 +16,11 @@ fi
 mkdir -p "$T/home/.config/hypr" "$T/run"
 chmod 700 "$T/run"
 cp "$AQUI"/config/hypr/*.lua "$T/home/.config/hypr/"
+# Los módulos de Serpantinum, del repo (lo que va en la ISO) y no de /usr/share: así sirve también sin
+# el shell instalado, como en el CI.
+sed -i "s|^local serp = \"/usr/share/serpantinum/compositors/hyprland\"|local serp = \"$AQUI/shell/compositors/hyprland\"|" \
+  "$T/home/.config/hypr/hyprland.lua"
+grep -q "^local serp = \"$AQUI/shell/" "$T/home/.config/hypr/hyprland.lua" || { echo "No encontré «local serp» en hyprland.lua" >&2; exit 1; }
 salida="$(cd "$T" && HOME="$T/home" XDG_RUNTIME_DIR="$T/run" XDG_CONFIG_HOME="$T/home/.config" \
   timeout 60 Hyprland --verify-config -c "$T/home/.config/hypr/hyprland.lua" 2>&1)"
 resultado="$(sed -n '/Config parsing result/,$p' <<<"$salida" | grep -v -e '^=*$' -e 'Config parsing result')"
