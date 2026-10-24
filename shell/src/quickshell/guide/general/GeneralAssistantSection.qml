@@ -28,6 +28,9 @@ SettingsBlob {
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
     // no se avisa de nada: no se inventa.
     property bool claudeOff: false
+    // Con qué IA piensa Miku («vortex-miku ia»): claude, local, gemini, openai u otra. El aviso de Claude
+    // apagado y la búsqueda en la web solo tienen sentido con Claude.
+    property string ia: "claude"
     readonly property bool busy: toggleProc.running
 
     function refreshState() {
@@ -46,7 +49,7 @@ SettingsBlob {
     // código (127 si falta el comando, 124 si no contestó en 5 s) y «claude=si|no|?» (si Claude
     // está activado; «?» si no hay comando vortex). Así basta un evento (el fin del flujo) y no
     // hay que esperar a varias señales distintas.
-    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
+    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; timeout 5 vortex-miku ia estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
 
     function setAvatar(on) {
         section.run("avatar", on);
@@ -70,6 +73,7 @@ SettingsBlob {
         let avatar = "";
         let internet = "";
         let claude = "?";
+        let ia = "claude";
         let lines = text.split("\n");
         for (let i = 0; i < lines.length; i++) {
             let l = lines[i].trim();
@@ -81,9 +85,12 @@ SettingsBlob {
                 claude = l.substring(7);
             else if (l.indexOf("internet=") === 0)
                 internet = l.substring(9);
+            else if (l.indexOf("ia=") === 0)
+                ia = l.substring(3);
         }
+        section.ia = ia;
         section.available = (rc === 0);
-        section.claudeOff = (claude === "no");
+        section.claudeOff = (claude === "no" && ia === "claude");
         // Sin respuesta se deja lo que había (de fábrica, encendido): no se inventa un cambio.
         if (rc === 0 && (avatar === "on" || avatar === "off"))
             section.avatarOn = (avatar === "on");
@@ -163,7 +170,7 @@ SettingsBlob {
         title: I18n.t("guide.general.assistant.internet_title") || "Miku with internet"
         description: I18n.t("guide.general.assistant.internet_desc") || "She can search the web and read pages; each time she asks for your permission"
         searchKeywords: "asistente miku internet web buscar busqueda búsqueda paginas páginas navegar permiso search browse"
-        visible: section.available
+        visible: section.available && section.ia === "claude"
 
         Toggle {
             id: internetToggle

@@ -250,10 +250,10 @@
       },
       "assistant": {
         "title": "Miku in 3D",
-        "desc": "Super + O opens and closes Miku, your voice assistant. On, her 3D model appears beside the screen; off, only the voice stays and it uses less RAM. Needs Claude turned on (the section above)",
+        "desc": "Super + O opens and closes Miku, your voice assistant. On, her 3D model appears beside the screen; off, only the voice stays and it uses less RAM. She thinks with Claude (the section above) or, without an account, with the local AI on your PC: pick it with «vortex-miku ia»",
         "working": "Switching…",
         "missing": "The assistant is not installed (vortex-miku package)",
-        "claude_off": "Claude is off: turn it on in the section above, or Miku will not be able to answer",
+        "claude_off": "Claude is off: turn it on in the section above, or tap «Use local AI» in Miku's window so she thinks on your PC without an account",
         "internet_title": "Miku with internet",
         "internet_desc": "She can search the web and read pages; each time she asks for your permission"
       }

@@ -251,10 +251,10 @@
       },
       "assistant": {
         "title": "Miku en 3D",
-        "desc": "Super + O abre y cierra a Miku, tu asistente de voz. Encendido, su modelo 3D sale al lado de la pantalla; apagado, queda solo la voz y gasta menos RAM. Necesita Claude activado (la sección de arriba)",
+        "desc": "Super + O abre y cierra a Miku, tu asistente de voz. Encendido, su modelo 3D sale al lado de la pantalla; apagado, queda solo la voz y gasta menos RAM. Piensa con Claude (la sección de arriba) o, sin cuenta, con la IA local en tu PC: elígela con «vortex-miku ia»",
         "working": "Cambiando…",
         "missing": "El asistente no está instalado (paquete vortex-miku)",
-        "claude_off": "Claude está apagado: actívalo en la sección de arriba, si no Miku no podrá contestar",
+        "claude_off": "Claude está apagado: actívalo en la sección de arriba, o en la ventana de Miku toca «Usar IA local» para que piense en tu PC sin cuenta",
         "internet_title": "Miku con internet",
         "internet_desc": "Puede buscar en la web y leer páginas; cada vez te pide permiso"
       }

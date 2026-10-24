@@ -143,6 +143,11 @@ python-onnxruntime-cpu
 # Miku graba las partidas (gpu-screen-recorder) y busca sus mejores momentos (ffmpeg).
 gpu-screen-recorder
 ffmpeg
+# La IA local de Miku (sin cuenta ni internet): Ollama con su motor Vulkan (~22 MB; usa la GPU NVIDIA, AMD
+# o Intel). NO ollama-cuda ni ollama-rocm (casi 1 GB cada uno). El modelo (~3,3 GB) no va en la ISO: Miku lo
+# baja la primera vez que eliges «Usar IA local».
+ollama
+ollama-vulkan
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el

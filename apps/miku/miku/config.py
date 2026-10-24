@@ -1,4 +1,4 @@
-"""~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta opcional>", "elevenlabs_voz": "<Voice ID>"}.
+"""~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta opcional>", "elevenlabs_voz": "<Voice ID>", "ia": "local"…}.
 
 Lo que falte toma su valor por defecto y un JSON inválido no truena: se usan los valores por defecto
 (y al guardar no se pierden las claves que no conocemos).
@@ -19,7 +19,12 @@ DEFECTOS = {
     "internet": False,              # buscar en la web y leer páginas (cada vez con tu permiso)
     "elevenlabs_voz": "",           # Voice ID de ElevenLabs (con la voz «elevenlabs»); la clave va en el llavero
     "elevenlabs_modelo": "",        # vacío = eleven_v4_turbo
+    "ia": "claude",                 # con qué piensa: claude, local, gemini, openai u otra (ia.py)
+    "ia_url": "",                   # con «otra»: la dirección compatible con OpenAI (…/v1)
+    "ia_modelo": "",                # vacío = el modelo por defecto de esa IA; la clave va en el llavero
+    "voz_natural_auto": True,       # Miku instala sola la voz natural si la PC aguanta («natural quitar» lo apaga)
 }
+IAS = ("claude", "local", "gemini", "openai", "otra")
 
 
 def _como_bool(v, defecto: bool) -> bool:
@@ -47,9 +52,12 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg = dict(DEFECTOS)
     cfg["avatar"] = _como_bool(crudo.get("avatar"), DEFECTOS["avatar"])
     cfg["seguir_escuchando"] = _como_bool(crudo.get("seguir_escuchando"), DEFECTOS["seguir_escuchando"])
+    cfg["voz_natural_auto"] = _como_bool(crudo.get("voz_natural_auto"), DEFECTOS["voz_natural_auto"])
     # Sin «internet» en miku.json manda la casilla del instalador (la marca de vortex-miku-internet).
     cfg["internet"] = _como_bool(crudo.get("internet"), rutas.MARCA_INTERNET.is_file())
-    for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo"):
+    if crudo.get("ia") in IAS:
+        cfg["ia"] = crudo["ia"]
+    for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo", "ia_url", "ia_modelo"):
         v = crudo.get(clave)
         if isinstance(v, str) and v.strip():
             cfg[clave] = v.strip()

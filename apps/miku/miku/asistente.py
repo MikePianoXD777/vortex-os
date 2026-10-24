@@ -22,7 +22,7 @@ from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signa
 from PySide6.QtNetwork import QLocalServer
 
 from . import cerebro as modulo_cerebro
-from . import config, descargas, elevenlabs, oido, rutas, voces
+from . import cerebro_abierto, config, descargas, elevenlabs, ia, oido, rutas, voces
 
 # Estados que la ventana muestra con su indicador.
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
@@ -111,6 +111,8 @@ class Asistente(QObject):
     _sig_progreso = Signal(str, float)
     _sig_paquete = Signal(str)
     _sig_descarga_fin = Signal(str)
+    _sig_ia_progreso = Signal(str, float)
+    _sig_ia_fin = Signal(str)
 
     def __init__(self, cfg: dict, avatar: bool, parent=None):
         super().__init__(parent)
@@ -118,15 +120,7 @@ class Asistente(QObject):
         self.avatar = avatar
         self.estado_actual = REPOSO
         self.oido = oido.Oido(silencio=cfg["silencio"], espera=ESPERA_PRIMERA)
-        self.cerebro = modulo_cerebro.Cerebro(avatar, lambda tipo, **d: self._evento_cerebro.emit(tipo, d))
-        if cfg.get("internet"):
-            self.cerebro.internet = True
-            self.cerebro.persona += "\n\n" + PERSONA_INTERNET
-        motor = (voces.buscar(cfg["voz"]) or {}).get("motor")
-        if motor == "elevenlabs":
-            self.cerebro.persona += "\n\n" + elevenlabs.PERSONA
-        elif motor == "qwen":
-            self.cerebro.persona += "\n\n" + PERSONA_NATURAL
+        self.cerebro = self._crear_cerebro()
         self.divisor = modulo_cerebro.DivisorFrases()
         self._acumulado = ""
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
@@ -149,6 +143,7 @@ class Asistente(QObject):
         self._descargando = False
         self._cancelar_descarga = threading.Event()
         self._titulo_descarga = ""
+        self._bajando_ia = False
         self._claude_ok = False          # ¿Claude está activado, instalado y con sesión? (se comprueba al abrir)
         self.acciones_visibles = False   # hay un botón (Activar Claude / Iniciar sesión) esperando a la persona
         # Cierre automático del panel de solo voz
@@ -179,6 +174,25 @@ class Asistente(QObject):
         self._sig_progreso.connect(self._al_progreso)
         self._sig_paquete.connect(self._al_paquete)
         self._sig_descarga_fin.connect(self._al_fin_descarga)
+        self._sig_ia_progreso.connect(self._al_progreso_ia)
+        self._sig_ia_fin.connect(self._al_fin_ia)
+
+    def _crear_cerebro(self):
+        """Claude (claude -p) o cualquier otra IA (cerebro_abierto), según «ia» en miku.json."""
+        al_evento = lambda tipo, **d: self._evento_cerebro.emit(tipo, d)   # noqa: E731
+        if self.cfg.get("ia", "claude") == "claude":
+            c = modulo_cerebro.Cerebro(self.avatar, al_evento)
+            if self.cfg.get("internet"):        # la búsqueda web solo existe con Claude
+                c.internet = True
+                c.persona += "\n\n" + PERSONA_INTERNET
+        else:
+            c = cerebro_abierto.CerebroAbierto(self.avatar, al_evento, self.cfg)
+        motor = (voces.buscar(self.cfg["voz"]) or {}).get("motor")
+        if motor == "elevenlabs":
+            c.persona += "\n\n" + elevenlabs.PERSONA
+        elif motor == "qwen":
+            c.persona += "\n\n" + PERSONA_NATURAL
+        return c
 
     # ---- Arranque ---------------------------------------------------------------------------
 
@@ -188,6 +202,7 @@ class Asistente(QObject):
             self._iniciar_descarga()
         else:
             self._arrancar_voz()
+            self._natural_en_segundo_plano()
         threading.Thread(target=self._comprobar_claude, daemon=True).start()
 
     def _comprobar_claude(self) -> None:
@@ -246,8 +261,37 @@ class Asistente(QObject):
             self._avisar_una_vez("descarga", error)
             if self.estado_actual == REPOSO:
                 self._iniciar_reloj_ocioso()
-        elif self.estado_actual == REPOSO and not self.acciones_visibles:
-            self._escuchar_si_toca()
+        else:
+            self._natural_en_segundo_plano()
+            if self.estado_actual == REPOSO and not self.acciones_visibles:
+                self._escuchar_si_toca()
+
+    def _natural_en_segundo_plano(self) -> None:
+        """La voz natural, sola y aparte, si la PC aguanta (NVIDIA serie 20+ de 6 GB, o un procesador de 10.ª
+        generación o más nuevo: lo decide «vortex-miku natural instalar --auto», que avisa con notificaciones).
+
+        Solo con el paquete instalado y fuera de la ISO en vivo (ahí bajaría GB a la RAM); las pruebas lo fuerzan
+        con VORTEX_MIKU_NATURAL_AUTO=1 y VORTEX_MIKU_CLI. Mientras, Miku habla con la voz de siempre.
+        """
+        forzada = os.environ.get("VORTEX_MIKU_NATURAL_AUTO")
+        if forzada is not None and forzada != "1":
+            return
+        if forzada is None and (rutas.RAIZ != Path("/usr/share/vortex-miku") or Path("/run/archiso").exists()):
+            return
+        cfg = config.cargar()
+        natural = voces.buscar("miku-natural")
+        if not cfg["voz_natural_auto"] or cfg["voz"] != voces.VOZ_DEFECTO or natural is None or voces.disponible(natural):
+            return
+        cli = os.environ.get("VORTEX_MIKU_CLI") or shutil.which("vortex-miku")
+        if not cli:
+            return
+        try:
+            rutas.DATOS.mkdir(parents=True, exist_ok=True)
+            with open(rutas.DATOS / "natural-auto.log", "ab") as log:
+                subprocess.Popen([cli, "natural", "instalar", "--auto"], stdin=subprocess.DEVNULL, stdout=log,
+                                 stderr=subprocess.STDOUT, start_new_session=True)
+        except OSError:
+            pass
 
     def _escuchar_si_toca(self) -> None:
         """Se pone a escuchar si no está haciendo otra cosa ni hay un problema con Claude pendiente."""
@@ -291,8 +335,14 @@ class Asistente(QObject):
         self._voz = p
         self._voz_id = id_voz
 
+    def _precargar_ia(self) -> None:
+        """Con la IA local, la sube a la GPU en cuanto la voz cargó (antes no: ver ia.precargar)."""
+        if not self._cerrado and self.cfg.get("ia") == "local" and (self._voz_lista or self._voz_error):
+            ia.precargar(ia.elegido(self.cfg)["modelo"])
+
     def _sin_voz(self, motivo: str) -> None:
         self._voz_error = True
+        self._precargar_ia()
         self._avisar_una_vez("voz", motivo + " Te respondo solo por texto.")
 
     def _avisar_una_vez(self, clave: str, texto: str) -> None:
@@ -310,6 +360,7 @@ class Asistente(QObject):
                 continue
             if m.get("listo"):
                 self._voz_lista = True
+                self._precargar_ia()
                 if m.get("modo") == "cpu":       # sin una GPU que sirva: ~6 s más lo que dura cada frase
                     self._avisar_una_vez("voz-lenta", "Voz natural en modo lento (en la CPU): tardo un poco en contestar.")
             elif "wav" in m:
@@ -570,7 +621,9 @@ class Asistente(QObject):
         elif tipo == "error":
             self._fallo(datos.get("clave", "otro"), datos["mensaje"])
 
-    BOTONES = {"activar": [["activar", "Activar Claude"]], "sesion": [["sesion", "Iniciar sesión"]]}
+    BOTONES = {"activar": [["activar", "Activar Claude"], ["usar_local", "Usar IA local (sin cuenta)"]],
+               "sesion": [["sesion", "Iniciar sesión"], ["usar_local", "Usar IA local (sin cuenta)"]],
+               "modelo": [["bajar_ia", f"Bajar la IA local ({ia.TAMANO_LOCAL})"]]}
 
     def _fallo(self, clave: str, mensaje: str) -> None:
         """Muestra el problema en el globo y lo dice en voz alta (en español, con qué hacer)."""
@@ -661,6 +714,12 @@ class Asistente(QObject):
         if id_accion in ("autorizar", "cancelar"):
             self._responder_permiso(id_accion == "autorizar", "" if id_accion == "autorizar" else "Cancelado: no hice nada.")
             return
+        if id_accion == "usar_local":
+            self._usar_ia_local()
+            return
+        if id_accion == "bajar_ia":
+            self._bajar_ia_local()
+            return
         vortex = modulo_cerebro.encontrar_vortex()
         if not vortex:
             self.aviso.emit("No encuentro el comando vortex. Abre una terminal y escribe: vortex claude")
@@ -682,6 +741,64 @@ class Asistente(QObject):
         self._poner_acciones([])
         self._ultimo_turno_con_error = False
         self.aviso.emit(texto)
+
+    # ---- IA local (Ollama): sin cuenta ni internet ----------------------------------------------
+
+    def _usar_ia_local(self) -> None:
+        """Cambia a la IA local (queda guardado en miku.json) y, si falta el modelo, lo baja."""
+        try:
+            config.guardar({"ia": "local"})
+        except OSError as e:
+            self.aviso.emit(f"No pude guardar el cambio ({e.strerror or e}).")
+            return
+        self.cfg["ia"] = "local"
+        autorizar = self.cerebro.autorizar
+        self.cerebro.olvidar()
+        self.cerebro = self._crear_cerebro()
+        self.cerebro.autorizar = autorizar
+        self._poner_acciones([])
+        self._ultimo_turno_con_error = False
+        self.aviso.emit("Listo: ahora pienso en tu PC, sin cuenta. Lo cambias con: vortex-miku ia claude")
+        threading.Thread(target=self._comprobar_claude, daemon=True).start()
+        self._precargar_ia()
+
+    def _bajar_ia_local(self) -> None:
+        if self._bajando_ia or self._cerrado:
+            return
+        if self._descargando:
+            self.aviso.emit("Espera a que termine de prepararse mi voz y vuelve a tocar el botón.")
+            return
+        self._bajando_ia = True
+        self._poner_acciones([])
+        titulo = f"Bajando la IA local de Miku (una sola vez, {ia.TAMANO_LOCAL})…"
+        self.progreso.emit(titulo, "Empezando…", 0.0)
+        modelo = ia.elegido(self.cfg)["modelo"]
+
+        def trabajo():
+            try:
+                ia.bajar_modelo(modelo, progreso=self._sig_ia_progreso.emit, cancelar=self._cancelar_descarga)
+                self._sig_ia_fin.emit("")
+            except ia.ErrorIA as e:
+                self._sig_ia_fin.emit(str(e))
+            except Exception as e:  # noqa: BLE001 - el hilo no debe morir sin avisar
+                self._sig_ia_fin.emit(f"No pude bajar la IA local ({type(e).__name__}).")
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def _al_progreso_ia(self, detalle: str, fraccion: float) -> None:
+        if self._bajando_ia and not self._cerrado:
+            self.progreso.emit(f"Bajando la IA local de Miku (una sola vez, {ia.TAMANO_LOCAL})…", detalle, fraccion)
+
+    def _al_fin_ia(self, error: str) -> None:
+        self._bajando_ia = False
+        self.progreso.emit("", "", -1.0)
+        if self._cerrado:
+            return
+        if error:
+            self._fallo("modelo", error)
+            return
+        self.aviso.emit("Ya tengo mi IA local. Háblame.")
+        threading.Thread(target=self._comprobar_claude, daemon=True).start()
+        self._precargar_ia()
 
     # ---- Fin de turno ---------------------------------------------------------------------------
 
@@ -731,6 +848,8 @@ class Asistente(QObject):
         self._reloj_seguir.stop()
         self.oido.cancelar()
         self.cerebro.olvidar()
+        if self.cfg.get("ia") == "local":
+            ia.soltar(ia.elegido(self.cfg)["modelo"])     # la GPU libre al cerrar, como todo lo demás
         if self._sonando is not None and self._sonando.state() != QProcess.ProcessState.NotRunning:
             self._sonando.kill()
         if self._voz is not None and self._voz.state() != QProcess.ProcessState.NotRunning:

@@ -35,3 +35,5 @@ jobs:
         run: runuser -u prueba -- env HOME=/home/prueba python3 -I apps/miku/pruebas/acciones.py
       - name: Miku, mejores momentos
         run: runuser -u prueba -- env HOME=/home/prueba python3 -I apps/miku/pruebas/momentos.py
+      - name: Miku, otra IA e IA local
+        run: runuser -u prueba -- env HOME=/home/prueba python3 -I apps/miku/pruebas/ia.py

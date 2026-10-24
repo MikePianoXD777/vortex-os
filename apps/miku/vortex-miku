@@ -14,10 +14,15 @@
   vortex-miku grabar [parar|estado]    graba la pantalla (una partida) en ~/Vídeos/Miku, o para la grabación
   vortex-miku momentos [VIDEO]         arma los mejores momentos (sin VIDEO, de la última grabación) como
                                        proyecto de Vortex Studio; Claude elige mirando miniaturas
-  vortex-miku natural instalar   voz natural y expresiva, sin internet: en tu GPU NVIDIA (~7 GB) o, si no
-                                 sirve (o con --cpu), en la CPU, lenta (~3 GB); natural estado / natural quitar
+  vortex-miku natural instalar   voz natural y expresiva, sin internet: en tu GPU NVIDIA serie 20+ de 6 GB
+                                 (~7 GB) o, si no, en un procesador de 10.ª gen o más nuevo, lenta (~3 GB).
+                                 Miku la instala sola la primera vez si tu PC aguanta; natural estado / quitar
   vortex-miku elevenlabs VOICE_ID   voz de ElevenLabs, en la nube (pide tu clave la primera vez)
   vortex-miku elevenlabs clave      cambia la clave · elevenlabs quitar: vuelve a la voz local (F1)
+  vortex-miku ia [estado]           con qué IA piensa: claude (tu cuenta), local (en tu PC, sin cuenta ni
+                                    internet), gemini u openai (con tu clave), u otra compatible con OpenAI
+  vortex-miku ia local|gemini|openai [MODELO] · ia otra URL MODELO · ia claude   la cambia
+  vortex-miku ia clave              pone la clave de la IA elegida · ia bajar: baja ya la IA local (~3,3 GB)
 
 La configuración está en ~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta>"}.
 Los modelos de la voz (Supertonic 3) y del oído (Whisper) no vienen en la ISO: la primera vez que se abre
@@ -28,6 +33,7 @@ corriendo. Solo usa la biblioteca estándar, así que arranca al instante.
 
 import fcntl
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -46,7 +52,7 @@ def _raiz() -> Path:
 
 RAIZ = _raiz()
 sys.path.insert(0, str(RAIZ))
-from miku import config, descargas, elevenlabs, grabacion, rutas, voces  # noqa: E402  (solo biblioteca estándar)
+from miku import config, descargas, elevenlabs, grabacion, ia, rutas, voces  # noqa: E402  (solo biblioteca estándar)
 
 APP = RAIZ / "miku" / "app.py"
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
@@ -437,12 +443,75 @@ def gpu_para_natural() -> tuple[bool, str]:
     return True, f"{nombre} ({gib:.0f} GB)"
 
 
-def elegir_modo(args: list[str]) -> tuple[str, bool, str]:
-    """(«gpu» o «cpu», ¿sirve la GPU?, explicación de la GPU). Con una GPU que sirva, gpu; si no, o con --cpu, cpu."""
+NATURAL_RAM_CPU_GIB = 7.0       # en la CPU ocupa ~4 GB mientras Miku está abierta: hace falta una PC de 8 GB
+
+
+def generacion_cpu(nombre: str) -> tuple[bool, str] | None:
+    """¿El procesador es de 10.ª generación de Intel (o un Ryzen 3000 de escritorio) o más nuevo? None si no se sabe.
+
+    Es la vara de Mike: en un i7-10700F la voz natural va lenta pero se puede platicar; más viejo, ya no.
+    """
+    n = " ".join(nombre.replace("(TM)", " ").replace("(R)", " ").split())
+    if re.search(r"\bCore Ultra\b|\bCore [357] \d{3}[A-Z]*\b", n):           # Core Ultra y la serie 100 (2023+)
+        return True, "Intel Core de 2023 o más nuevo"
+    m = re.search(r"\bCore i[3579]-(\d{4,5})", n)
+    if m:
+        cifras = m.group(1)
+        # i7-10700F, i9-11900K (5 cifras) y las de laptop i7-1065G7, i5-1135G7, i5-1235U (4 cifras que empiezan
+        # con 1: ninguna de la 2.ª a la 9.ª empieza así)
+        gen = int(cifras[:2]) if len(cifras) == 5 or cifras[0] == "1" else int(cifras[0])
+        return gen >= 10, f"Intel Core de {gen}.ª generación"
+    if re.search(r"\bRyzen AI\b|\bRyzen Z\d", n):
+        return True, "Ryzen de 2023 o más nuevo"
+    m = re.search(r"\bRyzen (?:Threadripper )?(?:\d )?(?:PRO )?(\d)\d{3}([A-Z]*)", n)
+    if m:
+        serie, sufijo = int(m.group(1)), m.group(2)
+        # Los 3000 de escritorio son Zen 2; los 3000 G, U y H son Zen+ (como los 2000).
+        return (serie >= 4 or (serie == 3 and sufijo in ("", "X", "XT", "WX"))), f"Ryzen serie {serie}000"
+    return None
+
+
+def cpu_para_natural() -> tuple[bool, str]:
+    """¿El procesador aguanta la voz natural (lenta)? (sí/no, explicación)."""
+    nombre = ""
+    try:
+        for linea in Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="replace").splitlines():
+            if linea.startswith("model name"):
+                nombre = linea.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    ram = 0.0
+    try:
+        for linea in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if linea.startswith("MemTotal:"):
+                ram = int(linea.split()[1]) / 1024 / 1024
+                break
+    except (OSError, ValueError, IndexError):
+        pass
+    if not nombre:
+        return False, "no pude leer qué procesador tienes."
+    gen = generacion_cpu(nombre)
+    if gen is None or not gen[0]:
+        return False, (f"tu {nombre} no llega: en la CPU hace falta un Intel Core de 10.ª generación o más nuevo, "
+                       "o un Ryzen 3000 o más nuevo.")
+    if ram and ram < NATURAL_RAM_CPU_GIB:
+        return False, f"tienes {ram:.0f} GB de RAM y la voz natural en la CPU necesita 8 GB."
+    return True, f"{nombre} ({gen[1]})"
+
+
+def elegir_modo(args: list[str]) -> tuple[str, str]:
+    """(«gpu», «cpu» o «», por qué). Una NVIDIA serie 20+ con 6 GB: gpu. Si no, un procesador de 10.ª generación
+    o más nuevo: cpu (lenta). Si tampoco, «»: Miku se queda con la voz de siempre. --cpu fuerza la CPU."""
     ok, gpu = gpu_para_natural()
     if "--cpu" in args:
-        return "cpu", ok, gpu
-    return ("gpu" if ok or "--sin-revisar" in args else "cpu"), ok, gpu
+        return "cpu", "Pediste el modo CPU."
+    if ok or "--sin-revisar" in args:
+        return "gpu", f"GPU: {gpu}."
+    ok_cpu, cpu = cpu_para_natural()
+    if ok_cpu:
+        return "cpu", f"GPU: no sirve ({gpu.rstrip('.')}). Procesador: {cpu}."
+    return "", f"GPU: no sirve ({gpu.rstrip('.')}). Procesador: {cpu}"
 
 
 def orden_natural(args: list[str]) -> int:
@@ -452,6 +521,7 @@ def orden_natural(args: list[str]) -> int:
     orden = args[0] if args else "estado"
     if orden == "estado":
         ok, gpu = gpu_para_natural()
+        modo, _ = elegir_modo([])
         instalada = voces.disponible(voz)
         print(f"Voz natural de Miku: {'instalada' if instalada else 'sin instalar'}"
               f"{' y en uso' if config.cargar()['voz'] == 'miku-natural' else ''}.")
@@ -459,25 +529,60 @@ def orden_natural(args: list[str]) -> int:
             print("  Modo: " + ("GPU" if voces.modo_natural() == "gpu"
                                 else "CPU (lento: cada frase tarda unos 6 s más lo que dura)"))
         print(f"  GPU: {gpu if ok else 'no sirve: ' + gpu}")
+        if not ok:
+            ok_cpu, cpu = cpu_para_natural()
+            print(f"  Procesador: {cpu if ok_cpu else 'no sirve: ' + cpu}")
         if not instalada:
-            print("  Instálala con: vortex-miku natural instalar   "
-                  + ("(~7 GB, una sola vez)" if ok else "(en la CPU, lenta; ~3 GB, una sola vez)"))
+            if modo:
+                print("  Instálala con: vortex-miku natural instalar   "
+                      + ("(~7 GB, una sola vez)" if modo == "gpu" else "(en la CPU, lenta; ~3 GB, una sola vez)"))
+                if config.cargar()["voz_natural_auto"]:
+                    print("  (Miku la instala sola en segundo plano la próxima vez que la abras.)")
+            else:
+                print("  Tu PC no aguanta la voz natural: Miku habla con la de siempre.")
         return 0
     if orden == "quitar":
         shutil.rmtree(rutas.NATURAL, ignore_errors=True)
+        cambios = {"voz_natural_auto": False}       # que Miku no la vuelva a instalar sola
         if config.cargar()["voz"] == "miku-natural":
-            config.guardar({"voz": voces.VOZ_DEFECTO})
+            cambios["voz"] = voces.VOZ_DEFECTO
+        config.guardar(cambios)
         print("Listo: borré la voz natural; Miku vuelve a la voz de siempre (F1).")
         reabrir_si_esta_abierta()
         return 0
-    if orden != "instalar" or any(a not in ("--cpu", "--sin-revisar") for a in args[1:]):
+    if orden != "instalar" or any(a not in ("--cpu", "--sin-revisar", "--auto") for a in args[1:]):
         return error("uso: vortex-miku natural [estado|instalar [--cpu]|quitar]", 2)
-    modo, ok, gpu = elegir_modo(args)
+    # --auto: lo lanza la ventana de Miku en segundo plano (ver asistente.py). Solo instala si nadie eligió otra
+    # voz ni la quitó, y una sola a la vez; al terminar avisa con una notificación y no reabre a Miku.
+    auto = "--auto" in args
+    if auto:
+        cfg = config.cargar()
+        if voces.disponible(voz) or not cfg["voz_natural_auto"] or cfg["voz"] != voces.VOZ_DEFECTO:
+            print("No hace falta: la voz natural ya está, la quitaste o elegiste otra voz.")
+            return 0
+        rutas.NATURAL.mkdir(parents=True, exist_ok=True)
+        candado = open(rutas.NATURAL / "instalando.lock", "w")      # se suelta al salir
+        try:
+            fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("Ya se está instalando.")
+            return 0
+    modo, porque = elegir_modo(args)
+    if not modo and auto:
+        print(f"Tu PC no aguanta la voz natural: Miku sigue con la de siempre. {porque}")
+        return 0
+    if auto:
+        print(f"{time.strftime('%F %T')} instalación automática ({modo.upper()}). {porque}", flush=True)
+        subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "Miku está preparando su voz natural",
+                        "Una sola vez (" + ("~7 GB" if modo == "gpu" else "~3 GB, en el procesador: será lenta")
+                        + "). Mientras, habla con la de siempre."], capture_output=True, check=False)
+    if not modo:
+        return error(f"tu PC no aguanta la voz natural. {porque}\nMiku sigue con la voz de siempre. Si igual la "
+                     "quieres (muy lenta): vortex-miku natural instalar --cpu")
     if modo == "gpu":
-        print(f"GPU: {gpu}. Instalo la voz natural en {rutas.NATURAL} (PyTorch ~3 GB + el modelo ~4 GB; una sola vez).")
+        print(f"{porque} Instalo la voz natural en {rutas.NATURAL} (PyTorch ~3 GB + el modelo ~4 GB; una sola vez).")
     else:
-        print(("Pediste el modo CPU" if "--cpu" in args else f"GPU: no sirve ({gpu.rstrip('.')})")
-              + f". Instalo la voz natural en la CPU, en {rutas.NATURAL}\n(PyTorch de CPU y lo demás ~2 GB + el "
+        print(f"{porque} Instalo la voz natural en la CPU, en {rutas.NATURAL}\n(PyTorch de CPU y lo demás ~2 GB + el "
               "modelo ~0,9 GB; una sola vez).")
         print("Ojo: en la CPU es lenta. Cada frase tarda en salir unos 6 s más lo que dura (en un i7 de 8 núcleos),\n"
               "así que Miku tarda más en contestar.")
@@ -529,7 +634,15 @@ def orden_natural(args: list[str]) -> int:
     else:
         rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_TORCH_CPU + NATURAL_PAQUETES_CPU)
                                        + f"\n{voz['modelo_cpu']} {voz['cuantizacion_cpu']}\n", encoding="utf-8")
+    if auto and config.cargar()["voz"] != voces.VOZ_DEFECTO:
+        print("\nListo, pero mientras tanto elegiste otra voz: la dejo como está (vortex-miku voz miku-natural la cambia).")
+        return 0
     config.guardar({"voz": "miku-natural"})
+    if auto:
+        print("\nListo: Miku ya tiene su voz natural; la usa la próxima vez que la abras.")
+        subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "Miku ya tiene su voz natural",
+                        "La usa la próxima vez que la abras (Super+O)."], capture_output=True, check=False)
+        return 0
     if modo == "gpu":
         print("\nListo: Miku ya habla con su voz natural. Solo usa la GPU mientras Miku está abierta.")
     else:
@@ -602,6 +715,95 @@ def orden_elevenlabs(args: list[str]) -> int:
     return 0
 
 
+def _pedir_clave_ia(p: dict) -> str:
+    import getpass
+    print(f"Tu clave de {p['nombre']}: {p.get('donde') or 'la de tu servicio'}.")
+    try:
+        return getpass.getpass("Pégala aquí (no se ve al escribir) y Enter: ").strip()
+    except (EOFError, OSError):
+        return ""
+
+
+def _bajar_ia_local(modelo: str) -> int:
+    print(f"Bajando la IA local «{modelo}» (una sola vez, ~{ia.TAMANO_LOCAL})…")
+
+    def progreso(detalle: str, fraccion: float) -> None:
+        print(f"\r  {fraccion * 100:5.1f} %  {detalle}      ", end="", flush=True)
+    try:
+        ia.bajar_modelo(modelo, progreso=progreso)
+    except ia.ErrorIA as e:
+        print()
+        return error(str(e))
+    print("\nLista: Miku ya puede pensar en tu PC, sin internet.")
+    return 0
+
+
+def orden_ia(args: list[str]) -> int:
+    cfg = config.cargar()
+    p = ia.elegido(cfg)
+    if not args or args[0] == "estado":
+        print(f"ia={p['id']}")
+        if p["id"] != "claude":
+            print(f"  {p['nombre']}: modelo «{p['modelo'] or '(sin poner)'}» en {p['url'] or '(sin dirección)'}")
+        if p.get("clave"):
+            print(f"  clave: {'guardada' if ia.leer_clave(p['id']) else '(sin poner: vortex-miku ia clave)'}")
+        if p["id"] == "local":
+            if not ia.ollama_instalado():
+                print("  falta Ollama: actualiza con «vortex actualizar»")
+            # Ajustes lo consulta cada vez que se abre: aquí no se arranca Ollama, Miku lo arranca al usarlo.
+            elif ia.ollama_corriendo():
+                print(f"  modelo bajado: {'sí' if ia.modelo_local_listo(p['modelo']) else 'no (vortex-miku ia bajar)'}")
+            else:
+                print("  Ollama: apagado (Miku lo arranca cuando lo necesita)")
+        print("Cámbiala con: vortex-miku ia claude|local|gemini|openai [MODELO]  ·  vortex-miku ia otra URL MODELO")
+        return 0
+    if args[0] == "clave":
+        if p.get("clave") is False or p["id"] == "claude":
+            return error(f"{p['nombre']} no usa clave.")
+        clave = args[1] if len(args) > 1 else _pedir_clave_ia(p)
+        if not clave:
+            return error("no escribiste ninguna clave.")
+        donde = ia.guardar_clave(p["id"], clave)
+        print(f"Listo: la clave de {p['nombre']} quedó en {'tu llavero' if donde == 'llavero' else donde}.")
+        reabrir_si_esta_abierta()
+        return 0
+    if args[0] == "bajar":
+        return _bajar_ia_local(ia.elegido(dict(cfg, ia="local"))["modelo"])
+    nuevo = args[0].lower()
+    if nuevo not in config.IAS:
+        return error("uso: vortex-miku ia claude|local|gemini|openai [MODELO] · ia otra URL MODELO · ia clave · ia bajar", 2)
+    cambios = {"ia": nuevo, "ia_modelo": ""}
+    if nuevo == "otra":
+        if len(args) != 3 or not args[1].startswith(("http://", "https://")):
+            return error("uso: vortex-miku ia otra URL MODELO   (p. ej. https://openrouter.ai/api/v1 un/modelo)", 2)
+        cambios.update(ia_url=args[1], ia_modelo=args[2])
+    elif len(args) > 1 and nuevo != "claude":
+        cambios["ia_modelo"] = args[1]
+    try:
+        config.guardar(cambios)
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    p = ia.elegido(dict(cfg, **cambios))
+    print(f"ia={nuevo}: Miku piensa con {p['nombre']}" + (f" («{p['modelo']}»)." if nuevo != "claude" else "."))
+    codigo = 0
+    if p.get("clave") and not ia.leer_clave(nuevo):
+        clave = _pedir_clave_ia(p) if sys.stdin.isatty() else ""
+        if clave:
+            ia.guardar_clave(nuevo, clave)
+        else:
+            print("Falta tu clave: ponla con «vortex-miku ia clave».")
+    if nuevo == "local":
+        if not ia.ollama_instalado():
+            print("Falta Ollama: actualiza Vortexine's con «vortex actualizar» y vuelve a correr esto.")
+        elif not ia.arrancar_ollama():
+            codigo = error("no pude arrancar Ollama. Mira: systemctl --user status vortex-ollama")
+        elif not ia.modelo_local_listo(p["modelo"]):
+            codigo = _bajar_ia_local(p["modelo"])
+    if reabrir_si_esta_abierta():
+        print("Miku estaba abierta: la volví a abrir con la IA nueva.")
+    return codigo
+
+
 def orden_grabar(args: list[str]) -> int:
     que = args[0] if args else "empezar"
     try:
@@ -668,6 +870,8 @@ def main(argv: list[str]) -> int:
         return orden_grabar(args)
     if orden == "momentos":
         return orden_momentos(args)
+    if orden == "ia":
+        return orden_ia(args)
     return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)
 
 

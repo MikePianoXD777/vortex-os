@@ -6,9 +6,9 @@
 Corre aparte, solo cuando la persona lo pide, y avisa con una notificación al terminar:
   1. Con ffmpeg busca los picos de sonido y de movimiento (cambios de escena) del video y saca los mejores
      candidatos, cada uno con una tira de 3 miniaturas.
-  2. Claude Sonnet (`claude -p`) mira las miniaturas y elige cuáles valen la pena, en orden, con un título
-     corto. No tiene NINGUNA herramienta: las imágenes le llegan por la entrada y solo contesta con JSON.
-     Sin Claude (apagado, sin sesión o sin internet) se quedan los picos más altos.
+  2. La IA de Miku (Claude Sonnet por `claude -p`, o la que elegiste con «vortex-miku ia») mira las
+     miniaturas y elige cuáles valen la pena, en orden, con un título corto. No tiene NINGUNA herramienta: las imágenes le llegan por la entrada y solo contesta con JSON.
+     Sin IA (apagada, sin sesión, sin internet o sin el modelo local) se quedan los picos más altos.
   3. Escribe «<video> - mejores momentos.vortex» en ~/Vídeos/Miku: los clips cortados del video original
      (sin recodificar nada), con su audio enlazado y un marcador con el título de cada momento.
 
@@ -30,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from miku import cerebro, grabacion  # noqa: E402  (solo biblioteca estándar)
+from miku import cerebro, config, grabacion, ia  # noqa: E402  (solo biblioteca estándar)
 
 FORMATO_VORTEX = 6           # el de Vortex Studio 1.0
 VENTANA = 0.5                # segundos por muestra de sonido y movimiento
@@ -183,7 +183,7 @@ def miniatura(video: Path, c: dict, destino: Path) -> Path | None:
     return destino if r.returncode == 0 and destino.is_file() else None
 
 
-# ---- 2. Claude elige -------------------------------------------------------------------------------
+# ---- 2. La IA elige ----------------------------------------------------------------------------------
 
 INSTRUCCION = """Eres el editor de Miku, la asistente de Vortexine's OS. Te paso candidatos a «mejores momentos» de una \
 partida grabada: para cada uno, una tira de 3 cuadros (antes, en el pico, después) y cuánto sonaba y se movía.
@@ -198,6 +198,32 @@ def _tiempo(t: float) -> str:
     m, s = divmod(int(t), 60)
     h, m = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def elegir_con_ia(cands: list[dict], tarea: Path, log: Registro) -> list[dict] | None:
+    """Elige con la IA de Miku («ia» en miku.json): Claude, o cualquier otra que vea imágenes."""
+    p = ia.elegido(config.cargar())
+    if p["id"] == "claude":
+        return elegir_con_claude(cands, tarea, log)
+    clave, mensaje = ia.comprobar(p)
+    if clave != "ok":
+        log(f"sin {p['nombre']} ({mensaje}): me quedo con los picos")
+        return None
+    contenido = [{"type": "text", "text": INSTRUCCION}]
+    for c in cands:
+        contenido.append({"type": "text", "text": f"Candidato {c['n']}: de {_tiempo(c['inicio'])} a {_tiempo(c['fin'])}, "
+                                                  f"sonido {c['sonido']:.2f}, movimiento {c['movimiento']:.2f} (de 0 a 1)."})
+        img = c.get("miniatura")
+        if img:
+            datos = base64.b64encode(Path(img).read_bytes()).decode()
+            contenido.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{datos}"}})
+    try:
+        texto = ia.completar(p, [{"role": "user", "content": contenido}], timeout=TIEMPO_CLAUDE)
+    except ia.ErrorIA as e:
+        log(f"{p['nombre']} no respondió: {e}")
+        return None
+    (tarea / "respuesta.txt").write_text(texto, encoding="utf-8")
+    return leer_eleccion(texto, cands, log)
 
 
 def elegir_con_claude(cands: list[dict], tarea: Path, log: Registro) -> list[dict] | None:
@@ -257,7 +283,7 @@ def leer_eleccion(texto: str, cands: list[dict], log: Registro) -> list[dict] | 
     except (ValueError, KeyError, TypeError):
         momentos = None
     if not isinstance(momentos, list):
-        log(f"respuesta de Claude que no entiendo: {texto[:200]!r}")
+        log(f"respuesta de la IA que no entiendo: {texto[:200]!r}")
         return None
     por_numero = {c["n"]: c for c in cands}
     salida, vistos = [], set()
@@ -273,7 +299,7 @@ def leer_eleccion(texto: str, cands: list[dict], log: Registro) -> list[dict] | 
             c["por_que"] = _limpio(mo.get("por_que"), 200)
             salida.append(c)
     if not salida:
-        log("Claude no eligió ningún candidato válido")
+        log("la IA no eligió ningún candidato válido")
         return None
     return sorted(salida, key=lambda c: c["inicio"])
 
@@ -372,7 +398,7 @@ def trabajar(video: Path, notificar: bool = True) -> Path:
         c["miniatura"] = str(miniatura(video, c, tarea / f"candidato-{c['n']:02d}.jpg") or "")
     (tarea / "candidatos.json").write_text(json.dumps(cands, indent=2, ensure_ascii=False), encoding="utf-8")
     log(f"{len(cands)} candidatos en {time.monotonic() - inicio:.0f} s")
-    elegidos = (elegir_con_claude(cands, tarea, log) if len(cands) > 1 else None) or \
+    elegidos = (elegir_con_ia(cands, tarea, log) if len(cands) > 1 else None) or \
         (sin_claude(cands) if len(cands) > 1 else [dict(cands[0], titulo="La partida", por_que="")])
     destino = destino_para(video)
     guardar(proyecto(video, destino, info, elegidos), destino)

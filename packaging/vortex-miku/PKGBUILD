@@ -10,7 +10,7 @@
 #
 #   cd packaging/vortex-miku && makepkg -si
 pkgname=vortex-miku
-pkgver=1.5.0
+pkgver=1.6.0
 pkgrel=1
 pkgdesc="Miku, la asistente de voz de Vortexine's OS: 3D, voz y oído locales, y Claude como cerebro (SUPER + O)"
 arch=('any')
@@ -20,9 +20,10 @@ license=('MIT')
 # bindings; qt6-wayland, la ventana en Wayland; python-numpy y python-onnxruntime-cpu, la voz (Supertonic 3).
 # NO python-onnxruntime: también lo proveen las variantes cuda y rocm, de varios GB. whisper-cpp es el oído
 # (trae ffmpeg y ggml); pipewire trae pw-record (el micrófono) y pw-play (el altavoz). gpu-screen-recorder graba
-# las partidas y ffmpeg busca sus mejores momentos.
+# las partidas y ffmpeg busca sus mejores momentos. ollama + ollama-vulkan son la IA local (sin cuenta): el
+# motor Vulkan sirve en NVIDIA, AMD e Intel y pesa ~5 MB (ollama-cuda y ollama-rocm, casi 1 GB cada uno).
 depends=('python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland' 'python-numpy' 'python-onnxruntime-cpu'
-         'whisper-cpp' 'pipewire' 'gpu-screen-recorder' 'ffmpeg')
+         'whisper-cpp' 'pipewire' 'gpu-screen-recorder' 'ffmpeg' 'ollama' 'ollama-vulkan')
 optdepends=("claude-code: el cerebro de Miku (en Vortexine's se activa con «vortex claude activar»)"
             'libsecret: guarda la clave de ElevenLabs en el llavero (sin él, en un archivo 0600)')
 source=("three-0.180.0.tgz::https://registry.npmjs.org/three/-/three-0.180.0.tgz"
@@ -67,6 +68,8 @@ package() {
 
     # El comando: la app lo reconoce instalado porque no hay miku/app.py junto a él.
     install -Dm755 "$origen/vortex-miku" "$pkgdir/usr/bin/vortex-miku"
+    # La IA local: Ollama para tu usuario (no arranca sola; la levanta Miku cuando la necesita).
+    install -Dm644 "$origen/systemd/vortex-ollama.service" "$pkgdir/usr/lib/systemd/user/vortex-ollama.service"
 
     # Licencias: la del proyecto, la de la voz (BigScience OpenRAIL-M completa, con sus restricciones de
     # uso: hay que entregarla a quien reciba el modelo), la del motor de voz, la del oído y las del 3D.

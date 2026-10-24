@@ -4,9 +4,11 @@
 1. Sin GPU ni PyTorch: VORTEX_MIKU_NATURAL apunta a una carpeta con un «python» falso que (a) avisa un error
    al cargar, (b) se muere sin decir nada o (c) arranca en modo CPU. En (a) y (b) Miku sigue con la F1 sin
    perder la frase; en (c) habla con la natural y avisa una sola vez que va en modo lento.
-2. «vortex-miku natural instalar» con la GPU, pip y la descarga de mentira: con una GPU que sirva instala lo
-   de siempre; sin ella (o con --cpu), el modo CPU (PyTorch de CPU, la rueda de CPU de qwentts.cpp y el GGUF
-   Q4_K_M); al cambiar de modo rehace el entorno; «natural estado» dice el modo.
+2. «vortex-miku natural instalar» con la GPU, el procesador, pip y la descarga de mentira: con una GPU que
+   sirva instala lo de siempre; sin ella, con un procesador de 10.ª generación o más nuevo (o con --cpu), el
+   modo CPU (PyTorch de CPU, la rueda de CPU de qwentts.cpp y el GGUF Q4_K_M); sin ninguno no instala; al
+   cambiar de modo rehace el entorno; «natural estado» dice el modo. Qué procesadores cuentan. El modo
+   --auto (el que lanza la ventana de Miku) y que la ventana lo lance solo cuando toca.
 3. Con una instalación CPU de verdad (VORTEX_MIKU_NATURAL_CPU, o si existe
    ~/.cache/vortex-miku-cpu-prueba/natural del usuario real): el proceso carga en la CPU y habla. Si no hay,
    se salta.
@@ -169,7 +171,7 @@ class SubprocesoFalso:
         return [" ".join(c) for c in self.ordenes if "pip" in c]
 
 
-def instalar(carpeta: Path, args: list[str], gpu_sirve: bool):
+def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = True):
     """Corre «vortex-miku natural instalar ARGS» de mentira. Devuelve (código, texto, subproceso, módulo)."""
     rutas, voces, _ = recargar(carpeta)
     m = cargar_comando()
@@ -178,7 +180,16 @@ def instalar(carpeta: Path, args: list[str], gpu_sirve: bool):
     m.gpu_para_natural = lambda: ((True, "NVIDIA GeForce RTX 3080 (10 GB)") if gpu_sirve else
                                   (False, "tu NVIDIA GeForce GTX 1060 6GB es muy vieja para la voz natural "
                                           "(hace falta una serie 20 o más nueva)."))
+    m.cpu_para_natural = lambda: ((True, "Intel(R) Core(TM) i9-11900K (Intel Core de 11.ª generación)") if cpu_sirve else
+                                  (False, "tu Intel(R) Core(TM) i7-4790K no llega: en la CPU hace falta un Intel Core "
+                                          "de 10.ª generación o más nuevo, o un Ryzen 3000 o más nuevo."))
     m.reabrir_si_esta_abierta = lambda: False
+    m.reabrio = False
+
+    def reabrir():
+        m.reabrio = True
+        return True
+    m.reabrir_si_esta_abierta = reabrir
     texto = io.StringIO()
     with contextlib.redirect_stdout(texto), contextlib.redirect_stderr(texto):
         rc = m.orden_natural(["instalar", *args])
@@ -242,6 +253,62 @@ def eleccion() -> None:
         print("== Opciones que no existen")
         rc, texto, falso, m = instalar(base / "mala", ["--rapido"], gpu_sirve=True)
         probar("se rechazan (código 2) sin instalar nada", rc == 2 and not falso.ordenes)
+
+        print("== Sin GPU que sirva y con un procesador viejo (i7-4790K): no instala")
+        rc, texto, falso, m = instalar(base / "vieja", [], gpu_sirve=False, cpu_sirve=False)
+        probar("sale con error, explica por qué y no baja nada",
+               rc == 1 and "4790K" in texto and "voz de siempre" in texto and "--cpu" in texto and not falso.ordenes)
+        e = estado(m)
+        probar("«natural estado» dice que el procesador no sirve y que se queda con la de siempre",
+               "Procesador: no sirve" in e and "con la de siempre" in e)
+        rc, texto, falso, m = instalar(base / "vieja", ["--cpu"], gpu_sirve=False, cpu_sirve=False)
+        probar("con --cpu igual la instala en la CPU", rc == 0 and (base / "vieja/modo").read_text().strip() == "cpu")
+
+        print("== --auto (lo lanza la ventana de Miku)")
+        from miku import config, voces as v
+        config.guardar({"voz": v.VOZ_DEFECTO, "voz_natural_auto": True})
+        rc, texto, falso, m = instalar(base / "auto", ["--auto"], gpu_sirve=False, cpu_sirve=True)
+        avisos = [c for c in falso.ordenes if c[0] == "notify-send"]
+        probar("instala en la CPU y deja la voz natural elegida",
+               rc == 0 and (base / "auto/listo").is_file() and config.cargar()["voz"] == "miku-natural")
+        probar("avisa al empezar y al terminar con notificaciones", len(avisos) == 2
+               and "preparando" in " ".join(avisos[0]) and "lenta" in " ".join(avisos[0])
+               and "ya tiene su voz natural" in " ".join(avisos[1]))
+        probar("no reabre a Miku", not m.reabrio)
+        rc, texto, falso, m = instalar(base / "auto", ["--auto"], gpu_sirve=True)
+        probar("ya instalada: no hace nada", rc == 0 and not falso.ordenes)
+        config.guardar({"voz": "supertonic-f3"})
+        rc, texto, falso, m = instalar(base / "auto2", ["--auto"], gpu_sirve=True)
+        probar("si elegiste otra voz, no la instala", rc == 0 and not falso.ordenes)
+        config.guardar({"voz": v.VOZ_DEFECTO})
+        rc, texto, falso, m = instalar(base / "auto3", ["--auto"], gpu_sirve=False, cpu_sirve=False)
+        probar("sin PC que aguante: sale bien, sin bajar nada", rc == 0 and not falso.ordenes and "de siempre" in texto)
+        texto = io.StringIO()
+        with contextlib.redirect_stdout(texto):
+            m.orden_natural(["quitar"])
+        rc, texto, falso, m = instalar(base / "auto4", ["--auto"], gpu_sirve=True)
+        probar("después de «natural quitar» no la vuelve a instalar sola",
+               config.cargar()["voz_natural_auto"] is False and rc == 0 and not falso.ordenes)
+
+        print("== Qué procesadores aguantan la voz natural en la CPU")
+        for nombre, sirve in (("Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz", True),
+                              ("11th Gen Intel(R) Core(TM) i9-11900K @ 3.50GHz", True),
+                              ("11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz", True),
+                              ("Intel(R) Core(TM) i7-1065G7 CPU @ 1.30GHz", True),
+                              ("13th Gen Intel(R) Core(TM) i9-13900HX", True),
+                              ("Intel(R) Core(TM) Ultra 7 155H", True),
+                              ("AMD Ryzen 5 5600H with Radeon Graphics", True),
+                              ("AMD Ryzen 7 3700X 8-Core Processor", True),
+                              ("AMD Ryzen 5 PRO 4650G with Radeon Graphics", True),
+                              ("AMD Ryzen AI 9 HX 370 w/ Radeon 890M", True),
+                              ("Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", False),
+                              ("Intel(R) Core(TM) i7-8565U CPU @ 1.80GHz", False),
+                              ("AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx", False),
+                              ("AMD Ryzen 5 2600 Six-Core Processor", False),
+                              ("Intel(R) Celeron(R) N4020 CPU @ 1.10GHz", False),
+                              ("Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz", False)):
+            g = m.generacion_cpu(nombre)
+            probar(f"{'sí' if sirve else 'no'}: {nombre}", (g is not None and g[0]) == sirve)
     finally:
         shutil.rmtree(base, ignore_errors=True)
         if copia is None:
@@ -283,12 +350,68 @@ def cpu_de_verdad(app) -> None:
     shutil.rmtree(salida, ignore_errors=True)
 
 
+def auto_desde_ventana() -> None:
+    """La ventana lanza «natural instalar --auto» aparte solo si toca (con VORTEX_MIKU_NATURAL_AUTO y un CLI falso)."""
+    print("== La ventana de Miku lanza la voz natural sola")
+    from miku import config
+    base = Path(tempfile.mkdtemp(prefix="vortex-miku-natural-auto."))
+    copia = None
+    try:
+        rutas, voces, asistente = recargar(base / "natural")
+        copia = rutas.CONFIG.read_bytes() if rutas.CONFIG.is_file() else None
+        anotado = base / "llamado"
+        cli = base / "vortex-miku"
+        cli.write_text(f'#!/bin/sh\necho "$@" >> {anotado}\n')
+        cli.chmod(0o755)
+        os.environ.update(VORTEX_MIKU_NATURAL_AUTO="1", VORTEX_MIKU_CLI=str(cli))
+        a = asistente.Asistente({"avatar": False, "voz": voces.VOZ_DEFECTO, "modelo": "", "seguir_escuchando": False,
+                                 "silencio": 1.5}, avatar=False)
+
+        def llamado() -> str:
+            for _ in range(30):
+                if anotado.is_file():
+                    break
+                time.sleep(0.1)
+            texto = anotado.read_text() if anotado.is_file() else ""
+            anotado.unlink(missing_ok=True)
+            return texto
+
+        config.guardar({"voz": voces.VOZ_DEFECTO, "voz_natural_auto": True})
+        a._natural_en_segundo_plano()
+        probar("con la voz de siempre y sin la natural: lanza «natural instalar --auto»",
+               llamado().strip() == "natural instalar --auto")
+        config.guardar({"voz_natural_auto": False})
+        a._natural_en_segundo_plano()
+        probar("con la natural quitada a propósito: no", llamado() == "")
+        config.guardar({"voz_natural_auto": True, "voz": "supertonic-f2"})
+        a._natural_en_segundo_plano()
+        probar("con otra voz elegida: no", llamado() == "")
+        config.guardar({"voz": voces.VOZ_DEFECTO})
+        os.environ["VORTEX_MIKU_NATURAL_AUTO"] = "0"
+        a._natural_en_segundo_plano()
+        probar("con VORTEX_MIKU_NATURAL_AUTO=0: no", llamado() == "")
+        del os.environ["VORTEX_MIKU_NATURAL_AUTO"]
+        a._natural_en_segundo_plano()
+        probar("desde el repo (no el paquete): no", llamado() == "")
+        a.cerrar_todo()
+    finally:
+        os.environ.pop("VORTEX_MIKU_NATURAL_AUTO", None)
+        os.environ.pop("VORTEX_MIKU_CLI", None)
+        from miku import rutas
+        if copia is None:
+            rutas.CONFIG.unlink(missing_ok=True)
+        else:
+            rutas.CONFIG.write_bytes(copia)
+        shutil.rmtree(base, ignore_errors=True)
+
+
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QCoreApplication
     app = QCoreApplication(sys.argv)
     respaldo(app)
     eleccion()
+    auto_desde_ventana()
     cpu_de_verdad(app)
     print("\nTodo bien" if not FALLOS else f"\nFALLARON {FALLOS} pruebas")
     return 1 if FALLOS else 0

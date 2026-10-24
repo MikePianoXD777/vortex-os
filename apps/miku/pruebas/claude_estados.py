@@ -126,7 +126,7 @@ def main() -> int:
     # 1. Claude apagado (de fábrica en Vortexine's)
     a, panel, r = caso(app, "Claude apagado", activado=False, sesion=False)
     comprobar("dice «Para hablar conmigo necesito tu cuenta de Claude.»", esperar(app, lambda: r["respuestas"] and "Para hablar conmigo necesito tu cuenta de Claude." in r["respuestas"][-1]))
-    comprobar("trae el botón «Activar Claude»", r["acciones"] and r["acciones"][-1] == [["activar", "Activar Claude"]], str(r["acciones"]))
+    comprobar("trae los botones «Activar Claude» y «Usar IA local»", r["acciones"] and r["acciones"][-1] == [["activar", "Activar Claude"], ["usar_local", "Usar IA local (sin cuenta)"]], str(r["acciones"]))
     comprobar("el micrófono no se abrió (nadie escucha)", "escuchando" not in r["estados"])
     app.processEvents()
     if capturas:
@@ -145,14 +145,14 @@ def main() -> int:
     # 2. Activado, pero el programa claude no está
     a, panel, r = caso(app, "Activado, pero Claude todavía no está instalado", activado=True, sesion=True, con_claude=False)
     comprobar("avisa que falta instalarlo con el botón «Activar Claude»",
-              esperar(app, lambda: r["acciones"] and r["acciones"][-1] == [["activar", "Activar Claude"]]) and "instalado" in r["respuestas"][-1], r["respuestas"][-1:] and r["respuestas"][-1])
+              esperar(app, lambda: r["acciones"] and r["acciones"][-1] == [["activar", "Activar Claude"], ["usar_local", "Usar IA local (sin cuenta)"]]) and "instalado" in r["respuestas"][-1], r["respuestas"][-1:] and r["respuestas"][-1])
     a.cerrar_todo()
     panel.deleteLater()
 
     # 3. Activado y con programa, pero sin sesión
     a, panel, r = caso(app, "Activado, sin sesión iniciada", activado=True, sesion=False)
     comprobar("dice que no hay sesión con el botón «Iniciar sesión»",
-              esperar(app, lambda: r["acciones"] and r["acciones"][-1] == [["sesion", "Iniciar sesión"]]) and "sesión" in r["respuestas"][-1], r["respuestas"][-1:] and r["respuestas"][-1])
+              esperar(app, lambda: r["acciones"] and r["acciones"][-1] == [["sesion", "Iniciar sesión"], ["usar_local", "Usar IA local (sin cuenta)"]]) and "sesión" in r["respuestas"][-1], r["respuestas"][-1:] and r["respuestas"][-1])
     comprobar("el micrófono no se abrió", "escuchando" not in r["estados"])
     if capturas:
         panel.grab().save(str(capturas / "panel-sin-sesion.png"))
@@ -164,7 +164,7 @@ def main() -> int:
     r["respuestas"].clear()
     a.enviar("hola")
     comprobar("una pregunta sin sesión también recibe el aviso y el botón",
-              esperar(app, lambda: r["respuestas"] and "sesión" in r["respuestas"][-1]) and r["acciones"][-1] == [["sesion", "Iniciar sesión"]])
+              esperar(app, lambda: r["respuestas"] and "sesión" in r["respuestas"][-1]) and r["acciones"][-1] == [["sesion", "Iniciar sesión"], ["usar_local", "Usar IA local (sin cuenta)"]])
     a.cerrar_todo()
     panel.deleteLater()
 
