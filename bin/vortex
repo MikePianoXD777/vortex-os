@@ -772,7 +772,11 @@ case "${1:-ayuda}" in
     ;;
   java) shift; cmd_java "$@" ;;
   primer-inicio) cmd_primer_inicio ;;
-  version) cat "$CONF/version" 2>/dev/null || echo "sin instalar (código en $VORTEX_DIR)" ;;
+  # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
+  version)
+    v="$(sed -n 's/^VERSION="\(.*\)"$/\1/p' "$VORTEX_RELEASE" 2>/dev/null)" || v=""
+    [[ -n "$v" ]] && echo "$v" || cat "$CONF/version" 2>/dev/null || echo "sin instalar (código en $VORTEX_DIR)"
+    ;;
   ayuda | -h | --help) ayuda ;;
   *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;
 esac
