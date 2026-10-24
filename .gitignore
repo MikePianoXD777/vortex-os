@@ -18,3 +18,6 @@ packaging/*/*.pkg.tar.*
 # Fuentes que baja makepkg (three.js, three-vrm…)
 packaging/*/*.tgz
 packaging/vortex-miku/whisper.cpp-MIT.txt
+# Cachés de QtWebEngine si Miku se abre con esta carpeta como directorio actual
+DawnCache/
+GPUCache/
