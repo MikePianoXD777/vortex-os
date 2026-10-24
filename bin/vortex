@@ -501,7 +501,7 @@ version_pkgbuild() {
 # vortex-os-release con su hook de pacman (como en la ISO) y se corre.
 version_sistema() {
   local v hook=/etc/pacman.d/hooks/98-vortex-os-release.hook
-  v="$(sed -n 's/^VORTEX_VERSION="\(.*\)"$/\1/p' "$VORTEX_DIR/install/lib.sh" 2>/dev/null)"
+  v="$(sed -n 's/^VORTEX_VERSION="\(.*\)"$/\1/p' "$VORTEX_DIR/install/lib.sh" 2>/dev/null)" || v=""
   [[ -n "$v" && -f "$VORTEX_RELEASE" ]] || return 0
   if ! grep -qx "VERSION=\"$v\"" "$VORTEX_RELEASE"; then
     sudo sed -i "s/^VERSION=.*/VERSION=\"$v\"/" "$VORTEX_RELEASE" || aviso "no pude poner la versión $v en $VORTEX_RELEASE"
