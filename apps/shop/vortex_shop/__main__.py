@@ -102,16 +102,17 @@ def main(argv: list[str] | None = None, motor: Motor | None = None, instancia: s
     interfaz, puente = cargar_interfaz(app, motor)
     if not interfaz.rootObjects():
         return 1
-    servidor = _escuchar(nombre, puente, app)  # noqa: F841 - vive mientras viva la aplicación
+    servidor = _escuchar(nombre, puente, app)   # vive mientras viva la aplicación
     puente.iniciar()
     codigo = app.exec()
-    if puente.ocupado:
-        # Se cerró con algo en la cola y el usuario lo confirmó: no se espera a que los hilos
-        # terminen (Qt esperaría a todas las instalaciones pendientes antes de salir).
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os._exit(codigo)
-    return codigo
+    # Cerrada la ventana, la tienda sale ya, sin esperar a los hilos de fondo: si se cerró con algo en
+    # la cola (y el usuario lo confirmó), Qt esperaría a todas las instalaciones; y un hilo del catálogo
+    # o de los íconos colgado (sin red) dejaba el proceso vivo sin ventana, con el socket de «una sola
+    # tienda» abierto, así que abrirla otra vez no hacía nada.
+    servidor.close()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(codigo)
 
 
 if __name__ == "__main__":
