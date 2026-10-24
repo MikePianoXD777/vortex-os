@@ -22,7 +22,14 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   justo debajo de la barra. No te quita el teclado al abrirse.
 - **Comandos:** `vortex miku` (abre o cierra), `vortex miku estado`, `vortex miku voz [ID]` y
   `vortex miku modelo RUTA.vrm`. Las opciones quedan en `~/.config/vortex/miku.json`.
-- **Voz natural con ElevenLabs (opcional):** `vortex-miku elevenlabs VOICE_ID` usa una voz que elijas en
+- **Voz natural en tu GPU (opcional):** `vortex-miku natural instalar` le pone a Miku una voz natural y
+  expresiva (melancólica, un poco grave) que corre en tu tarjeta NVIDIA, sin internet ni cuentas. Usa
+  Qwen3-TTS (Apache-2.0) acelerado con faster-qwen3-tts: en una RTX 3080 habla 2,5 veces más rápido que el
+  tiempo real. Necesita una NVIDIA serie 20 o más nueva con 6 GB o más (la GTX 10 no) y ~7 GB de disco.
+  Solo usa la GPU (~5 GB) mientras Miku está abierta; al cerrarla se libera. Si no carga, Miku sigue con la
+  voz de siempre. La voz se inventó a partir de una descripción: no es la de ninguna persona.
+  `vortex-miku natural quitar` la borra.
+- **Voz con ElevenLabs (opcional, en la nube):** `vortex-miku elevenlabs VOICE_ID` usa una voz que elijas en
   [elevenlabs.io](https://elevenlabs.io) (Voice Library o Voice Design), con emociones de verdad: Claude pone
   etiquetas como `[sighs]` o `[whispers]` que cambian cómo lo dice (y la cara del 3D), y no salen en pantalla.
   Usa el modelo `eleven_v4_turbo` (o `eleven_v3` si tu cuenta no lo tiene). La clave se pide una vez, sin

@@ -12,6 +12,14 @@ Modelo 3D «MIKU NAKANO»
   El modelo no forma parte del código: no está en el repositorio, lo pone la ISO en
   /usr/share/vortex-miku/modelo/ (o tú con «vortex-miku modelo RUTA.vrm»).
 
+Voz natural (opcional, con GPU): Qwen3-TTS
+  Alibaba Qwen Team (https://github.com/QwenLM/Qwen3-TTS), modelo Qwen3-TTS-12Hz-1.7B-Base, licencia
+  Apache-2.0; acelerado con faster-qwen3-tts (Andrés Marafioti, MIT). No vienen en la ISO: los instala
+  «vortex-miku natural instalar» en ~/.local/share/vortex/miku/natural/ junto con PyTorch (BSD-3).
+  La voz (voces/miku-natural.wav) se inventó con Qwen3-TTS-12Hz-1.7B-VoiceDesign a partir de una
+  descripción escrita («joven, suave, un poco grave, cansada y melancólica, muy expresiva»): no es la
+  voz de ninguna persona ni copia la de nadie.
+
 Voz: Supertonic 3 (voz preestablecida F1)
   Supertone Inc. (https://huggingface.co/Supertone/supertonic-3).
   Los pesos del modelo están bajo la licencia BigScience OpenRAIL-M (BigScience-OpenRAIL-M.txt):

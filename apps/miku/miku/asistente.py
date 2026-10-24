@@ -40,6 +40,15 @@ _ALEGRES = {"laughs", "laughs softly", "giggles", "excited", "happy"}
 _SORPRESA = {"surprised", "curious", "nervous", "hesitates"}
 
 
+# Con la voz natural (Qwen3-TTS) la emoción sale de cómo está escrito: se le pide a Claude que se note.
+PERSONA_NATURAL = (
+    "Tu voz es natural y expresiva, y suena como escribes: deja que se note lo que sientes con interjecciones "
+    "(«ay», «mmm», «oye»), puntos suspensivos para las pausas y signos de exclamación o de pregunta cuando toque, "
+    "sin exagerar. Si quieres, pon antes de una frase una etiqueta en inglés entre corchetes como [sighs], [sad], "
+    "[laughs softly] o [excited]: no se lee en voz alta ni se muestra, solo cambia tu cara."
+)
+
+
 def emocion_de(frase: str) -> tuple[str, float]:
     """Una emoción suave para la frase que va a decir (Miku es apagada: nunca pasa de una sonrisa leve).
 
@@ -96,8 +105,11 @@ class Asistente(QObject):
         self.estado_actual = REPOSO
         self.oido = oido.Oido(silencio=cfg["silencio"], espera=ESPERA_PRIMERA)
         self.cerebro = modulo_cerebro.Cerebro(avatar, lambda tipo, **d: self._evento_cerebro.emit(tipo, d))
-        if (voces.buscar(cfg["voz"]) or {}).get("motor") == "elevenlabs":
+        motor = (voces.buscar(cfg["voz"]) or {}).get("motor")
+        if motor == "elevenlabs":
             self.cerebro.persona += "\n\n" + elevenlabs.PERSONA
+        elif motor == "qwen":
+            self.cerebro.persona += "\n\n" + PERSONA_NATURAL
         self.divisor = modulo_cerebro.DivisorFrases()
         self._acumulado = ""
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
@@ -213,28 +225,40 @@ class Asistente(QObject):
 
     # ---- Voz (proceso aparte con Supertonic 3) --------------------------------------------------
 
-    def _arrancar_voz(self) -> None:
-        id_voz = self.cfg["voz"]
+    def _arrancar_voz(self, id_voz: str | None = None) -> None:
+        id_voz = id_voz or self.cfg["voz"]
         voz = voces.buscar(id_voz)
         if voz is None:
             self._sin_voz(f"No existe la voz «{id_voz}». Mira las que hay con: vortex-miku voz")
             return
         if not voces.disponible(voz):
+            if voz.get("motor") in ("qwen", "elevenlabs") and id_voz != voces.VOZ_DEFECTO:
+                self._avisar_una_vez("voz-natural", f"La voz «{voz['nombre']}» no está lista; hablo con la de siempre.")
+                self._arrancar_voz(voces.VOZ_DEFECTO)
+                return
             if self._descargando:                  # se está bajando: arranca sola al terminar
                 self._voz_error = True
                 return
             self._sin_voz(f"La voz «{id_voz}» no está instalada. Instálala con: vortex-miku voz {id_voz}")
             return
-        script = Path(__file__).resolve().parent / "voz_worker.py"
         p = QProcess(self)
         env = QProcessEnvironment.systemEnvironment()
+        if voz.get("motor") == "qwen":
+            # La voz natural corre con el Python de su entorno (PyTorch y Qwen3-TTS no están en el sistema).
+            script = Path(__file__).resolve().parent / "voz_natural.py"
+            env.insert("HF_HUB_OFFLINE", "1")
+            p.setProgram(str(rutas.NATURAL_PYTHON))
+            p.setArguments(["-I", str(script), "--voz", id_voz])
+        else:
+            script = Path(__file__).resolve().parent / "voz_worker.py"
+            p.setProgram(sys.executable)
+            p.setArguments(["-I", str(script), "--voz", id_voz, "--estilo", "miku" if self.avatar else "normal"])
         p.setProcessEnvironment(env)
-        p.setProgram(sys.executable)
-        p.setArguments(["-I", str(script), "--voz", id_voz, "--estilo", "miku" if self.avatar else "normal"])
         p.readyReadStandardOutput.connect(self._leer_voz)
         p.finished.connect(self._voz_termino)
         p.start()
         self._voz = p
+        self._voz_id = id_voz
 
     def _sin_voz(self, motivo: str) -> None:
         self._voz_error = True
@@ -262,13 +286,37 @@ class Asistente(QObject):
                 self._cola.append((m["wav"], float(m.get("seg", 0)), m.get("visemas") or [], texto, turno))
                 self._sonar_siguiente()
             elif m.get("error") and m.get("id") is None:
+                if getattr(self, "_voz_id", voces.VOZ_DEFECTO) != voces.VOZ_DEFECTO:
+                    self._cambiar_a_respaldo(f"No pude cargar la voz natural ({m['error']}).")
+                    return
                 self._sin_voz(f"No pude cargar la voz ({m['error']}).")
             elif m.get("error"):
                 self._pedidos.pop(m.get("id"), None)
                 self._avisar_una_vez("voz-frase", f"La voz falló con una frase ({m['error']}).")
                 self._revisar_fin_de_turno()
 
+    def _cambiar_a_respaldo(self, motivo: str) -> None:
+        """La voz elegida no arrancó: se sigue con la de siempre (Supertonic F1) sin perder lo pendiente."""
+        viejo, self._voz = self._voz, None
+        if viejo is not None:
+            viejo.finished.disconnect(self._voz_termino)
+            viejo.kill()
+            viejo.deleteLater()
+        self._voz_buf = b""
+        self._voz_lista = False
+        self._avisar_una_vez("voz-natural", motivo + " Hablo con la voz de siempre.")
+        pendientes = sorted(self._pedidos.items())
+        self._pedidos.clear()
+        self._arrancar_voz(voces.VOZ_DEFECTO)
+        for _n, (frase, turno) in pendientes:
+            if turno == self._turno:
+                self._decir(frase)
+
     def _voz_termino(self, *_args) -> None:
+        if not self._cerrado and not self._voz_error and getattr(self, "_voz_id", voces.VOZ_DEFECTO) != voces.VOZ_DEFECTO \
+                and not self._voz_lista:
+            self._cambiar_a_respaldo("La voz natural se cerró al arrancar.")
+            return
         if not self._cerrado and not self._voz_error:
             self._sin_voz("La voz se detuvo.")
             self._pedidos.clear()

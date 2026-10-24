@@ -1,6 +1,17 @@
 {
   "voces": [
     {
+      "id": "miku-natural",
+      "nombre": "Miku natural (GPU)",
+      "descripcion": "Natural y expresiva, melancólica y un poco grave. Corre en tu GPU NVIDIA (serie 20 o más nueva, 6 GB o más), sin internet. Se instala con «vortex-miku natural instalar» (~7 GB).",
+      "motor": "qwen",
+      "incluida": false,
+      "modelo": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "muestra": "voces/miku-natural.wav",
+      "muestra_texto": "¿Sabes?... a veces me quedo pensando en cosas que pasaron hace mucho. Pero bueno... aquí estoy contigo. ¿Qué necesitas?",
+      "licencia": "Qwen3-TTS (Apache-2.0). La voz se inventó con Qwen3-TTS VoiceDesign a partir de una descripción: no es la de ninguna persona."
+    },
+    {
       "id": "supertonic-f1",
       "nombre": "Miku (F1)",
       "descripcion": "La voz de fábrica: femenina y joven, clara. Con el 3D encendido se vuelve más grave, lenta y apagada, como Miku; sin 3D suena normal.",

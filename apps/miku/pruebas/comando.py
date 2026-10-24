@@ -173,7 +173,7 @@ def main() -> int:
     f2 = home / ".local/share/vortex/miku/voz/voice_styles/F2.json"
     comprobar("una voz opcional baja su archivito, lo comprueba y la elige", r.returncode == 0 and f2.read_bytes() == falso and json.loads(CONFIG.read_text())["voz"] == "supertonic-f2", r.stderr)
     f2.unlink()
-    cat["voces"][1]["archivo"]["sha256"] = "0" * 64
+    next(v for v in cat["voces"] if v["id"] == "supertonic-f2")["archivo"]["sha256"] = "0" * 64
     (trabajo / "voces.json").write_text(json.dumps(cat))
     r = correr("voz", "supertonic-f2", env=env2)
     comprobar("si llega distinta (sha256) no se instala ni se elige", r.returncode != 0 and not f2.exists() and "sha256" in r.stderr, r.stderr.strip()[:100])

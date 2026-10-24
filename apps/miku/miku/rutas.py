@@ -38,6 +38,10 @@ OIDO = DATOS / "oido"                  # el modelo de Whisper para reconocer lo 
 AJUSTES_SHELL = _xdg("XDG_CONFIG_HOME", ".config") / "serpantinum" / "settings.json"     # solo lectura (general.uiScale)
 PALETA_SHELL = _xdg("XDG_STATE_HOME", ".local/state") / "serpantinum" / "qs_colors.json"  # solo lectura (colores del fondo)
 CEREBRO_CWD = DATOS / "cerebro"        # carpeta neutra y vacía desde donde corre Claude
+# Voz natural (opcional, con GPU): PyTorch y Qwen3-TTS en su propio entorno, que pone «vortex-miku natural instalar».
+NATURAL = Path(os.environ.get("VORTEX_MIKU_NATURAL") or DATOS / "natural")
+NATURAL_PYTHON = NATURAL / "venv" / "bin" / "python"
+NATURAL_LISTO = NATURAL / "listo"      # lo escribe la instalación al terminar bien (con las versiones)
 
 
 def runtime() -> Path:

@@ -46,7 +46,7 @@ package() {
     local vendor="$share/web/vendor"
 
     install -d "$share" "$vendor/addons/loaders" "$vendor/addons/utils"
-    cp -a "$origen/miku" "$origen/web" "$origen/persona" "$origen/licencias" "$share/"
+    cp -a "$origen/miku" "$origen/web" "$origen/persona" "$origen/licencias" "$origen/voces" "$share/"
     install -m644 "$origen/voces.json" "$share/voces.json"
     # Sin restos de ejecutar la app desde el repo.
     find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
