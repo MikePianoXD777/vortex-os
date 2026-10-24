@@ -23,6 +23,7 @@ Uso: vortex <comando>
   gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
                                        enfocada, modo juego automático, presión de memoria)
   claude                               abre Claude en una terminal (si está activado)
+  claude login                         solo inicia sesión (ventana que se cierra sola)
   claude activar|desactivar|activado   conecta Vortexine's OS con Claude (viene apagado; también
                                        desde Ajustes → General → Claude). Necesita tu cuenta de Claude
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
@@ -349,6 +350,18 @@ cmd_claude() {
       echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
       ;;
     instalar) shift; cmd_claude_instalar "$@" ;;
+    # Solo para iniciar sesión (lo usa Miku): una ventanita que se cierra sola al terminar. Miku no
+    # necesita ninguna consola abierta: usa Claude por su cuenta, en segundo plano.
+    login)
+      export PATH="$HOME/.local/bin:$PATH"
+      command -v claude >/dev/null 2>&1 || cmd_claude_instalar || exit 1
+      if claude auth status >/dev/null 2>&1; then
+        notificar "Claude" "Ya tienes la sesión iniciada: no hace falta nada más."
+        exit 0
+      fi
+      local guion='claude auth login && { echo; echo "Listo: sesión iniciada. Esta ventana se cierra sola."; sleep 3; } || { echo; read -rp "No se pudo iniciar sesión. Enter para cerrar."; }'
+      exec "${TERMINAL:-kitty}" --title "Iniciar sesión en Claude" bash -lc "$guion"
+      ;;
     estado)
       if [[ -f "$pausa" ]]; then echo "en pausa"; else echo "con acceso (te avisa cada vez que mira)"; fi
       ;;

@@ -667,11 +667,11 @@ class Asistente(QObject):
             return
         if id_accion == "activar":
             # Aparte de Miku (setsid -f): la terminal de Claude tiene que seguir abierta aunque cierres a Miku.
-            orden = ["setsid", "-f", "bash", "-c", '"$1" claude activar && exec "$1" claude', "vortex-miku", vortex]
-            texto = "Activando Claude. Se abrirá una terminal para que inicies sesión con tu cuenta; cuando termines, vuelve a hablarme."
+            orden = ["setsid", "-f", "bash", "-c", '"$1" claude activar && exec "$1" claude login', "vortex-miku", vortex]
+            texto = "Activando Claude. Se abrirá una ventanita para que inicies sesión con tu cuenta; se cierra sola al terminar y luego me hablas."
         elif id_accion == "sesion":
-            orden = ["setsid", "-f", vortex, "claude"]
-            texto = "Inicia sesión con tu cuenta en la terminal que se abrió; cuando termines, vuelve a hablarme."
+            orden = ["setsid", "-f", vortex, "claude", "login"]
+            texto = "Inicia sesión con tu cuenta en la ventanita que se abrió; se cierra sola al terminar y luego me hablas."
         else:
             return
         try:

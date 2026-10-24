@@ -9,7 +9,7 @@ orden que recibe en vortex.log; el `claude` falso responde a «auth status» seg
 contesta con un flujo mínimo en el mismo formato que el real. Se comprueba, para cada caso:
   - el mensaje en español y el botón que aparece (Activar Claude / Iniciar sesión);
   - que el micrófono NO se abre mientras Claude no esté listo;
-  - que cada botón lanza lo que debe (`vortex claude activar` y luego `vortex claude`, o solo `vortex claude`),
+  - que cada botón lanza lo que debe (`vortex claude activar` y luego `vortex claude login`, o solo `vortex claude login`),
     aparte de la app (setsid -f), sin pasar por una shell con texto de nadie.
 """
 
@@ -135,8 +135,8 @@ def main() -> int:
     comprobar("lo dijo también en voz alta (audio generado)", esperar(app, lambda: list((trabajo / "altavoz").glob("*.wav")), 20))
     (trabajo / "vortex.log").write_text("")
     a.accion("activar")
-    comprobar("«Activar Claude» corre `vortex claude activar` y luego `vortex claude`",
-              esperar(app, lambda: (trabajo / "vortex.log").read_text().splitlines() == ["vortex claude activar", "vortex claude"], 5),
+    comprobar("«Activar Claude» corre `vortex claude activar` y luego `vortex claude login`",
+              esperar(app, lambda: (trabajo / "vortex.log").read_text().splitlines() == ["vortex claude activar", "vortex claude login"], 5),
               repr((trabajo / "vortex.log").read_text()))
     comprobar("el botón desaparece y avisa qué hacer", r["acciones"][-1] == [] and any("inicies sesión" in x for x in r["avisos"]))
     a.cerrar_todo()
@@ -158,8 +158,8 @@ def main() -> int:
         panel.grab().save(str(capturas / "panel-sin-sesion.png"))
     (trabajo / "vortex.log").write_text("")
     a.accion("sesion")
-    comprobar("«Iniciar sesión» abre `vortex claude` (la terminal de Claude)",
-              esperar(app, lambda: (trabajo / "vortex.log").read_text().splitlines() == ["vortex claude"], 5), repr((trabajo / "vortex.log").read_text()))
+    comprobar("«Iniciar sesión» abre `vortex claude login` (solo el inicio de sesión, que se cierra solo)",
+              esperar(app, lambda: (trabajo / "vortex.log").read_text().splitlines() == ["vortex claude login"], 5), repr((trabajo / "vortex.log").read_text()))
     # Escribir una pregunta con Claude sin sesión vuelve a comprobar y vuelve a decirlo (no revienta).
     r["respuestas"].clear()
     a.enviar("hola")
