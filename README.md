@@ -89,7 +89,7 @@ piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 | Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |
 | Pantallas | `vortex-pantallas` | cada monitor a su resolución máxima y su frecuencia más alta (144, 165, 200, 240 Hz), al entrar y al conectarlo; respeta lo que pongas en Ajustes → Pantalla o en `hypr-mio.lua` |
 | Tienda de apps | **Vortexine's Shop** (`vortex-shop`) | todo Flathub a un clic, sin terminal ni contraseñas; las apps no vienen en la ISO |
-| Asistente de voz | Miku (`vortex-miku`): modelo 3D VRM + Claude Sonnet + voz y oído locales | Super+O; viene instalada y encendida (necesita Claude activado) y se apaga del todo al cerrarla |
+| Asistente de voz | Miku (`vortex-miku`): modelo 3D VRM + Claude Sonnet (u otra IA, o una local con Ollama) + voz y oído locales | Super+O; viene instalada y encendida y se apaga del todo al cerrarla |
 
 Todo se personaliza desde la app de **Ajustes** del shell: la barra (posición, estilo, módulos), el fondo,
 el tema, la inactividad... En una PC de escritorio Vortex **nunca suspende** (solo bloquea y apaga la
@@ -272,16 +272,30 @@ hay, lo reintenta en el próximo inicio) y al terminar avisa con una notificaci�
 ### Miku, el asistente de voz
 
 Viene instalada y encendida en la ISO (paquete `vortex-miku`; `install.sh` la pregunta, y `--sin-miku` la
-omite). **Necesita Claude activado** (Ajustes → General → Claude), porque Claude es su cerebro: con Claude
-apagado, ella te lo dice. **Super+O** la abre —sale pegada al borde derecho, debajo de la barra, y se pone a escuchar— y
+omite). Piensa con **Claude** (Ajustes → General → Claude) o, sin cuenta, con otra IA o con la **IA local**
+que trae la ISO (ver abajo): con Claude apagado, ella te lo dice y te ofrece la local. **Super+O** la abre —sale pegada al borde derecho, debajo de la barra, y se pone a escuchar— y
 **Super+O otra vez la cierra del todo**: sin ventana no queda ningún proceso (ni la voz, ni el oído, ni
 Claude), así que no gasta RAM cuando no la usas.
 
-- **Qué es:** Miku Nakano en 3D (un modelo VRM) con **Claude Sonnet** de cerebro, que puede ver tu pantalla,
-  y una voz de IA genérica (no imita a ninguna persona). El oído (whisper.cpp) y la voz (Supertonic 3)
-  corren en tu PC; lo único que sale es lo que ella piensa, que pasa por Claude con tu cuenta (como Super+A).
+- **Qué es:** Miku Nakano en 3D (un modelo VRM) con **Claude Sonnet** (u otra IA) de cerebro, que puede ver
+  tu pantalla, y una voz de IA genérica (no imita a ninguna persona). El oído (whisper.cpp) y la voz
+  (Supertonic 3) corren en tu PC; lo único que sale es lo que ella piensa, que pasa por Claude con tu cuenta
+  (como Super+A) o por la IA que elegiste. Con la IA local no sale nada.
   Los modelos de voz y de oído **no vienen en la ISO**: se bajan la primera vez que la abres (necesita
   internet esa vez) y quedan en tu usuario.
+- **Otra IA o IA local:** `vortex-miku ia` dice con cuál piensa y la cambia: `vortex-miku ia local` (Ollama
+  con Vulkan y Qwen 3.5 de 4B, 3,3 GB: se baja la primera vez y luego va sin internet; cabe en una GPU de
+  4 GB y sin GPU va en la CPU, más lenta), `vortex-miku ia gemini`, `vortex-miku ia openai [MODELO]`,
+  `vortex-miku ia otra URL MODELO` (cualquier API compatible con la de OpenAI) o `vortex-miku ia claude`.
+  La clave va al llavero (`vortex-miku ia clave`). Con otra IA ve tu pantalla y usa sus acciones igual, con
+  tu permiso; la búsqueda en la web solo va con Claude. Ollama escucha solo en `127.0.0.1` y suelta la GPU
+  a los 10 minutos sin uso.
+- **Voz natural (sola):** la primera vez que la abres, si tu PC aguanta, Miku se prepara aparte una voz más
+  expresiva que corre en tu PC (Qwen3-TTS) y avisa con notificaciones. En una NVIDIA serie 20 o más nueva
+  de 6 GB, va en la GPU (~7 GB); si no, con un Intel Core de 10.ª generación o más nuevo (o un Ryzen 3000+)
+  y 8 GB de RAM, va en el procesador, lenta pero funcional (~3 GB); si tampoco, se queda con la de siempre.
+  `vortex-miku natural estado` dice qué sirve, `natural instalar [--cpu]` la pone a mano y `natural quitar`
+  la borra (y ya no se reinstala sola). No se pone sola si elegiste otra voz.
 - **Solo voz:** en **Ajustes → General → Miku en 3D** (o `vortex miku avatar off`) se apaga el 3D y queda un
   panel chico de asistente de voz, que gasta bastante menos RAM. `vortex miku avatar on` lo vuelve a encender.
   (En un sistema ya instalado, el interruptor y `vortex miku` llegan con `vortex actualizar --forzar`.)
@@ -294,7 +308,8 @@ Claude), así que no gasta RAM cuando no la usas.
 - **Mejores momentos:** si se lo pides, busca los picos de sonido y movimiento de la grabación, Claude mira
   unas miniaturas (sin ninguna otra herramienta) para elegir los que valen la pena, y te deja un proyecto de
   **Vortex Studio** (`… - mejores momentos.vortex`) con los cortes, su audio y un marcador con el título de
-  cada momento. Corre aparte y avisa al terminar; sin Claude se queda con los picos más altos. También:
+  cada momento. Corre aparte y avisa al terminar; usa la IA que elegiste, y sin ninguna se queda con los
+  picos más altos. También:
   `vortex-miku momentos [VIDEO]`.
 - **Comandos:** `vortex miku` abre o cierra, `vortex miku estado` dice si el 3D está encendido y si está
   abierta, `vortex miku voz [ID]` lista o elige la voz y `vortex miku modelo RUTA.vrm` pone otro modelo 3D.
@@ -309,7 +324,8 @@ Las pruebas corren sin VM ni pantalla: `pruebas/miku.sh` (el comando, la ISO y e
 `pruebas/miku-qml.sh` (el interruptor de Ajustes, con el quickshell de verdad) y `pruebas/atajos.sh` (Super+O y
 las reglas de su ventana). Falta probar la ventana transparente sobre una sesión real de Hyprland.
 Las acciones (con la grabadora falsa) y los mejores momentos (con un video hecho por ffmpeg y un Claude
-falso) se prueban con `apps/miku/pruebas/acciones.py` y `apps/miku/pruebas/momentos.py`; en GitHub corren
+falso) se prueban con `apps/miku/pruebas/acciones.py` y `apps/miku/pruebas/momentos.py`, y la otra IA y la
+local (con una IA, un Ollama y un servidor MCP falsos) con `apps/miku/pruebas/ia.py`; en GitHub corren
 solas en cada push, junto con shellcheck, las claves de idioma y `Hyprland --verify-config`
 (`.github/workflows/pruebas.yml`).
 
