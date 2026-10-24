@@ -480,19 +480,42 @@ version_pkgbuild() {
   awk -F= '/^pkgver=/ {v = $2} /^pkgrel=/ {r = $2} END {print v "-" r}' "$VORTEX_DIR/packaging/$1/PKGBUILD"
 }
 
+URL_VORTEX="${VORTEX_URL:-https://github.com/MikePianoXD777/vortex-os.git}"   # VORTEX_URL: para pruebas
+
+# git sobre el código de Vortex. En una instalación desde la ISO vive en /usr/share/vortex-os (de root):
+# ahí va con sudo; en un repo tuyo (install.sh desde tu carpeta), como tú.
+git_vortex() {
+  if [[ -w "$VORTEX_DIR" && ( ! -e "$VORTEX_DIR/.git" || -w "$VORTEX_DIR/.git" ) ]]; then
+    GIT_TERMINAL_PROMPT=0 git -C "$VORTEX_DIR" "$@"
+  else
+    sudo env GIT_TERMINAL_PROMPT=0 git -c safe.directory="$VORTEX_DIR" -C "$VORTEX_DIR" "$@"
+  fi
+}
+
+# Trae el código nuevo de Vortex. Las ISO hasta la 1.3 dejaron /usr/share/vortex-os sin .git: la primera
+# vez se convierte en un clon del repo público (lo de la carpeta es una copia de él: se reemplaza).
+traer_vortex() {
+  if [[ ! -d "$VORTEX_DIR/.git" ]]; then
+    aviso "conecto $VORTEX_DIR con el repo de Vortexine's ($URL_VORTEX), una sola vez"
+    git_vortex init -q -b main &&
+      git_vortex remote add origin "$URL_VORTEX" &&
+      git_vortex fetch -q origin main &&
+      git_vortex reset -q --hard origin/main &&
+      git_vortex branch -q --set-upstream-to=origin/main main
+    return
+  fi
+  git_vortex pull --ff-only
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
-    if [[ -d "$VORTEX_DIR/.git" ]]; then
-      # Sin red, sin repo publicado o con historia divergida el pull falla: no debe
-      # abortar antes de actualizar los paquetes, ni quedarse pidiendo credenciales.
-      if GIT_TERMINAL_PROMPT=0 git -C "$VORTEX_DIR" pull --ff-only; then
-        # Lo de abajo puede haber cambiado con el pull: se sigue con el vortex recién traído.
-        exec "$VORTEX_DIR/bin/vortex" actualizar --ya-traido "$@"
-      fi
-      aviso "no pude actualizar Vortex (¿sin red o repo sin publicar?); sigo con los paquetes"
-    else
-      aviso "este Vortex no es un repo git; no puedo actualizarlo"
+    # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
+    # los paquetes, ni quedarse pidiendo credenciales.
+    if traer_vortex; then
+      # Lo de abajo puede haber cambiado: se sigue con el vortex recién traído.
+      exec "$VORTEX_DIR/bin/vortex" actualizar --ya-traido "$@"
     fi
+    aviso "no pude actualizar Vortex (¿sin red?); sigo con los paquetes"
   else
     shift
   fi
@@ -505,8 +528,16 @@ cmd_actualizar() {
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar ]] || continue
-    (cd "$VORTEX_DIR/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
-    rm -rf "$VORTEX_DIR/packaging/$pkg/"{pkg,src} "$VORTEX_DIR/packaging/$pkg/"*.pkg.tar.*
+    # makepkg no corre como root ni escribe en una carpeta de root (/usr/share/vortex-os): ahí se
+    # construye en una copia en tu caché.
+    local base="$VORTEX_DIR"
+    if [[ ! -w "$VORTEX_DIR/packaging/$pkg" ]]; then
+      base="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/construir"
+      mkdir -p "$base" && rsync -a --delete --exclude=.git "$VORTEX_DIR/" "$base/" ||
+        { aviso "no pude copiar el código para construir $pkg"; continue; }
+    fi
+    (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
+    rm -rf "$base/packaging/$pkg/"{pkg,src} "$base/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && hypr_corriendo && hyprctl reload >/dev/null 2>&1

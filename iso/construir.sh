@@ -186,7 +186,7 @@ URL_PUBLICO="https://github.com/MikePianoXD777/vortex-os.git"
 git_raiz() { git -c safe.directory="$RAIZ" -C "$RAIZ" --no-optional-locks "$@"; }
 if ! command -v git >/dev/null || ! git_raiz rev-parse --git-dir >/dev/null 2>&1; then
   echo "Aviso: no hay git o $RAIZ no es un repo; la ISO sale sin .git y «vortex actualizar» no podrá actualizar Vortex." >&2
-elif [[ -n "$(git_raiz status --porcelain)" ]]; then
+elif [[ -n "$(git_raiz status --porcelain --untracked-files=no)" ]]; then   # lo sin seguimiento no va en la copia de git
   echo "Aviso: el árbol tiene cambios sin commit; la ISO sale sin .git (haz commit y reconstruye para incluirlo)." >&2
 elif ! rama="$(git_raiz symbolic-ref --short HEAD 2>/dev/null)"; then
   echo "Aviso: HEAD está desprendido (sin rama); la ISO sale sin .git." >&2
