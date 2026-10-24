@@ -172,8 +172,11 @@ ajustes_jq() {
   shift
   tmp="$(mktemp "$(dirname "$AJUSTES")/.settings_vortex_XXXXXX")" || return 1
   if jq "$@" "$filtro" "$AJUSTES" >"$tmp" && [[ -s "$tmp" ]]; then
-    chmod --reference="$AJUSTES" "$tmp" 2>/dev/null || chmod 644 "$tmp"
-    mv "$tmp" "$AJUSTES"
+    # Se escribe en el mismo archivo (no con mv): el shell vigila settings.json y, si el archivo se
+    # reemplaza por otro, deja de enterarse de los cambios (el selector de fondos se quedaba con la
+    # carpeta vieja). El JSON ya está completo en $tmp, así que la escritura es de un solo golpe.
+    cat "$tmp" >"$AJUSTES"
+    rm -f "$tmp"
   else
     rm -f "$tmp"
     return 1
