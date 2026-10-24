@@ -114,14 +114,15 @@ es_elf() { [[ "$(head -c4 "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')" == 7f45
 # Escribe «archivo: nota» por cada ELF del paquete $1 cuya nota «x86 ISA needed» pide más que
 # x86-64 básico (v2, v3 o v4): el glibc no lo abre en una CPU que no llega a ese nivel, aunque el
 # código no use nada de eso. Sin nota no se escribe nada (el glibc no revisa). Si el paquete no se
-# puede abrir, devuelve 1.
+# puede abrir, devuelve 1. (readelf pone la nota en su propia línea o, si es la primera propiedad,
+# detrás de «Properties:»: por eso el sed no se ancla al principio.)
 elf_no_genericos() {
   local f="$1" d e nota
   d="$(mktemp -d "${TMPDIR:-/tmp}/vortex-isa.XXXXXX")" || return 1
   bsdtar -xf "$f" -C "$d" 2>/dev/null || { rm -rf "$d"; return 1; }
   while IFS= read -r -d '' e; do
     es_elf "$e" || continue
-    nota="$(LC_ALL=C readelf -n "$e" 2>/dev/null | sed -n 's/^[[:space:]]*x86 ISA needed:[[:space:]]*//p' | head -n1)"
+    nota="$(LC_ALL=C readelf -n "$e" 2>/dev/null | sed -n 's/.*x86 ISA needed:[[:space:]]*//p' | head -n1)"
     if [[ "$nota" =~ x86-64-v[2-9] ]]; then printf '%s: %s\n' "${e#"$d"/}" "$nota"; fi
   done < <(find "$d" -type f -print0)
   rm -rf "$d"
