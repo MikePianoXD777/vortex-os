@@ -497,11 +497,20 @@ git_vortex() {
 traer_vortex() {
   if [[ ! -d "$VORTEX_DIR/.git" ]]; then
     aviso "conecto $VORTEX_DIR con el repo de Vortexine's ($URL_VORTEX), una sola vez"
-    git_vortex init -q -b main &&
-      git_vortex remote add origin "$URL_VORTEX" &&
-      git_vortex fetch -q origin main &&
-      git_vortex reset -q --hard origin/main &&
-      git_vortex branch -q --set-upstream-to=origin/main main
+    # Primero se clona aparte: si no hay red, la carpeta de Vortex no se toca.
+    local tmp
+    tmp="$(mktemp -d)" || return 1
+    if ! GIT_TERMINAL_PROMPT=0 git clone -q --no-checkout --single-branch --branch main "$URL_VORTEX" "$tmp/r"; then
+      rm -rf "$tmp"
+      return 1
+    fi
+    if [[ -w "$VORTEX_DIR" ]]; then
+      mv "$tmp/r/.git" "$VORTEX_DIR/.git"
+    else
+      sudo cp -r "$tmp/r/.git" "$VORTEX_DIR/.git"
+    fi
+    rm -rf "$tmp"
+    git_vortex reset -q --hard origin/main
     return
   fi
   git_vortex pull --ff-only

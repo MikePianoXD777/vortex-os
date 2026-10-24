@@ -363,6 +363,7 @@ env HOME="$H" "$AQUI/bin/vortex" ayuda >"$T/salida" 2>&1
 probar "la ayuda de vortex lo lista" "grep -q 'otaku' '$T/salida'"
 
 echo "== vortex actualizar deja los comandos al día"
+export VORTEX_URL="$T/repo-que-no-existe"     # sin red: no se conecta a GitHub ni toca el repo de prueba
 mkdir -p "$T/destino" "$T/repo/bin" "$T/repo/shell"
 for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku; do
   cp "$AQUI/bin/$c" "$T/repo/bin/$c"
