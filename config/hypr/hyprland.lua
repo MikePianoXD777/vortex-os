@@ -134,9 +134,9 @@ hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = t
 -- ponga encima, así que eso lo hacen estas reglas: fija en todos los escritorios (pin), sin
 -- borde, sombra, blur ni animación (el fondo de la ventana es transparente: el contorno del
 -- personaje no debe llevar nada alrededor), opaca al 100 % (si no, la regla de arriba de «todas
--- las ventanas al 95 %» la volvería un poco transparente), sin quitarte el teclado al abrirse ni
--- al darle clic, y pegada al borde derecho justo debajo de la barra, a la misma distancia que
--- cualquier ventana (gaps_out = 7). La barra mide 34 px (40 al 85 % del shell de la 1.2), así que
+-- las ventanas al 95 %» la volvería un poco transparente), sin quitarte el teclado al abrirse (al
+-- darle clic sí lo toma, para que puedas escribirle y usar sus botones), y pegada al borde derecho
+-- justo debajo de la barra, a la misma distancia que cualquier ventana (gaps_out = 7). La barra mide 34 px (40 al 85 % del shell de la 1.2), así que
 -- la ventana arranca en 34 + 7 = 41. El redondeo lo dibuja la app (18, como todo lo demás): aquí
 -- 0, para que Hyprland no recorte el contorno del personaje. No lleva «size»: la app fija su
 -- tamaño (460x760 con el 3D, 420x240 sin él) y lo cambia al reabrirse. Si cambias el tamaño del
@@ -148,7 +148,6 @@ hl.window_rule({
     float = true,
     pin = true,
     no_initial_focus = true,
-    no_focus = true,
     no_shadow = true,
     no_blur = true,
     no_dim = true,
