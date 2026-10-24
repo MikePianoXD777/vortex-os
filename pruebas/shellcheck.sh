@@ -20,6 +20,10 @@ while IFS= read -r -d '' f; do
   fi
 done < <(git ls-files -z --cached --others --exclude-standard)   # también los nuevos sin commit
 
+if (( ${#scripts[@]} == 0 )); then
+  echo "No encontré scripts: ¿git no puede leer el repo? (git ls-files)" >&2
+  exit 1
+fi
 echo "shellcheck en ${#scripts[@]} scripts"
 if shellcheck -x -S warning "${scripts[@]}"; then
   echo "Todo bien"

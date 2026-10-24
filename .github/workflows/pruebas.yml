@@ -16,6 +16,9 @@ jobs:
       - name: Paquetes
         run: pacman -Syu --noconfirm --needed git python python-numpy pyside6 ffmpeg shellcheck hyprland
       - uses: actions/checkout@v4
+      # En el contenedor el repo es de otro usuario y git no lo lee («dubious ownership»).
+      - name: git confía en el repo
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: shellcheck
         run: bash pruebas/shellcheck.sh
       - name: Claves de idioma (es y en)
