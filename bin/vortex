@@ -99,9 +99,11 @@ cmd_fondo() {
   done
 }
 
-# Al iniciar sesión: si todavía no hay fondo, pone el primero de la carpeta de Vortex
-# (así el primer arranque ya tiene fondo y colores). Espera a que el shell responda.
+# Al iniciar sesión: enciende el aviso de actualizaciones si nunca se encendió y, si todavía no hay
+# fondo, pone el primero de la carpeta de Vortex (así el primer arranque ya tiene fondo y colores).
+# Espera a que el shell responda.
 cmd_primer_inicio() {
+  avisos_primera_vez
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _
@@ -582,11 +584,7 @@ cmd_actualizar() {
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
-  # El aviso de actualizaciones se enciende solo la primera vez (si lo apagaste, se respeta).
-  if [[ ! -e "$AVISOS_ESTADO/actualizaciones-configurado" ]]; then
-    mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/actualizaciones-configurado"
-    (cmd_actualizaciones on) >/dev/null 2>&1 || true     # subshell: su «exit» no corta la actualización
-  fi
+  avisos_primera_vez
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
   # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   local pkg instalado
@@ -662,6 +660,17 @@ WantedBy=timers.target
 UNIDAD
 }
 
+# El aviso se enciende solo la primera vez (si lo apagaste, se respeta). Lo llaman «vortex actualizar» y
+# «vortex primer-inicio» (cada vez que entras): así llega también a los sistemas recién instalados desde
+# la ISO, que nunca han corrido «vortex actualizar». En el live no, que se borra al apagar.
+avisos_primera_vez() {
+  [[ -e /etc/vortex/live || -e "$AVISOS_ESTADO/actualizaciones-configurado" ]] && return 0
+  # subshell: su «exit» no corta a quien lo llama. Si systemd --user no responde, se reintenta la
+  # próxima vez.
+  (cmd_actualizaciones on) >/dev/null 2>&1 || return 0
+  mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/actualizaciones-configurado"
+}
+
 # Lo que hay por actualizar, una línea por cosa (vacío = nada). Sin red, nada.
 avisos_pendientes() {
   if command -v checkupdates >/dev/null; then
@@ -697,6 +706,7 @@ cmd_actualizaciones() {
       ;;
     off)
       systemctl --user disable --now vortex-actualizaciones.timer >/dev/null 2>&1 || true
+      mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/actualizaciones-configurado"   # no se vuelve a encender solo
       echo "Ya no te aviso de actualizaciones. Para volver: vortex actualizaciones on"
       ;;
     sonido)

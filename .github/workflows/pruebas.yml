@@ -29,6 +29,8 @@ jobs:
         run: useradd -m prueba
       - name: Hyprland --verify-config
         run: runuser -u prueba -- env HOME=/home/prueba bash pruebas/hyprland-config.sh
+      - name: Aviso de actualizaciones al entrar
+        run: runuser -u prueba -- env HOME=/home/prueba bash pruebas/actualizaciones.sh
       - name: Miku, acciones
         env:
           QT_QPA_PLATFORM: offscreen
