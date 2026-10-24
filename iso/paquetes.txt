@@ -51,6 +51,7 @@ scx-scheds
 scx-tools
 zram-generator
 paru
+pacman-contrib
 
 # --- Red, sonido, inicio de sesión ---
 networkmanager

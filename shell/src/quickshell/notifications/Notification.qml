@@ -73,6 +73,14 @@ Rectangle {
         if (cfg.dnd === true) return;
         let soundEnabled = cfg.sound !== undefined ? cfg.sound : true;
         let soundFile = cfg.soundFile !== undefined ? cfg.soundFile : "";
+        // Vortex: las pistas estándar de la notificación mandan sobre el sonido de Ajustes:
+        // «suppress-sound» la deja en silencio y «sound-file» trae su propio sonido (el aviso de
+        // actualizaciones de Vortex usa el que eligió la persona).
+        let hints = (model && model.notif && model.notif.hints) ? model.notif.hints : ({});
+        if (hints["suppress-sound"] === true) return;
+        let propio = hints["sound-file"] ? String(hints["sound-file"]) : "";
+        if (propio.indexOf("file://") === 0) propio = decodeURIComponent(propio.substring(7));
+        if (propio !== "") soundFile = propio;
         if (!soundEnabled || soundFile === "") return;
 
         if (typeof Sounds !== "undefined") {

@@ -30,6 +30,9 @@ Uso: vortex <comando>
                                        en tu primer inicio con red si elegiste Claude al instalar)
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
   actualizar                           actualiza Vortex, su shell y el sistema
+  actualizaciones [revisar|on|off|sonido ARCHIVO]
+                                       avisa (con notificación y un botón «Actualizar») cuando hay
+                                       actualizaciones del sistema, de tus apps o de Vortexine's
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
@@ -530,6 +533,14 @@ cmd_actualizar() {
   fi
   instalar_comandos
   paru -Syu
+  # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
+  pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
+    aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
+  # El aviso de actualizaciones se enciende solo la primera vez (si lo apagaste, se respeta).
+  if [[ ! -e "$AVISOS_ESTADO/actualizaciones-configurado" ]]; then
+    mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/actualizaciones-configurado"
+    cmd_actualizaciones on >/dev/null 2>&1 || true
+  fi
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
   # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   local pkg instalado
@@ -570,6 +581,113 @@ cmd_actualizar() {
   return 0
 }
 
+# ---- Aviso de actualizaciones ----------------------------------------------------------------------
+# Un temporizador de tu usuario (systemd --user) corre «vortex actualizaciones revisar» 10 min después de
+# entrar y luego cada 6 h: si hay actualizaciones nuevas (del sistema, de tus apps de Flatpak o de
+# Vortexine's) avisa una vez, con el sonido que elijas y un botón «Actualizar» que abre una terminal con
+# «vortex actualizar». No actualiza nada solo.
+AVISOS_CONF="$CONF/actualizaciones.conf"
+AVISOS_ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+
+avisos_unidades() {
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  mkdir -p "$d"
+  cat >"$d/vortex-actualizaciones.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine's OS: revisar si hay actualizaciones
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vortex actualizaciones revisar
+UNIDAD
+  cat >"$d/vortex-actualizaciones.timer" <<'UNIDAD'
+[Unit]
+Description=Vortexine's OS: revisar actualizaciones cada 6 h
+
+[Timer]
+OnStartupSec=10min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIDAD
+}
+
+# Lo que hay por actualizar, una línea por cosa (vacío = nada). Sin red, nada.
+avisos_pendientes() {
+  if command -v checkupdates >/dev/null; then
+    checkupdates 2>/dev/null | awk '{print "sistema " $1}'
+  fi
+  if command -v flatpak >/dev/null; then
+    flatpak remote-ls --updates --user --columns=application 2>/dev/null | sed 's/^/app /'
+    flatpak remote-ls --updates --system --columns=application 2>/dev/null | sed 's/^/app /'
+  fi
+  local remoto local_
+  remoto="$(GIT_TERMINAL_PROMPT=0 timeout 30 git ls-remote "$URL_VORTEX" refs/heads/main 2>/dev/null | cut -f1)"
+  if [[ -n "$remoto" ]]; then
+    local_="$(git -c safe.directory="$VORTEX_DIR" -C "$VORTEX_DIR" rev-parse HEAD 2>/dev/null)" || local_=""
+    [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
+  fi
+}
+
+cmd_actualizaciones() {
+  local orden="${1:-revisar}"
+  case "$orden" in
+    on)
+      avisos_unidades
+      systemctl --user daemon-reload
+      systemctl --user enable --now vortex-actualizaciones.timer >/dev/null 2>&1 ||
+        { aviso "no pude encender el aviso de actualizaciones"; exit 1; }
+      echo "Te avisaré cuando haya actualizaciones (se revisa cada 6 h)."
+      ;;
+    off)
+      systemctl --user disable --now vortex-actualizaciones.timer >/dev/null 2>&1 || true
+      echo "Ya no te aviso de actualizaciones. Para volver: vortex actualizaciones on"
+      ;;
+    sonido)
+      local f="${2:-}"
+      [[ -f "$f" ]] || { aviso "uso: vortex actualizaciones sonido ARCHIVO (un .wav, .ogg o .mp3)"; exit 2; }
+      mkdir -p "$AVISOS_ESTADO/sonidos" "$CONF"
+      local destino="$AVISOS_ESTADO/sonidos/actualizaciones.${f##*.}"
+      cp -f "$f" "$destino"
+      printf 'SONIDO=%q\n' "$destino" >"$AVISOS_CONF"
+      echo "Listo: el aviso de actualizaciones sonará con ${f##*/}."
+      ;;
+    revisar)
+      local pendientes huella anterior n_sis n_app vortex_nuevo cuerpo sonido=""
+      pendientes="$(avisos_pendientes | sort)"
+      [[ -n "$pendientes" ]] || return 0
+      # Solo se avisa una vez de lo mismo: si sale algo nuevo, otra vez.
+      huella="$(sha256sum <<<"$pendientes" | cut -c1-16)"
+      mkdir -p "$AVISOS_ESTADO"
+      anterior="$(cat "$AVISOS_ESTADO/actualizaciones-avisadas" 2>/dev/null)" || anterior=""
+      [[ "$huella" == "$anterior" && "${2:-}" != --siempre ]] && return 0
+      echo "$huella" >"$AVISOS_ESTADO/actualizaciones-avisadas"
+      n_sis="$(grep -c '^sistema ' <<<"$pendientes")" || n_sis=0
+      n_app="$(grep -c '^app ' <<<"$pendientes")" || n_app=0
+      vortex_nuevo="$(grep -c '^vortex ' <<<"$pendientes")" || vortex_nuevo=0
+      cuerpo=""
+      ((vortex_nuevo)) && cuerpo+="Hay una versión nueva de Vortexine's. "
+      ((n_sis)) && cuerpo+="$n_sis paquetes del sistema. "
+      ((n_app)) && cuerpo+="$n_app apps. "
+      cuerpo+="Toca «Actualizar» o corre: vortex actualizar"
+      # shellcheck disable=SC1090
+      [[ -r "$AVISOS_CONF" ]] && sonido="$(. "$AVISOS_CONF"; printf '%s' "${SONIDO:-}")"
+      local args=(-a "Vortexine's OS" -i system-software-update -A "actualizar=Actualizar" -w)
+      [[ -n "$sonido" && -f "$sonido" ]] && args+=(-h "string:sound-file:$sonido")
+      local respuesta
+      respuesta="$(notify-send "${args[@]}" "Hay actualizaciones" "$cuerpo" 2>/dev/null)" || true
+      if [[ "$respuesta" == actualizar ]]; then
+        setsid -f kitty --title "Actualizar Vortexine's" -e bash -c \
+          'vortex actualizar; echo; read -rp "Listo. Presiona Enter para cerrar."' >/dev/null 2>&1
+      fi
+      ;;
+    *) aviso "uso: vortex actualizaciones [revisar|on|off|sonido ARCHIVO]"; exit 2 ;;
+  esac
+}
+
 # La config de Vortex para tu usuario (install/usuario.sh), sin instalar nada. La ISO la corre
 # en el primer inicio de cada usuario nuevo; sirve también para dejar todo como recién instalado
 # (lo que ya existe se respeta, o se respalda si se reemplaza).
@@ -597,6 +715,7 @@ case "${1:-ayuda}" in
   windows) shift; cmd_windows "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;
+  actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)
