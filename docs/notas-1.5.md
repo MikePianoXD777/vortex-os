@@ -27,6 +27,9 @@ sin traducir, y el repo tiene pruebas automáticas en cada cambio.
 - **El shell en español, completo:** 32 textos que faltaban (estilos de la barra y de los espacios de
   trabajo, el menú del dock, el lanzador, la pantalla de bloqueo, widgets…) ya están traducidos, y si
   algún día falta uno, sale el texto en inglés en vez de la clave interna (`guide.bar.height.title`).
+- **Vortexine's Shop vuelve a abrir:** si la dejabas abierta en otro espacio de trabajo, abrirla otra vez
+  no hacía nada y parecía colgada (Hyprland ignora las peticiones de foco de las apps). Ahora te lleva a
+  su ventana.
 - **Instalar sobre Arch o CachyOS** ahora es con `git clone` + `./install.sh` (se quitó `boot.sh`, el
   `curl | bash`), o con la ISO.
 

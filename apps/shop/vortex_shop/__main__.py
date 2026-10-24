@@ -7,6 +7,8 @@ local para que se traiga al frente y sale. La clase de ventana (app_id en Waylan
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -42,14 +44,39 @@ def _avisar_a_la_abierta(nombre: str) -> bool:
     return True
 
 
+def _enfocar_en_hyprland() -> None:
+    """Le pide a Hyprland que enfoque esta ventana, aunque esté en otro espacio de trabajo.
+
+    requestActivate() no alcanza: Hyprland trae «misc:focus_on_activate» apagado y la ignora, así que
+    con la tienda abierta en otro espacio, abrirla otra vez no hacía nada visible (parecía colgada).
+    Primero la sintaxis de la config en Lua (Hyprland 0.56+); si falla, la de antes.
+    """
+    hyprctl = shutil.which("hyprctl")
+    if not hyprctl or not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return
+    ventana = f"pid:{os.getpid()}"
+    for orden in (f'hl.dsp.focus({{ window = "{ventana}" }})', f"focuswindow {ventana}"):
+        try:
+            hecho = subprocess.run([hyprctl, "dispatch", orden], capture_output=True, timeout=3)
+        except (OSError, subprocess.TimeoutExpired):
+            return
+        if hecho.returncode == 0:
+            return
+
+
 def _escuchar(nombre: str, puente: Puente, padre: QObject) -> QLocalServer:
     QLocalServer.removeServer(nombre)   # resto de una sesión anterior que no cerró bien
     servidor = QLocalServer(padre)
     servidor.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
 
+    def mostrar(socket: QLocalSocket) -> None:
+        socket.readAll()
+        puente.mostrarVentana.emit()
+        _enfocar_en_hyprland()
+
     def conexion() -> None:
         while (socket := servidor.nextPendingConnection()) is not None:
-            socket.readyRead.connect(lambda s=socket: (s.readAll(), puente.mostrarVentana.emit()))
+            socket.readyRead.connect(lambda s=socket: mostrar(s))
             socket.disconnected.connect(socket.deleteLater)
 
     servidor.newConnection.connect(conexion)

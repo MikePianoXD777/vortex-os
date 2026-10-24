@@ -1,5 +1,6 @@
 """Prueba de «una sola tienda por usuario»: la segunda instancia le avisa a la primera (que se trae al
-frente) y sale con 0 sin abrir ventana. Usa un nombre de socket de prueba, el motor falso y «offscreen».
+frente y le pide a Hyprland que enfoque su ventana) y sale con 0 sin abrir ventana. Usa un nombre de
+socket de prueba, el motor falso, «offscreen» y un hyprctl falso que anota lo que le piden.
 
     python apps/shop/pruebas/ui_instancia.py
 """
@@ -30,7 +31,14 @@ sys.exit(main([sys.argv[0]], motor=motor, instancia={nombre!r}))
 def main() -> int:
     nombre = f"vortexines-shop-prueba-{os.getpid()}"
     codigo = CODIGO.format(tienda=str(TIENDA), aqui=str(AQUI), datos=tempfile.mkdtemp(prefix="vortex-shop-inst-"), nombre=nombre)
-    primera = subprocess.Popen([sys.executable, "-c", codigo], stderr=subprocess.PIPE, text=True)
+    # hyprctl falso: anota cada orden; la sintaxis Lua falla, como en un Hyprland con config de antes.
+    binarios = Path(tempfile.mkdtemp(prefix="vortex-shop-hypr-"))
+    anotado = binarios / "ordenes.txt"
+    falso = binarios / "hyprctl"
+    falso.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{anotado}"\ncase "$*" in *hl.dsp*) exit 7 ;; esac\n')
+    falso.chmod(0o755)
+    entorno = dict(os.environ, PATH=f"{binarios}:{os.environ.get('PATH', '')}", HYPRLAND_INSTANCE_SIGNATURE="prueba")
+    primera = subprocess.Popen([sys.executable, "-c", codigo], stderr=subprocess.PIPE, text=True, env=entorno)
     try:
         time.sleep(4)
         vive = primera.poll() is None
@@ -40,7 +48,11 @@ def main() -> int:
         rapido = time.monotonic() - t0 < 15
         print(("ok    " if segunda.returncode == 0 else "FALLA ") + f"la segunda sale con 0 (salió con {segunda.returncode})")
         print(("ok    " if rapido and primera.poll() is None else "FALLA ") + "la segunda sale sola y la primera sigue viva")
-        bien = vive and segunda.returncode == 0 and rapido and primera.poll() is None
+        ordenes = anotado.read_text().splitlines() if anotado.exists() else []
+        esperadas = [f'dispatch hl.dsp.focus({{ window = "pid:{primera.pid}" }})', f"dispatch focuswindow pid:{primera.pid}"]
+        enfoca = ordenes == esperadas
+        print(("ok    " if enfoca else "FALLA ") + f"la primera le pide a Hyprland enfocar su ventana (Lua y, si falla, la de antes): {ordenes}")
+        bien = vive and segunda.returncode == 0 and rapido and primera.poll() is None and enfoca
     finally:
         primera.terminate()
         try:

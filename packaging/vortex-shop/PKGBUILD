@@ -5,7 +5,7 @@
 #   cd packaging/vortex-shop && makepkg -si
 pkgname=vortex-shop
 pkgver=1.1
-pkgrel=2
+pkgrel=3
 pkgdesc="Vortexine's Shop: la tienda de aplicaciones de Vortexine's OS (Flathub, sin contraseña)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
