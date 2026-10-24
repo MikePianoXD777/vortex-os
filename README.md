@@ -16,12 +16,8 @@ de tu fondo) optimizado, y **Claude integrado** para que pueda ver lo que haces 
 Sobre un Arch recién instalado (con `archinstall`, perfil «minimal») o sobre tu CachyOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MikePianoXD777/vortex-os/main/boot.sh | bash
-```
-
-O desde el código:
-
-```bash
+git clone https://github.com/MikePianoXD777/vortex-os.git
+cd vortex-os
 ./install.sh --prueba     # muestra lo que haría, sin tocar nada
 ./install.sh              # instala
 ./install.sh --si --sin-dev --inicio-automatico
@@ -292,6 +288,14 @@ Claude), así que no gasta RAM cuando no la usas.
 - **Privacidad:** el micrófono solo escucha mientras su ventana está abierta, y el audio no se guarda. La
   pantalla solo la ve cuando se lo pides, y cada vez te sale una notificación (`vortex claude pausa` le corta
   el acceso). Sin Claude instalado o sin sesión la voz sigue funcionando: ella te dice qué falta.
+- **Graba tus partidas:** «Miku, grábame» graba el monitor que usas con el sonido del sistema (no el
+  micrófono) en `~/Vídeos/Miku`, y sigue aunque la cierres hasta que le digas que pare (o
+  `vortex-miku grabar parar`). Solo graba cuando se lo pides, y siempre con tu permiso en su ventana.
+- **Mejores momentos:** si se lo pides, busca los picos de sonido y movimiento de la grabación, Claude mira
+  unas miniaturas (sin ninguna otra herramienta) para elegir los que valen la pena, y te deja un proyecto de
+  **Vortex Studio** (`… - mejores momentos.vortex`) con los cortes, su audio y un marcador con el título de
+  cada momento. Corre aparte y avisa al terminar; sin Claude se queda con los picos más altos. También:
+  `vortex-miku momentos [VIDEO]`.
 - **Comandos:** `vortex miku` abre o cierra, `vortex miku estado` dice si el 3D está encendido y si está
   abierta, `vortex miku voz [ID]` lista o elige la voz y `vortex miku modelo RUTA.vrm` pone otro modelo 3D.
   Las opciones quedan en `~/.config/vortex/miku.json`.
@@ -304,6 +308,10 @@ Claude), así que no gasta RAM cuando no la usas.
 Las pruebas corren sin VM ni pantalla: `pruebas/miku.sh` (el comando, la ISO y el instalador),
 `pruebas/miku-qml.sh` (el interruptor de Ajustes, con el quickshell de verdad) y `pruebas/atajos.sh` (Super+O y
 las reglas de su ventana). Falta probar la ventana transparente sobre una sesión real de Hyprland.
+Las acciones (con la grabadora falsa) y los mejores momentos (con un video hecho por ffmpeg y un Claude
+falso) se prueban con `apps/miku/pruebas/acciones.py` y `apps/miku/pruebas/momentos.py`; en GitHub corren
+solas en cada push, junto con shellcheck, las claves de idioma y `Hyprland --verify-config`
+(`.github/workflows/pruebas.yml`).
 
 ## ¿Cuánto más ligero?
 
@@ -336,7 +344,6 @@ porque usa el mismo kernel y los mismos drivers. Lo que se gana es menos RAM y p
 ## Estructura
 
 ```
-boot.sh              instalación con un comando (curl | bash)
 install.sh           instalador; corre install/NN-*.sh en orden
 install/             pasos: revisar, restauración, repos, sistema, escritorio, juegos, dev, claude, final
 packages/            listas de paquetes por grupo
