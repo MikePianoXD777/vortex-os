@@ -1,4 +1,4 @@
-# Vortexine's OS 1.3 (borrador)
+# Vortexine's OS 1.3
 
 El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude de cerebro.
 
@@ -65,6 +65,7 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
 El micrófono solo escucha con la ventana de Miku abierta y el audio no se guarda. Con la voz de ElevenLabs,
 el texto de lo que Miku dice (no tu voz) se manda a ElevenLabs para convertirlo en audio. La pantalla solo
 la ve cuando se lo pides, y cada vez sale una notificación. `vortex claude pausa` le corta el acceso.
+Las acciones (instalar, abrir, comandos, ajustes, borradores) solo pasan con tu clic en **Autorizar**.
 
 ## Créditos
 
@@ -72,12 +73,8 @@ la ve cuando se lo pides, y cada vez sale una notificación. `vortex claude paus
   crédito obligatorio, sin uso comercial. La ventana de Miku muestra el crédito.
 - [three.js](https://threejs.org) y [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) (MIT).
 - Supertonic 3 (OpenRAIL-M) y [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT).
-
-## Pendiente de este borrador
-
-- Probar la ventana transparente y su posición en una sesión real de Hyprland (con la barra de la 1.2).
-- Probar la ISO completa con el paquete y el modelo (la integración se probó sin VM).
-- Pasar `VORTEX_VERSION` y las notas a su forma final cuando se cierre la 1.3.
+- Voz natural: [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) (Apache-2.0), [faster-qwen3-tts](https://github.com/andimarafioti/faster-qwen3-tts)
+  (MIT), qwentts.cpp y los GGUF de Serveurperso (MIT y Apache-2.0). Se instalan solo si los pides.
 
 ## Requisitos
 
