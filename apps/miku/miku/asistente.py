@@ -161,6 +161,7 @@ class Asistente(QObject):
         self._reloj_seguir.timeout.connect(lambda: self.escuchar(seguimiento=True))
         # Permisos de las acciones (acciones_mcp.py): cada acción llama aquí y espera tu Autorizar o Cancelar.
         self._permiso = None                      # el socket de la acción que espera respuesta
+        self._autorizar_todo = False              # «Autorizar todo»: ya no pregunta hasta cerrar a Miku
         self._permiso_reloj = QTimer(self)
         self._permiso_reloj.setSingleShot(True)
         self._permiso_reloj.setInterval(PERMISO_SEG * 1000)
@@ -611,9 +612,13 @@ class Asistente(QObject):
         self._permiso = s
         self.cerebro.ocupado.set()
         self._reloj_ocioso.stop()
+        if self._autorizar_todo:
+            # Ya lo autorizaste todo en esta sesión: se hace sin preguntar, pero se dice qué fue.
+            self._responder_permiso(True, f"Hecho sin preguntar (autorizaste todo):  {titulo}\n\n{detalle}")
+            return
         self._cambiar_estado(PENSANDO, "Esperando tu permiso...")
         self.aviso.emit(f"¿Lo hago?  {titulo}\n\n{detalle}")
-        self._poner_acciones([["autorizar", "Autorizar"], ["cancelar", "Cancelar"]])
+        self._poner_acciones([["autorizar", "Autorizar"], ["autorizar_todo", "Autorizar todo"], ["cancelar", "Cancelar"]])
         self._decir("¿Me das permiso?")
         self._permiso_reloj.start()
 
@@ -646,7 +651,13 @@ class Asistente(QObject):
 
     def accion(self, id_accion: str) -> None:
         """Un botón del globo. Activar Claude: lo instala y abre su terminal para entrar con tu cuenta. Iniciar sesión: abre esa terminal.
-        Autorizar / Cancelar: la respuesta a una acción que pidió permiso."""
+        Autorizar / Autorizar todo / Cancelar: la respuesta a una acción que pidió permiso («Autorizar todo» vale
+        hasta cerrar a Miku)."""
+        if id_accion == "autorizar_todo":
+            # Hasta cerrar a Miku (Super+O): al volver a abrirla pregunta otra vez.
+            self._autorizar_todo = True
+            self._responder_permiso(True, "Autorizado todo hasta que me cierres: ya no te pregunto, pero te digo qué hago.")
+            return
         if id_accion in ("autorizar", "cancelar"):
             self._responder_permiso(id_accion == "autorizar", "" if id_accion == "autorizar" else "Cancelado: no hice nada.")
             return

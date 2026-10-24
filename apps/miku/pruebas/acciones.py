@@ -210,6 +210,14 @@ def parte_asistente() -> None:
     a._permiso_reloj.setInterval(800)
     r = pedir("Abrir «Steam»", "la app", None, esperar_ms=1500)
     probar("sin respuesta se cancela sola", r.get("ok") is False and any("Se acabó el tiempo" in t for t in avisos), str(r))
+    a._permiso_reloj.setInterval(asistente.PERMISO_SEG * 1000 * 60)
+    r = pedir("Subir el volumen", "$ wpctl set-volume … 30%", "autorizar_todo")
+    probar("muestra también «Autorizar todo»", any(["autorizar_todo", "Autorizar todo"] in b for b in botones), str(botones[-3:]))
+    probar("«Autorizar todo» autoriza esta acción", r.get("ok") is True, str(r))
+    n = len(botones)
+    r = pedir("Abrir «Vortex Studio»", "la app", None, esperar_ms=300)
+    probar("…y las siguientes pasan sin preguntar (sin botones), diciendo qué hizo", r.get("ok") is True
+           and not any(b for b in botones[n:]) and any("sin preguntar" in t and "Vortex Studio" in t for t in avisos), str(r))
     a.cerrar_todo()
     probar("al cerrar a Miku se borra el socket", not Path(ruta).exists())
 
