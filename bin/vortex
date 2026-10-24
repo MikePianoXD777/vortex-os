@@ -495,6 +495,26 @@ version_pkgbuild() {
   awk -F= '/^pkgver=/ {v = $2} /^pkgrel=/ {r = $2} END {print v "-" r}' "$VORTEX_DIR/packaging/$1/PKGBUILD"
 }
 
+# La versión que dice el sistema («vortex version», «Acerca de», fastfetch) es la de este código: se
+# escribe en /etc/vortex-release al instalar y aquí se pone al día. En un sistema que pasó a Vortexine's
+# con install.sh, además, el nombre del sistema (os-release) seguía siendo el de antes: se instala
+# vortex-os-release con su hook de pacman (como en la ISO) y se corre.
+version_sistema() {
+  local v hook=/etc/pacman.d/hooks/98-vortex-os-release.hook
+  v="$(sed -n 's/^VORTEX_VERSION="\(.*\)"$/\1/p' "$VORTEX_DIR/install/lib.sh" 2>/dev/null)"
+  [[ -n "$v" && -f "$VORTEX_RELEASE" ]] || return 0
+  if ! grep -qx "VERSION=\"$v\"" "$VORTEX_RELEASE"; then
+    sudo sed -i "s/^VERSION=.*/VERSION=\"$v\"/" "$VORTEX_RELEASE" || aviso "no pude poner la versión $v en $VORTEX_RELEASE"
+  fi
+  if [[ -f "$VORTEX_DIR/bin/vortex-os-release" ]]; then
+    cmp -s "$VORTEX_DIR/bin/vortex-os-release" /usr/local/bin/vortex-os-release ||
+      sudo install -Dm755 "$VORTEX_DIR/bin/vortex-os-release" /usr/local/bin/vortex-os-release
+    local origen="$VORTEX_DIR/iso/airootfs/etc/pacman.d/hooks/98-vortex-os-release.hook"
+    [[ -f "$origen" ]] && ! cmp -s "$origen" "$hook" && sudo install -Dm644 "$origen" "$hook"
+    sudo /usr/local/bin/vortex-os-release || true
+  fi
+}
+
 URL_VORTEX="${VORTEX_URL:-https://github.com/MikePianoXD777/vortex-os.git}"   # VORTEX_URL: para pruebas
 
 # git sobre el código de Vortex. En una instalación desde la ISO vive en /usr/share/vortex-os (de root):
@@ -545,6 +565,7 @@ cmd_actualizar() {
   fi
   instalar_comandos
   paru -Syu
+  version_sistema
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
