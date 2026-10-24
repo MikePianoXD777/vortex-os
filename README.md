@@ -71,7 +71,11 @@ sudo iso/construir.sh            # construye la ISO en iso/out/ (necesita archis
 `iso/paquetes.sh` no vuelve a compilar los paquetes del AUR (Calamares tarda ~10 min) si el repo ya tiene esa
 misma versión; `VORTEX_PAQUETES_FORZAR=1` los compila de todos modos. Todo se compila para un x86-64
 genérico (no para tu CPU, aunque tu `makepkg.conf` diga `-march=native`, como el de CachyOS): la ISO tiene que
-arrancar también en equipos sin AVX2. Las piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
+arrancar también en equipos sin AVX2. Lo que trae binarios (Calamares, wl-gammarelay-rs, Vortex Studio) se
+compila en un chroot limpio de Arch (necesita `devtools` y sudo; vive en `/var/tmp/vortex-chroot`), porque el
+glibc «v3» de CachyOS marca todo lo que se enlaza con él como «necesita x86-64-v3». Al final, y otra vez antes
+de construir la ISO, se revisa que ningún programa del repo pida más que x86-64 básico (`readelf -n`). Las
+piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 
 ## Qué trae
 
