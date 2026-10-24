@@ -22,6 +22,12 @@ command -v mkarchiso >/dev/null || pacman -S --needed --noconfirm archiso
 command -v cc >/dev/null || { echo "Falta un compilador de C (base-devel)." >&2; exit 1; }
 [[ -f "$REPO/vortex.db" ]] || { echo "No encuentro el repo local en $REPO: corre antes iso/paquetes.sh" >&2; exit 1; }
 grep -q '^\[cachyos\]' /etc/pacman.conf || { echo "Este equipo no tiene el repo [cachyos] en /etc/pacman.conf." >&2; exit 1; }
+# Ningún programa del repo [vortex] puede pedir más que x86-64 básico (nota «x86 ISA needed»): el
+# glibc del live no lo abriría en una CPU sin AVX2, como al Calamares de la 1.3. Ver iso/paquetes.sh.
+# (paquetes.sh se puede cargar sin armar nada; define el mismo AQUI y RAIZ que este script.)
+# shellcheck source=iso/paquetes.sh
+source "$AQUI/paquetes.sh"
+revisar_isa "$REPO" || { echo "El repo $REPO trae programas que no abrirían sin AVX2: vuelve a correr iso/paquetes.sh" >&2; exit 1; }
 
 rm -rf "$TRABAJO"
 mkdir -p "$TRABAJO" "$SALIDA"
