@@ -12,10 +12,16 @@ Modelo 3D «MIKU NAKANO»
   El modelo no forma parte del código: no está en el repositorio, lo pone la ISO en
   /usr/share/vortex-miku/modelo/ (o tú con «vortex-miku modelo RUTA.vrm»).
 
-Voz natural (opcional, con GPU): Qwen3-TTS
-  Alibaba Qwen Team (https://github.com/QwenLM/Qwen3-TTS), modelo Qwen3-TTS-12Hz-1.7B-Base, licencia
-  Apache-2.0; acelerado con faster-qwen3-tts (Andrés Marafioti, MIT). No vienen en la ISO: los instala
-  «vortex-miku natural instalar» en ~/.local/share/vortex/miku/natural/ junto con PyTorch (BSD-3).
+Voz natural (opcional, en la GPU o, lenta, en la CPU): Qwen3-TTS
+  Alibaba Qwen Team (https://github.com/QwenLM/Qwen3-TTS), modelo Qwen3-TTS-12Hz-1.7B-Base (en la GPU) o
+  Qwen3-TTS-12Hz-0.6B-Base (en la CPU), licencia Apache-2.0; acelerado con faster-qwen3-tts (Andrés
+  Marafioti, MIT). No vienen en la ISO: los instala «vortex-miku natural instalar» en
+  ~/.local/share/vortex/miku/natural/ junto con PyTorch (BSD-3).
+  En la CPU, el modelo va convertido a GGUF y cuantizado (Q4_K_M) por Serveurperso
+  (https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF, Apache-2.0) y corre con qwentts.cpp, de
+  Serveurperso (https://github.com/ServeurpersoCom/qwentts.cpp, MIT), sobre ggml (MIT, © The ggml
+  authors), por medio de qwentts-cpp-python (Andrés Marafioti, MIT; la rueda de CPU que publica en
+  https://huggingface.co/datasets/andito/qwentts-cpp-python-wheels).
   La voz (voces/miku-natural.wav) se inventó con Qwen3-TTS-12Hz-1.7B-VoiceDesign a partir de una
   descripción escrita («joven, suave, un poco grave, cansada y melancólica, muy expresiva»): no es la
   voz de ninguna persona ni copia la de nadie.

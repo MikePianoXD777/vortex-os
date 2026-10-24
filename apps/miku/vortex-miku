@@ -10,7 +10,8 @@
   vortex-miku licencias       créditos y licencias (el modelo 3D, la voz, el oído, three.js)
   vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
   vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
-  vortex-miku natural instalar   voz natural y expresiva en tu GPU NVIDIA, sin internet (~7 GB; natural quitar la borra)
+  vortex-miku natural instalar   voz natural y expresiva, sin internet: en tu GPU NVIDIA (~7 GB) o, si no
+                                 sirve (o con --cpu), en la CPU, lenta (~3 GB); natural estado / natural quitar
   vortex-miku elevenlabs VOICE_ID   voz de ElevenLabs, en la nube (pide tu clave la primera vez)
   vortex-miku elevenlabs clave      cambia la clave · elevenlabs quitar: vuelve a la voz local (F1)
 
@@ -276,8 +277,8 @@ def orden_voz(args: list[str]) -> int:
             print(f"{'*' if v['id'] == actual else ' '} {v['id']:<14} {v['nombre']}  [{estado}]")
             if v.get("descripcion"):
                 print(f"    {v['descripcion']}")
-        print("\nmiku-natural usa tu GPU (Qwen3-TTS, Apache-2.0); las supertonic-* son locales en CPU (Supertonic 3,\n"
-              "BigScience OpenRAIL-M); elevenlabs va por internet. Elige una con: vortex-miku voz ID")
+        print("\nmiku-natural usa tu GPU o, lenta, tu CPU (Qwen3-TTS, Apache-2.0); las supertonic-* son locales en CPU\n"
+              "(Supertonic 3, BigScience OpenRAIL-M); elevenlabs va por internet. Elige una con: vortex-miku voz ID")
         return 0
     if len(args) != 1:
         return error("uso: vortex-miku voz [ID]", 2)
@@ -366,12 +367,23 @@ def orden_decir(args: list[str]) -> int:
     return 0
 
 
-# ---- Voz natural (Qwen3-TTS en la GPU) ------------------------------------------------------------
+# ---- Voz natural (Qwen3-TTS en la GPU o, lenta, en la CPU) -----------------------------------------
 
 # Versiones probadas juntas (PyTorch lo trae faster-qwen3-tts; transformers 5.20 rompe su parche de Mimi).
 NATURAL_PAQUETES = ["faster-qwen3-tts==0.5.4", "transformers==5.15.1", "setuptools<81"]
 NATURAL_GIB_MIN = 6.0           # VRAM: el modelo 1.7B usa ~5 GB
 NATURAL_CC_MIN = 7.5            # serie 20 (Turing) o más nueva: el PyTorch con CUDA 13 ya no trae las Pascal (GTX 10)
+# Modo CPU (sin una GPU que sirva): el backend ggml de faster-qwen3-tts (qwentts.cpp) con el modelo 0.6B en Q4_K_M.
+# faster-qwen3-tts importa PyTorch igual, así que va el de CPU (~0,8 GB en vez de ~6 GB con CUDA). La rueda de
+# qwentts.cpp de PyPI viene compilada con CUDA (pide libcudart, libcublas y el driver de NVIDIA aunque no use la
+# GPU): se usa la de CPU que su autor publica en Hugging Face, fijada a un commit y comprobada con sha256.
+NATURAL_INDICE_TORCH_CPU = "https://download.pytorch.org/whl/cpu"
+NATURAL_TORCH_CPU = ["torch==2.14.1", "torchaudio==2.11.0"]
+NATURAL_QWENTTS_CPU = ("qwentts-cpp-python @ https://huggingface.co/datasets/andito/qwentts-cpp-python-wheels/resolve/"
+                       "c7d8345b0ec4773a64976f322bcd0947d81a205a/whl/cpu/"
+                       "qwentts_cpp_python-0.5.0%2Bcpu-py3-none-manylinux_2_35_x86_64.whl"
+                       "#sha256=71aefbc34908503cef086dfef2e2549a03d9a0303c50a82562308019e3a9a77d")
+NATURAL_PAQUETES_CPU = NATURAL_PAQUETES + [NATURAL_QWENTTS_CPU]
 
 
 def gpu_para_natural() -> tuple[bool, str]:
@@ -402,6 +414,14 @@ def gpu_para_natural() -> tuple[bool, str]:
     return True, f"{nombre} ({gib:.0f} GB)"
 
 
+def elegir_modo(args: list[str]) -> tuple[str, bool, str]:
+    """(«gpu» o «cpu», ¿sirve la GPU?, explicación de la GPU). Con una GPU que sirva, gpu; si no, o con --cpu, cpu."""
+    ok, gpu = gpu_para_natural()
+    if "--cpu" in args:
+        return "cpu", ok, gpu
+    return ("gpu" if ok or "--sin-revisar" in args else "cpu"), ok, gpu
+
+
 def orden_natural(args: list[str]) -> int:
     voz = voces.buscar("miku-natural")
     if voz is None:
@@ -409,11 +429,16 @@ def orden_natural(args: list[str]) -> int:
     orden = args[0] if args else "estado"
     if orden == "estado":
         ok, gpu = gpu_para_natural()
-        print(f"Voz natural de Miku: {'instalada' if voces.disponible(voz) else 'sin instalar'}"
+        instalada = voces.disponible(voz)
+        print(f"Voz natural de Miku: {'instalada' if instalada else 'sin instalar'}"
               f"{' y en uso' if config.cargar()['voz'] == 'miku-natural' else ''}.")
+        if instalada:
+            print("  Modo: " + ("GPU" if voces.modo_natural() == "gpu"
+                                else "CPU (lento: cada frase tarda unos 6 s más lo que dura)"))
         print(f"  GPU: {gpu if ok else 'no sirve: ' + gpu}")
-        if not voces.disponible(voz):
-            print("  Instálala con: vortex-miku natural instalar   (~7 GB, una sola vez)")
+        if not instalada:
+            print("  Instálala con: vortex-miku natural instalar   "
+                  + ("(~7 GB, una sola vez)" if ok else "(en la CPU, lenta; ~3 GB, una sola vez)"))
         return 0
     if orden == "quitar":
         shutil.rmtree(rutas.NATURAL, ignore_errors=True)
@@ -422,40 +447,71 @@ def orden_natural(args: list[str]) -> int:
         print("Listo: borré la voz natural; Miku vuelve a la voz de siempre (F1).")
         reabrir_si_esta_abierta()
         return 0
-    if orden != "instalar":
-        return error("uso: vortex-miku natural [estado|instalar|quitar]", 2)
-    ok, gpu = gpu_para_natural()
-    if not ok and "--sin-revisar" not in args:
-        return error(gpu + " Miku sigue con su voz de siempre.")
-    print(f"GPU: {gpu}. Instalo la voz natural en {rutas.NATURAL} (PyTorch ~3 GB + el modelo ~4 GB; una sola vez).")
+    if orden != "instalar" or any(a not in ("--cpu", "--sin-revisar") for a in args[1:]):
+        return error("uso: vortex-miku natural [estado|instalar [--cpu]|quitar]", 2)
+    modo, ok, gpu = elegir_modo(args)
+    if modo == "gpu":
+        print(f"GPU: {gpu}. Instalo la voz natural en {rutas.NATURAL} (PyTorch ~3 GB + el modelo ~4 GB; una sola vez).")
+    else:
+        print(("Pediste el modo CPU" if "--cpu" in args else f"GPU: no sirve ({gpu.rstrip('.')})")
+              + f". Instalo la voz natural en la CPU, en {rutas.NATURAL}\n(PyTorch de CPU y lo demás ~2 GB + el "
+              "modelo ~0,9 GB; una sola vez).")
+        print("Ojo: en la CPU es lenta. Cada frase tarda en salir unos 6 s más lo que dura (en un i7 de 8 núcleos),\n"
+              "así que Miku tarda más en contestar.")
     rutas.NATURAL.mkdir(parents=True, exist_ok=True)
     rutas.NATURAL_LISTO.unlink(missing_ok=True)
+    if voces.modo_natural() != modo and (rutas.NATURAL / "venv").exists():
+        # El PyTorch de un modo no sirve para el otro (el de CPU no trae CUDA) y los modelos son otros.
+        print(f"Estaba instalada en modo {voces.modo_natural().upper()}: la rehago para {modo.upper()}.")
+        for d in ("venv", "hf", "referencias"):
+            shutil.rmtree(rutas.NATURAL / d, ignore_errors=True)
+    rutas.NATURAL_MODO.write_text(modo + "\n", encoding="utf-8")
     venv_py = rutas.NATURAL_PYTHON
+    pip = [str(venv_py), "-m", "pip", "install", "--disable-pip-version-check", "--progress-bar", "on"]
     pasos = []
     if not venv_py.is_file():
         pasos.append(("Creando su entorno de Python", [sys.executable, "-m", "venv", str(rutas.NATURAL / "venv")]))
-    pasos += [
-        ("Instalando PyTorch y Qwen3-TTS", [str(venv_py), "-m", "pip", "install", "--disable-pip-version-check",
-                                           "--progress-bar", "on", *NATURAL_PAQUETES]),
-        ("Bajando el modelo de la voz", [str(venv_py), "-I", "-c",
-                                        "import sys; from huggingface_hub import snapshot_download; "
-                                        "snapshot_download(sys.argv[1], cache_dir=sys.argv[2])",
-                                        voz["modelo"], str(rutas.NATURAL / "hf")]),
-    ]
+    if modo == "gpu":
+        pasos += [
+            ("Instalando PyTorch y Qwen3-TTS", pip + NATURAL_PAQUETES),
+            ("Bajando el modelo de la voz", [str(venv_py), "-I", "-c",
+                                            "import sys; from huggingface_hub import snapshot_download; "
+                                            "snapshot_download(sys.argv[1], cache_dir=sys.argv[2])",
+                                            voz["modelo"], str(rutas.NATURAL / "hf")]),
+        ]
+    else:
+        pasos += [
+            # Primero el PyTorch de CPU: así faster-qwen3-tts lo da por puesto y no baja el de CUDA.
+            ("Instalando PyTorch (CPU)", pip + ["--index-url", NATURAL_INDICE_TORCH_CPU, *NATURAL_TORCH_CPU]),
+            ("Instalando Qwen3-TTS y qwentts.cpp", pip + NATURAL_PAQUETES_CPU),
+            ("Bajando el modelo de la voz", [str(venv_py), "-I", "-c",
+                                            "import sys; from qwentts_cpp.models import resolve_gguf_paths; "
+                                            "resolve_gguf_paths(sys.argv[1], quant=sys.argv[2], cache_dir=sys.argv[3])",
+                                            voz["modelo_cpu"], voz["cuantizacion_cpu"], str(rutas.NATURAL / "hf")]),
+        ]
     for titulo, cmd in pasos:
         print(f"\n==> {titulo}…", flush=True)
         if subprocess.run(cmd).returncode != 0:
-            return error(f"falló «{titulo}». Lo bajado se conserva: vuelve a correr «vortex-miku natural instalar».")
-    print("\n==> Probando la voz…", flush=True)
+            return error(f"falló «{titulo}». Lo bajado se conserva: vuelve a correr «vortex-miku natural instalar"
+                         f"{' --cpu' if '--cpu' in args else ''}».")
+    print("\n==> Probando la voz…" + (" (en la CPU tarda unos 20 s)" if modo == "cpu" else ""), flush=True)
     prueba = rutas.temporales() / f"natural-{os.getpid()}.wav"
     r = subprocess.run([str(venv_py), "-I", str(RAIZ / "miku" / "voz_natural.py"), "--salida", str(prueba),
                         "Hola... ya estoy lista."], env={**os.environ, "HF_HUB_OFFLINE": "1"})
     if r.returncode != 0 or not prueba.is_file():
         return error("la voz natural se instaló pero no pudo hablar. Mira el mensaje de arriba.")
     prueba.unlink(missing_ok=True)
-    rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_PAQUETES) + f"\n{voz['modelo']}\n", encoding="utf-8")
+    if modo == "gpu":
+        rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_PAQUETES) + f"\n{voz['modelo']}\n", encoding="utf-8")
+    else:
+        rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_TORCH_CPU + NATURAL_PAQUETES_CPU)
+                                       + f"\n{voz['modelo_cpu']} {voz['cuantizacion_cpu']}\n", encoding="utf-8")
     config.guardar({"voz": "miku-natural"})
-    print("\nListo: Miku ya habla con su voz natural. Solo usa la GPU mientras Miku está abierta.")
+    if modo == "gpu":
+        print("\nListo: Miku ya habla con su voz natural. Solo usa la GPU mientras Miku está abierta.")
+    else:
+        print("\nListo: Miku ya habla con su voz natural, en la CPU (modo lento). Solo ocupa memoria (~4 GB) "
+              "mientras Miku está abierta.")
     print("Pruébala con: vortex-miku decir \"Hola... ¿cómo estás?\"")
     if reabrir_si_esta_abierta():
         print("Miku estaba abierta: la volví a abrir con la voz nueva.")

@@ -27,13 +27,16 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   listos correos y mensajes (los envías tú: ella no envía nada). Antes de cada acción, su ventana muestra
   exactamente qué va a hacer con los botones **Autorizar** y **Cancelar**; sin tu clic no pasa nada, y si no
   contestas en 2 minutos se cancela. Lo que ve en tu pantalla no puede autorizar nada.
-- **Voz natural en tu GPU (opcional):** `vortex-miku natural instalar` le pone a Miku una voz natural y
-  expresiva (melancólica, un poco grave) que corre en tu tarjeta NVIDIA, sin internet ni cuentas. Usa
-  Qwen3-TTS (Apache-2.0) acelerado con faster-qwen3-tts: en una RTX 3080 habla 2,5 veces más rápido que el
-  tiempo real. Necesita una NVIDIA serie 20 o más nueva con 6 GB o más (la GTX 10 no) y ~7 GB de disco.
-  Solo usa la GPU (~5 GB) mientras Miku está abierta; al cerrarla se libera. Si no carga, Miku sigue con la
-  voz de siempre. La voz se inventó a partir de una descripción: no es la de ninguna persona.
-  `vortex-miku natural quitar` la borra.
+- **Voz natural en tu GPU, o lenta en la CPU (opcional):** `vortex-miku natural instalar` le pone a Miku una
+  voz natural y expresiva (melancólica, un poco grave) que corre en tu computadora, sin internet ni cuentas.
+  Usa Qwen3-TTS (Apache-2.0) acelerado con faster-qwen3-tts. Con una NVIDIA serie 20 o más nueva y 6 GB o más
+  corre en la GPU: en una RTX 3080 habla 2,5 veces más rápido que el tiempo real (~7 GB de disco; solo usa la
+  GPU, ~5 GB, mientras Miku está abierta). Sin una GPU que sirva (por ejemplo una GTX 10) se instala sola en
+  **modo CPU**, y lo avisa: el modelo chico (0.6B) cuantizado con qwentts.cpp, ~3 GB de disco y ~4 GB de RAM,
+  sin nada de CUDA (sirve también sin NVIDIA). Es lenta: cada frase tarda en salir unos 6 s más lo que dura (en
+  un i7-10700F; carga en ~8 s), y la ventana avisa una vez «voz natural en modo lento». `--cpu` fuerza ese modo
+  y `vortex-miku natural estado` dice cuál quedó. Si no carga, Miku sigue con la voz de siempre. La voz se
+  inventó a partir de una descripción: no es la de ninguna persona. `vortex-miku natural quitar` la borra.
 - **Voz con ElevenLabs (opcional, en la nube):** `vortex-miku elevenlabs VOICE_ID` usa una voz que elijas en
   [elevenlabs.io](https://elevenlabs.io) (Voice Library o Voice Design), con emociones de verdad: Claude pone
   etiquetas como `[sighs]` o `[whispers]` que cambian cómo lo dice (y la cara del 3D), y no salen en pantalla.

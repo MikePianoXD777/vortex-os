@@ -1,22 +1,53 @@
 #!/usr/bin/env python3
-"""Prueba del respaldo de la voz natural: si su proceso no arranca, Miku sigue con la F1 sin perder la frase.
+"""Pruebas de la voz natural: el respaldo a la F1, el modo lento en la CPU y cómo elige el modo la instalación.
 
-Sin GPU ni PyTorch: VORTEX_MIKU_NATURAL apunta a una carpeta con un «python» falso que (a) avisa un error
-al cargar o (b) se muere sin decir nada. Hace falta el modelo de Supertonic (la F1) en el HOME de prueba
-(como en las demás pruebas, con env.sh) y PySide6. Sin ventanas (QT_QPA_PLATFORM=offscreen).
+1. Sin GPU ni PyTorch: VORTEX_MIKU_NATURAL apunta a una carpeta con un «python» falso que (a) avisa un error
+   al cargar, (b) se muere sin decir nada o (c) arranca en modo CPU. En (a) y (b) Miku sigue con la F1 sin
+   perder la frase; en (c) habla con la natural y avisa una sola vez que va en modo lento.
+2. «vortex-miku natural instalar» con la GPU, pip y la descarga de mentira: con una GPU que sirva instala lo
+   de siempre; sin ella (o con --cpu), el modo CPU (PyTorch de CPU, la rueda de CPU de qwentts.cpp y el GGUF
+   Q4_K_M); al cambiar de modo rehace el entorno; «natural estado» dice el modo.
+3. Con una instalación CPU de verdad (VORTEX_MIKU_NATURAL_CPU, o si existe
+   ~/.cache/vortex-miku-cpu-prueba/natural del usuario real): el proceso carga en la CPU y habla. Si no hay,
+   se salta.
+
+Hace falta el modelo de Supertonic (la F1) en el HOME de prueba (como en las demás pruebas, con env.sh) y
+PySide6. Sin ventanas (QT_QPA_PLATFORM=offscreen).
 
   python3 -I apps/miku/pruebas/natural.py
 """
 
-import json
+import contextlib
+import importlib
+import importlib.machinery
+import importlib.util
+import io
 import os
+import pwd
+import shutil
 import sys
 import tempfile
+import time
+import types
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 FALLOS = 0
+
+# Un «python» de la voz natural que arranca en modo CPU y contesta cada frase con medio segundo de silencio.
+PYTHON_LENTO = '''#!/usr/bin/python3
+import json, os, sys, wave
+print(json.dumps({"listo": True, "voz": "miku-natural", "modo": "cpu"}), flush=True)
+for n, linea in enumerate(sys.stdin):
+    pedido = json.loads(linea)
+    if pedido.get("cmd") == "salir":
+        break
+    ruta = os.path.join(CARPETA, f"falsa-{os.getpid()}-{n}.wav")
+    with wave.open(ruta, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(bytes(24000))
+    print(json.dumps({"id": pedido.get("id"), "wav": ruta, "seg": 0.5, "visemas": []}), flush=True)
+'''
 
 
 def probar(nombre: str, ok: bool) -> None:
@@ -25,12 +56,27 @@ def probar(nombre: str, ok: bool) -> None:
     FALLOS += 0 if ok else 1
 
 
+def recargar(carpeta: Path):
+    """Apunta la voz natural a otra carpeta (VORTEX_MIKU_NATURAL) y recarga lo que la lee al importarse."""
+    os.environ["VORTEX_MIKU_NATURAL"] = str(carpeta)
+    from miku import rutas, voces
+    importlib.reload(rutas)
+    importlib.reload(voces)
+    from miku import asistente
+    importlib.reload(asistente)
+    return rutas, voces, asistente
+
+
 def armar(caso: str) -> Path:
     d = Path(tempfile.mkdtemp(prefix=f"vortex-miku-natural-{caso}."))
     (d / "venv/bin").mkdir(parents=True)
     py = d / "venv/bin/python"
     if caso == "error":
         py.write_text('#!/bin/sh\necho \'{"error": "RuntimeError: no hay una GPU NVIDIA disponible"}\'\nexit 1\n')
+    elif caso == "lenta":
+        from miku import rutas
+        py.write_text(PYTHON_LENTO.replace("CARPETA", repr(str(rutas.temporales())), 1))
+        (d / "modo").write_text("cpu\n")
     else:
         py.write_text("#!/bin/sh\nexit 3\n")
     py.chmod(0o755)
@@ -38,40 +84,212 @@ def armar(caso: str) -> Path:
     return d
 
 
+def hablar(app, asistente, voces, carpeta: Path, espera: float):
+    """Abre el asistente con la voz natural, le pide una frase y espera a que «suene» (o a que pase «espera»)."""
+    from PySide6.QtCore import QTimer
+    cfg = {"avatar": False, "voz": "miku-natural", "modelo": "", "seguir_escuchando": False, "silencio": 1.5}
+    salida = carpeta / "sono"                   # VORTEX_MIKU_SALIDA: lo que «suena» se copia aquí
+    os.environ["VORTEX_MIKU_SALIDA"] = str(salida)
+    a = asistente.Asistente(cfg, avatar=False)
+    avisos = []
+    a.aviso.connect(avisos.append)
+    t0 = time.monotonic()
+    marcas = {}
+    a._arrancar_voz()
+    a._decir("Hola, ¿cómo estás?")
+    limite = QTimer()                           # no singleShot: uno pendiente de un caso anterior cortaría este
+    limite.setSingleShot(True)
+    limite.timeout.connect(app.quit)
+    limite.start(int(espera * 1000))
+    reloj = QTimer()
+
+    def mirar():
+        if a._voz_lista and "lista" not in marcas:
+            marcas["lista"] = time.monotonic() - t0
+        if salida.is_dir() and any(salida.glob("*.wav")):
+            marcas["sono"] = time.monotonic() - t0
+            app.quit()
+    reloj.timeout.connect(mirar)
+    reloj.start(100)
+    app.exec()
+    reloj.stop()
+    limite.stop()
+    return a, avisos, salida, marcas
+
+
+def respaldo(app) -> None:
+    for caso in ("error", "muere", "lenta"):
+        carpeta = armar(caso)
+        rutas, voces, asistente = recargar(carpeta)
+        print({"error": "== La voz natural avisa un error al cargar", "muere": "== La voz natural se muere al cargar",
+               "lenta": "== La voz natural arranca en modo CPU (lenta)"}[caso])
+        probar("la voz natural cuenta como instalada", voces.disponible(voces.buscar("miku-natural")))
+        a, avisos, salida, _ = hablar(app, asistente, voces, carpeta, 15)
+        if caso == "lenta":
+            probar("sigue con la voz natural", getattr(a, "_voz_id", "") == "miku-natural" and a._voz_lista)
+            probar("avisa una vez que va en modo lento", sum("modo lento" in t for t in avisos) == 1)
+            probar("no cae a la voz de siempre", not any("voz de siempre" in t for t in avisos))
+        else:
+            probar("cambia a la F1", getattr(a, "_voz_id", "") == voces.VOZ_DEFECTO and a._voz_lista)
+            probar("avisa una vez que usa la voz de siempre", sum("voz de siempre" in t for t in avisos) == 1)
+            probar("no dice que va en modo lento", not any("modo lento" in t for t in avisos))
+        probar("la frase sale", salida.is_dir() and len(list(salida.glob("*.wav"))) == 1)
+        a.cerrar_todo()
+        shutil.rmtree(carpeta, ignore_errors=True)
+
+
+# ---- Instalación: cómo elige el modo ----------------------------------------------------------------
+
+def cargar_comando():
+    """El comando vortex-miku (un script sin .py) como módulo, para cambiarle la GPU, pip y la descarga."""
+    cargador = importlib.machinery.SourceFileLoader("vortex_miku_prueba", str(RAIZ / "vortex-miku"))
+    m = importlib.util.module_from_spec(importlib.util.spec_from_loader(cargador.name, cargador))
+    cargador.exec_module(m)
+    return m
+
+
+class SubprocesoFalso:
+    """Anota lo que se correría. Crear el venv deja un python; la prueba de la voz deja su WAV."""
+
+    def __init__(self):
+        self.ordenes: list[list[str]] = []
+
+    def run(self, cmd, **_kw):
+        cmd = [str(c) for c in cmd]
+        self.ordenes.append(cmd)
+        if cmd[1:3] == ["-m", "venv"]:
+            py = Path(cmd[3]) / "bin" / "python"
+            py.parent.mkdir(parents=True, exist_ok=True)
+            py.write_text("#!/bin/sh\n")
+        if "--salida" in cmd:
+            Path(cmd[cmd.index("--salida") + 1]).write_bytes(b"RIFF")
+        return types.SimpleNamespace(returncode=0)
+
+    def pip(self) -> list[str]:
+        return [" ".join(c) for c in self.ordenes if "pip" in c]
+
+
+def instalar(carpeta: Path, args: list[str], gpu_sirve: bool):
+    """Corre «vortex-miku natural instalar ARGS» de mentira. Devuelve (código, texto, subproceso, módulo)."""
+    rutas, voces, _ = recargar(carpeta)
+    m = cargar_comando()
+    falso = SubprocesoFalso()
+    m.subprocess = falso
+    m.gpu_para_natural = lambda: ((True, "NVIDIA GeForce RTX 3080 (10 GB)") if gpu_sirve else
+                                  (False, "tu NVIDIA GeForce GTX 1060 6GB es muy vieja para la voz natural "
+                                          "(hace falta una serie 20 o más nueva)."))
+    m.reabrir_si_esta_abierta = lambda: False
+    texto = io.StringIO()
+    with contextlib.redirect_stdout(texto), contextlib.redirect_stderr(texto):
+        rc = m.orden_natural(["instalar", *args])
+    return rc, texto.getvalue(), falso, m
+
+
+def estado(m) -> str:
+    texto = io.StringIO()
+    with contextlib.redirect_stdout(texto):
+        m.orden_natural(["estado"])
+    return texto.getvalue()
+
+
+def eleccion() -> None:
+    from miku import rutas
+    copia = rutas.CONFIG.read_bytes() if rutas.CONFIG.is_file() else None     # instalar cambia la voz elegida
+    base = Path(tempfile.mkdtemp(prefix="vortex-miku-natural-modo."))
+    try:
+        print("== Instalar con una GPU que sirva: lo de siempre (GPU)")
+        rc, texto, falso, m = instalar(base / "gpu", [], gpu_sirve=True)
+        pip = " | ".join(falso.pip())
+        probar("termina bien", rc == 0)
+        probar("guarda el modo gpu", (base / "gpu/modo").read_text().strip() == "gpu" and (base / "gpu/listo").is_file())
+        probar("instala faster-qwen3-tts con su PyTorch de CUDA (sin el de CPU ni qwentts.cpp)",
+               "faster-qwen3-tts==0.5.4" in pip and "download.pytorch.org" not in pip and "qwentts" not in pip)
+        probar("baja el modelo 1.7B", any("Qwen/Qwen3-TTS-12Hz-1.7B-Base" in c for c in falso.ordenes))
+        probar("«natural estado» dice GPU", "Modo: GPU" in estado(m))
+
+        print("== Instalar sin una GPU que sirva (GTX 1060): modo CPU, avisando que es lento")
+        rc, texto, falso, m = instalar(base / "cpu", [], gpu_sirve=False)
+        pip = falso.pip()
+        probar("termina bien", rc == 0)
+        probar("explica por qué y que será lenta", "GTX 1060" in texto and "lenta" in texto)
+        probar("guarda el modo cpu", (base / "cpu/modo").read_text().strip() == "cpu" and (base / "cpu/listo").is_file())
+        probar("primero el PyTorch de CPU, de su índice",
+               len(pip) == 2 and "--index-url https://download.pytorch.org/whl/cpu" in pip[0] and "torch==" in pip[0])
+        probar("luego faster-qwen3-tts y la rueda de CPU de qwentts.cpp, fijada con sha256 (nada de CUDA)",
+               len(pip) == 2 and "faster-qwen3-tts==0.5.4" in pip[1] and "qwentts_cpp_python-0.5.0%2Bcpu" in pip[1]
+               and "#sha256=" in pip[1] and "nvidia" not in pip[1] and "download.pytorch.org" not in pip[1])
+        probar("baja el GGUF del 0.6B en Q4_K_M", any("resolve_gguf_paths" in " ".join(c) and "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+                                                     in c and "Q4_K_M" in c for c in falso.ordenes))
+        e = estado(m)
+        probar("«natural estado» dice CPU (lento) y que la GPU no sirve", "Modo: CPU (lento" in e and "no sirve" in e)
+
+        print("== Instalar con --cpu aunque la GPU sirva")
+        rc, texto, falso, m = instalar(base / "forzada", ["--cpu"], gpu_sirve=True)
+        probar("usa el modo CPU", rc == 0 and (base / "forzada/modo").read_text().strip() == "cpu"
+               and "Pediste el modo CPU" in texto)
+
+        print("== Cambiar de modo (GPU → CPU) rehace el entorno")
+        (base / "gpu/venv/viejo").write_text("PyTorch de CUDA\n")
+        (base / "gpu/hf").mkdir(exist_ok=True)
+        rc, texto, falso, m = instalar(base / "gpu", ["--cpu"], gpu_sirve=True)
+        probar("borra el entorno y el modelo de la GPU y crea uno nuevo", rc == 0 and not (base / "gpu/venv/viejo").exists()
+               and not (base / "gpu/hf").exists() and any(c[1:3] == ["-m", "venv"] for c in falso.ordenes))
+        probar("queda en modo cpu", (base / "gpu/modo").read_text().strip() == "cpu")
+        print("== Una instalación de antes (sin archivo «modo») cuenta como GPU")
+        (base / "gpu/modo").unlink()
+        probar("estado: Modo GPU", "Modo: GPU" in estado(m))
+
+        print("== Opciones que no existen")
+        rc, texto, falso, m = instalar(base / "mala", ["--rapido"], gpu_sirve=True)
+        probar("se rechazan (código 2) sin instalar nada", rc == 2 and not falso.ordenes)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+        if copia is None:
+            rutas.CONFIG.unlink(missing_ok=True)
+        else:
+            rutas.CONFIG.write_bytes(copia)
+
+
+# ---- Con una instalación CPU de verdad -----------------------------------------------------------------
+
+def instalacion_cpu() -> Path | None:
+    d = os.environ.get("VORTEX_MIKU_NATURAL_CPU")
+    carpeta = Path(d) if d else Path(pwd.getpwuid(os.getuid()).pw_dir) / ".cache/vortex-miku-cpu-prueba/natural"
+    try:
+        listo = (carpeta / "listo").is_file() and (carpeta / "modo").read_text().strip() == "cpu"
+    except OSError:
+        listo = False
+    return carpeta if listo else None
+
+
+def cpu_de_verdad(app) -> None:
+    print("== La voz natural de verdad en la CPU")
+    carpeta = instalacion_cpu()
+    if carpeta is None:
+        print("  --  no hay una instalación CPU de prueba (VORTEX_MIKU_NATURAL_CPU): se salta")
+        return
+    rutas, voces, asistente = recargar(carpeta)
+    salida = Path(tempfile.mkdtemp(prefix="vortex-miku-natural-cpu."))
+    a, avisos, sono, marcas = hablar(app, asistente, voces, salida, 180)
+    probar("carga en la CPU y queda lista (no cae a la F1)", getattr(a, "_voz_id", "") == "miku-natural" and a._voz_lista)
+    probar("avisa una vez que va en modo lento", sum("modo lento" in t for t in avisos) == 1)
+    wavs = list(sono.glob("*.wav")) if sono.is_dir() else []
+    probar("la frase suena", len(wavs) == 1 and wavs[0].stat().st_size > 24000)
+    if "lista" in marcas and "sono" in marcas:
+        print(f"      lista a los {marcas['lista']:.1f} s; la primera frase sonó a los {marcas['sono']:.1f} s")
+    else:
+        print(f"      tiempos: {marcas}; avisos: {avisos}")
+    a.cerrar_todo()
+    shutil.rmtree(salida, ignore_errors=True)
+
+
 def main() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    casos = {c: armar(c) for c in ("error", "muere")}
-    from PySide6.QtCore import QCoreApplication, QTimer
+    from PySide6.QtCore import QCoreApplication
     app = QCoreApplication(sys.argv)
-    for caso, carpeta in casos.items():
-        os.environ["VORTEX_MIKU_NATURAL"] = str(carpeta)
-        import importlib
-
-        from miku import rutas, voces
-        importlib.reload(rutas)
-        importlib.reload(voces)
-        from miku import asistente
-        importlib.reload(asistente)
-        print(f"== La voz natural {'avisa un error' if caso == 'error' else 'se muere'} al cargar")
-        probar("la voz natural cuenta como instalada", voces.disponible(voces.buscar("miku-natural")))
-        cfg = {"avatar": False, "voz": "miku-natural", "modelo": "", "seguir_escuchando": False, "silencio": 1.5}
-        salida = carpeta / "sono"                   # VORTEX_MIKU_SALIDA: lo que «suena» se copia aquí
-        os.environ["VORTEX_MIKU_SALIDA"] = str(salida)
-        a = asistente.Asistente(cfg, avatar=False)
-        avisos = []
-        a.aviso.connect(avisos.append)
-        a._arrancar_voz()
-        a._decir("Hola, ¿cómo estás?")
-        QTimer.singleShot(15000, app.quit)
-        reloj = QTimer()
-        reloj.timeout.connect(lambda: app.quit() if salida.is_dir() and any(salida.glob("*.wav")) else None)
-        reloj.start(100)
-        app.exec()
-        reloj.stop()
-        probar("cambia a la F1", getattr(a, "_voz_id", "") == voces.VOZ_DEFECTO and a._voz_lista)
-        probar("avisa una vez que usa la voz de siempre", sum("voz de siempre" in t for t in avisos) == 1)
-        probar("la frase pendiente igual sale con la F1", salida.is_dir() and len(list(salida.glob("*.wav"))) == 1)
-        a.cerrar_todo()
+    respaldo(app)
+    eleccion()
+    cpu_de_verdad(app)
     print("\nTodo bien" if not FALLOS else f"\nFALLARON {FALLOS} pruebas")
     return 1 if FALLOS else 0
 

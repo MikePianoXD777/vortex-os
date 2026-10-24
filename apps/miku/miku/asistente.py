@@ -294,6 +294,8 @@ class Asistente(QObject):
                 continue
             if m.get("listo"):
                 self._voz_lista = True
+                if m.get("modo") == "cpu":       # sin una GPU que sirva: ~6 s más lo que dura cada frase
+                    self._avisar_una_vez("voz-lenta", "Voz natural en modo lento (en la CPU): tardo un poco en contestar.")
             elif "wav" in m:
                 texto, turno = self._pedidos.pop(m.get("id"), ("", -1))      # -1: pedido descartado, no suena
                 if m.get("aviso"):
