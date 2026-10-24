@@ -340,7 +340,10 @@
               "pills": "Píldoras",
               "numbers": "Números",
               "pacman": "Pacman"
-            }
+            },
+            "numbers": "Índices numerados",
+            "pacman": "Puntos animados estilo arcade",
+            "pills": "Indicadores mínimos en píldora"
           },
           "name": "Espacios de trabajo"
         },
@@ -360,7 +363,10 @@
               "classic": "Clásico",
               "material": "Material",
               "badge": "Matriz de puntos"
-            }
+            },
+            "badge": "Tarjetas segmentadas en cápsula",
+            "classic": "Hora y fecha apiladas, limpias",
+            "material": "Números grandes en diagonal con acento"
           }
         },
         "info": "Grabación/temporizador",
@@ -502,11 +508,13 @@
           "name": {
             "classic": "Clásico",
             "minimal": "Minimalista",
-            "text": "Texto"
+            "text": "Texto",
+            "button": "Botón"
           },
           "classic": "Píldora con onda de degradado",
           "minimal": "Cápsula tipo iOS/Android con tapa",
-          "text": "Texto e icono limpios sin fondo"
+          "text": "Texto e icono limpios sin fondo",
+          "button": "Píldora de botón interactivo con fondo"
         }
       },
       "wifi": {
@@ -632,6 +640,10 @@
           "button": "Botones de icono interactivos con fondo",
           "icon": "Iconos limpios sin fondo"
         }
+      },
+      "height": {
+        "title": "Alto de la barra",
+        "desc": "Establecer el alto de la barra como porcentaje"
       }
     },
     "theme": {
@@ -742,7 +754,8 @@
         "pink": "Rosa",
         "flamingo": "Flamenco",
         "rosewater": "Agua de rosas"
-      }
+      },
+      "edit_title": "Editar tema personalizado"
     },
     "wellbeing": {
       "desktop": "Escritorio",
@@ -918,7 +931,8 @@
         "shuffle": "Mezclar apps",
         "empty": "No hay aplicaciones configuradas para el dock",
         "enter_edit": "Modo de edición",
-        "exit_edit": "Salir de edición"
+        "exit_edit": "Salir de edición",
+        "desc": "Configura y ordena las aplicaciones que se muestran en el dock"
       },
       "picker": {
         "search": "Buscar aplicaciones...",
@@ -978,7 +992,10 @@
         "workspace": "Solo espacio de trabajo activo"
       },
       "window_menu": {
-        "untitled": "Untitled"
+        "untitled": "Untitled",
+        "new_window": "Nueva ventana",
+        "pin": "Fijar en el dock",
+        "unpin": "Quitar del dock"
       },
       "background": {
         "title": "Dibujar un fondo detrás de las apps",
@@ -1029,7 +1046,11 @@
     "tab_files": "Archivos",
     "placeholder_files": "Buscar archivos o escribir ruta...",
     "tab_emojis": "Emojis",
-    "placeholder_emojis": "Buscar emojis o escribir palabra clave..."
+    "placeholder_emojis": "Buscar emojis o escribir palabra clave...",
+    "calc_result": "Resultado del cálculo (Enter para copiar)",
+    "command_hint": "Escribe un comando para ejecutarlo",
+    "command_run": "Ejecutar comando: {cmd}",
+    "no_emojis_found": "No se encontraron emojis"
   },
   "calendar": {
     "loading": "Cargando...",
@@ -1065,12 +1086,14 @@
       "locked": "Bloqueado",
       "access_denied": "Acceso denegado",
       "authenticating": "Autenticando...",
-      "enter_pin": "Introduce el PIN"
+      "enter_pin": "Introduce el PIN",
+      "too_many_attempts": "Demasiados intentos"
     },
     "fingerprint": {
       "ready": "Toca el sensor",
       "not_recognized": "Huella no reconocida",
-      "recognized": "Huella reconocida"
+      "recognized": "Huella reconocida",
+      "blocked": "Huella desactivada"
     },
     "power": {
       "suspend": "Suspender",
@@ -1213,7 +1236,8 @@
       },
       "weather": {
         "fallback_summary": "Reporte meteorológico",
-        "fallback_body": "No se proporcionaron datos detallados."
+        "fallback_body": "No se proporcionaron datos detallados.",
+        "title": "Clima"
       },
       "screenshot": {
         "badge": "Captura de pantalla",
@@ -1273,7 +1297,10 @@
         "copied_body": "Dibujo copiado al portapapeles",
         "failed_title": "Error al exportar",
         "failed_body": "No se pudo guardar el dibujo"
-      }
+      },
+      "hex": "Hex",
+      "palette": "Paleta",
+      "palette_default": "Predeterminada"
     },
     "notes": {
       "title": "Notas",
@@ -1426,7 +1453,8 @@
       "blue": "Azul",
       "purple": "Morado",
       "pink": "Rosa",
-      "monochrome": "Monocromo"
+      "monochrome": "Monocromo",
+      "history": "Historial"
     }
   },
   "weather": {
@@ -1543,7 +1571,8 @@
       "stretched": "Estirado",
       "lumen": "Lumen",
       "lyrics": "Letra",
-      "simpleLyrics": "Letra simple"
+      "simpleLyrics": "Letra simple",
+      "circle": "Círculo"
     },
     "presets": {
       "minimal": {
@@ -1572,7 +1601,10 @@
     },
     "settings": {
       "lyricsLines": "Líneas",
-      "lyricsAlignment": "Alineación"
+      "lyricsAlignment": "Alineación",
+      "lineThickness": "Grosor",
+      "usageStyle": "Estilo",
+      "visualizerStyle": "Estilo del visualizador"
     },
     "align": {
       "left": "Izquierda",
@@ -1584,6 +1616,10 @@
     },
     "battery": {
       "none": "Sin batería"
+    },
+    "style": {
+      "circle": "Círculo",
+      "wave": "Onda"
     }
   },
   "cli": {

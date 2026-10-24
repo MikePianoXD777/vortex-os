@@ -339,7 +339,10 @@
               "pills": "Pills",
               "numbers": "Numbers",
               "pacman": "Pacman"
-            }
+            },
+            "numbers": "Numbered indices",
+            "pacman": "Animated arcade dots",
+            "pills": "Minimal pill indicators"
           },
           "name": "Workspaces"
         },
@@ -359,7 +362,10 @@
               "classic": "Classic",
               "material": "Material",
               "badge": "Dot Matrix"
-            }
+            },
+            "badge": "Pill-capsule segmented cards",
+            "classic": "Clean stacked time and date",
+            "material": "Diagonal bold accent numbers"
           }
         },
         "info": "Recording/timer",
@@ -636,6 +642,10 @@
           "button": "Interactive icon buttons with background",
           "icon": "Clean icons without background"
         }
+      },
+      "height": {
+        "title": "Bar height",
+        "desc": "Set the height of the bar as a percentage"
       }
     },
     "theme": {
@@ -746,7 +756,8 @@
         "pink": "Pink",
         "flamingo": "Flamingo",
         "rosewater": "Rosewater"
-      }
+      },
+      "edit_title": "Edit Custom Theme"
     },
     "wellbeing": {
       "desktop": "Desktop",
@@ -883,7 +894,8 @@
         "shuffle": "Shuffle Apps",
         "empty": "No applications configured for the dock",
         "enter_edit": "Edit",
-        "exit_edit": "Exit edit mode"
+        "exit_edit": "Exit edit mode",
+        "desc": "Configure and organize applications displayed on the dock"
       },
       "picker": {
         "search": "Search apps...",
@@ -993,7 +1005,11 @@
     "tab_files": "Files",
     "placeholder_files": "Search files or enter path...",
     "tab_emojis": "Emojis",
-    "placeholder_emojis": "Search emojis by name or keyword..."
+    "placeholder_emojis": "Search emojis by name or keyword...",
+    "calc_result": "Calculation result (Enter to copy)",
+    "command_hint": "Type a command to execute",
+    "command_run": "Execute command: {cmd}",
+    "no_emojis_found": "No emojis found"
   },
   "calendar": {
     "loading": "Loading...",
@@ -1179,7 +1195,8 @@
       },
       "weather": {
         "fallback_summary": "Weather report",
-        "fallback_body": "No breakdown data provided."
+        "fallback_body": "No breakdown data provided.",
+        "title": "Weather"
       },
       "screenshot": {
         "badge": "Screenshot",
@@ -1395,7 +1412,8 @@
       "blue": "Blue",
       "purple": "Purple",
       "pink": "Pink",
-      "monochrome": "Monochrome"
+      "monochrome": "Monochrome",
+      "history": "History"
     }
   },
   "weather": {
