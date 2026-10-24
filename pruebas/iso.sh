@@ -11,7 +11,9 @@
 #   3. vortex-sesion: lanza esa instalación en segundo plano solo con la marca /etc/vortex/claude
 #      (/etc se simula con un overlay en un user namespace);
 #   4. iso/paquetes.sh: no recompila un paquete del AUR si el repo ya tiene esa versión, ni si lo
-#      compilado sigue enlazando con las bibliotecas del sistema (binarios de verdad, con cc);
+#      compilado sigue enlazando con las bibliotecas del sistema (binarios de verdad, con cc); sí
+#      si algún ELF pide más que x86-64 básico (nota «x86 ISA needed»), y revisar_isa falla con él;
+#      lo «any» se compila aquí y lo demás en el chroot de Arch (sin construir el chroot);
 #   5. vortex-post-instalacion: el autologin de Calamares pasa a greetd ([initial_session]);
 #   6. el hook de pacman que activa RemoveMake en paru, con pacman de verdad en una raíz falsa.
 #
@@ -523,6 +525,10 @@ if command -v cc >/dev/null && command -v readelf >/dev/null; then
   echo 'int vortex_prueba(void); int main(void) { return vortex_prueba() == 7 ? 0 : 1; }' >"$C/prog.c"
   cc -shared -fPIC -Wl,-soname,libvortex-prueba.so.9 -o "$C/libvortex-prueba.so.9" "$C/lib.c" \
     && cc -o "$C/prog" "$C/prog.c" "$C/libvortex-prueba.so.9" 2>/dev/null
+  # Sin la nota de CPU: en un equipo con el glibc v3 de CachyOS saldrían marcados x86-64-v3 y
+  # ya_en_repo los recompilaría por eso (eso se prueba aparte, abajo).
+  objcopy --remove-section=.note.gnu.property "$C/prog" 2>/dev/null
+  objcopy --remove-section=.note.gnu.property "$C/libvortex-prueba.so.9" 2>/dev/null
   probar "(el programa de prueba pide libvortex-prueba.so.9)" bash -c "readelf -d '$C/prog' | grep -q 'NEEDED.*libvortex-prueba.so.9'"
   elf_pkgbuild() { # elf_pkgbuild DIR [con-biblioteca]: depende de «bash», como un PKGBUILD cualquiera
     mkdir -p "$1"; cp "$C/prog" "$1/"
@@ -549,6 +555,66 @@ if command -v cc >/dev/null && command -v readelf >/dev/null; then
 else
   salto "sin compilador de C ni readelf: se salta la prueba de bibliotecas (NEEDED) de ya_en_repo"
 fi
+
+# La nota «x86 ISA needed» (GNU_PROPERTY_X86_ISA_1_NEEDED): un ELF marcado x86-64-v3 (como el Calamares
+# de la 1.3, por el crt1.o del glibc v3 de CachyOS) no se reutiliza y hace fallar revisar_isa. Los ELF
+# de prueba se arman en ensamblador, sin crt1.o ni glibc, para que la nota sea justo la que se escribe
+# (1 = básico, 4 = v3) y no la del glibc de quien corre la prueba.
+if command -v cc >/dev/null && command -v readelf >/dev/null; then
+  I="$P/isa"; mkdir -p "$I"
+  elf_isa() { # elf_isa NIVEL SALIDA
+    cat >"$I/isa.S" <<ASM
+.globl _start
+.text
+_start:
+  mov \$60, %eax
+  xor %edi, %edi
+  syscall
+.section .note.gnu.property,"a"
+.p2align 3
+.long 4, 16, 5
+.asciz "GNU"
+.long 0xc0008002, 4, $1
+.p2align 3
+ASM
+    cc -nostdlib -static -o "$2" "$I/isa.S" 2>/dev/null
+  }
+  elf_isa 4 "$I/prog-v3"; elf_isa 1 "$I/prog-basico"
+  probar "(el ELF de prueba v3 lleva la nota x86-64-v3)" bash -c "LC_ALL=C readelf -n '$I/prog-v3' | grep -q 'ISA needed:.*x86-64-v3'"
+  probar "(el ELF de prueba básico solo pide x86-64-baseline)" bash -c "LC_ALL=C readelf -n '$I/prog-basico' | grep 'ISA needed' | grep -q baseline && ! LC_ALL=C readelf -n '$I/prog-basico' | grep 'ISA needed' | grep -q -- '-v[2-9]'"
+  isa_pkgbuild() { # isa_pkgbuild DIR PROGRAMA
+    mkdir -p "$1"; cp "$2" "$1/prog"
+    printf 'pkgname=falso\npkgver=1.0\npkgrel=1\narch=(any)\ndepends=(bash)\noptions=(!strip !debug)\npackage() { install -Dm755 "$startdir/prog" "$pkgdir/usr/bin/falso-prog"; }\n' >"$1/PKGBUILD"
+  }
+  rm -rf "$P/repo6" "$P/repo7"; mkdir -p "$P/repo6" "$P/repo7"
+  isa_pkgbuild "$P/i1" "$I/prog-v3"
+  (cd "$P/i1" && PKGDEST="$P/repo6" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps >/dev/null 2>&1)
+  isa_pkgbuild "$P/i2" "$I/prog-basico"
+  (cd "$P/i2" && PKGDEST="$P/repo7" BUILDDIR="$P/build" PACKAGER="$PACKAGER_GENERICO" makepkg -f --nodeps >/dev/null 2>&1)
+  probar "elf_no_genericos señala el ELF marcado x86-64-v3" \
+    bash -c "source '$AQUI/iso/paquetes.sh'; elf_no_genericos '$P/repo6/falso-1.0-1-any.pkg.tar.zst' | grep -q '^usr/bin/falso-prog: .*x86-64-v3'"
+  probar "elf_no_genericos no dice nada de un ELF de x86-64 básico" \
+    bash -c "source '$AQUI/iso/paquetes.sh'; [[ -z \"\$(elf_no_genericos '$P/repo7/falso-1.0-1-any.pkg.tar.zst')\" ]]"
+  probar "misma versión y marca, pero un ELF pide x86-64-v3: se compila" bash -c "source '$AQUI/iso/paquetes.sh'; ! ya_en_repo '$P/i1' '$P/repo6'"
+  probar "misma versión y marca, ELF de x86-64 básico: no se recompila" bash -c "source '$AQUI/iso/paquetes.sh'; ya_en_repo '$P/i2' '$P/repo7'"
+  probar "revisar_isa falla con un paquete v3 en el repo y lo nombra" \
+    bash -c "source '$AQUI/iso/paquetes.sh'; ! revisar_isa '$P/repo6' 2>'$T/isa.err' && grep -q 'falso-1.0-1-any' '$T/isa.err'"
+  probar "revisar_isa pasa con un repo de x86-64 básico" bash -c "source '$AQUI/iso/paquetes.sh'; revisar_isa '$P/repo7'"
+  probar "construir.sh corre revisar_isa sobre el repo antes de armar la ISO" contiene "$AQUI/iso/construir.sh" 'revisar_isa "$REPO"'
+else
+  salto "sin compilador de C ni readelf: se salta la prueba de la nota x86 ISA needed"
+fi
+
+# Qué se compila dónde: lo «any» en este equipo (marca genérica), lo demás en el chroot de Arch.
+mkdir -p "$P/q1" "$P/q2"
+printf 'pkgname=falso\npkgver=1.0\npkgrel=1\narch=(any)\npackage() { :; }\n' >"$P/q1/PKGBUILD"
+printf 'pkgname=falso\npkgver=1.0\npkgrel=1\narch=(i686 x86_64)\npackage() { :; }\n' >"$P/q2/PKGBUILD"
+probar "un PKGBUILD «any» lleva la marca genérica (se compila en este equipo)" \
+  bash -c "source '$AQUI/iso/paquetes.sh'; [[ \"\$(marca_de '$P/q1')\" == \"\$PACKAGER_GENERICO\" ]]"
+probar "uno con arch=(… x86_64) lleva la marca del chroot de Arch" \
+  bash -c "source '$AQUI/iso/paquetes.sh'; [[ \"\$(marca_de '$P/q2')\" == \"\$PACKAGER_CHROOT\" ]]"
+probar "el pacman.conf del chroot solo tiene core, extra y multilib (nada de CachyOS)" \
+  bash -c "source '$AQUI/iso/paquetes.sh'; [[ \"\$(pacman_conf_arch /c | grep '^\[' | tr '\n' ' ')\" == '[options] [core] [extra] [multilib] ' ]] && ! pacman_conf_arch /c | grep -qi cachyos"
 
 # Compilar para un x86-64 genérico aunque el makepkg.conf del constructor sea el de CachyOS
 # (-march=native, rust.conf con target-cpu=native). Se prueba con makepkg de verdad: un PKGBUILD cuyo

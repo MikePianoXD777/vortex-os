@@ -23,6 +23,11 @@ Miku con internet, y `vortex actualizar` que por fin funciona en las instalacion
   - la ISO ya trae el repo con git.
 - **Arreglo:** `vortex actualizar` ya no se corta al recargar Hyprland desde una terminal sin la variable de
   Hyprland.
+- **Arreglo: el instalador abre en procesadores sin AVX2** (Intel anteriores a Haswell, muchos
+  Celeron/Pentium/Atom, AMD A8/A10 viejos). En la 1.3 Calamares decía «CPU ISA level is lower than
+  required» y no abría. Ahora se compila en un sistema Arch genérico y la ISO se revisa antes de salir, así
+  que ya no hace falta el arreglo `iso/arreglos/calamares-cpu-vieja.sh` (sigue ahí para quien tenga la ISO
+  1.3).
 
 ## Si vienes de la 1.3 instalada desde la ISO
 

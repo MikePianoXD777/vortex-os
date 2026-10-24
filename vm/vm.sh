@@ -14,6 +14,11 @@
 #   vm/vm.sh borrar       borra el disco para empezar de cero
 #
 # Todo vive en ~/.cache/vortex-os-vm (fuera de la bóveda, son varios GB).
+#
+# Variables: VORTEX_VM (carpeta), VORTEX_VM_PUERTO (SSH), VORTEX_VM_USUARIO, VORTEX_VM_VIDEO (ver
+# qemu_comun), VORTEX_VM_CPUS y VORTEX_VM_RAM, VORTEX_VM_SB=1 (Secure Boot) y VORTEX_VM_CPU: el
+# modelo de CPU de QEMU (por defecto «host», la tuya). Para probar en una CPU sin AVX2, como las PC
+# viejas: VORTEX_VM_CPU=Nehalem (x86-64-v2) o VORTEX_VM_CPU=SandyBridge (AVX, sin AVX2).
 set -euo pipefail
 
 VM="${VORTEX_VM:-$HOME/.cache/vortex-os-vm}"
@@ -75,7 +80,7 @@ qemu_comun() {
     sb=(-global driver=cfi.pflash01,property=secure,value=on)
   fi
   QEMU=(
-    qemu-system-x86_64 -enable-kvm -machine "$maquina" -cpu host "${sb[@]}"
+    qemu-system-x86_64 -enable-kvm -machine "$maquina" -cpu "${VORTEX_VM_CPU:-host}" "${sb[@]}"
     -smp "${VORTEX_VM_CPUS:-6}" -m "${VORTEX_VM_RAM:-6G}"
     -drive "if=pflash,format=raw,readonly=on,file=$codigo"
     -drive "if=pflash,format=raw,file=$VM/OVMF_VARS.fd"
@@ -244,6 +249,6 @@ case "${1:-}" in
     echo "Disco borrado."
     ;;
   *)
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac
