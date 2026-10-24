@@ -66,9 +66,22 @@ def correr(*args, env=None):
     return subprocess.run([sys.executable, "-I", COMANDO, *args], capture_output=True, text=True, env=env or ENV, timeout=60)
 
 
+def _ancestros() -> set[int]:
+    """Esta prueba y quienes la lanzaron (su shell puede nombrar la carpeta del repo): no son de Miku."""
+    vistos, pid = set(), os.getpid()
+    while pid > 1 and pid not in vistos:
+        vistos.add(pid)
+        try:
+            pid = int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return vistos
+
+
 def procesos_de_miku() -> list[tuple[int, str]]:
     """Todo proceso vivo cuya línea de órdenes sea de ESTA copia de la app (la app, la voz, QtWebEngine…)."""
     marca = str(raiz)
+    ancestros = _ancestros()
     salida = []
     for d in os.listdir("/proc"):
         if d.isdigit():
@@ -77,7 +90,7 @@ def procesos_de_miku() -> list[tuple[int, str]]:
                 estado = Path(f"/proc/{d}/stat").read_text().rsplit(")", 1)[1].split()[0]
             except OSError:
                 continue
-            if marca in cmd and estado != "Z" and int(d) != os.getpid() and "comando.py" not in cmd:
+            if marca in cmd and estado != "Z" and int(d) not in ancestros and "comando.py" not in cmd:
                 salida.append((int(d), cmd[-80:]))
     return salida
 
