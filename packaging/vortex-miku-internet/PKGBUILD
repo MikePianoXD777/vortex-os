@@ -1,0 +1,19 @@
+# «Miku con internet» en el instalador gráfico. El paquete solo deja una marca, /etc/vortex/miku-internet:
+# mientras tu ~/.config/vortex/miku.json no diga otra cosa, Miku puede buscar en la web y leer páginas,
+# cada vez con tu permiso en su ventana. Se cambia en Ajustes → General o con «vortex-miku internet on|off».
+pkgname=vortex-miku-internet
+pkgver=1
+pkgrel=1
+pkgdesc="Miku con internet: busca en la web y lee páginas, siempre con tu permiso"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+depends=('vortex-miku')
+
+package() {
+  install -Dm644 /dev/stdin "$pkgdir/etc/vortex/miku-internet" <<'MARCA'
+# Vortexine's OS: «Miku con internet» elegido en el instalador. Mientras ~/.config/vortex/miku.json no
+# tenga «internet», Miku puede buscar en la web y leer páginas (cada vez con tu permiso). Borra el
+# archivo para que venga apagado.
+MARCA
+}

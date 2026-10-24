@@ -47,7 +47,8 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg = dict(DEFECTOS)
     cfg["avatar"] = _como_bool(crudo.get("avatar"), DEFECTOS["avatar"])
     cfg["seguir_escuchando"] = _como_bool(crudo.get("seguir_escuchando"), DEFECTOS["seguir_escuchando"])
-    cfg["internet"] = _como_bool(crudo.get("internet"), DEFECTOS["internet"])
+    # Sin «internet» en miku.json manda la casilla del instalador (la marca de vortex-miku-internet).
+    cfg["internet"] = _como_bool(crudo.get("internet"), rutas.MARCA_INTERNET.is_file())
     for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo"):
         v = crudo.get(clave)
         if isinstance(v, str) and v.strip():

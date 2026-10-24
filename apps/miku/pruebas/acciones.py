@@ -121,6 +121,53 @@ def parte_mcp() -> None:
     subprocess.run(["rm", "-rf", str(tmp)])
 
 
+def hook(env: dict, datos: dict) -> dict:
+    r = subprocess.run([sys.executable, "-I", str(RAIZ / "miku/permiso_web.py")], input=json.dumps(datos), text=True,
+                       capture_output=True, env=env, timeout=60)
+    return json.loads(r.stdout or "{}").get("hookSpecificOutput", {})
+
+
+def parte_web() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="vortex-miku-web."))
+    boton = Boton(tmp / "autorizar.sock")
+    env = {"PATH": "/usr/bin:/bin", "VORTEX_MIKU_AUTORIZAR": str(boton.ruta)}
+    print("== Internet: el hook del permiso")
+    r = hook(env, {"tool_name": "WebSearch", "tool_input": {"query": "versión de Python"}})
+    probar("búsqueda autorizada: allow, y el permiso muestra la búsqueda exacta", r.get("permissionDecision") == "allow"
+           and boton.pedidos[-1] == {"tipo": "pedir", "titulo": "Buscar en internet", "detalle": "Búsqueda: versión de Python"}, str(r))
+    boton.responder = False
+    r = hook(env, {"tool_name": "WebFetch", "tool_input": {"url": "https://ejemplo.org/x?d=secreto", "prompt": "lee"}})
+    probar("página cancelada: deny, y el permiso muestra la dirección completa", r.get("permissionDecision") == "deny"
+           and boton.pedidos[-1]["detalle"] == "https://ejemplo.org/x?d=secreto", str(r))
+    r = hook({**env, "VORTEX_MIKU_AUTORIZAR": ""}, {"tool_name": "WebSearch", "tool_input": {"query": "x"}})
+    probar("sin la ventana de Miku: deny", r.get("permissionDecision") == "deny", str(r))
+    r = hook(env, {"tool_name": "Bash", "tool_input": {"command": "id"}})
+    probar("otra herramienta: deny sin pedir permiso", r.get("permissionDecision") == "deny", str(r))
+
+    print("== Internet: el comando de Claude")
+    from miku import cerebro
+    con = cerebro.construir_comando("claude", "p", "hola", None, None, str(boton.ruta), True)
+    sin = cerebro.construir_comando("claude", "p", "hola", None, None, str(boton.ruta), False)
+    sin_ventana = cerebro.construir_comando("claude", "p", "hola", None, None, None, True)
+    tools = lambda c: c[c.index("--tools") + 1]
+    probar("con internet: WebSearch y WebFetch, con el hook del permiso", tools(con) == "WebSearch,WebFetch"
+           and "permiso_web.py" in con[con.index("--settings") + 1] and "WebFetch" in con[con.index("--allowedTools"):con.index("--disallowedTools")])
+    probar("sin internet: ninguna herramienta propia de Claude", tools(sin) == "" and "--settings" not in sin
+           and "WebFetch" in sin[sin.index("--disallowedTools"):])
+    probar("sin la ventana para pedir permiso, nada de internet", tools(sin_ventana) == "" and "--settings" not in sin_ventana)
+
+    print("== Internet: la casilla del instalador")
+    from miku import config, rutas
+    marca, cfg = tmp / "miku-internet", tmp / "miku.json"
+    rutas.MARCA_INTERNET = marca
+    probar("sin marca y sin elegir nada: apagado", config.cargar(cfg)["internet"] is False)
+    marca.write_text("x")
+    probar("con la marca del instalador: encendido", config.cargar(cfg)["internet"] is True)
+    cfg.write_text('{"internet": false}')
+    probar("lo que elijas en miku.json gana a la marca", config.cargar(cfg)["internet"] is False)
+    subprocess.run(["rm", "-rf", str(tmp)])
+
+
 def parte_asistente() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QCoreApplication, QTimer
@@ -169,6 +216,7 @@ def parte_asistente() -> None:
 
 def main() -> int:
     parte_mcp()
+    parte_web()
     parte_asistente()
     print("\nTodo bien" if not FALLOS else f"\nFALLARON {FALLOS} pruebas")
     return 1 if FALLOS else 0

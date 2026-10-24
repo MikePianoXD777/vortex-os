@@ -50,6 +50,10 @@
       description: "Claude Code integrado al escritorio: Super+A lo abre y le hablas con el micrófono (toca Espacio). Puede ver tu pantalla solo cuando se lo pides y te avisa. Viene apagado: márcalo para instalarlo en tu primer inicio de sesión con internet, o actívalo después en Ajustes → General → Claude. Necesitas tu cuenta de Claude"
       selected: false
       packages: [ vortex-claude ]
+    - name: "Miku con internet (necesita Claude)"
+      description: "Miku, la asistente de voz (Super+O), puede buscar en la web y leer páginas cuando le preguntas algo actual. Cada búsqueda y cada página te pide permiso en su ventana, con la búsqueda o la dirección exacta. Se cambia después en Ajustes → General"
+      selected: false
+      packages: [ vortex-miku-internet ]
     - name: "Discord"
       description: "Chat de voz y texto"
       selected: false

@@ -37,6 +37,8 @@ VOZ = DATOS / "voz"                    # Supertonic 3 (ONNX) y los estilos de vo
 OIDO = DATOS / "oido"                  # el modelo de Whisper para reconocer lo que dices; se baja la primera vez
 AJUSTES_SHELL = _xdg("XDG_CONFIG_HOME", ".config") / "serpantinum" / "settings.json"     # solo lectura (general.uiScale)
 PALETA_SHELL = _xdg("XDG_STATE_HOME", ".local/state") / "serpantinum" / "qs_colors.json"  # solo lectura (colores del fondo)
+# Marca del instalador («Miku con internet», paquete vortex-miku-internet): internet encendido de fábrica.
+MARCA_INTERNET = Path(os.environ.get("VORTEX_MIKU_MARCA_INTERNET", "/etc/vortex/miku-internet"))
 CEREBRO_CWD = DATOS / "cerebro"        # carpeta neutra y vacía desde donde corre Claude
 # Voz natural (opcional, en la GPU o, lenta, en la CPU): PyTorch y Qwen3-TTS en su propio entorno, que pone
 # «vortex-miku natural instalar».

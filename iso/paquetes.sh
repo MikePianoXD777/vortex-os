@@ -20,7 +20,7 @@ RAIZ="$(dirname "$AQUI")"
 # apps (Flathub): en la ISO solo viene ella, las apps se bajan después. Calamares (el instalador
 # gráfico) se compila aquí porque los de CachyOS están enlazados a un boost viejo (no arrancan
 # con el de Arch).
-PROPIOS=(vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku)
+PROPIOS=(vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku vortex-miku-internet)
 AUR=(wl-gammarelay-rs calamares shim-signed)
 AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 
