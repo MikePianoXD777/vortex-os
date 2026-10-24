@@ -21,6 +21,8 @@ SettingsBlob {
 
     // true = Miku en 3D (el valor de fábrica); false = solo la voz.
     property bool avatarOn: true
+    // true = Miku puede buscar en la web y leer páginas (cada vez con permiso); de fábrica, apagado.
+    property bool internetOn: false
     // false = no hay vortex-miku (el paquete no está instalado) o no contestó.
     property bool available: true
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
@@ -38,18 +40,26 @@ SettingsBlob {
     // en su propia sesión (setsid) y sin pegarse a las tuberías del Process (no lo mata un
     // SIGPIPE): sigue solo hasta el final, y al volver a abrir Ajustes se lee el estado. Si el
     // comando no está (un sistema donde no se instaló el paquete) avisa en vez de callar.
-    readonly property string runScript: 'command -v vortex-miku >/dev/null || { notify-send -a "Vortex OS" "Miku" "Falta el asistente (paquete vortex-miku). En la carpeta de Vortex: cd packaging/vortex-miku && makepkg -sif" 2>/dev/null; exit 127; }; ' + 'setsid -w vortex-miku avatar "$1" </dev/null >/dev/null 2>&1 & wait $!'
+    readonly property string runScript: 'command -v vortex-miku >/dev/null || { notify-send -a "Vortex OS" "Miku" "Falta el asistente (paquete vortex-miku). En la carpeta de Vortex: cd packaging/vortex-miku && makepkg -sif" 2>/dev/null; exit 127; }; ' + 'setsid -w vortex-miku "$@" </dev/null >/dev/null 2>&1 & wait $!'
 
     // El estado se lee con una sola salida: las líneas de «vortex-miku estado», «rc=N» con su
     // código (127 si falta el comando, 124 si no contestó en 5 s) y «claude=si|no|?» (si Claude
     // está activado; «?» si no hay comando vortex). Así basta un evento (el fin del flujo) y no
     // hay que esperar a varias señales distintas.
-    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
+    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
 
     function setAvatar(on) {
+        section.run("avatar", on);
+    }
+
+    function setInternet(on) {
+        section.run("internet", on);
+    }
+
+    function run(option, on) {
         if (toggleProc.running)
             return;
-        toggleProc.command = ["bash", "-c", section.runScript, "vortex-miku", on ? "on" : "off"];
+        toggleProc.command = ["bash", "-c", section.runScript, "vortex-miku", option, on ? "on" : "off"];
         toggleProc.running = true;
         // Si el comando no pudo ni arrancar, no hay "terminó": se vuelve a leer el estado real.
         recheckTimer.restart();
@@ -58,6 +68,7 @@ SettingsBlob {
     function applyState(text) {
         let rc = -1;
         let avatar = "";
+        let internet = "";
         let claude = "?";
         let lines = text.split("\n");
         for (let i = 0; i < lines.length; i++) {
@@ -68,6 +79,8 @@ SettingsBlob {
                 avatar = l.substring(7);
             else if (l.indexOf("claude=") === 0)
                 claude = l.substring(7);
+            else if (l.indexOf("internet=") === 0)
+                internet = l.substring(9);
         }
         section.available = (rc === 0);
         section.claudeOff = (claude === "no");
@@ -75,6 +88,9 @@ SettingsBlob {
         if (rc === 0 && (avatar === "on" || avatar === "off"))
             section.avatarOn = (avatar === "on");
         avatarToggle.checked = section.avatarOn;
+        if (rc === 0 && (internet === "on" || internet === "off"))
+            section.internetOn = (internet === "on");
+        internetToggle.checked = section.internetOn;
     }
 
     Process {
@@ -135,6 +151,31 @@ SettingsBlob {
             handleOffColor: ThemeBackend.text
             onToggled: function (on) {
                 section.setAvatar(on);
+            }
+        }
+    }
+
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_internet"
+        icon: "󰖟"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.internet_title") || "Miku with internet"
+        description: I18n.t("guide.general.assistant.internet_desc") || "She can search the web and read pages; each time she asks for your permission"
+        searchKeywords: "asistente miku internet web buscar busqueda búsqueda paginas páginas navegar permiso search browse"
+        visible: section.available
+
+        Toggle {
+            id: internetToggle
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            enabled: !section.busy
+            checked: section.internetOn
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function (on) {
+                section.setInternet(on);
             }
         }
     }

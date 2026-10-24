@@ -533,7 +533,8 @@ cmd_actualizar() {
     local base="$VORTEX_DIR"
     if [[ ! -w "$VORTEX_DIR/packaging/$pkg" ]]; then
       base="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/construir"
-      mkdir -p "$base" && rsync -a --delete --exclude=.git "$VORTEX_DIR/" "$base/" ||
+      rm -rf "$base" && mkdir -p "$base" &&
+        tar -C "$VORTEX_DIR" --exclude=./.git -cf - . | tar -C "$base" -xf - ||
         { aviso "no pude copiar el código para construir $pkg"; continue; }
     fi
     (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"

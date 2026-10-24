@@ -14,6 +14,7 @@ La conversación se olvida al cerrar: se borra la transcripción que Claude Code
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,10 @@ HERRAMIENTAS_PERMITIDAS = [
 ACCIONES = ["instalar_app", "quitar_app", "abrir", "correr_comando", "ajuste", "redactar_correo", "redactar_mensaje"]
 HERRAMIENTAS_ACCIONES = [f"mcp__miku__{a}" for a in ACCIONES]
 SERVIDOR_ACCIONES = Path(__file__).resolve().parent / "acciones_mcp.py"
+# Internet (opcional, «internet» en miku.json): la búsqueda y la lectura de páginas de Claude, cada una con tu
+# permiso en la ventana (el hook permiso_web.py corre antes de cada una).
+HERRAMIENTAS_WEB = ["WebSearch", "WebFetch"]
+HOOK_WEB = Path(__file__).resolve().parent / "permiso_web.py"
 # Portapapeles e historial de la terminal existen en vortex-mcp, pero una asistente que habla en voz
 # alta no debe leerlos; el resto es cinturón y tirantes sobre --tools "".
 HERRAMIENTAS_PROHIBIDAS = [
@@ -110,11 +115,16 @@ def entorno_claude() -> dict:
 
 
 def construir_comando(claude: str, persona: str, texto: str, sesion: str | None, mcp: str | None,
-                      autorizar: str | None = None) -> list[str]:
+                      autorizar: str | None = None, internet: bool = False) -> list[str]:
+    web = internet and bool(autorizar)          # sin la ventana para pedir permiso, nada de internet
     cmd = [claude, "-p", "--model", "sonnet", "--effort", "low",
            "--output-format", "stream-json", "--verbose", "--include-partial-messages",
            "--append-system-prompt", persona,
-           "--restricted", "--tools", ""]
+           "--restricted", "--tools", ",".join(HERRAMIENTAS_WEB) if web else ""]
+    if web:
+        hook = f"{shlex.quote(sys.executable)} -I {shlex.quote(str(HOOK_WEB))}"
+        cmd += ["--settings", json.dumps({"hooks": {"PreToolUse": [
+            {"matcher": "|".join(HERRAMIENTAS_WEB), "hooks": [{"type": "command", "command": hook, "timeout": 150}]}]}})]
     cmd += ["--strict-mcp-config"]
     servidores, permitidas = {}, []
     if mcp:
@@ -128,8 +138,12 @@ def construir_comando(claude: str, persona: str, texto: str, sesion: str | None,
         permitidas += HERRAMIENTAS_ACCIONES
     if servidores:
         cmd += ["--mcp-config", json.dumps({"mcpServers": servidores})]
+    if web:
+        permitidas += HERRAMIENTAS_WEB
+    if permitidas:
         cmd += ["--allowedTools", *permitidas]
-    cmd += ["--disallowedTools", *HERRAMIENTAS_PROHIBIDAS,
+    prohibidas = [h for h in HERRAMIENTAS_PROHIBIDAS if not (web and h in HERRAMIENTAS_WEB)]
+    cmd += ["--disallowedTools", *prohibidas,
             "--permission-mode", "dontAsk", "--disable-slash-commands", "--max-turns", "8"]
     if sesion:
         cmd += ["--resume", sesion]
@@ -229,6 +243,7 @@ class Cerebro:
         self.claude = encontrar_claude()
         self.mcp = encontrar_mcp()
         self.autorizar: str | None = None                # socket del permiso de las acciones (lo pone el asistente)
+        self.internet = False                            # búsqueda web y páginas, con permiso (lo pone el asistente)
         self.ocupado = threading.Event()                # una acción espera tu clic o está corriendo: no cortar a Claude
         if not self.mcp:
             self.persona += "\n\nEn esta sesión no tienes acceso a la pantalla: si te piden mirarla, explica que no puedes."
@@ -290,9 +305,12 @@ class Cerebro:
             avisar("error", clave=clave, mensaje=mensaje)
             return
         rutas.CEREBRO_CWD.mkdir(parents=True, exist_ok=True)
-        cmd = construir_comando(self.claude, self.persona, texto, self.sesion, self.mcp, self.autorizar)
+        cmd = construir_comando(self.claude, self.persona, texto, self.sesion, self.mcp, self.autorizar, self.internet)
+        env = entorno_claude()
+        if self.autorizar:
+            env["VORTEX_MIKU_AUTORIZAR"] = self.autorizar        # para el hook de internet
         try:
-            p = subprocess.Popen(cmd, cwd=rutas.CEREBRO_CWD, env=entorno_claude(), stdin=subprocess.DEVNULL,
+            p = subprocess.Popen(cmd, cwd=rutas.CEREBRO_CWD, env=env, stdin=subprocess.DEVNULL,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
         except OSError:
             avisar("error", clave="activar", mensaje=MSG_INSTALANDO)

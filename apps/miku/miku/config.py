@@ -16,6 +16,7 @@ DEFECTOS = {
     "modelo": "",                   # ruta a otro .vrm (vacío = el de siempre)
     "seguir_escuchando": True,      # tras contestar, vuelve a escuchar unos segundos
     "silencio": 1.5,                # segundos callada que cierran tu turno
+    "internet": False,              # buscar en la web y leer páginas (cada vez con tu permiso)
     "elevenlabs_voz": "",           # Voice ID de ElevenLabs (con la voz «elevenlabs»); la clave va en el llavero
     "elevenlabs_modelo": "",        # vacío = eleven_v4_turbo
 }
@@ -46,6 +47,7 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg = dict(DEFECTOS)
     cfg["avatar"] = _como_bool(crudo.get("avatar"), DEFECTOS["avatar"])
     cfg["seguir_escuchando"] = _como_bool(crudo.get("seguir_escuchando"), DEFECTOS["seguir_escuchando"])
+    cfg["internet"] = _como_bool(crudo.get("internet"), DEFECTOS["internet"])
     for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo"):
         v = crudo.get(clave)
         if isinstance(v, str) and v.strip():

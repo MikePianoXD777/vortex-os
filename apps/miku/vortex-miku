@@ -10,6 +10,7 @@
   vortex-miku licencias       créditos y licencias (el modelo 3D, la voz, el oído, three.js)
   vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
   vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
+  vortex-miku internet on|off|estado   deja a Miku buscar en la web y leer páginas (siempre con tu permiso)
   vortex-miku natural instalar   voz natural y expresiva, sin internet: en tu GPU NVIDIA (~7 GB) o, si no
                                  sirve (o con --cpu), en la CPU, lenta (~3 GB); natural estado / natural quitar
   vortex-miku elevenlabs VOICE_ID   voz de ElevenLabs, en la nube (pide tu clave la primera vez)
@@ -213,6 +214,25 @@ def orden_avatar(args: list[str]) -> int:
         return error(f"no pude guardar {rutas.CONFIG}: {e}")
     reabrir_si_esta_abierta()
     print(f"avatar={'on' if nuevo else 'off'}")
+    return 0
+
+
+def orden_internet(args: list[str]) -> int:
+    if not args or args[0] == "estado":
+        print(f"internet={'on' if config.cargar()['internet'] else 'off'}")
+        return 0
+    valores = {"on": True, "si": True, "sí": True, "true": True, "1": True, "off": False, "no": False, "false": False, "0": False}
+    if len(args) != 1 or args[0].lower() not in valores:
+        return error("uso: vortex-miku internet on|off|estado", 2)
+    nuevo = valores[args[0].lower()]
+    try:
+        config.guardar({"internet": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    reabrir_si_esta_abierta()
+    print(f"internet={'on' if nuevo else 'off'}")
+    if nuevo:
+        print("Miku podrá buscar en la web y leer páginas; cada vez te pedirá permiso en su ventana.")
     return 0
 
 
@@ -590,6 +610,8 @@ def main(argv: list[str]) -> int:
         return orden_avatar(args)
     if orden == "estado":
         return orden_estado()
+    if orden == "internet":
+        return orden_internet(args)
     if orden == "modelo":
         return orden_modelo(args)
     if orden == "voz":

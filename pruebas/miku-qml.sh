@@ -116,14 +116,26 @@ ShellRoot {
         let tg = find(ld.item, function(i) { return i.isStubToggle === true; });
         console.log("T " + tag + " clic=" + tg.click());
     }
-    Timer { interval: 100; running: true; repeat: true; onTriggered: root.snap("tick") }
-    Timer { interval: 700; running: true; onTriggered: root.clic("primero") }
+    function internetToggle() {
+        let row = find(ld.item, function(i) { return i.settingId === "miku_internet"; });
+        return find(row, function(i) { return i.isStubToggle === true; });
+    }
+    function snapInternet(tag) {
+        let sec = ld.item;
+        if (!sec) return;
+        let tg = internetToggle();
+        console.log("T " + tag + " internetOn=" + sec.internetOn + " checked=" + tg.checked + " enabled=" + tg.enabled);
+    }
+    Timer { interval: 100; running: true; repeat: true; onTriggered: { root.snap("tick"); root.snapInternet("net") } }
+    Timer { interval: 700; running: root.scen !== "internet"; onTriggered: root.clic("primero") }
     // Un doble clic de verdad (150 ms después): el interruptor está quieto y no hace nada.
-    Timer { interval: 850; running: true; onTriggered: root.clic("segundo") }
+    Timer { interval: 850; running: root.scen !== "internet"; onTriggered: root.clic("segundo") }
+    // Internet: se apaga con su interruptor (el del 3D no se toca).
+    Timer { interval: 700; running: root.scen === "internet"; onTriggered: console.log("T internet clic=" + root.internetToggle().click()) }
     // Normal: se vuelve a encender ya terminado. Destruir: se cierra Ajustes con el comando corriendo.
     Timer { interval: 2800; running: root.scen === "normal"; onTriggered: root.clic("encender") }
     Timer { interval: 1100; running: root.scen === "destruir"; onTriggered: { console.log("T cierro Ajustes"); ld.active = false; } }
-    Timer { interval: 4900; running: true; onTriggered: { root.snap("fin"); Qt.quit(); } }
+    Timer { interval: 4900; running: true; onTriggered: { root.snap("fin"); root.snapInternet("netfin"); Qt.quit(); } }
 }
 EOF
 # vortex-miku falso: el contrato del comando (estado: dos líneas; avatar on|off guarda "avatar" en
@@ -134,6 +146,18 @@ cfg="$XDG_CONFIG_HOME/vortex/miku.json"
 leer() { if [[ -f "$cfg" ]] && grep -q '"avatar": *false' "$cfg"; then echo off; else echo on; fi; }
 case "$1" in
   estado) echo "avatar=$(leer)"; echo "abierta=no" ;;
+  internet)
+    if [[ "${2:-estado}" == estado ]]; then
+      if [[ -f "$cfg.internet" ]]; then echo "internet=$(cat "$cfg.internet")"
+      elif [[ -f "$cfg" ]] && grep -q '"internet": *true' "$cfg"; then echo "internet=on"
+      else echo "internet=off"; fi
+    else
+      echo "arranca: $*" >>"$QS_LOG"
+      mkdir -p "$(dirname "$cfg")"
+      echo "$2" >"$cfg.internet"
+      echo "termina: $*" >>"$QS_LOG"
+    fi
+    ;;
   avatar)
     echo "arranca: $*" >>"$QS_LOG"
     sleep 1
@@ -223,6 +247,15 @@ correr destruir
 probar "se destruyó la sección" "grep -q 'T fin destruida' '$T/destruir/salida.log'"
 probar "el comando termina igual y deja el archivo (no lo mata el cierre)" \
   "grep -q 'termina: avatar off' '$T/destruir/cmd.log' && grep -q '\"avatar\": false' '$T/destruir/cfg/vortex/miku.json'"
+
+echo "== Miku con internet"
+correr internet '{"internet": true}'
+probar "con «internet»: true guardado, su interruptor arranca marcado" \
+  "grep -q 'T net internetOn=true checked=true enabled=true' '$T/internet/salida.log'"
+probar "su interruptor llama a «vortex-miku internet off» y queda apagado" \
+  "grep -q 'termina: internet off' '$T/internet/cmd.log' && grep -q 'T netfin internetOn=false checked=false enabled=true' '$T/internet/salida.log'"
+probar "el interruptor del 3D no se tocó" "! grep -q 'arranca: avatar' '$T/internet/cmd.log'"
+probar "sin nada guardado, internet arranca apagado" "grep -q 'T net internetOn=false checked=false' '$T/normal/salida.log'"
 
 echo "== Falta vortex-miku (el paquete no está instalado)"
 correr falta
