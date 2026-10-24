@@ -162,7 +162,21 @@ correr() {
   local esc="$1" r="$T/$1" claude="$T/bin-claude-si" ruta
   [[ "$esc" == claude-apagado ]] && claude="$T/bin-claude-no"
   ruta="$T/bin:$claude:$T/bin-notif:$PATH"
-  [[ "$esc" == falta ]] && ruta="$claude:$T/bin-notif:$PATH"
+  if [[ "$esc" == falta ]]; then
+    # Instalado de verdad, vortex-miku está en el PATH (junto a bash y quickshell en /usr/bin): cada carpeta
+    # que lo tenga se cambia por una copia de enlaces a todo lo demás.
+    local sin="" d i=0
+    while read -r d; do
+      if [[ -x "$d/vortex-miku" ]]; then
+        i=$((i + 1))
+        mkdir -p "$T/sin-vortex-miku-$i"
+        for f in "$d"/*; do [[ "${f##*/}" == vortex-miku ]] || ln -sf "$f" "$T/sin-vortex-miku-$i/"; done
+        d="$T/sin-vortex-miku-$i"
+      fi
+      sin+="${sin:+:}$d"
+    done < <(tr ':' '\n' <<<"$PATH")
+    ruta="$claude:$T/bin-notif:$sin"
+  fi
   [[ "$esc" == roto ]] && ruta="$T/bin-roto:$claude:$T/bin-notif:$PATH"
   mkdir -p "$r/home" "$r/rt" "$r/cfg" "$r/cache" "$r/state"
   chmod 700 "$r/rt"

@@ -141,10 +141,18 @@ chmod +x "$T/bin/vortex-otaku" "$T/bin-notif/notify-send"
 correr() {
   local esc="$1" r="$T/$1" ruta="$T/bin:$T/bin-notif:$PATH"
   if [[ "$esc" == falta ]]; then
-    # En un Vortexine's instalado el vortex-otaku de verdad está en el PATH: se quitan sus carpetas.
-    local d sin=""
-    local IFS=:
-    for d in $PATH; do [[ -x "$d/vortex-otaku" ]] || sin+="${sin:+:}$d"; done
+    # Instalado de verdad, vortex-otaku está en el PATH (junto a bash y quickshell en /usr/bin): cada carpeta
+    # que lo tenga se cambia por una copia de enlaces a todo lo demás.
+    local sin="" d i=0
+    while read -r d; do
+      if [[ -x "$d/vortex-otaku" ]]; then
+        i=$((i + 1))
+        mkdir -p "$T/sin-vortex-otaku-$i"
+        for f in "$d"/*; do [[ "${f##*/}" == vortex-otaku ]] || ln -sf "$f" "$T/sin-vortex-otaku-$i/"; done
+        d="$T/sin-vortex-otaku-$i"
+      fi
+      sin+="${sin:+:}$d"
+    done < <(tr ':' '\n' <<<"$PATH")
     ruta="$T/bin-notif:$sin"
   fi
   mkdir -p "$r/home" "$r/rt" "$r/cfg" "$r/cache" "$r/state"
