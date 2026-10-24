@@ -541,7 +541,7 @@ cmd_actualizar() {
     rm -rf "$base/packaging/$pkg/"{pkg,src} "$base/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
-    [[ "$pkg" == vortex-shell ]] && hypr_corriendo && hyprctl reload >/dev/null 2>&1
+    [[ "$pkg" == vortex-shell ]] && { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   done
   # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
   # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
@@ -556,7 +556,7 @@ cmd_actualizar() {
   done
   if ((cambio)); then
     printf 'vortex: %s\n' "config de Hyprland al día (la anterior quedó en ${respaldo/#"$HOME"/\~})"
-    hypr_corriendo && hyprctl reload >/dev/null 2>&1
+    { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   fi
   return 0
 }
