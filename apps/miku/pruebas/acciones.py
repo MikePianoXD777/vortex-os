@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -77,8 +78,10 @@ def parte_mcp() -> None:
     log = tmp / "log"
     falsos(tmp / "bin", log)
     boton = Boton(tmp / "autorizar.sock")
+    (tmp / "run").mkdir()
     env = {"PATH": f"{tmp / 'bin'}:/usr/bin:/bin", "HOME": str(tmp / "home"), "LOG": str(log),
-           "VORTEX_MIKU_AUTORIZAR": str(boton.ruta), "XDG_DATA_DIRS": str(tmp / "nada")}
+           "VORTEX_MIKU_AUTORIZAR": str(boton.ruta), "XDG_DATA_DIRS": str(tmp / "nada"),
+           "XDG_RUNTIME_DIR": str(tmp / "run"), "VORTEX_MIKU_VIDEOS": str(tmp / "home/Vídeos/Miku")}
 
     def leer_log():
         return log.read_text() if log.exists() else ""
@@ -94,6 +97,18 @@ def parte_mcp() -> None:
     r = mcp(env, "correr_comando", {"comando": "sudo pacman -Syu"})
     probar("con sudo: lo rechaza sin siquiera pedir permiso", "sudo" in r and len(boton.pedidos) == n, r)
     boton.responder = True
+    # RTK falso en ~/.local/bin (fuera del PATH, como lo deja su instalador): solo «echo con-rtk» tiene equivalente.
+    rtk = tmp / "home/.local/bin/rtk"
+    rtk.parent.mkdir(parents=True)
+    rtk.write_text('#!/bin/sh\nif [ "$1" = rewrite ]; then\n  [ "$2" = "echo con-rtk" ] && { echo "rtk echo con-rtk"; exit 3; }\n'
+                   '  exit 1\nfi\necho "rtk $*" >> "$LOG"\nexec "$@"\n')
+    rtk.chmod(0o755)
+    r = mcp(env, "correr_comando", {"comando": "echo con-rtk"})
+    probar("con rtk: corre la versión de rtk", "con-rtk" in r and "código 0" in r and "rtk echo con-rtk" in leer_log(), r)
+    probar("con rtk: el permiso muestra el comando original", boton.pedidos[-1]["detalle"].endswith("$ echo con-rtk"), str(boton.pedidos[-1]))
+    r = mcp(env, "correr_comando", {"comando": "echo sin-equivalente"})
+    probar("sin equivalente en rtk: corre tal cual", "sin-equivalente" in r and "rtk echo sin-equivalente" not in leer_log(), r)
+    rtk.unlink()
     r = mcp(env, "instalar_app", {"nombre": "Steam"})
     probar("instalar: pide permiso con el nombre y el ID de Flathub", boton.pedidos[-1]["titulo"] == "Instalar «Steam»"
            and "com.valvesoftware.Steam" in boton.pedidos[-1]["detalle"] and "Empecé a instalar Steam" in r, r)
@@ -116,6 +131,44 @@ def parte_mcp() -> None:
     copiado = Path(str(log) + ".copiado")
     probar("mensaje: lo copia y abre WhatsApp web, no lo envía", copiado.exists() and copiado.read_text() == "Ya llegué"
            and "https://web.whatsapp.com" in leer_log() and "No se envió nada" in r, r)
+    # Grabadora falsa: anota cómo la llamaron y, al recibir SIGINT (como la de verdad), escribe el video y sale.
+    (tmp / "bin/gpu-screen-recorder").write_text(
+        '#!/bin/sh\necho "gpu-screen-recorder $*" >> "$LOG"\nout=""\n'
+        'while [ $# -gt 0 ]; do [ "$1" = -o ] && out="$2"; shift; done\n'
+        'trap \'printf video > "$out"; exit 0\' INT\nwhile :; do sleep 0.1; done\n')
+    (tmp / "bin/gpu-screen-recorder").chmod(0o755)
+    r = mcp(env, "mejores_momentos", {})
+    probar("mejores momentos sin grabaciones: lo dice", "No hay grabaciones" in r, r)
+    r = mcp(env, "grabar", {"accion": "empezar"})
+    probar("grabar: pide permiso y empieza en ~/Vídeos/Miku", boton.pedidos[-1]["titulo"] == "Grabar la pantalla"
+           and "Empecé a grabar" in r and "-w screen -f 60 -a default_output" in leer_log(), r)
+    n = len(boton.pedidos)
+    r = mcp(env, "grabar", {"accion": "empezar"})
+    probar("grabar dos veces: lo dice sin pedir permiso", "Ya estoy grabando" in r and len(boton.pedidos) == n, r)
+    r = mcp(env, "grabar", {"accion": "estado"})
+    probar("estado de la grabación", "Grabando en" in r, r)
+    r = mcp(env, "mejores_momentos", {})
+    probar("mejores momentos de lo que se está grabando: no", "todavía se está grabando" in r, r)
+    r = mcp(env, "grabar", {"accion": "parar"})
+    grabados = list((tmp / "home/Vídeos/Miku").glob("Partida *.mp4"))
+    probar("parar: guarda el video", "Listo: grabé" in r and len(grabados) == 1 and grabados[0].read_text() == "video", r)
+    r = mcp(env, "grabar", {"accion": "parar"})
+    probar("parar sin grabar: lo dice", "No estoy grabando" in r, r)
+    boton.responder = False
+    r = mcp(env, "mejores_momentos", {})
+    probar("mejores momentos cancelado: no lanza nada", "NO lo autorizó" in r and not (tmp / "home/Miku").exists(), r)
+    boton.responder = True
+    r = mcp(env, "mejores_momentos", {"video": str(tmp / "no-existe.mp4")})
+    probar("mejores momentos de un video que no existe", "No existe" in r, r)
+    r = mcp(env, "mejores_momentos", {})
+    probar("mejores momentos: pide permiso con el video y empieza aparte", "Empecé a buscar" in r
+           and grabados[0].name in boton.pedidos[-1]["detalle"], r)
+    # Ese «video» es texto: el trabajador falla y lo avisa con una notificación (sin colgarse).
+    for _ in range(100):
+        if "No pude armar los mejores momentos" in leer_log():
+            break
+        time.sleep(0.1)
+    probar("…y si el video no sirve, avisa", "No pude armar los mejores momentos" in leer_log(), leer_log()[-300:])
     r = mcp({**env, "VORTEX_MIKU_AUTORIZAR": ""}, "ajuste", {"tipo": "volumen", "valor": "10"})
     probar("sin la ventana de Miku: no hace nada", "no hice nada" in r and "set-volume @DEFAULT_AUDIO_SINK@ 10%" not in leer_log(), r)
     subprocess.run(["rm", "-rf", str(tmp)])

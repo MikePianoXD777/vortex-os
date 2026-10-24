@@ -10,7 +10,7 @@
 #
 #   cd packaging/vortex-miku && makepkg -si
 pkgname=vortex-miku
-pkgver=1.4.2
+pkgver=1.5.0
 pkgrel=1
 pkgdesc="Miku, la asistente de voz de Vortexine's OS: 3D, voz y oído locales, y Claude como cerebro (SUPER + O)"
 arch=('any')
@@ -19,9 +19,10 @@ license=('MIT')
 # pyside6 es Python + Qt; qt6-webengine (+ qt6-webchannel) dibuja el 3D, y no lo trae pyside6 aunque tenga los
 # bindings; qt6-wayland, la ventana en Wayland; python-numpy y python-onnxruntime-cpu, la voz (Supertonic 3).
 # NO python-onnxruntime: también lo proveen las variantes cuda y rocm, de varios GB. whisper-cpp es el oído
-# (trae ffmpeg y ggml); pipewire trae pw-record (el micrófono) y pw-play (el altavoz).
+# (trae ffmpeg y ggml); pipewire trae pw-record (el micrófono) y pw-play (el altavoz). gpu-screen-recorder graba
+# las partidas y ffmpeg busca sus mejores momentos.
 depends=('python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland' 'python-numpy' 'python-onnxruntime-cpu'
-         'whisper-cpp' 'pipewire')
+         'whisper-cpp' 'pipewire' 'gpu-screen-recorder' 'ffmpeg')
 optdepends=("claude-code: el cerebro de Miku (en Vortexine's se activa con «vortex claude activar»)"
             'libsecret: guarda la clave de ElevenLabs en el llavero (sin él, en un archivo 0600)')
 source=("three-0.180.0.tgz::https://registry.npmjs.org/three/-/three-0.180.0.tgz"

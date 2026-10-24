@@ -10,8 +10,10 @@ ve en tu pantalla no puede autorizar nada: solo tu clic.
 Lo que hay:
   instalar_app / quitar_app   apps de Flathub para tu usuario (sin sudo), como Vortexine's Shop
   abrir                       una app, una carpeta, un archivo o una página web
-  correr_comando              un comando de terminal como tu usuario (sin sudo), con su salida
+  correr_comando              un comando de terminal como tu usuario (sin sudo), con su salida (por RTK si está)
   ajuste                      volumen, brillo, Wi-Fi, Bluetooth, modo juego, fondo de pantalla
+  grabar                      empieza o para la grabación de la pantalla (una partida) en ~/Vídeos/Miku
+  mejores_momentos            arma los mejores momentos de una grabación como proyecto de Vortex Studio
   redactar_correo             deja el correo escrito en tu app de correo: lo envías tú
   redactar_mensaje            copia el mensaje y abre la app (Discord, WhatsApp…): lo pegas y envías tú
 
@@ -29,6 +31,10 @@ import subprocess
 import sys
 import urllib.parse
 from pathlib import Path
+
+# python -I no pone la carpeta del script en sys.path: se agrega a mano para grabacion.py (al lado).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import grabacion  # noqa: E402
 
 VERSION = "0.1.0"
 PROTOCOLOS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
@@ -98,11 +104,12 @@ def avisar(texto: str) -> None:
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def correr(cmd: list[str], timeout: float = 60, entrada: str | None = None) -> subprocess.CompletedProcess:
+def correr(cmd: list[str], timeout: float = 60, entrada: str | None = None,
+           env: dict | None = None) -> subprocess.CompletedProcess:
     if not shutil.which(cmd[0]):
         raise ErrorAccion(f"Falta el programa «{cmd[0]}».")
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=entrada,
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=entrada, env=env,
                               stdin=None if entrada is not None else subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
         raise ErrorAccion(f"«{cmd[0]}» tardó demasiado (más de {int(timeout)} s) y lo corté.") from None
@@ -229,6 +236,35 @@ def abrir(a: dict) -> str:
 
 # ---- Comandos -------------------------------------------------------------------------------------
 
+def encontrar_rtk() -> str | None:
+    """RTK (opcional, no viene en la ISO): su instalador lo deja en ~/.local/bin, que puede no estar en el PATH."""
+    for ruta in (shutil.which("rtk"), str(Path.home() / ".local/bin/rtk"), str(Path.home() / ".cargo/bin/rtk")):
+        if ruta and os.access(ruta, os.X_OK):
+            return ruta
+    return None
+
+
+def con_rtk(comando: str) -> tuple[str, dict | None]:
+    """El comando en su forma de RTK (hace lo mismo, pero su salida gasta menos tokens) y el entorno para correrlo.
+
+    `rtk rewrite` sale con 0 o 3 cuando imprime la versión nueva; con 1 (sin equivalente) o 2 (una regla de
+    permisos de Claude Code, que aquí no manda: el permiso ya lo diste en la ventana) va el comando tal cual.
+    Sin rtk, o si falla, también. La versión nueva llama a «rtk» por su nombre: su carpeta va al PATH.
+    """
+    rtk = encontrar_rtk()
+    if not rtk:
+        return comando, None
+    try:
+        r = subprocess.run([rtk, "rewrite", comando], capture_output=True, text=True, timeout=5,
+                           stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return comando, None
+    nuevo = r.stdout.strip()
+    if r.returncode not in (0, 3) or not nuevo:
+        return comando, None
+    return nuevo, dict(os.environ, PATH=os.pathsep.join([os.path.dirname(rtk), os.environ.get("PATH", "")]))
+
+
 def correr_comando(a: dict) -> str:
     comando = str(a.get("comando", "")).strip()
     para_que = str(a.get("para_que", "")).strip()
@@ -238,9 +274,62 @@ def correr_comando(a: dict) -> str:
         raise ErrorAccion("Ese comando necesita la contraseña de administrador (sudo): no lo corro. Dile a la persona "
                           "que lo escriba ella en su terminal.")
     with Permiso("Correr un comando", (f"{para_que}\n" if para_que else "") + f"$ {comando}"):
-        r = correr(["bash", "-c", comando], timeout=120)
+        comando, env = con_rtk(comando)
+        r = correr(["bash", "-c", comando], timeout=120, env=env)
     salida = recortar((r.stdout or "") + (("\n" + r.stderr) if r.stderr else ""))
     return f"Salió con código {r.returncode}.\n{salida or '(sin salida)'}"
+
+
+# ---- Grabar y mejores momentos --------------------------------------------------------------------
+
+def grabar(a: dict) -> str:
+    que = str(a.get("accion", "")).strip().lower()
+    try:
+        if que in ("empezar", "grabar", "iniciar", "on"):
+            if grabacion.grabando():
+                raise grabacion.ErrorGrabacion("Ya estoy grabando.")
+            with Permiso("Grabar la pantalla", f"Graba el monitor que estás usando y el sonido del sistema (no el "
+                                               f"micrófono) hasta que digas que pare.\nSe guarda en {grabacion.carpeta_videos()}"):
+                archivo = grabacion.empezar()
+            avisar("Estoy grabando la pantalla. Dime «ya para» o corre: vortex-miku grabar parar")
+            return f"Empecé a grabar en «{archivo.name}». Sigue aunque me cierres; para pararla, pídemelo."
+        if que in ("parar", "detener", "terminar", "off"):
+            if not grabacion.grabando():
+                raise grabacion.ErrorGrabacion("No estoy grabando nada.")
+            with Permiso("Parar la grabación", "Termina la grabación de la pantalla y guarda el video."):
+                archivo, segundos = grabacion.parar()
+            return f"Listo: grabé {grabacion.duracion_texto(segundos)} en «{archivo}»."
+        if que == "estado":
+            e = grabacion.grabando()
+            return f"Grabando en «{e['archivo']}»." if e else "No estoy grabando."
+    except grabacion.ErrorGrabacion as e:
+        raise ErrorAccion(str(e)) from None
+    raise ErrorAccion("«accion» tiene que ser empezar, parar o estado.")
+
+
+MOMENTOS = Path(__file__).resolve().parent / "momentos.py"
+
+
+def mejores_momentos(a: dict) -> str:
+    ruta = str(a.get("video", "")).strip()
+    en_curso = grabacion.grabando()
+    video = Path(os.path.expanduser(ruta)) if ruta else (Path(en_curso["archivo"]) if en_curso
+                                                           else grabacion.ultima_grabacion())
+    if en_curso and Path(en_curso["archivo"]).resolve() == video.resolve():
+        raise ErrorAccion("Ese video todavía se está grabando: primero hay que pararlo.")
+    if video is None:
+        raise ErrorAccion(f"No hay grabaciones en {grabacion.carpeta_videos()}.")
+    if not video.is_file():
+        raise ErrorAccion(f"No existe «{video}».")
+    for programa in ("ffmpeg", "ffprobe"):
+        if not shutil.which(programa):
+            raise ErrorAccion(f"Falta el programa «{programa}».")
+    with Permiso("Armar los mejores momentos",
+                 f"Busca los mejores momentos de «{video.name}» y los deja como proyecto de Vortex Studio en "
+                 f"{grabacion.carpeta_videos()}.\nClaude mira unas miniaturas de la partida para elegirlos."):
+        lanzar_aparte([sys.executable, "-I", str(MOMENTOS), str(video)])
+    return (f"Empecé a buscar los mejores momentos de «{video.name}». Tarda unos minutos; te llega una notificación "
+            "cuando esté el proyecto.")
 
 
 # ---- Ajustes --------------------------------------------------------------------------------------
@@ -363,6 +452,13 @@ HERRAMIENTAS = {
                        "modo_juego (on/off) o fondo (ruta a una imagen). Pide permiso antes.",
                {"tipo": {"type": "string", "description": "volumen, brillo, wifi, bluetooth, modo_juego o fondo."},
                 "valor": {"type": "string", "description": "El valor nuevo."}}),
+    "grabar": (grabar, "Empieza o para la grabación de la pantalla (para grabar una partida) en ~/Vídeos/Miku. Úsala "
+                       "SOLO si la persona te pide grabar o parar; nunca por tu cuenta. Pide permiso antes.",
+               {"accion": {"type": "string", "description": "empezar, parar o estado."}}),
+    "mejores_momentos": (mejores_momentos, "Arma los mejores momentos de una grabación como proyecto de Vortex "
+                                           "Studio, en segundo plano (avisa al terminar). Úsala SOLO si la persona te "
+                                           "lo pide. Sin «video», usa la última grabación. Pide permiso antes.",
+                         {"video": {"type": "string", "description": "Ruta del video (opcional)."}}),
     "redactar_correo": (redactar_correo, "Deja un correo escrito en la app de correo del usuario (o en Gmail web) "
                                          "para que lo revise y lo envíe él. No envía nada. Pide permiso antes.",
                         {"para": {"type": "string"}, "asunto": {"type": "string"}, "cuerpo": {"type": "string"}}),

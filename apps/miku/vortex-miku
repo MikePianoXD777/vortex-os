@@ -11,6 +11,9 @@
   vortex-miku preparar        baja ya la voz y el oído (~560 MB, una sola vez); si no, se bajan al abrirla
   vortex-miku decir "texto" [-o archivo.wav]   prueba la voz elegida (suena, o se guarda en un WAV)
   vortex-miku internet on|off|estado   deja a Miku buscar en la web y leer páginas (siempre con tu permiso)
+  vortex-miku grabar [parar|estado]    graba la pantalla (una partida) en ~/Vídeos/Miku, o para la grabación
+  vortex-miku momentos [VIDEO]         arma los mejores momentos (sin VIDEO, de la última grabación) como
+                                       proyecto de Vortex Studio; Claude elige mirando miniaturas
   vortex-miku natural instalar   voz natural y expresiva, sin internet: en tu GPU NVIDIA (~7 GB) o, si no
                                  sirve (o con --cpu), en la CPU, lenta (~3 GB); natural estado / natural quitar
   vortex-miku elevenlabs VOICE_ID   voz de ElevenLabs, en la nube (pide tu clave la primera vez)
@@ -43,7 +46,7 @@ def _raiz() -> Path:
 
 RAIZ = _raiz()
 sys.path.insert(0, str(RAIZ))
-from miku import config, descargas, elevenlabs, rutas, voces  # noqa: E402  (solo biblioteca estándar)
+from miku import config, descargas, elevenlabs, grabacion, rutas, voces  # noqa: E402  (solo biblioteca estándar)
 
 APP = RAIZ / "miku" / "app.py"
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
@@ -599,6 +602,37 @@ def orden_elevenlabs(args: list[str]) -> int:
     return 0
 
 
+def orden_grabar(args: list[str]) -> int:
+    que = args[0] if args else "empezar"
+    try:
+        if que == "estado":
+            e = grabacion.grabando()
+            print(f"grabando={'si' if e else 'no'}" + (f"\narchivo={e['archivo']}" if e else ""))
+            return 0
+        if que == "parar":
+            archivo, segundos = grabacion.parar()
+            print(f"Listo: {grabacion.duracion_texto(segundos)} en «{archivo}».")
+            print("Sus mejores momentos: vortex-miku momentos")
+            return 0
+        if que != "empezar" or len(args) > 1:
+            return error("uso: vortex-miku grabar [parar|estado]", 2)
+        archivo = grabacion.empezar()
+    except grabacion.ErrorGrabacion as e:
+        return error(str(e))
+    print(f"Grabando en «{archivo}». Para pararla: vortex-miku grabar parar")
+    return 0
+
+
+def orden_momentos(args: list[str]) -> int:
+    if len(args) > 1:
+        return error("uso: vortex-miku momentos [VIDEO]", 2)
+    video = Path(os.path.expanduser(args[0])) if args else grabacion.ultima_grabacion()
+    if video is None:
+        return error(f"no hay grabaciones en {grabacion.carpeta_videos()}. Dime cuál: vortex-miku momentos VIDEO")
+    from miku import momentos
+    return momentos.main([str(video)])
+
+
 def main(argv: list[str]) -> int:
     if not argv or argv[0] in ("alternar", "abrir", "toggle"):
         return alternar()
@@ -630,6 +664,10 @@ def main(argv: list[str]) -> int:
         return orden_elevenlabs(args)
     if orden == "natural":
         return orden_natural(args)
+    if orden == "grabar":
+        return orden_grabar(args)
+    if orden == "momentos":
+        return orden_momentos(args)
     return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)
 
 

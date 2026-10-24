@@ -29,7 +29,8 @@ HERRAMIENTAS_PERMITIDAS = [
     "mcp__vortex__ver_pantalla", "mcp__vortex__ventana_activa", "mcp__vortex__ventanas", "mcp__vortex__estado_sistema",
 ]
 # Las acciones (acciones_mcp.py): cada una pide permiso en la ventana de Miku antes de hacer nada.
-ACCIONES = ["instalar_app", "quitar_app", "abrir", "correr_comando", "ajuste", "redactar_correo", "redactar_mensaje"]
+ACCIONES = ["instalar_app", "quitar_app", "abrir", "correr_comando", "ajuste", "grabar", "mejores_momentos",
+            "redactar_correo", "redactar_mensaje"]
 HERRAMIENTAS_ACCIONES = [f"mcp__miku__{a}" for a in ACCIONES]
 SERVIDOR_ACCIONES = Path(__file__).resolve().parent / "acciones_mcp.py"
 # Internet (opcional, «internet» en miku.json): la búsqueda y la lectura de páginas de Claude, cada una con tu

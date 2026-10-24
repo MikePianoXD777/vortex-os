@@ -140,6 +140,9 @@ vortex-miku
 qt6-webengine
 whisper-cpp
 python-onnxruntime-cpu
+# Miku graba las partidas (gpu-screen-recorder) y busca sus mejores momentos (ffmpeg).
+gpu-screen-recorder
+ffmpeg
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el
