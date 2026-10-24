@@ -182,7 +182,7 @@ def modelo_local_listo(modelo: str = MODELO_LOCAL) -> bool:
         return False
 
 
-_precargado = 0.0
+_precargado: float | None = None       # time.monotonic() de la última precarga (cuenta desde que prendió la PC)
 
 
 def precargar(modelo: str = MODELO_LOCAL) -> None:
@@ -192,7 +192,7 @@ def precargar(modelo: str = MODELO_LOCAL) -> None:
     Ollama no (lo que no cabe lo deja en la CPU). Al revés, en una RTX 3080 la voz natural ya no cabía.
     """
     global _precargado
-    if time.monotonic() - _precargado < 300:
+    if _precargado is not None and time.monotonic() - _precargado < 300:
         return
     _precargado = time.monotonic()
 
@@ -208,7 +208,7 @@ def precargar(modelo: str = MODELO_LOCAL) -> None:
 def soltar(modelo: str = MODELO_LOCAL) -> None:
     """Saca el modelo de la GPU ya (al cerrar Miku: si no, sigue ahí 10 min y la voz natural no cabe al reabrirla)."""
     global _precargado
-    _precargado = 0.0
+    _precargado = None
     try:
         _ollama_json("/api/generate", {"model": modelo, "keep_alive": 0}, timeout=3)
     except (OSError, ValueError):
