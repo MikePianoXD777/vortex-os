@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
@@ -26,6 +27,10 @@ from . import rutas
 HERRAMIENTAS_PERMITIDAS = [
     "mcp__vortex__ver_pantalla", "mcp__vortex__ventana_activa", "mcp__vortex__ventanas", "mcp__vortex__estado_sistema",
 ]
+# Las acciones (acciones_mcp.py): cada una pide permiso en la ventana de Miku antes de hacer nada.
+ACCIONES = ["instalar_app", "quitar_app", "abrir", "correr_comando", "ajuste", "redactar_correo", "redactar_mensaje"]
+HERRAMIENTAS_ACCIONES = [f"mcp__miku__{a}" for a in ACCIONES]
+SERVIDOR_ACCIONES = Path(__file__).resolve().parent / "acciones_mcp.py"
 # Portapapeles e historial de la terminal existen en vortex-mcp, pero una asistente que habla en voz
 # alta no debe leerlos; el resto es cinturón y tirantes sobre --tools "".
 HERRAMIENTAS_PROHIBIDAS = [
@@ -98,22 +103,34 @@ def entorno_claude() -> dict:
         "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
         "DISABLE_AUTOUPDATER": "1",
         "CLAUDE_CODE_MAX_RETRIES": "2",             # sin internet, falla en ~3 s y no en minutos
+        "MCP_TOOL_TIMEOUT": "300000",               # una acción espera hasta 2 min tu permiso y luego corre
     })
     env["PATH"] = os.pathsep.join([str(Path.home() / ".local/bin"), env.get("PATH", "")])
     return env
 
 
-def construir_comando(claude: str, persona: str, texto: str, sesion: str | None, mcp: str | None) -> list[str]:
+def construir_comando(claude: str, persona: str, texto: str, sesion: str | None, mcp: str | None,
+                      autorizar: str | None = None) -> list[str]:
     cmd = [claude, "-p", "--model", "sonnet", "--effort", "low",
            "--output-format", "stream-json", "--verbose", "--include-partial-messages",
            "--append-system-prompt", persona,
            "--restricted", "--tools", ""]
     cmd += ["--strict-mcp-config"]
+    servidores, permitidas = {}, []
     if mcp:
-        cmd += ["--mcp-config", json.dumps({"mcpServers": {"vortex": {"command": mcp}}})]
-        cmd += ["--allowedTools", *HERRAMIENTAS_PERMITIDAS]
+        servidores["vortex"] = {"command": mcp}
+        permitidas += HERRAMIENTAS_PERMITIDAS
+    if autorizar:
+        # «dontAsk» deja pasar estas herramientas sin preguntar en Claude: el permiso lo pide cada acción en la
+        # ventana de Miku (el socket), y sin tu clic no hacen nada.
+        servidores["miku"] = {"command": sys.executable, "args": ["-I", str(SERVIDOR_ACCIONES)],
+                              "env": {"VORTEX_MIKU_AUTORIZAR": autorizar}}
+        permitidas += HERRAMIENTAS_ACCIONES
+    if servidores:
+        cmd += ["--mcp-config", json.dumps({"mcpServers": servidores})]
+        cmd += ["--allowedTools", *permitidas]
     cmd += ["--disallowedTools", *HERRAMIENTAS_PROHIBIDAS,
-            "--permission-mode", "dontAsk", "--disable-slash-commands", "--max-turns", "5"]
+            "--permission-mode", "dontAsk", "--disable-slash-commands", "--max-turns", "8"]
     if sesion:
         cmd += ["--resume", sesion]
     # «--» es obligatorio: --allowedTools y --disallowedTools aceptan varios valores y se comerían el
@@ -211,6 +228,8 @@ class Cerebro:
         self._sesion_comprobada = False
         self.claude = encontrar_claude()
         self.mcp = encontrar_mcp()
+        self.autorizar: str | None = None                # socket del permiso de las acciones (lo pone el asistente)
+        self.ocupado = threading.Event()                # una acción espera tu clic o está corriendo: no cortar a Claude
         if not self.mcp:
             self.persona += "\n\nEn esta sesión no tienes acceso a la pantalla: si te piden mirarla, explica que no puedes."
 
@@ -271,7 +290,7 @@ class Cerebro:
             avisar("error", clave=clave, mensaje=mensaje)
             return
         rutas.CEREBRO_CWD.mkdir(parents=True, exist_ok=True)
-        cmd = construir_comando(self.claude, self.persona, texto, self.sesion, self.mcp)
+        cmd = construir_comando(self.claude, self.persona, texto, self.sesion, self.mcp, self.autorizar)
         try:
             p = subprocess.Popen(cmd, cwd=rutas.CEREBRO_CWD, env=entorno_claude(), stdin=subprocess.DEVNULL,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
@@ -285,11 +304,17 @@ class Cerebro:
         ultima = [time.monotonic()]
         inicio = time.monotonic()
 
+        tiempo_en_acciones = [0.0]
+
         def vigilante():
             while p.poll() is None:
                 time.sleep(1.0)
                 ahora = time.monotonic()
-                if ahora - ultima[0] > SILENCIO_MAXIMO or ahora - inicio > DURACION_MAXIMA:
+                if self.ocupado.is_set():                # esperando tu permiso o corriendo una acción
+                    ultima[0] = ahora
+                    tiempo_en_acciones[0] += 1.0
+                    continue
+                if ahora - ultima[0] > SILENCIO_MAXIMO or ahora - inicio - tiempo_en_acciones[0] > DURACION_MAXIMA:
                     p.kill()
                     return
         threading.Thread(target=vigilante, daemon=True).start()

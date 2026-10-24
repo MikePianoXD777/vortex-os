@@ -22,6 +22,11 @@ El asistente. Todo lo de la 1.2, más **Miku**, un asistente de voz con Claude d
   justo debajo de la barra. No te quita el teclado al abrirse.
 - **Comandos:** `vortex miku` (abre o cierra), `vortex miku estado`, `vortex miku voz [ID]` y
   `vortex miku modelo RUTA.vrm`. Las opciones quedan en `~/.config/vortex/miku.json`.
+- **Miku hace cosas, con tu permiso:** instalar o quitar apps de Flathub, abrir apps, carpetas o páginas,
+  correr un comando (nunca con sudo), cambiar volumen, brillo, Wi-Fi, Bluetooth, modo juego o fondo, y dejar
+  listos correos y mensajes (los envías tú: ella no envía nada). Antes de cada acción, su ventana muestra
+  exactamente qué va a hacer con los botones **Autorizar** y **Cancelar**; sin tu clic no pasa nada, y si no
+  contestas en 2 minutos se cancela. Lo que ve en tu pantalla no puede autorizar nada.
 - **Voz natural en tu GPU (opcional):** `vortex-miku natural instalar` le pone a Miku una voz natural y
   expresiva (melancólica, un poco grave) que corre en tu tarjeta NVIDIA, sin internet ni cuentas. Usa
   Qwen3-TTS (Apache-2.0) acelerado con faster-qwen3-tts: en una RTX 3080 habla 2,5 veces más rápido que el

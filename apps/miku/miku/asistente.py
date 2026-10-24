@@ -19,6 +19,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
+from PySide6.QtNetwork import QLocalServer
 
 from . import cerebro as modulo_cerebro
 from . import config, descargas, elevenlabs, oido, rutas, voces
@@ -27,6 +28,7 @@ from . import config, descargas, elevenlabs, oido, rutas, voces
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
     "reposo", "escuchando", "transcribiendo", "pensando", "viendo", "hablando")
 
+PERMISO_SEG = 120              # cuánto espera una acción tu Autorizar antes de cancelarse sola
 CIERRE_PANEL_SEG = 20          # el panel de solo voz se cierra solo tras tanto tiempo sin que lo toquen
 ESPERA_SEGUIMIENTO = 8.0       # tras contestar, cuánto escucha por si sigues hablando
 ESPERA_PRIMERA = 10.0          # al abrir, cuánto espera a que empieces a hablar
@@ -142,6 +144,19 @@ class Asistente(QObject):
         self._reloj_seguir = QTimer(self)
         self._reloj_seguir.setSingleShot(True)
         self._reloj_seguir.timeout.connect(lambda: self.escuchar(seguimiento=True))
+        # Permisos de las acciones (acciones_mcp.py): cada acción llama aquí y espera tu Autorizar o Cancelar.
+        self._permiso = None                      # el socket de la acción que espera respuesta
+        self._permiso_reloj = QTimer(self)
+        self._permiso_reloj.setSingleShot(True)
+        self._permiso_reloj.setInterval(PERMISO_SEG * 1000)
+        self._permiso_reloj.timeout.connect(lambda: self._responder_permiso(False, "Se acabó el tiempo; no hice nada."))
+        self._servidor_permiso = QLocalServer(self)
+        ruta_permiso = str(rutas.temporales() / "autorizar.sock")
+        QLocalServer.removeServer(ruta_permiso)
+        self._servidor_permiso.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
+        if self._servidor_permiso.listen(ruta_permiso):
+            self.cerebro.autorizar = ruta_permiso
+        self._servidor_permiso.newConnection.connect(self._nuevo_permiso)
         self._texto_oido.connect(self._al_texto_oido)
         self._error_oido.connect(self._al_error_oido)
         self._evento_cerebro.connect(self._al_evento_cerebro)
@@ -485,6 +500,7 @@ class Asistente(QObject):
             self.oido.cancelar()
         self._reloj_ocioso.stop()
         self._reloj_seguir.stop()
+        self._responder_permiso(False)        # una pregunta nueva cancela la acción que esperaba permiso
         self._poner_acciones([])
         self.parar_de_hablar()
         self._cancelar_cerebro()
@@ -518,7 +534,10 @@ class Asistente(QObject):
             if resto:
                 self._decir(resto)
             if tipo == "herramienta":
-                self._cambiar_estado(VIENDO, "Mirando tu pantalla...")
+                if str(datos.get("nombre", "")).startswith("mcp__miku__"):
+                    self._cambiar_estado(PENSANDO, "Preparando...")
+                else:
+                    self._cambiar_estado(VIENDO, "Mirando tu pantalla...")
         elif tipo == "listo":
             resto = self.divisor.vaciar()
             if resto:
@@ -548,12 +567,72 @@ class Asistente(QObject):
         self._cambiar_estado(REPOSO, "")
         self._revisar_fin_de_turno()
 
+    # ---- Permisos de las acciones ---------------------------------------------------------------
+
+    def _nuevo_permiso(self) -> None:
+        while self._servidor_permiso.hasPendingConnections():
+            s = self._servidor_permiso.nextPendingConnection()
+            s.setProperty("buf", b"")
+            s.readyRead.connect(lambda s=s: self._leer_permiso(s))
+            s.disconnected.connect(lambda s=s: self._permiso_cerrado(s))
+
+    def _leer_permiso(self, s) -> None:
+        buf = bytes(s.property("buf") or b"") + bytes(s.readAll())
+        s.setProperty("buf", buf)
+        if b"\n" not in buf or s.property("pedido"):
+            return
+        s.setProperty("pedido", True)
+        try:
+            m = json.loads(buf.split(b"\n", 1)[0])
+            titulo, detalle = str(m.get("titulo", "")).strip(), str(m.get("detalle", "")).strip()
+        except ValueError:
+            titulo = ""
+        if not titulo or self._cerrado or self._permiso is not None:
+            s.write(b'{"ok": false}\n')          # mal formado, o ya hay otra esperando: no
+            s.flush()
+            return
+        self._permiso = s
+        self.cerebro.ocupado.set()
+        self._reloj_ocioso.stop()
+        self._cambiar_estado(PENSANDO, "Esperando tu permiso...")
+        self.aviso.emit(f"¿Lo hago?  {titulo}\n\n{detalle}")
+        self._poner_acciones([["autorizar", "Autorizar"], ["cancelar", "Cancelar"]])
+        self._decir("¿Me das permiso?")
+        self._permiso_reloj.start()
+
+    def _responder_permiso(self, ok: bool, texto: str = "") -> None:
+        s, self._permiso = self._permiso, None
+        self._permiso_reloj.stop()
+        self._poner_acciones([])
+        if s is None:
+            return
+        s.write(b'{"ok": true}\n' if ok else b'{"ok": false}\n')
+        s.flush()
+        if ok:
+            self._cambiar_estado(PENSANDO, "Haciéndolo...")
+        if texto:
+            self.aviso.emit(texto)
+
+    def _permiso_cerrado(self, s) -> None:
+        """La acción terminó (o se cayó): Claude sigue solo."""
+        if s is self._permiso:              # se fue sin esperar respuesta
+            self._permiso = None
+            self._permiso_reloj.stop()
+            self._poner_acciones([])
+        if self._permiso is None:
+            self.cerebro.ocupado.clear()
+        s.deleteLater()
+
     def _poner_acciones(self, botones: list) -> None:
         self.acciones_visibles = bool(botones)
         self.acciones.emit(botones)
 
     def accion(self, id_accion: str) -> None:
-        """Un botón del globo. Activar Claude: lo instala y abre su terminal para entrar con tu cuenta. Iniciar sesión: abre esa terminal."""
+        """Un botón del globo. Activar Claude: lo instala y abre su terminal para entrar con tu cuenta. Iniciar sesión: abre esa terminal.
+        Autorizar / Cancelar: la respuesta a una acción que pidió permiso."""
+        if id_accion in ("autorizar", "cancelar"):
+            self._responder_permiso(id_accion == "autorizar", "" if id_accion == "autorizar" else "Cancelado: no hice nada.")
+            return
         vortex = modulo_cerebro.encontrar_vortex()
         if not vortex:
             self.aviso.emit("No encuentro el comando vortex. Abre una terminal y escribe: vortex claude")
@@ -616,7 +695,9 @@ class Asistente(QObject):
         """Cierra la voz, el oído y Claude, borra los audios temporales y la conversación."""
         if self._cerrado:
             return
+        self._responder_permiso(False)
         self._cerrado = True
+        self._servidor_permiso.close()
         self._cancelar_descarga.set()
         self._reloj_ocioso.stop()
         self._reloj_seguir.stop()

@@ -172,6 +172,7 @@ class PanelVoz(QWidget):
         self.tu = QLabel("")
         self.tu.setWordWrap(True)
         self.respuesta = QLabel("")
+        self.respuesta.setTextFormat(Qt.TextFormat.PlainText)      # nunca HTML: lo que dice Claude (y los permisos) se ve tal cual
         self.respuesta.setWordWrap(True)
         self.respuesta.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.respuesta.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
