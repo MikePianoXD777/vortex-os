@@ -4,10 +4,16 @@
 # deciden por ellos. El archivo es del paquete filesystem: el hook 98-vortex-os-release lo vuelve a
 # poner tras cada actualización de ese paquete.
 set -u
-f="${VORTEX_OS_RELEASE:-/usr/lib/os-release}"
-[[ -f "$f" ]] || exit 0
 version="$(sed -n 's/^VERSION="\(.*\)"$/\1/p' /etc/vortex-release 2>/dev/null)"
 nombre="Vortexine's OS"
+# /etc/os-release suele ser un enlace a /usr/lib/os-release; en un sistema que pasó de otra distro
+# (p. ej. CachyOS) puede ser un archivo propio, y ese es el que se lee primero: se cambian los dos.
+archivos=("${VORTEX_OS_RELEASE:-/usr/lib/os-release}")
+if [[ -z "${VORTEX_OS_RELEASE:-}" && -f /etc/os-release && ! -L /etc/os-release ]]; then
+  archivos+=(/etc/os-release)
+fi
+for f in "${archivos[@]}"; do
+[[ -f "$f" ]] || continue
 sed -i -e '/^NAME=/d' -e '/^PRETTY_NAME=/d' -e '/^VERSION=/d' -e '/^HOME_URL=/d' "$f"
 {
   printf 'NAME="%s"\n' "$nombre"
@@ -17,4 +23,5 @@ sed -i -e '/^NAME=/d' -e '/^PRETTY_NAME=/d' -e '/^VERSION=/d' -e '/^HOME_URL=/d'
   cat "$f"
 } >"$f.vortex" && cat "$f.vortex" >"$f"
 rm -f "$f.vortex"
+done
 exit 0
