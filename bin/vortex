@@ -657,12 +657,18 @@ avisos_pendientes() {
     flatpak remote-ls --updates --user --columns=application 2>/dev/null | sed 's/^/app /'
     flatpak remote-ls --updates --system --columns=application 2>/dev/null | sed 's/^/app /'
   fi
-  local remoto local_
+  local remoto local_ pkg instalado
   remoto="$(GIT_TERMINAL_PROMPT=0 timeout 30 git ls-remote "$URL_VORTEX" refs/heads/main 2>/dev/null | cut -f1)"
   if [[ -n "$remoto" ]]; then
     local_="$(git -c safe.directory="$VORTEX_DIR" -C "$VORTEX_DIR" rev-parse HEAD 2>/dev/null)" || local_=""
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
+  # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku).
+  for pkg in vortex-shell vortex-shop vortex-miku; do
+    [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
+    instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
+    [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"
+  done
 }
 
 cmd_actualizaciones() {
