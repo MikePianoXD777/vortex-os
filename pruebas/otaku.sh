@@ -120,6 +120,7 @@ EOF
 
 H="$T/home"
 FONDOS_ESP="$H/Imágenes/Fondos"
+OTAKU="$H/Imágenes/Fondos otaku"   # los fondos otaku van aparte (no salen en el selector normal)
 # Arranca una «sesión» limpia: HOME nuevo, ajustes del shell y un fondo ya puesto en DP-1.
 nueva_sesion() {
   rm -rf "$H"
@@ -154,7 +155,7 @@ otaku() {
     VORTEX_SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml "$AQUI/bin/vortex-otaku" "$@" 2>&1
 }
 ajuste() { jq -r "$1" "$H/.config/serpantinum/settings.json"; }
-numero_fondos() { find "$FONDOS_ESP/otaku" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.png' \) 2>/dev/null | wc -l; }
+numero_fondos() { find "$OTAKU" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.png' \) 2>/dev/null | wc -l; }
 MARCA="$H/.config/vortex/otaku"
 ANTES="$H/.config/vortex/otaku-antes.json"
 CALL='ipc -p /usr/share/serpantinum/src/quickshell/Shell.qml call wallpaper setWallpaper'
@@ -167,18 +168,18 @@ probar "queda la marca ~/.config/vortex/otaku" "[[ -f '$MARCA' ]]"
 probar "la primera petición es la búsqueda SFW de las quintillizas (Go-Toubun no Hanayome)" \
   "[[ \"\$(head -n1 '$T/curl.log')\" == 'https://wallhaven.cc/api/v1/search?q=Go-Toubun%20no%20Hanayome&categories=010&purity=100&sorting=favorites&atleast=1920x1080' ]]"
 probar "el selector de fondos apunta a los fondos otaku mientras está encendido" \
-  "[[ \"\$(jq -r .wallpaperDir '$H/.config/serpantinum/settings.json')\" == '$FONDOS_ESP/otaku' ]]"
+  "[[ \"\$(jq -r .wallpaperDir '$H/.config/serpantinum/settings.json')\" == '$OTAKU' ]]"
 probar "baja 5 fondos a Imágenes/Fondos/otaku (con tilde y espacios en la ruta)" "((\$(numero_fondos) == 5))"
-probar "los que fallan (bbbbbb) se saltan y se baja el siguiente" "[[ ! -e '$FONDOS_ESP/otaku/wallhaven-bbbbbb.jpg' ]] && [[ -e '$FONDOS_ESP/otaku/wallhaven-eeeeee.png' && ! -e '$FONDOS_ESP/otaku/wallhaven-ffffff.jpg' ]]"
+probar "los que fallan (bbbbbb) se saltan y se baja el siguiente" "[[ ! -e '$OTAKU/wallhaven-bbbbbb.jpg' ]] && [[ -e '$OTAKU/wallhaven-eeeeee.png' && ! -e '$OTAKU/wallhaven-ffffff.jpg' ]]"
 probar "no pide nada fuera de wallhaven.cc (ni evilwallhaven.cc ni wallhaven.cc.evil.com) ni los verticales ni los gif" \
   "! grep -q -E 'evil|hhhhhh|kkkkkk|mmmmmm|nnnnnn|x\\.jpg|llllll' '$T/curl.log'"
 probar "sí pide a los subdominios de wallhaven.cc (w.wallhaven.cc)" "grep -q '^https://w\\.wallhaven\\.cc/full/' '$T/curl.log'"
 probar "fuentes.json guarda la URL de Wallhaven de cada fondo" \
-  "[[ \"\$(jq -r '.fondos | map(.url | startswith(\"https://wallhaven.cc/w/\")) | all' '$FONDOS_ESP/otaku/fuentes.json')\" == true ]] && [[ \"\$(jq '.fondos | length' '$FONDOS_ESP/otaku/fuentes.json')\" == 5 ]]"
+  "[[ \"\$(jq -r '.fondos | map(.url | startswith(\"https://wallhaven.cc/w/\")) | all' '$OTAKU/fuentes.json')\" == true ]] && [[ \"\$(jq '.fondos | length' '$OTAKU/fuentes.json')\" == 5 ]]"
 probar "el que no traía «url» se arma con su id" \
-  "[[ \"\$(jq -r '.fondos[] | select(.id == \"gggggg\") | .url' '$FONDOS_ESP/otaku/fuentes.json')\" == https://wallhaven.cc/w/gggggg ]]"
+  "[[ \"\$(jq -r '.fondos[] | select(.id == \"gggggg\") | .url' '$OTAKU/fuentes.json')\" == https://wallhaven.cc/w/gggggg ]]"
 probar "pone el fondo con la IPC del shell en cada monitor" \
-  "grep -q -E '^$CALL DP-1 $FONDOS_ESP/otaku/wallhaven-[a-z]+\\.(jpg|png) fade\$' '$T/ipc.log' && grep -q -E '^$CALL HDMI-A-1 ' '$T/ipc.log'"
+  "grep -q -E '^$CALL DP-1 $OTAKU/wallhaven-[a-z]+\\.(jpg|png) fade\$' '$T/ipc.log' && grep -q -E '^$CALL HDMI-A-1 ' '$T/ipc.log'"
 probar "guarda el fondo de antes y los ajustes de antes" \
   "[[ \"\$(jq -c . '$ANTES')\" == '{\"fondos\":{\"DP-1\":\"$FONDOS_ESP/vortex-azul.jpg\"},\"tema\":{\"fontFamily\":\"Adwaita Mono\",\"borderRadius\":8,\"wallpaperDir\":\"$FONDOS_ESP\"}}' ]]"
 probar "ajustes: fuente y bordes nuevos" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 24 ]]"
@@ -188,7 +189,7 @@ probar "el settings.json sigue con los mismos permisos y sin temporales" \
   "[[ \"\$(stat -c %a '$H/.config/serpantinum/settings.json')\" == \"\$(stat -c %a '$T/settings-original.json')\" && -z \"\$(ls -A '$H/.config/serpantinum' | grep -v '^settings.json\$')\" ]]"
 probar "avisa con una notificación" "grep -q 'Modo otaku activado' '$T/notify.log'"
 otaku estado >"$T/salida"
-probar "estado dice encendido y el fondo" "grep -q 'Modo otaku: encendido' '$T/salida' && grep -q 'Fondo: $FONDOS_ESP/otaku/' '$T/salida'"
+probar "estado dice encendido y el fondo" "grep -q 'Modo otaku: encendido' '$T/salida' && grep -q 'Fondo: $OTAKU/' '$T/salida'"
 
 echo "== Encender dos veces, otro fondo y apagar"
 n_curl="$(wc -l <"$T/curl.log")"
@@ -205,10 +206,9 @@ probar "off termina bien" "((rc == 0))"
 probar "off devuelve el fondo de antes en DP-1" "grep -q '^$CALL DP-1 $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
 probar "off pone ese mismo fondo en el monitor que no estaba antes" "grep -q '^$CALL HDMI-A-1 $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
 probar "off deja los ajustes como estaban" "[[ \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
-probar "off borra lo que se bajó y la carpeta" "[[ ! -e '$FONDOS_ESP/otaku' ]]"
+probar "off deja los fondos otaku en su carpeta (para usarlos en el modo normal)" "[[ -f '$OTAKU/fuentes.json' ]] && ((\$(numero_fondos) == 5))"
 probar "no toca los fondos del usuario" "[[ -f '$FONDOS_ESP/vortex-azul.jpg' && -f '$FONDOS_ESP/mi fondo (raro).jpg' ]]"
 probar "off quita la marca y lo guardado" "[[ ! -e '$MARCA' && ! -e '$ANTES' ]]"
-probar "off espera un poco antes de borrar el fondo anterior" "[[ -s '$T/sleep.log' ]]"
 otaku estado >"$T/salida"
 probar "estado dice apagado" "grep -q 'Modo otaku: apagado' '$T/salida'"
 salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
@@ -218,19 +218,21 @@ probar "«otro» con el modo apagado avisa y falla" "((rc == 1))"
 otaku alternar >/dev/null
 probar "alternar enciende" "[[ -f '$MARCA' ]]"
 otaku alternar >/dev/null
-probar "alternar apaga" "[[ ! -f '$MARCA' && ! -e '$FONDOS_ESP/otaku' ]]"
+probar "alternar apaga" "[[ ! -f '$MARCA' ]]"
+otaku borrar >/dev/null; rc=$?
+probar "«borrar» quita lo que se bajó y la carpeta" "((rc == 0)) && [[ ! -e '$OTAKU' ]]"
 
 echo "== Sin red"
 nueva_sesion
 touch "$T/sin-red"
 salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "on funciona igual" "((rc == 0)) && [[ -f '$MARCA' ]]"
-probar "usa el fondo original de respaldo (copia del repo)" "cmp -s '$RESP' '$FONDOS_ESP/otaku/otaku-respaldo.jpg'"
-probar "lo dice en la marca y en fuentes.json" "grep -q '^fuente=respaldo\$' '$MARCA' && jq -e '.fondos[0].url == null' '$FONDOS_ESP/otaku/fuentes.json' >/dev/null"
-probar "pone ese fondo con la IPC" "grep -q '^$CALL DP-1 $FONDOS_ESP/otaku/otaku-respaldo.jpg fade\$' '$T/ipc.log'"
+probar "usa el fondo original de respaldo (copia del repo)" "cmp -s '$RESP' '$OTAKU/otaku-respaldo.jpg'"
+probar "lo dice en la marca y en fuentes.json" "grep -q '^fuente=respaldo\$' '$MARCA' && jq -e '.fondos[0].url == null' '$OTAKU/fuentes.json' >/dev/null"
+probar "pone ese fondo con la IPC" "grep -q '^$CALL DP-1 $OTAKU/otaku-respaldo.jpg fade\$' '$T/ipc.log'"
 probar "avisa de que no hubo red" "grep -q 'sin red' '$T/salida'"
 salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
-probar "off lo deja todo como estaba" "((rc == 0)) && [[ ! -e '$FONDOS_ESP/otaku' && \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
+probar "off lo deja todo como estaba" "((rc == 0)) && [[ \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
 
 echo "== La IPC del shell no responde (no hay Serpantinum)"
 nueva_sesion
@@ -265,7 +267,7 @@ rm -f "$H/.config/serpantinum/settings.json"
 otaku on >/dev/null; rc=$?
 probar "sin settings.json: on funciona y no lo crea" "((rc == 0)) && [[ ! -e '$H/.config/serpantinum/settings.json' ]]"
 otaku off >/dev/null; rc=$?
-probar "…y off también" "((rc == 0)) && [[ ! -e '$MARCA' && ! -e '$FONDOS_ESP/otaku' ]]"
+probar "…y off también" "((rc == 0)) && [[ ! -e '$MARCA' ]]"
 
 echo "== Sin fondo de antes ni Hyprland"
 nueva_sesion
@@ -285,7 +287,7 @@ chmod 755 "$H/.config/serpantinum"
 probar "off avisa de que los ajustes no volvieron" "((rc == 0)) && grep -q 'no pude devolver los ajustes' '$T/salida' && grep -q 'ajustes del shell no volvieron' '$T/salida'"
 probar "…conserva lo de antes (el aviso promete ese archivo) y quita la marca" \
   "[[ -f '$ANTES' && ! -e '$MARCA' && \"\$(jq -r '.tema.fontFamily' '$ANTES')\" == 'Adwaita Mono' ]]"
-probar "…y no promete nada falso: el fondo sí volvió y los archivos se borraron" "[[ ! -e '$FONDOS_ESP/otaku' ]] && grep -q '^$CALL DP-1 $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
+probar "…y no promete nada falso: el fondo sí volvió" "grep -q '^$CALL DP-1 $FONDOS_ESP/vortex-azul.jpg fade\$' '$T/ipc.log'"
 salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "otro off lo reintenta con lo guardado y ahora sí lo deja todo como estaba" \
   "((rc == 0)) && [[ ! -e '$ANTES' && \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]] && grep -q 'todo volvió a como estaba' '$T/salida'"
@@ -298,24 +300,26 @@ otaku off >/dev/null
 rm -f "$T/ipc-falla"
 probar "el off con el shell caído deja los archivos (el shell podría estar usándolos)" "((\$(numero_fondos) == 5)) && [[ ! -e '$MARCA' ]]"
 touch "$T/sin-red"
-printf 'JPG-DEL-USUARIO-EN-OTAKU' >"$FONDOS_ESP/otaku/mio.jpg"
+printf 'JPG-DEL-USUARIO-EN-OTAKU' >"$OTAKU/mio.jpg"
 otaku on >/dev/null
-probar "el on sin red deja solo el fondo de respaldo (los 5 de antes se podan)" \
-  "[[ \"\$(find '$FONDOS_ESP/otaku' -maxdepth 1 -name 'wallhaven-*' | wc -l)\" == 0 && -f '$FONDOS_ESP/otaku/otaku-respaldo.jpg' ]]"
-probar "…y no toca archivos que el comando no creó" "[[ -f '$FONDOS_ESP/otaku/mio.jpg' ]]"
+probar "el on sin red usa los fondos otaku que ya tenía (no los cambia por el de respaldo)" \
+  "[[ \"\$(find '$OTAKU' -maxdepth 1 -name 'wallhaven-*' | wc -l)\" == 5 && ! -f '$OTAKU/otaku-respaldo.jpg' ]]"
+probar "…y no toca archivos que el comando no creó" "[[ -f '$OTAKU/mio.jpg' ]]"
 otaku off >/dev/null
-probar "el off siguiente borra todo lo suyo (queda solo lo ajeno)" \
-  "[[ \"\$(ls -A '$FONDOS_ESP/otaku')\" == mio.jpg ]]"
-rm -f "$FONDOS_ESP/otaku/mio.jpg"
+otaku borrar >/dev/null
+probar "«borrar» quita todo lo suyo (queda solo lo ajeno)" \
+  "[[ \"\$(ls -A '$OTAKU')\" == mio.jpg ]]"
+rm -f "$OTAKU/mio.jpg"
 nueva_sesion
-mkdir -p "$FONDOS_ESP/otaku"
-head -c 70000 /dev/urandom >"$FONDOS_ESP/otaku/wallhaven-zzzzzz.jpg"
-printf '{"fondos":[{"archivo":"wallhaven-zzzzzz.jpg"}]}' >"$FONDOS_ESP/otaku/fuentes.json"
+mkdir -p "$OTAKU"
+head -c 70000 /dev/urandom >"$OTAKU/wallhaven-zzzzzz.jpg"
+printf '{"fondos":[{"archivo":"wallhaven-zzzzzz.jpg"}]}' >"$OTAKU/fuentes.json"
 otaku on >/dev/null
 probar "un resto que la lista nueva ya no menciona se poda; los de la lista se quedan" \
-  "[[ ! -e '$FONDOS_ESP/otaku/wallhaven-zzzzzz.jpg' ]] && ((\$(numero_fondos) == 5))"
+  "[[ ! -e '$OTAKU/wallhaven-zzzzzz.jpg' ]] && ((\$(numero_fondos) == 5))"
 otaku off >/dev/null
-probar "…y el off siguiente deja la carpeta limpia" "[[ ! -e '$FONDOS_ESP/otaku' ]]"
+otaku borrar >/dev/null
+probar "…y «borrar» deja la carpeta limpia" "[[ ! -e '$OTAKU' ]]"
 
 echo "== Se corta la pasada en plena descarga (Ajustes cerrado, apagón) y se vuelve a encender"
 nueva_sesion
@@ -326,19 +330,19 @@ touch "$T/curl-lento"
   echo $! >"$T/pid-corte"
 )
 for _ in $(seq 1 50); do
-  compgen -G "$FONDOS_ESP/otaku/.*.parcial" >/dev/null && break
+  compgen -G "$OTAKU/.*.parcial" >/dev/null && break
   /usr/bin/sleep 0.1
 done
-probar "la pasada va por la mitad (hay un .parcial y aún no hay marca)" "compgen -G '$FONDOS_ESP/otaku/.*.parcial' >/dev/null && [[ ! -e '$MARCA' ]]"
+probar "la pasada va por la mitad (hay un .parcial y aún no hay marca)" "compgen -G '$OTAKU/.*.parcial' >/dev/null && [[ ! -e '$MARCA' ]]"
 kill -9 -- "-$(cat "$T/pid-corte")" 2>/dev/null
 /usr/bin/sleep 0.3
 rm -f "$T/curl-lento"
 salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "el siguiente on se recupera: enciende, 5 fondos y su fuentes.json" \
-  "((rc == 0)) && [[ -f '$MARCA' ]] && ((\$(numero_fondos) == 5)) && [[ \"\$(jq '.fondos | length' '$FONDOS_ESP/otaku/fuentes.json')\" == 5 ]] && ! compgen -G '$FONDOS_ESP/otaku/.*.parcial' >/dev/null"
+  "((rc == 0)) && [[ -f '$MARCA' ]] && ((\$(numero_fondos) == 5)) && [[ \"\$(jq '.fondos | length' '$OTAKU/fuentes.json')\" == 5 ]] && ! compgen -G '$OTAKU/.*.parcial' >/dev/null"
 otaku off >/dev/null; rc=$?
 probar "…y el off deja todo como estaba" \
-  "((rc == 0)) && [[ ! -e '$FONDOS_ESP/otaku' && \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
+  "((rc == 0)) && [[ \"\$(jq -S . '$H/.config/serpantinum/settings.json')\" == \"\$(jq -S . '$T/settings-original.json')\" ]]"
 
 echo "== Cortado a medias"
 nueva_sesion
@@ -355,7 +359,7 @@ flock "$H/.config/vortex/vortex-otaku.lock" sleep 3 &
 PID_CANDADO=$!
 sleep 0.5
 salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
-probar "con otro vortex-otaku trabajando, el segundo avisa y no hace nada" "((rc == 1)) && grep -q 'otro vortex-otaku' '$T/salida' && [[ ! -e '$MARCA' && ! -e '$FONDOS_ESP/otaku' && ! -s '$T/curl.log' ]]"
+probar "con otro vortex-otaku trabajando, el segundo avisa y no hace nada" "((rc == 1)) && grep -q 'otro vortex-otaku' '$T/salida' && [[ ! -e '$MARCA' && ! -e '$OTAKU' && ! -s '$T/curl.log' ]]"
 kill "$PID_CANDADO" 2>/dev/null
 wait "$PID_CANDADO" 2>/dev/null
 

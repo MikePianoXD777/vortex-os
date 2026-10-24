@@ -311,8 +311,14 @@ GuideTab {
         command: [
             "bash", "-c",
             "python3 -c '\n" +
-            "import os\n" +
+            "import os, subprocess\n" +
             "home = os.path.expanduser(\"~\")\n" +
+            // Vortex: las carpetas de imágenes y videos del idioma del sistema (Imágenes, Vídeos…), no solo las de inglés.
+            "def xdg(n):\n" +
+            "    try:\n" +
+            "        return subprocess.run([\"xdg-user-dir\", n], capture_output=True, text=True, timeout=3).stdout.strip()\n" +
+            "    except Exception:\n" +
+            "        return \"\"\n" +
             "exts = {\".jpg\", \".jpeg\", \".png\", \".webp\", \".bmp\", \".mp4\", \".mkv\", \".mov\", \".webm\"}\n" +
             "dirs = set()\n" +
             "candidates = [\n" +
@@ -325,6 +331,7 @@ GuideTab {
             "    \"/usr/share/backgrounds\",\n" +
             "    \"/usr/share/wallpapers\"\n" +
             "]\n" +
+            "candidates += [d for d in (xdg(\"PICTURES\"), xdg(\"VIDEOS\")) if d and d != home]\n" +
             "for c in candidates:\n" +
             "    if not os.path.isdir(c):\n" +
             "        continue\n" +

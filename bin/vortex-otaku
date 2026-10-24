@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vortex-otaku: «Modo otaku» de Vortexine's OS (un easter egg para un amigo de Mike).
 #
-#   vortex-otaku on|off|alternar|estado|otro|elegir      (también: vortex otaku ...)
+#   vortex-otaku on|off|alternar|estado|otro|elegir|bajar|borrar      (también: vortex otaku ...)
 #
 # «on» baja 10 fondos de las quintillizas («Go-Toubun no Hanayome»), pone uno y le da un toque suave al
 # shell (fuente y bordes más redondeados); mientras está encendido, el selector de fondos (Super+Shift+W,
@@ -9,7 +9,7 @@
 #
 # Derechos de autor: este repo NO lleva imágenes del personaje. Los fondos se bajan al
 # encender, de la API pública de Wallhaven (solo SFW), a ~/Imágenes/Fondos/otaku/ (o la
-# carpeta de imágenes de tu idioma), y se borran al apagar. De cada uno se guarda su URL en
+# carpeta de imágenes de tu idioma), y se quedan al apagar («borrar» los quita). De cada uno se guarda su URL en
 # fuentes.json. Sin red usa un fondo ORIGINAL de Vortex (config/fondos/otaku/): audífonos
 # estilizados, sin el personaje.
 #
@@ -35,7 +35,9 @@ AJUSTES="$CONFIG/serpantinum/settings.json"
 CACHE_FONDO="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
 FONDOS="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
-DESTINO="$FONDOS/otaku"
+# Fuera de Fondos, en su propia carpeta: así no salen en el selector en el modo normal (se usan
+# eligiéndola en Ajustes > Tema > Carpeta de fondos), y no se borran al apagar.
+DESTINO="$(dirname "$FONDOS")/Fondos otaku"
 
 # Wallhaven: búsqueda pública, solo SFW (purity=100) y categoría anime (categories=010).
 API="https://wallhaven.cc/api/v1/search?q=Go-Toubun%20no%20Hanayome&categories=010&purity=100&sorting=favorites&atleast=1920x1080"
@@ -70,8 +72,11 @@ Uso: vortex otaku <comando>
   estado             dice si está encendido y qué fondo tiene
   otro               cambia al siguiente fondo (con el modo encendido)
   elegir             abre el selector de fondos para elegir uno de los 10 (también Super+Shift+W)
+  bajar              baja los fondos otaku sin encender el modo (para el modo normal)
+  borrar             borra los fondos otaku bajados (con el modo apagado)
 
-Los fondos se descargan de Wallhaven al encender y se borran al apagar; sin red se usa un
+Los fondos se descargan de Wallhaven al encender, a Imágenes/Fondos otaku, y se quedan ahí al
+apagar: en el modo normal los eliges en Ajustes > Tema > Carpeta de fondos. Sin red se usa un
 fondo original de Vortex (audífonos). Con el modo encendido, Ajustes > Tema lo muestra.
 EOF
 }
@@ -223,7 +228,7 @@ descargar_wallhaven() {
   ((n > 0)) || return 1
   jq -n --argjson f "$fuentes" '{
     fuente: "Wallhaven (https://wallhaven.cc), búsqueda: Go-Toubun no Hanayome (las quintillizas), solo SFW",
-    aviso: "Imágenes bajadas a tu equipo por el modo otaku; no forman parte de Vortexine’s OS y sus derechos son de sus autores. Se borran al apagar el modo.",
+    aviso: "Imágenes bajadas a tu equipo por el modo otaku; no forman parte de Vortexine’s OS y sus derechos son de sus autores. Se quedan al apagar el modo; «vortex otaku borrar» los quita.",
     fondos: $f
   }' >"$destino/fuentes.json"
 }
@@ -368,7 +373,11 @@ cmd_on() {
   fi
   mkdir -p "$DESTINO"
   echo "Trayendo fondos de Wallhaven..."
-  if ! descargar_wallhaven "$DESTINO"; then
+  if ! descargar_wallhaven "$DESTINO" &&
+    [[ "$(jq -r '.fondos[]?.archivo // empty' "$DESTINO/fuentes.json" 2>/dev/null | grep -c '^wallhaven-')" -gt 0 ]]; then
+    # Sin red, pero ya había fondos de Wallhaven de otra vez (se guardan al apagar): se usan esos.
+    aviso "no pude traer fondos nuevos de Wallhaven (¿sin red?); uso los que ya tenías"
+  elif [[ ! -s "$DESTINO/fuentes.json" ]] || ! jq -e '.fondos[]?.archivo | select(startswith("wallhaven-"))' "$DESTINO/fuentes.json" >/dev/null 2>&1; then
     fuente=respaldo
     aviso "no pude traer fondos de Wallhaven (¿sin red?); uso el fondo original de Vortex"
     if ! poner_respaldo "$DESTINO"; then
@@ -402,12 +411,9 @@ cmd_off() {
   anterior="$(jq -r '.fondos // {} | to_entries[0].value // empty' "$ANTES" 2>/dev/null || true)"
   restaurar_fondos || fondo_ok=1
   restaurar_ajustes || ajustes_ok=1
-  if ((fondo_ok == 0)); then
-    # Un momento para que termine el cambio de fondo antes de borrar el anterior.
-    sleep 2
-    borrar_descargas
-  else
-    aviso "no pude devolver el fondo (¿el shell no está abierto?); dejo los archivos en $DESTINO"
+  # Los fondos otaku se quedan en su carpeta (para usarlos en el modo normal); «vortex otaku borrar» los quita.
+  if ((fondo_ok != 0)); then
+    aviso "no pude devolver el fondo (¿el shell no está abierto?)"
     [[ -n "$anterior" ]] && aviso "con el escritorio abierto: vortex fondo '$anterior'"
   fi
   # Si los ajustes no volvieron, lo de antes se queda en $ANTES (otro «off» lo reintenta, y un
@@ -417,8 +423,9 @@ cmd_off() {
   if ((ajustes_ok != 0)); then
     echo "Modo otaku apagado, pero los ajustes del shell no volvieron: lo de antes sigue en $ANTES (reintenta con vortex otaku off)."
   elif ((fondo_ok == 0)); then
-    notificar -t 2500 "Modo otaku apagado" "Tu fondo y tus ajustes volvieron como estaban"
-    echo "Modo otaku apagado: todo volvió a como estaba."
+    notificar -t 4000 "Modo otaku apagado" "Tu fondo y tus ajustes volvieron como estaban. Los fondos otaku siguen en $DESTINO"
+    echo "Modo otaku apagado: todo volvió a como estaba. Los fondos otaku se quedan en $DESTINO"
+    echo "(para usarlos: Ajustes > Tema > Carpeta de fondos; para borrarlos: vortex otaku borrar)"
   else
     echo "Modo otaku apagado: los ajustes volvieron, pero el fondo no se pudo cambiar."
   fi
@@ -445,6 +452,24 @@ cmd_otro() {
     aviso "el shell no responde; el fondo no se cambió"
     exit 1
   fi
+}
+
+# Baja los fondos otaku sin encender el modo: para usarlos en el modo normal (Ajustes > Tema > Carpeta de fondos).
+cmd_bajar() {
+  un_solo_proceso
+  mkdir -p "$DESTINO"
+  echo "Trayendo fondos de Wallhaven..."
+  descargar_wallhaven "$DESTINO" || { aviso "no pude traer fondos de Wallhaven (¿sin red?)"; exit 1; }
+  podar_sobras
+  echo "Listo: $(imagenes | wc -l) fondos en $DESTINO (elige esa carpeta en Ajustes > Tema > Carpeta de fondos)."
+}
+
+# Borra los fondos otaku bajados (solo con el modo apagado).
+cmd_borrar() {
+  un_solo_proceso
+  [[ ! -f "$MARCA" ]] || { aviso "el modo otaku está encendido: apágalo antes (vortex otaku off)"; exit 1; }
+  borrar_descargas
+  echo "Listo: borré los fondos otaku de $DESTINO."
 }
 
 # Abre el selector de fondos del shell, que con el modo encendido muestra los fondos otaku.
@@ -478,6 +503,8 @@ case "${1:-ayuda}" in
   estado) cmd_estado ;;
   otro | siguiente) cmd_otro ;;
   elegir) cmd_elegir ;;
+  borrar) cmd_borrar ;;
+  bajar) cmd_bajar ;;
   ayuda | -h | --help) ayuda ;;
   *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;
 esac
