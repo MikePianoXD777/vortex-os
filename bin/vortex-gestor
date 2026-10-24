@@ -51,6 +51,18 @@ RENICE="${VORTEX_GESTOR_RENICE:-renice}"
 VORTEX="${VORTEX_GESTOR_VORTEX:-vortex}"
 QS="${VORTEX_GESTOR_QS:-quickshell}"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
+# La ruta del shell que de verdad corre (quickshell -p RUTA/Shell.qml): el IPC de quickshell solo
+# encuentra la instancia por su ruta, y no siempre es la del paquete (un shell lanzado desde el repo,
+# con SERPANTINUM_DIR, está en otra carpeta). Sin ninguno corriendo, la del paquete.
+shell_qml_activo() {
+  local pid ruta
+  [[ -n "${VORTEX_SHELL_QML:-}" ]] && { printf '%s\n' "$VORTEX_SHELL_QML"; return 0; }   # pruebas
+  for pid in $(pgrep -u "$(id -u)" -x quickshell 2>/dev/null); do
+    ruta="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | awk 'f { print; exit } $0 == "-p" || $0 == "--path" { f = 1 }')"
+    [[ "$ruta" == */Shell.qml && -f "$ruta" ]] && { printf '%s\n' "$ruta"; return 0; }
+  done
+  printf '%s\n' "$SHELL_QML"
+}
 ESTADO_DIR="$RUN/vortex"
 ESTADO="$ESTADO_DIR/gestor"
 MARCA_JUEGO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego"
@@ -361,7 +373,7 @@ es_juego() { [[ "$2" == game ]] || [[ -n "$1" && "$1" =~ $JUEGOS_CLASES ]]; }
 # que el arranque de Hyprland; si es de antes de reiniciar, no cuenta).
 modo_juego_activo() { [[ -e "$MARCA_JUEGO" && "$MARCA_JUEGO" -nt "$HYPR_DIR/.socket2.sock" ]]; }
 
-fondo() { timeout 5 "$QS" ipc -p "$SHELL_QML" call wallpaper setPlayback all "$1" >/dev/null 2>&1; }
+fondo() { timeout 5 "$QS" ipc -p "$(shell_qml_activo)" call wallpaper setPlayback all "$1" >/dev/null 2>&1; }
 
 empezar_juego() {
   log "juego abierto ($1): modo juego"
@@ -419,11 +431,11 @@ soltar_shell() {
     while read -r linea; do
       [[ "$linea" == target\ * ]] && objetivo="${linea#target }"
       [[ "$objetivo" == vortex && "$linea" == *"function soltarMemoria"* ]] && hay=1
-    done < <(timeout 5 "$QS" ipc -p "$SHELL_QML" show 2>/dev/null)
+    done < <(timeout 5 "$QS" ipc -p "$(shell_qml_activo)" show 2>/dev/null)
     if ((hay)); then SHELL_SOLTAR="sí"; else SHELL_SOLTAR="no sabe"; fi
   fi
   [[ "$SHELL_SOLTAR" == "sí" ]] || return 0
-  timeout 5 "$QS" ipc -p "$SHELL_QML" call vortex soltarMemoria >/dev/null 2>&1 &
+  timeout 5 "$QS" ipc -p "$(shell_qml_activo)" call vortex soltarMemoria >/dev/null 2>&1 &
 }
 
 # Comprime (a zram) lo que no usan las apps de fondo que ordenó el gestor; nunca la

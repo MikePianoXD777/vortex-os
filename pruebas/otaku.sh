@@ -150,7 +150,8 @@ EOF
 # vortex-otaku con el entorno falso. Con 2>&1 se ven también los avisos.
 otaku() {
   env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u XDG_STATE_HOME -u XDG_RUNTIME_DIR -u HYPRLAND_INSTANCE_SIGNATURE -u QS_SETTINGS \
-    HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent "$AQUI/bin/vortex-otaku" "$@" 2>&1
+    HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_OTAKU_CUANTOS=5 \
+    VORTEX_SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml "$AQUI/bin/vortex-otaku" "$@" 2>&1
 }
 ajuste() { jq -r "$1" "$H/.config/serpantinum/settings.json"; }
 numero_fondos() { find "$FONDOS_ESP/otaku" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.png' \) 2>/dev/null | wc -l; }
@@ -163,8 +164,10 @@ nueva_sesion
 salida="$(otaku on)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
 probar "on termina bien" "((rc == 0))"
 probar "queda la marca ~/.config/vortex/otaku" "[[ -f '$MARCA' ]]"
-probar "la primera petición es la búsqueda SFW de Nakano Miku" \
-  "[[ \"\$(head -n1 '$T/curl.log')\" == 'https://wallhaven.cc/api/v1/search?q=Nakano%20Miku&categories=010&purity=100&sorting=favorites&atleast=1920x1080' ]]"
+probar "la primera petición es la búsqueda SFW de las quintillizas (Go-Toubun no Hanayome)" \
+  "[[ \"\$(head -n1 '$T/curl.log')\" == 'https://wallhaven.cc/api/v1/search?q=Go-Toubun%20no%20Hanayome&categories=010&purity=100&sorting=favorites&atleast=1920x1080' ]]"
+probar "el selector de fondos apunta a los fondos otaku mientras está encendido" \
+  "[[ \"\$(jq -r .wallpaperDir '$H/.config/serpantinum/settings.json')\" == '$FONDOS_ESP/otaku' ]]"
 probar "baja 5 fondos a Imágenes/Fondos/otaku (con tilde y espacios en la ruta)" "((\$(numero_fondos) == 5))"
 probar "los que fallan (bbbbbb) se saltan y se baja el siguiente" "[[ ! -e '$FONDOS_ESP/otaku/wallhaven-bbbbbb.jpg' ]] && [[ -e '$FONDOS_ESP/otaku/wallhaven-eeeeee.png' && ! -e '$FONDOS_ESP/otaku/wallhaven-ffffff.jpg' ]]"
 probar "no pide nada fuera de wallhaven.cc (ni evilwallhaven.cc ni wallhaven.cc.evil.com) ni los verticales ni los gif" \
@@ -177,10 +180,10 @@ probar "el que no traía «url» se arma con su id" \
 probar "pone el fondo con la IPC del shell en cada monitor" \
   "grep -q -E '^$CALL DP-1 $FONDOS_ESP/otaku/wallhaven-[a-z]+\\.(jpg|png) fade\$' '$T/ipc.log' && grep -q -E '^$CALL HDMI-A-1 ' '$T/ipc.log'"
 probar "guarda el fondo de antes y los ajustes de antes" \
-  "[[ \"\$(jq -c . '$ANTES')\" == '{\"fondos\":{\"DP-1\":\"$FONDOS_ESP/vortex-azul.jpg\"},\"tema\":{\"fontFamily\":\"Adwaita Mono\",\"borderRadius\":8}}' ]]"
+  "[[ \"\$(jq -c . '$ANTES')\" == '{\"fondos\":{\"DP-1\":\"$FONDOS_ESP/vortex-azul.jpg\"},\"tema\":{\"fontFamily\":\"Adwaita Mono\",\"borderRadius\":8,\"wallpaperDir\":\"$FONDOS_ESP\"}}' ]]"
 probar "ajustes: fuente y bordes nuevos" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Google Sans Flex' && \"\$(ajuste .theme.borderRadius)\" == 24 ]]"
 probar "ajustes: lo demás sigue igual" \
-  "[[ \"\$(ajuste .theme.activePreset)\" == Matugen && \"\$(ajuste .general.language)\" == es && \"\$(ajuste .wallpaperDir)\" == '$FONDOS_ESP' ]]"
+  "[[ \"\$(ajuste .theme.activePreset)\" == Matugen && \"\$(ajuste .general.language)\" == es ]]"
 probar "el settings.json sigue con los mismos permisos y sin temporales" \
   "[[ \"\$(stat -c %a '$H/.config/serpantinum/settings.json')\" == \"\$(stat -c %a '$T/settings-original.json')\" && -z \"\$(ls -A '$H/.config/serpantinum' | grep -v '^settings.json\$')\" ]]"
 probar "avisa con una notificación" "grep -q 'Modo otaku activado' '$T/notify.log'"
