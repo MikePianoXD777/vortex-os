@@ -539,7 +539,7 @@ cmd_actualizar() {
   # El aviso de actualizaciones se enciende solo la primera vez (si lo apagaste, se respeta).
   if [[ ! -e "$AVISOS_ESTADO/actualizaciones-configurado" ]]; then
     mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/actualizaciones-configurado"
-    cmd_actualizaciones on >/dev/null 2>&1 || true
+    (cmd_actualizaciones on) >/dev/null 2>&1 || true     # subshell: su «exit» no corta la actualización
   fi
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
   # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
@@ -637,7 +637,7 @@ cmd_actualizaciones() {
   case "$orden" in
     on)
       avisos_unidades
-      systemctl --user daemon-reload
+      systemctl --user daemon-reload 2>/dev/null || true
       systemctl --user enable --now vortex-actualizaciones.timer >/dev/null 2>&1 ||
         { aviso "no pude encender el aviso de actualizaciones"; exit 1; }
       echo "Te avisaré cuando haya actualizaciones (se revisa cada 6 h)."
