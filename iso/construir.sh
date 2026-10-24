@@ -269,7 +269,7 @@ if [[ -n "${VORTEX_SB_LLAVE:-}" ]]; then
     [[ -f "$VORTEX_SB_LLAVE/$f" ]] || { echo "Secure Boot: falta $VORTEX_SB_LLAVE/$f" >&2; exit 1; }
   done
   pacman -S --needed --noconfirm sbsigntools mtools >/dev/null
-  shim="$(ls "$REPO"/shim-signed-*.pkg.tar.* 2>/dev/null | grep -v '\.sig$' | sort -V | tail -n 1 || true)"
+  shim="$(compgen -G "$REPO/shim-signed-*.pkg.tar.*" | grep -v '\.sig$' | sort -V | tail -n 1 || true)"
   [[ -n "$shim" ]] || { echo "Secure Boot: falta shim-signed en el repo [vortex] (corre iso/paquetes.sh)" >&2; exit 1; }
   export VORTEX_SB_DIR="$TRABAJO/secureboot"
   mkdir -p "$VORTEX_SB_DIR"

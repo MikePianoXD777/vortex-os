@@ -20,7 +20,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$runtime/bus" ]]; then
   export DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime/bus"
 fi
 if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
-  WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && ls wayland-* 2>/dev/null | grep -v '\.lock$' | head -n1)"
+  WAYLAND_DISPLAY="$(cd "$runtime" 2>/dev/null && compgen -G 'wayland-*' | grep -v '\.lock$' | head -n1)"
 fi
 pgrep -x calamares >/dev/null && exit 0
 
@@ -61,7 +61,7 @@ export LANG="${VORTEX_INSTALADOR_IDIOMA:-es_MX.UTF-8}"
 # Solo si localed todavía no tiene distribución: así no se pisa la que se eligió en una apertura
 # anterior del instalador. vortex-teclado-live se la pasa también al escritorio del live.
 teclado_inicial() {
-  local teclado actual
+  local teclado
   case "${LANG%%.*}" in
     es_AR | es_BO | es_CL | es_CO | es_CR | es_CU | es_DO | es_EC | es_GT | es_HN | es_MX | es_NI | es_PA | es_PE | es_PR | es_PY | es_SV | es_UY | es_VE)
       teclado=latam ;;

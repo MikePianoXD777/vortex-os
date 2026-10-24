@@ -423,7 +423,9 @@ mkdir -p "$T/repo/config/hypr" "$H/.config/hypr"
 cp "$AQUI/config/hypr/hyprland.lua" "$AQUI/config/hypr/atajos.lua" "$T/repo/config/hypr/"
 echo '-- vieja' >"$H/.config/hypr/hyprland.lua"
 rm -f "$H/.config/hypr/atajos.lua"
-env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1; rc=$?
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1
+# shellcheck disable=SC2034  # rc lo lee probar (eval)
+rc=$?
 probar "pone al día ~/.config/hypr/hyprland.lua y respalda la vieja" \
   "((rc == 0)) && cmp -s '$AQUI/config/hypr/hyprland.lua' '$H/.config/hypr/hyprland.lua' && grep -rqx -- '-- vieja' '$H/.config/vortex/'respaldo-*/.config/hypr/hyprland.lua"
 probar "no crea atajos.lua si no lo tenías" "[[ ! -e '$H/.config/hypr/atajos.lua' ]]"

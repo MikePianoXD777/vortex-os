@@ -60,10 +60,10 @@ teclado_xkb() {
       sv-latin1) layout=se ;;
       no|no-latin1) layout=no ;;
       dk|dk-latin1) layout=dk ;;
-      fi|fi-latin1|fi-latin9) layout=fi ;;
-      nl|nl2) layout=nl ;;
+      fi|fi-latin1|fi-latin9) layout="fi" ;;
+      nl|nl2) layout="nl" ;;
       be-latin1) layout=be ;;
-      tr_q-latin5) layout=tr ;;
+      tr_q-latin5) layout="tr" ;;
       cf) layout=ca ;;
       dvorak) layout=us variant=dvorak ;;
       colemak) layout=us variant=colemak ;;

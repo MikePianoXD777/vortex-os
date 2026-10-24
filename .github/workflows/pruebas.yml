@@ -1,0 +1,30 @@
+# Pruebas fijas de Vortexine's OS en cada push a main y en cada pull request, en un contenedor de Arch
+# (los mismos paquetes que el sistema): shellcheck, las claves de idioma del shell, la config de Hyprland
+# y las pruebas de Miku que no necesitan pantalla, micrófono ni Claude de verdad.
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Paquetes
+        run: pacman -Syu --noconfirm --needed git python python-numpy pyside6 ffmpeg shellcheck hyprland
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: bash pruebas/shellcheck.sh
+      - name: Claves de idioma (es y en)
+        run: python3 -I pruebas/idioma.py
+      - name: Hyprland --verify-config
+        run: bash pruebas/hyprland-config.sh
+      - name: Miku, acciones
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python3 -I apps/miku/pruebas/acciones.py
+      - name: Miku, mejores momentos
+        run: python3 -I apps/miku/pruebas/momentos.py

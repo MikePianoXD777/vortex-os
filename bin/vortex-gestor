@@ -331,9 +331,9 @@ dar_prioridad() {
   elif del_usuario "$CG"; then
     if [[ -z "${MIS_CG[$CG]:-}" && -z "${AJENO_PESO[$CG]:-}" ]]; then
       # Un cgroup que no creó el gestor (flatpak, otra app): se guarda su peso para devolverlo.
-      local w=""
-      [[ -r "$CGROOT$CG/cpu.weight" ]] && read -r w <"$CGROOT$CG/cpu.weight"
-      [[ "$w" =~ ^[0-9]+$ ]] && AJENO_PESO[$CG]="$w"
+      local peso=""
+      [[ -r "$CGROOT$CG/cpu.weight" ]] && read -r peso <"$CGROOT$CG/cpu.weight"
+      [[ "$peso" =~ ^[0-9]+$ ]] && AJENO_PESO[$CG]="$peso"
     fi
     if [[ -n "${MIS_CG[$CG]:-}" || -n "${AJENO_PESO[$CG]:-}" ]] && poner_peso "$CG" "$PESO_FOCO"; then
       FOCO_CG="$CG"

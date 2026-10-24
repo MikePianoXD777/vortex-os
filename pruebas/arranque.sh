@@ -27,7 +27,6 @@ no_contiene() { ! grep -qF -- "$2" "$1" 2>/dev/null; }
 
 POST="$AQUI/iso/airootfs/usr/local/bin/vortex-post-instalacion"
 GPU="$AQUI/iso/airootfs/usr/local/bin/vortex-gpu"
-CAL="$AQUI/iso/airootfs/etc/calamares"
 MODBIOS="$AQUI/iso/airootfs/usr/lib/calamares/modules/vortex-bios"
 
 # Comandos de mentira. df: el espacio libre de /boot sale de $FAKE_LIBRE (MB); pacman, chwd,

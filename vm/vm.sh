@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2054  # las comas son de las opciones de QEMU, no separan elementos
 # Máquina virtual de pruebas de Vortexine's OS (QEMU + KVM, UEFI).
 #
 #   vm/vm.sh live [iso]   arranca una ISO (por defecto la de Arch) con acceso SSH por el puerto 2222
@@ -22,7 +23,6 @@
 set -euo pipefail
 
 VM="${VORTEX_VM:-$HOME/.cache/vortex-os-vm}"
-AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISO_ARCH="$(ls "$VM"/iso/archlinux-*-x86_64.iso 2>/dev/null | sort | tail -1 || true)"
 DISCO="$VM/disco.qcow2"
 LLAVE="$VM/llave"

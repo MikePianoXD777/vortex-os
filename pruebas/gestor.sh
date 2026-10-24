@@ -30,8 +30,8 @@ termino() { [[ ! -e "/proc/$1" ]] || [[ "$(awk '{print $3}' "/proc/$1/stat" 2>/d
 
 # Espera (hasta 5 s) a que se cumpla una condición.
 esperar() {
-  local i
-  for i in $(seq 100); do
+  local _
+  for _ in $(seq 100); do
     eval "$1" && return 0
     sleep 0.05
   done
@@ -105,7 +105,7 @@ activa 4001 aaa1 kitty
 hyprland_falso
 "$T/vortex-eventos" "$HD/.socket2.sock" "$HD/.socket.sock" /proc/pressure/memory 150000 2000000 80 >"$T/salida" 2>"$T/errores" 7>&- &
 AY=$!
-PIDS_FONDO+=($AY)
+PIDS_FONDO+=("$AY")
 esperar "grep -q '^foco' '$T/salida'"
 SEP=$'\037'
 probar "ventanas abiertas al arrancar" "grep -qx 'abre${SEP}aaa1${SEP}none${SEP}kitty' '$T/salida' && grep -qx 'abre${SEP}eee5${SEP}game${SEP}steam_app_1' '$T/salida'"
@@ -236,7 +236,7 @@ gestor() {
     VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" \
     "$AQUI/bin/vortex-gestor" >"$T/gestor.log" 2>&1 7>&- 8>&- &
   GESTOR=$!
-  PIDS_FONDO+=($GESTOR)
+  PIDS_FONDO+=("$GESTOR")
 }
 echo 'DEPURAR=1' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
 echo "some avg10=3.10 avg60=1.00 avg300=0.20 total=1" >"$T/psi"

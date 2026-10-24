@@ -133,6 +133,7 @@ probar "por un enlace simbólico también encuentra su carpeta" "grep -qx 'RAIZ=
 if [[ ! -f /usr/share/vortex-shop/vortex_shop/__init__.py ]]; then
   mkdir -p "$LAN/solo"
   cp "$TIENDA/vortex-shop" "$LAN/solo/vortex-shop"
+  # shellcheck disable=SC2034  # salida la lee probar (eval)
   salida="$(VORTEX_SHOP_DIR="$LAN/vacio" "$LAN/solo/vortex-shop" 2>&1)"
   rc=$?
   probar "sin código: sale con 1" "[[ $rc == 1 ]]"
@@ -151,6 +152,7 @@ if command -v makepkg >/dev/null && [[ $EUID -ne 0 ]]; then
   if (cd "$PK" && makepkg --force --nodeps >"$T/paquete.log" 2>&1); then
     bien "makepkg arma el paquete (sin instalarlo)"
     pkg="$(compgen -G "$PKGDEST/vortex-shop-*.pkg.tar.*" | head -n1)"
+    # shellcheck disable=SC2034  # lista la lee probar (eval)
     lista="$(bsdtar -tf "$pkg")"
     for archivo in usr/bin/vortex-shop usr/share/vortex-shop/vortex_shop/__init__.py \
       usr/share/vortex-shop/vortex_shop/catalogo.py usr/share/vortex-shop/vortex_shop/flatpak.py \
@@ -163,6 +165,7 @@ if command -v makepkg >/dev/null && [[ $EUID -ne 0 ]]; then
     done
     probar "el paquete no lleva restos de pruebas ni de caché de otros" \
       "! grep -E 'pruebas/|\.tmp$|/pkg/|/src/' <<<\"\$lista\" >/dev/null"
+    # shellcheck disable=SC2034  # info la lee probar (eval)
     info="$(bsdtar -xOf "$pkg" .PKGINFO)"
     probar "arch=any" "grep -qx 'arch = any' <<<\"\$info\""
     for dependencia in python pyside6 qt6-declarative qt6-svg python-gobject flatpak; do
