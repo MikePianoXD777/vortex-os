@@ -674,6 +674,22 @@
           "liquid": "Liquid glass"
         }
       },
+      "animated": {
+        "title": "Animated wallpapers",
+        "desc": "Play video wallpapers (mp4, webm…). Turned off, they stay still on one frame",
+        "covered": {
+          "title": "Pause behind windows",
+          "desc": "They stop while a window is open on that monitor's workspace"
+        },
+        "battery": {
+          "title": "Pause on battery",
+          "desc": "On a laptop, they stop while it is not plugged in"
+        },
+        "optimize": {
+          "title": "Optimize videos",
+          "desc": "Makes a light copy at your screen size (30 fps max, no audio) and plays that one"
+        }
+      },
       "otaku": {
         "title": "Otaku mode",
         "desc": "Miku Nakano wallpaper, a different font and softer corners. Downloaded when enabled; turn it off and everything goes back as it was",

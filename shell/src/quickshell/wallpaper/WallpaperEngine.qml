@@ -3,6 +3,8 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Hyprland
+import Quickshell.Services.UPower
 import QtMultimedia
 import "../"
 
@@ -43,6 +45,115 @@ ShellRoot {
                 property string pathB: ""
                 property bool isVideoB: false
                 property bool playbackPaused: false
+
+                // Vortex: fondos animados (Ajustes > Tema > Fondos animados; «animatedWallpapers» en
+                // settings.json). Se pausan solos (se queda el cuadro) si están apagados, si hay ventanas
+                // en el escritorio de este monitor o con la laptop a batería; y se reproduce una copia
+                // optimizada (scripts/wallpaper/optimizar_video.sh) en cuanto está lista.
+                property int animRev: 0
+                readonly property var animCfg: {
+                    let dummy = barWindow.animRev;
+                    let a = (typeof Config !== "undefined") ? Config.getSetting("animatedWallpapers", {}) : {};
+                    return (a && typeof a === "object") ? a : {};
+                }
+                readonly property bool animEnabled: animCfg.enabled !== false
+                readonly property bool animPauseCovered: animCfg.pauseCovered !== false
+                readonly property bool animPauseBattery: animCfg.pauseOnBattery !== false
+                readonly property bool animOptimize: animCfg.optimize !== false
+                readonly property var hyprMonitor: Hyprland.monitorFor(barWindow.screen)
+                readonly property bool covered: {
+                    let ws = barWindow.hyprMonitor ? barWindow.hyprMonitor.activeWorkspace : null;
+                    return !!(ws && ws.toplevels && ws.toplevels.values && ws.toplevels.values.length > 0);
+                }
+                readonly property bool onBattery: UPower.onBattery
+                readonly property bool autoPaused: !animEnabled || (animPauseCovered && covered) || (animPauseBattery && onBattery)
+                readonly property bool effectivePaused: playbackPaused || autoPaused
+                property var optimizedReady: ({})       // video original -> copia optimizada (ya hecha)
+                property var optimizedApplied: ({})     // las que ya se reproducen (se cambian sin que se vea)
+                readonly property string videoSrcA: (isVideoA && pathA) ? (optimizedApplied[pathA] || pathA) : ""
+                readonly property string videoSrcB: (isVideoB && pathB) ? (optimizedApplied[pathB] || pathB) : ""
+
+                Connections {
+                    target: (typeof Config !== "undefined") ? Config : null
+                    function onSettingsLoaded() { barWindow.animRev++; }
+                }
+
+                onEffectivePausedChanged: {
+                    if (effectivePaused) {
+                        barWindow.applyOptimized();
+                        barWindow.pauseA();
+                        barWindow.pauseB();
+                    } else {
+                        if (barWindow.activeLayer === 0 && barWindow.isVideoA) barWindow.playA();
+                        if (barWindow.activeLayer === 1 && barWindow.isVideoB) barWindow.playB();
+                    }
+                }
+
+                // La copia optimizada entra cuando no se ve el cambio: con el fondo pausado o en una capa que
+                // no es la activa. Si no, espera a la próxima pausa.
+                function applyOptimized() {
+                    let ready = barWindow.optimizedReady;
+                    let applied = Object.assign({}, barWindow.optimizedApplied);
+                    let changed = false;
+                    for (let orig in ready) {
+                        if (applied[orig] === ready[orig]) continue;
+                        let visible = (barWindow.activeLayer === 0 && barWindow.pathA === orig) ||
+                                      (barWindow.activeLayer === 1 && barWindow.pathB === orig);
+                        if (visible && !barWindow.effectivePaused) continue;
+                        applied[orig] = ready[orig];
+                        changed = true;
+                    }
+                    if (changed) barWindow.optimizedApplied = applied;
+                }
+
+                function requestOptimized(path) {
+                    if (!barWindow.animOptimize || !path || barWindow.optimizedReady[path] !== undefined) return;
+                    if (videoOptimizer.running) {
+                        videoOptimizer.queued = path;
+                        return;
+                    }
+                    videoOptimizer.targetPath = path;
+                    videoOptimizer.running = true;
+                }
+
+                Process {
+                    id: videoOptimizer
+                    running: false
+                    property string targetPath: ""
+                    property string queued: ""
+                    readonly property real dpr: (barWindow.screen && barWindow.screen.devicePixelRatio) ? barWindow.screen.devicePixelRatio : 1
+                    command: [
+                        "bash", Caching.serpantinumDir + "/scripts/wallpaper/optimizar_video.sh", targetPath,
+                        String(Math.round((barWindow.screen ? barWindow.screen.width : 1920) * dpr)),
+                        String(Math.round((barWindow.screen ? barWindow.screen.height : 1080) * dpr)),
+                        barWindow.wpCacheDir + "/animados"
+                    ]
+                    stdout: StdioCollector {
+                        onStreamFinished: {
+                            let lines = this.text.trim().split("\n");
+                            let out = lines.length > 0 ? lines[lines.length - 1].trim() : "";
+                            let orig = videoOptimizer.targetPath;
+                            if (orig !== "") {
+                                let ready = Object.assign({}, barWindow.optimizedReady);
+                                ready[orig] = (out !== "" && out !== orig) ? out : orig;
+                                barWindow.optimizedReady = ready;
+                                barWindow.applyOptimized();
+                            }
+                        }
+                    }
+                    onExited: {
+                        if (queued !== "") {
+                            let next = queued;
+                            queued = "";
+                            barWindow.requestOptimized(next);
+                        }
+                    }
+                }
+
+                onPathAChanged: if (isVideoA && pathA) requestOptimized(pathA)
+                onPathBChanged: if (isVideoB && pathB) requestOptimized(pathB)
+                onIsVideoAChanged: if (isVideoA && pathA) requestOptimized(pathA)
+                onIsVideoBChanged: if (isVideoB && pathB) requestOptimized(pathB)
                 property bool snapReadyA: false
                 property bool snapReadyB: false
                 property int snapRevA: 0
@@ -241,7 +352,15 @@ ShellRoot {
 
                 function playA() {
                     if (videoLoaderA.item && typeof videoLoaderA.item.play === "function") {
-                        videoLoaderA.item.play();
+                        // Pausado: carga el video y se queda en el primer cuadro (no en negro).
+                        if (barWindow.effectivePaused) videoLoaderA.item.pause();
+                        else videoLoaderA.item.play();
+                    }
+                }
+
+                function pauseA() {
+                    if (videoLoaderA.item && typeof videoLoaderA.item.pause === "function") {
+                        videoLoaderA.item.pause();
                     }
                 }
 
@@ -253,7 +372,14 @@ ShellRoot {
 
                 function playB() {
                     if (videoLoaderB.item && typeof videoLoaderB.item.play === "function") {
-                        videoLoaderB.item.play();
+                        if (barWindow.effectivePaused) videoLoaderB.item.pause();
+                        else videoLoaderB.item.play();
+                    }
+                }
+
+                function pauseB() {
+                    if (videoLoaderB.item && typeof videoLoaderB.item.pause === "function") {
+                        videoLoaderB.item.pause();
                     }
                 }
 
@@ -478,16 +604,18 @@ ShellRoot {
                     Item {
                         anchors.fill: parent
                         function play() { playerA.play(); }
+                        function pause() { playerA.pause(); }
                         function stop() { playerA.stop(); }
 
                         MediaPlayer {
                             id: playerA
-                            source: barWindow.isVideoA && barWindow.pathA ? "file://" + barWindow.pathA : ""
+                            source: barWindow.videoSrcA ? "file://" + barWindow.videoSrcA : ""
                             videoOutput: videoOutputA
                             loops: MediaPlayer.Infinite
                             onMediaStatusChanged: {
-                                if ((mediaStatus === MediaPlayer.LoadedMedia || mediaStatus === MediaPlayer.BufferedMedia) && barWindow.activeLayer === 0 && barWindow.isVideoA && !barWindow.playbackPaused) {
-                                    playerA.play();
+                                if ((mediaStatus === MediaPlayer.LoadedMedia || mediaStatus === MediaPlayer.BufferedMedia) && barWindow.activeLayer === 0 && barWindow.isVideoA) {
+                                    if (barWindow.effectivePaused) playerA.pause();
+                                    else playerA.play();
                                 }
                             }
                         }
@@ -505,16 +633,18 @@ ShellRoot {
                     Item {
                         anchors.fill: parent
                         function play() { playerB.play(); }
+                        function pause() { playerB.pause(); }
                         function stop() { playerB.stop(); }
 
                         MediaPlayer {
                             id: playerB
-                            source: barWindow.isVideoB && barWindow.pathB ? "file://" + barWindow.pathB : ""
+                            source: barWindow.videoSrcB ? "file://" + barWindow.videoSrcB : ""
                             videoOutput: videoOutputB
                             loops: MediaPlayer.Infinite
                             onMediaStatusChanged: {
-                                if ((mediaStatus === MediaPlayer.LoadedMedia || mediaStatus === MediaPlayer.BufferedMedia) && barWindow.activeLayer === 1 && barWindow.isVideoB && !barWindow.playbackPaused) {
-                                    playerB.play();
+                                if ((mediaStatus === MediaPlayer.LoadedMedia || mediaStatus === MediaPlayer.BufferedMedia) && barWindow.activeLayer === 1 && barWindow.isVideoB) {
+                                    if (barWindow.effectivePaused) playerB.pause();
+                                    else playerB.play();
                                 }
                             }
                         }
@@ -592,8 +722,9 @@ ShellRoot {
                             sourceComponent: videoLayerCompA
                             visible: barWindow.isVideoA
                             onLoaded: {
-                                if (item && barWindow.activeLayer === 0 && barWindow.isVideoA && !barWindow.playbackPaused) {
-                                    item.play();
+                                if (item && barWindow.activeLayer === 0 && barWindow.isVideoA) {
+                                    if (barWindow.effectivePaused) item.pause();
+                                    else item.play();
                                 }
                             }
                         }
@@ -659,8 +790,9 @@ ShellRoot {
                             sourceComponent: videoLayerCompB
                             visible: barWindow.isVideoB
                             onLoaded: {
-                                if (item && barWindow.activeLayer === 1 && barWindow.isVideoB && !barWindow.playbackPaused) {
-                                    item.play();
+                                if (item && barWindow.activeLayer === 1 && barWindow.isVideoB) {
+                                    if (barWindow.effectivePaused) item.pause();
+                                    else item.play();
                                 }
                             }
                         }

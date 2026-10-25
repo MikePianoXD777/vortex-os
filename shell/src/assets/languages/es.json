@@ -686,6 +686,22 @@
           "liquid": "Cristal líquido"
         }
       },
+      "animated": {
+        "title": "Fondos animados",
+        "desc": "Reproduce los fondos de video (mp4, webm…). Apagados, se quedan quietos en un cuadro",
+        "covered": {
+          "title": "Pausar detrás de las ventanas",
+          "desc": "Se detienen mientras hay una ventana abierta en el escritorio de ese monitor"
+        },
+        "battery": {
+          "title": "Pausar con batería",
+          "desc": "En una laptop, se detienen mientras no está conectada"
+        },
+        "optimize": {
+          "title": "Optimizar los videos",
+          "desc": "Hace una copia ligera al tamaño de tu pantalla (30 fps como mucho, sin audio) y reproduce esa"
+        }
+      },
       "otaku": {
         "title": "Modo otaku",
         "desc": "Fondo de Miku Nakano, otra fuente y bordes más suaves. Se descarga al encenderlo; al apagarlo todo vuelve como estaba",

@@ -8,3 +8,4 @@ ThemeWallpaperDirRow 1.0 ThemeWallpaperDirRow.qml
 ThemeAppearanceSection 1.0 ThemeAppearanceSection.qml
 ThemePresetsSection 1.0 ThemePresetsSection.qml
 ThemeOtakuSection 1.0 ThemeOtakuSection.qml
+ThemeAnimatedSection 1.0 ThemeAnimatedSection.qml
