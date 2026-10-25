@@ -413,10 +413,22 @@ probar "chwd falla: termina mal para que el servicio reintente" test "$rc" -ne 0
 probar "chwd falla: la marca se queda y no avisa de nada" bash -c "[[ -e '$T/marca' ]] && ! grep -q '^notify' '$T/llamadas'"
 rm -f "$T/marca"
 
+echo "== vortex-post-instalacion imagen (antes de unpackfs)"
+A="$T/archiso"
+imagen() { VORTEX_ARCHISO="$A" bash "$POST" imagen >>"$T/imagen.out" 2>&1; }
+mkdir -p "$A/bootmnt/arch/x86_64" && : >"$A/bootmnt/arch/x86_64/airootfs.sfs"
+probar "USB montada (copytoram=n): no toca nada" bash -c "$(declare -f imagen); A='$A' T='$T' POST='$POST'; imagen && [[ -f '$A/bootmnt/arch/x86_64/airootfs.sfs' && ! -L '$A/bootmnt/arch/x86_64/airootfs.sfs' ]]"
+rm -rf "$A" && mkdir -p "$A/copytoram" && : >"$A/copytoram/airootfs.sfs"
+probar "copiada a la RAM y sin bootmnt (Ventoy): enlaza la copia donde la busca unpackfs" bash -c "$(declare -f imagen); A='$A' T='$T' POST='$POST'; imagen && [[ \"\$(readlink '$A/bootmnt/arch/x86_64/airootfs.sfs')\" == '$A/copytoram/airootfs.sfs' ]]"
+rm -rf "$A" && mkdir -p "$A"
+probar "sin imagen en ningún lado: falla (unpackfs no seguiría a ciegas)" bash -c "$(declare -f imagen); A='$A' T='$T' POST='$POST'; ! imagen"
+probar "settings.conf corre el paso justo antes de unpackfs" bash -c "grep -A1 -- '- shellprocess@vortex-imagen' '$AQUI/iso/airootfs/etc/calamares/settings.conf' | grep -q -- '- unpackfs@vortex'"
+probar "construir.sh pone copytoram=n en las entradas de arranque" grep -qF "& copytoram=n/" "$AQUI/iso/construir.sh"
+
 echo
 if ((FALLOS)); then
   echo "$FALLOS pruebas fallaron (salidas de lo que corrieron, abajo)"
-  for f in "$T"/kernel.out "$T"/arranque.out "$T"/gpu.out "$T"/vgpu.out "$T"/grub.out "$T"/bios.out; do
+  for f in "$T"/imagen.out "$T"/kernel.out "$T"/arranque.out "$T"/gpu.out "$T"/vgpu.out "$T"/grub.out "$T"/bios.out; do
     [[ -s "$f" ]] && { echo "--- ${f##*/}"; sed 's/^/    /' "$f"; }
   done
   exit 1

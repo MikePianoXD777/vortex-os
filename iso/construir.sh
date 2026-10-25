@@ -248,10 +248,16 @@ grep -rl 'Arch Linux install medium' "$perfil"/efiboot "$perfil"/syslinux "$perf
 # copytoram=n en todas las entradas: archiso copia el sistema a la RAM si la imagen pesa menos de 4 GiB y
 # sobra memoria (casi cualquier PC con 8 GB) y entonces desmonta la USB, y el instalador (unpackfs) ya no
 # encuentra /run/archiso/bootmnt/arch/x86_64/airootfs.sfs: «Falló la instalación» (había que editar la
-# línea de arranque a mano). En la VM de prueba, con 6 GB, no pasaba.
+# línea de arranque a mano). En la VM no se veía: desde un CD archiso nunca copia a la RAM. Si otro
+# cargador (Ventoy) arma su propia línea, «vortex-post-instalacion imagen» lo salva antes de unpackfs.
 entradas="$(grep -rl 'archisobasedir=%INSTALL_DIR%' "$perfil"/efiboot "$perfil"/syslinux "$perfil"/grub 2>/dev/null)"
 [[ -n "$entradas" ]] || { echo "No encontré las entradas de arranque de releng (archisobasedir=%INSTALL_DIR%)." >&2; exit 1; }
 xargs -r sed -i 's/archisobasedir=%INSTALL_DIR%/& copytoram=n/' <<<"$entradas"
+if grep -rh 'archisobasedir=' "$perfil"/efiboot "$perfil"/syslinux "$perfil"/grub | grep -vq 'copytoram=n'; then
+  echo "Hay entradas de arranque sin copytoram=n (¿cambiaron las plantillas de releng?):" >&2
+  grep -rn 'archisobasedir=' "$perfil"/efiboot "$perfil"/syslinux "$perfil"/grub | grep -v 'copytoram=n' >&2
+  exit 1
+fi
 
 # Miku (vortex-miku): el modelo 3D no va en git ni en el paquete, se pone aquí desde la carpeta
 # VORTEX_MIKU_MODELO (modelo.vrm y CREDITO.txt) a /usr/share/vortex-miku/modelo/, 0644 root. Sin

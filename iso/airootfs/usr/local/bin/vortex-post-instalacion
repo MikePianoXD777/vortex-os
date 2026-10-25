@@ -44,6 +44,22 @@ quitar_kernel() {
   rm -f "$raiz/etc/mkinitcpio.d/$pkgbase.preset"
 }
 
+# Antes de unpackfs (sin chroot): unpackfs copia el sistema desde la imagen de la USB, en
+# /run/archiso/bootmnt. Si archiso la copió a la RAM (copytoram: las entradas de la ISO lo apagan, pero
+# Ventoy u otro cargador arman su propia línea de arranque), soltó la USB y esa ruta ya no existe: se
+# vuelve a crear apuntando a la copia en RAM. VORTEX_ARCHISO: otra raíz, para las pruebas.
+paso_imagen() {
+  local archiso="${VORTEX_ARCHISO:-/run/archiso}"
+  local imagen="$archiso/bootmnt/arch/x86_64/airootfs.sfs" copia="$archiso/copytoram/airootfs.sfs"
+  [[ -e "$imagen" ]] && return 0
+  if [[ ! -f "$copia" ]]; then
+    log "no encuentro la imagen del sistema ni en $imagen ni en $copia"
+    return 1
+  fi
+  mkdir -p "${imagen%/*}" && ln -sfn "$copia" "$imagen" || { log "no pude enlazar $copia en $imagen"; return 1; }
+  log "la imagen estaba en la RAM (copytoram): unpackfs la toma de $copia"
+}
+
 paso_kernel() {
   local raiz="${VORTEX_RAIZ:-}" boot
   boot="$raiz/boot"
@@ -349,6 +365,7 @@ paso_espejos() {
 # Se puede cargar con source (pruebas/arranque.sh prueba las funciones sueltas) sin correr nada.
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   case "${1:-}" in
+    imagen) paso_imagen ;;
     kernel) paso_kernel ;;
     final) shift; paso_final "$@" ;;
     arranque) paso_arranque ;;
@@ -356,6 +373,6 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     inicio-automatico) shift; paso_inicio_automatico "$@" ;;
     grub) paso_grub ;;
     gpu) paso_gpu ;;
-    *) echo "uso: vortex-post-instalacion kernel | final USUARIO | arranque | espejos RAIZ | inicio-automatico USUARIO | grub | gpu" >&2; exit 1 ;;
+    *) echo "uso: vortex-post-instalacion imagen | kernel | final USUARIO | arranque | espejos RAIZ | inicio-automatico USUARIO | grub | gpu" >&2; exit 1 ;;
   esac
 fi
