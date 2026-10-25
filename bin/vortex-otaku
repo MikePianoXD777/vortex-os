@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vortex-otaku: «Modo otaku» de Vortexine's OS (un easter egg para un amigo de Mike).
 #
-#   vortex-otaku on|off|alternar|estado|otro|elegir|bajar|borrar      (también: vortex otaku ...)
+#   vortex-otaku on|off|alternar|estado|otro|elegir|bajar|borrar|reparar      (también: vortex otaku ...)
 #
 # «on» baja 10 fondos de las quintillizas («Go-Toubun no Hanayome»), pone uno y le da un toque suave al
 # shell (fuente y bordes más redondeados); mientras está encendido, el selector de fondos (Super+Shift+W,
@@ -52,6 +52,14 @@ TEMA_RADIO=24
 # (ThemeBackend.qml): borrar la clave no le diría nada a un shell que ya está corriendo.
 TEMA_FUENTE_DEFECTO="Adwaita Mono"
 TEMA_RADIO_DEFECTO=18
+# Huella del toque: la carpeta de los fondos otaku con la fuente y los bordes del modo, las tres a la vez.
+# Unos «ajustes de antes» con la huella no son los del usuario: los guardó un «on» que se cortó o una
+# versión vieja que no los devolvió, y cada «off» volvía a poner los fondos otaku. Se cambian por los
+# normales (la carpeta Fondos, y la fuente y los bordes por defecto). Elegir a mano la carpeta otaku
+# en el modo normal no deja la huella completa, y se respeta.
+LIMPIO_JQ='def limpio($d; $fs; $f; $r):
+  if .wallpaperDir == $d and .fontFamily == $f and .borderRadius == $r
+  then {fontFamily: null, borderRadius: null, wallpaperDir: $fs} else . end;'
 
 # Del JSON de Wallhaven: id, página y archivo de las imágenes horizontales (jpg o png),
 # solo si salen de wallhaven.cc o un subdominio suyo, con el punto de por medio (evilwallhaven.cc
@@ -74,6 +82,7 @@ Uso: vortex otaku <comando>
   elegir             abre el selector de fondos para elegir uno de los 10 (también Super+Shift+W)
   bajar              baja los fondos otaku sin encender el modo (para el modo normal)
   borrar             borra los fondos otaku bajados (con el modo apagado)
+  reparar            si el modo está apagado pero los ajustes se quedaron con los suyos, los devuelve
 
 Los fondos se descargan de Wallhaven al encender, a Imágenes/Fondos otaku, y se quedan ahí al
 apagar: en el modo normal los eliges en Ajustes > Tema > Carpeta de fondos. Sin red se usa un
@@ -291,7 +300,9 @@ guardar_antes() {
     [[ -n "$m" ]] && fondos="$(jq -c --arg m "$m" --arg p "$p" '.[$m] = $p' <<<"$fondos")"
   done < <(fondos_actuales)
   if ajustes_validos; then
-    tema="$(jq -c '{fontFamily: (.theme.fontFamily // null), borderRadius: (.theme.borderRadius // null), wallpaperDir: (.wallpaperDir // null)}' "$AJUSTES")"
+    tema="$(jq -c --arg d "$DESTINO" --arg fs "$FONDOS" --arg f "$TEMA_FUENTE" --argjson r "$TEMA_RADIO" "$LIMPIO_JQ"'
+      {fontFamily: (.theme.fontFamily // null), borderRadius: (.theme.borderRadius // null), wallpaperDir: (.wallpaperDir // null)}
+      | limpio($d; $fs; $f; $r)' "$AJUSTES")"
   fi
   jq -n --argjson fondos "$fondos" --argjson tema "$tema" '{fondos: $fondos, tema: $tema}' >"$ANTES.$$"
   mv "$ANTES.$$" "$ANTES"
@@ -309,14 +320,27 @@ restaurar_ajustes() {
   [[ -f "$ANTES" ]] || return 0
   [[ "$(jq -c '.tema' "$ANTES" 2>/dev/null || echo null)" != null ]] || return 0
   ajustes_validos || return 0
-  ajustes_jq '$a[0].tema as $t
+  ajustes_jq "$LIMPIO_JQ"'($a[0].tema | limpio($d; $fs; $f; $r)) as $t
     | .theme = ((.theme // {})
       | .fontFamily = ($t.fontFamily // $fd)
       | .borderRadius = ($t.borderRadius // $rd))
     | if ($t | has("wallpaperDir")) then
         (if $t.wallpaperDir == null then del(.wallpaperDir) else .wallpaperDir = $t.wallpaperDir end)
       else . end' --slurpfile a "$ANTES" --arg fd "$TEMA_FUENTE_DEFECTO" --argjson rd "$TEMA_RADIO_DEFECTO" \
+    --arg d "$DESTINO" --arg fs "$FONDOS" --arg f "$TEMA_FUENTE" --argjson r "$TEMA_RADIO" \
     || { aviso "no pude devolver los ajustes del shell a como estaban; los de antes quedan guardados en $ANTES"; return 1; }
+}
+
+# Con el modo apagado, los ajustes del shell que se quedaron con la huella del toque (ver LIMPIO_JQ)
+# vuelven a los normales. Lo corren «off» y «vortex actualizar». Éxito si no había nada que reparar.
+reparar_restos() {
+  [[ ! -f "$MARCA" && ! -f "$ANTES" ]] || return 0
+  ajustes_validos || return 0
+  jq -e --arg d "$DESTINO" --arg f "$TEMA_FUENTE" --argjson r "$TEMA_RADIO" \
+    '.wallpaperDir == $d and .theme.fontFamily == $f and .theme.borderRadius == $r' "$AJUSTES" >/dev/null 2>&1 || return 0
+  ajustes_jq '.theme = ((.theme // {}) | .fontFamily = $fd | .borderRadius = $rd) | .wallpaperDir = $fs' \
+    --arg fd "$TEMA_FUENTE_DEFECTO" --argjson rd "$TEMA_RADIO_DEFECTO" --arg fs "$FONDOS" || return 1
+  echo "Los ajustes del shell se habían quedado con los del modo otaku: volvieron a los normales (fondos de $FONDOS)."
 }
 
 # Devuelve el fondo de antes en cada monitor (o el de Vortex si no había). Falla si el shell no responde.
@@ -406,6 +430,7 @@ cmd_on() {
 cmd_off() {
   un_solo_proceso
   if [[ ! -f "$MARCA" && ! -f "$ANTES" ]]; then
+    reparar_restos || aviso "no pude devolver los ajustes del shell a los normales"
     echo "El modo otaku ya está apagado."
     return 0
   fi
@@ -421,7 +446,7 @@ cmd_off() {
   # Si los ajustes no volvieron, lo de antes se queda en $ANTES (otro «off» lo reintenta, y un
   # «on» nuevo lo respeta); la marca sí se quita: el modo ya está apagado.
   rm -f "$MARCA"
-  if ((ajustes_ok == 0)); then rm -f "$ANTES"; fi
+  if ((ajustes_ok == 0)); then rm -f "$ANTES"; reparar_restos >/dev/null || true; fi
   if ((ajustes_ok != 0)); then
     echo "Modo otaku apagado, pero los ajustes del shell no volvieron: lo de antes sigue en $ANTES (reintenta con vortex otaku off)."
   elif ((fondo_ok == 0)); then
@@ -506,6 +531,7 @@ case "${1:-ayuda}" in
   otro | siguiente) cmd_otro ;;
   elegir) cmd_elegir ;;
   borrar) cmd_borrar ;;
+  reparar) un_solo_proceso; reparar_restos ;;
   bajar) cmd_bajar ;;
   ayuda | -h | --help) ayuda ;;
   *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;

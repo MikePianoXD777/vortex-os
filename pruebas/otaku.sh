@@ -352,6 +352,44 @@ otaku on >/dev/null
 probar "si ya hay un «antes» sin marca (se cortó una pasada), se conserva" "[[ \"\$(jq -r '.fondos[\"DP-1\"]' '$ANTES')\" == /de/antes.jpg ]]"
 otaku off >/dev/null
 
+echo "== Ajustes que se quedaron con los del modo otaku (el fallo hasta la 1.6.2)"
+# La huella: carpeta otaku + fuente y bordes del modo, sin marca ni «antes» (un «on» viejo cortado).
+envenenar() { jq --arg d "$OTAKU" '.wallpaperDir = $d | .theme.fontFamily = "Google Sans Flex" | .theme.borderRadius = 24' \
+  "$T/settings-original.json" >"$H/.config/serpantinum/settings.json"; }
+nueva_sesion
+envenenar
+salida="$(otaku off)"; rc=$?; printf '%s\n' "$salida" >"$T/salida"
+probar "off con el modo ya apagado devuelve la carpeta Fondos (los fondos otaku dejan de salir)" \
+  "((rc == 0)) && [[ \"\$(ajuste .wallpaperDir)\" == '$FONDOS_ESP' ]]"
+probar "…y la fuente y los bordes por defecto" "[[ \"\$(ajuste .theme.fontFamily)\" == 'Adwaita Mono' && \"\$(ajuste .theme.borderRadius)\" == 18 ]]"
+probar "…sin tocar lo demás" "[[ \"\$(ajuste .theme.activePreset)\" == Matugen && \"\$(ajuste .general.language)\" == es ]]"
+nueva_sesion
+envenenar
+otaku on >/dev/null
+probar "on con los ajustes contaminados no los guarda como «los de antes»" \
+  "[[ \"\$(jq -c .tema '$ANTES')\" == '{\"fontFamily\":null,\"borderRadius\":null,\"wallpaperDir\":\"$FONDOS_ESP\"}' ]]"
+otaku off >/dev/null
+probar "…y al apagar vuelve la carpeta Fondos" "[[ \"\$(ajuste .wallpaperDir)\" == '$FONDOS_ESP' && \"\$(ajuste .theme.fontFamily)\" == 'Adwaita Mono' ]]"
+nueva_sesion
+mkdir -p "$H/.config/vortex"
+echo "{\"fondos\":{},\"tema\":{\"fontFamily\":\"Google Sans Flex\",\"borderRadius\":24,\"wallpaperDir\":\"$OTAKU\"}}" >"$ANTES"
+touch "$MARCA"
+envenenar
+otaku off >/dev/null
+probar "un «antes» viejo con la huella tampoco devuelve los fondos otaku" "[[ \"\$(ajuste .wallpaperDir)\" == '$FONDOS_ESP' && ! -e '$ANTES' ]]"
+nueva_sesion
+jq --arg d "$OTAKU" '.wallpaperDir = $d' "$T/settings-original.json" >"$H/.config/serpantinum/settings.json"
+otaku reparar >/dev/null; rc=$?
+probar "elegir a mano la carpeta otaku (sin la fuente ni los bordes del modo) se respeta" "((rc == 0)) && [[ \"\$(ajuste .wallpaperDir)\" == '$OTAKU' ]]"
+nueva_sesion
+envenenar
+mkdir -p "$H/.config/vortex"; touch "$MARCA"
+otaku reparar >/dev/null
+probar "con el modo encendido «reparar» no toca nada" "[[ \"\$(ajuste .wallpaperDir)\" == '$OTAKU' ]]"
+rm -f "$MARCA"
+grep -q 'vortex-otaku" reparar' "$AQUI/bin/vortex"
+probar "vortex actualizar corre «vortex-otaku reparar»" "(($? == 0))"
+
 echo "== Dos a la vez"
 nueva_sesion
 mkdir -p "$H/.config/vortex"

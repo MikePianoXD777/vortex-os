@@ -597,6 +597,8 @@ cmd_actualizar() {
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
   avisos_primera_vez
+  # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
+  "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
   # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   local pkg instalado
