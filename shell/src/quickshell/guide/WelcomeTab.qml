@@ -255,6 +255,24 @@ GuideTab {
 
                 onTriggered: rootObj.gotoTab("About")
             }
+
+            // Vortex: el botón «67» (pedido de Mike). Suena aunque los efectos estén silenciados: lo
+            // pediste con el clic.
+            ClickButton {
+                id: sixSevenBtn
+                Layout.preferredWidth: rootObj.s(80)
+                Layout.preferredHeight: rootObj.s(48)
+                horizontalPadding: rootObj.s(12)
+                cornerRadius: rootObj.s(12)
+                buttonText: "67"
+                textFontSize: rootObj.s(16)
+                buttonIcon: ""
+                iconFontSize: rootObj.s(16)
+                accentColor: ThemeBackend.surface0
+                textColor: ThemeBackend.text
+
+                onTriggered: Sounds.playSfx("guide/67.ogg", 0.7, 0, true)   // el audio viene muy fuerte (pico en 0 dB)
+            }
         }
     }
 }
