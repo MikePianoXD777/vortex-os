@@ -73,6 +73,9 @@ vulkan-radeon
 lib32-vulkan-radeon
 vulkan-intel
 lib32-vulkan-intel
+# Decodificar video en la GPU (fondos animados, navegador): AMD ya lo trae en mesa.
+intel-media-driver
+libva-nvidia-driver
 
 # --- Escritorio (packages/escritorio.txt y extra.txt) ---
 hyprland

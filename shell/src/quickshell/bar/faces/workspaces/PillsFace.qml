@@ -13,16 +13,17 @@ Item {
     implicitWidth: wsLayout.implicitWidth
     implicitHeight: wsLayout.implicitHeight
 
-    // Vortex: un escritorio con apps crece para que quepan sus íconos (WorkspacesFace.appIconsFor).
+    // Vortex: un escritorio con apps crece para que quepan sus íconos (WorkspacesFace.appIconsKey).
     readonly property real iconSize: widget ? widget.s(widget.isCompact ? 12 : 13) : 13
     readonly property real iconGap: widget ? widget.s(3) : 3
     readonly property real iconPad: widget ? widget.s(5) : 5
-    function iconsOf(index) {
-        return (widget && typeof widget.appIconsFor === "function") ? widget.appIconsFor(index) : [];
+    function iconsKey(index) {
+        return (widget && typeof widget.appIconsKey === "function") ? widget.appIconsKey(index) : "";
     }
     function pillLength(index, active) {
         let base = widget ? widget.s(widget.isCompact ? (active ? 34 : 16) : (active ? 36 : 18)) : (active ? 36 : 18);
-        let n = iconsOf(index).length;
+        let key = iconsKey(index);
+        let n = key === "" ? 0 : key.split("|").length;
         if (n === 0) return base;
         return Math.max(base, n * iconSize + (n - 1) * iconGap + 2 * iconPad);
     }
@@ -222,7 +223,7 @@ Item {
                 required property int index
                 readonly property bool shown: widget && typeof widget.isShown === "function" ? widget.isShown(index) : true
                 readonly property bool isActive: index === pillsFaceRoot.activeIdx
-                readonly property var icons: pillsFaceRoot.iconsOf(index)
+                readonly property string iconsKey: pillsFaceRoot.iconsKey(index)
                 readonly property real length: shown ? pillsFaceRoot.pillLength(index, isActive) : 0
                 readonly property real thickness: widget ? widget.s(widget.isCompact ? 16 : 18) : 18
                 visible: shown
@@ -242,7 +243,7 @@ Item {
                     anchors.centerIn: parent
                     spacing: pillsFaceRoot.iconGap
                     Repeater {
-                        model: iconSlot.icons
+                        model: iconSlot.iconsKey === "" ? [] : iconSlot.iconsKey.split("|")
                         delegate: Image {
                             required property string modelData
                             width: pillsFaceRoot.iconSize

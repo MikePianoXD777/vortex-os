@@ -145,11 +145,12 @@ Item {
         return src;
     }
 
-    // Hasta maxAppIcons íconos distintos de las ventanas del escritorio (en el orden en que se abrieron).
-    function appIconsFor(index) {
-        if (!showAppIcons) return [];
+    // Hasta maxAppIcons íconos distintos de las ventanas del escritorio (en el orden en que se abrieron),
+    // unidos con «|»: un texto igual no vuelve a disparar los bindings (un arreglo nuevo sí, y recreaba los íconos).
+    function appIconsKey(index) {
+        if (!showAppIcons) return "";
         let ws = wsForId(index + 1);
-        if (!ws || !ws.toplevels || !ws.toplevels.values) return [];
+        if (!ws || !ws.toplevels || !ws.toplevels.values) return "";
         let vistos = {};
         let out = [];
         let tops = ws.toplevels.values;
@@ -160,7 +161,7 @@ Item {
             vistos[id] = true;
             out.push(iconForApp(id));
         }
-        return out;
+        return out.join("|");
     }
 
     ListModel {

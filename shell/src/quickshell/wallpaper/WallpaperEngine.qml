@@ -48,7 +48,7 @@ ShellRoot {
 
                 // Vortex: fondos animados (Ajustes > Tema > Fondos animados; «animatedWallpapers» en
                 // settings.json). Se pausan solos (se queda el cuadro) si están apagados, si hay ventanas
-                // en el escritorio de este monitor o con la laptop a batería; y se reproduce una copia
+                // en el escritorio de este monitor, con la laptop a batería o con el equipo inactivo; y se reproduce una copia
                 // optimizada (scripts/wallpaper/optimizar_video.sh) en cuanto está lista.
                 property int animRev: 0
                 readonly property var animCfg: {
@@ -66,7 +66,13 @@ ShellRoot {
                     return !!(ws && ws.toplevels && ws.toplevels.values && ws.toplevels.values.length > 0);
                 }
                 readonly property bool onBattery: UPower.onBattery
-                readonly property bool autoPaused: !animEnabled || (animPauseCovered && covered) || (animPauseBattery && onBattery)
+                // También tras 3 min sin tocar el equipo (pantalla bloqueada o apagada): nadie lo ve.
+                IdleMonitor {
+                    id: animIdle
+                    timeout: 180
+                    respectInhibitors: true
+                }
+                readonly property bool autoPaused: !animEnabled || (animPauseCovered && covered) || (animPauseBattery && onBattery) || animIdle.isIdle
                 readonly property bool effectivePaused: playbackPaused || autoPaused
                 property var optimizedReady: ({})       // video original -> copia optimizada (ya hecha)
                 property var optimizedApplied: ({})     // las que ya se reproducen (se cambian sin que se vea)

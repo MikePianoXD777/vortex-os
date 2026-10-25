@@ -6,8 +6,9 @@
 #
 #   optimizar_video.sh VIDEO ANCHO ALTO CARPETA_CACHE
 #
-# Corre con prioridad baja (nice/ionice) y una sola vez por video y tamaño (flock): dos monitores con
-# el mismo fondo esperan a la misma copia. Las copias que nadie usa en 30 días se borran.
+# Corre con prioridad baja (nice/ionice) y con 2 hilos, para no ocupar todos los núcleos de una PC modesta,
+# y una sola vez por video y tamaño (flock): dos monitores con el mismo fondo esperan a la misma copia.
+# Las copias que nadie usa en 30 días se borran.
 set -uo pipefail
 
 entrada="$1" ancho="$2" alto="$3" cache="$4"
@@ -45,7 +46,7 @@ if [[ ! -s "$salida" ]]; then
   # Cubre el monitor (como PreserveAspectCrop) y recorta lo que sobra; dimensiones pares para yuv420p.
   if nice -n 19 ionice -c 3 ffmpeg -nostdin -hide_banner -loglevel error -y -i "$entrada" -an \
     -vf "scale=${ancho}:${alto}:force_original_aspect_ratio=increase,crop=${ancho}:${alto},fps=fps='min(source_fps,30)',format=yuv420p" \
-    -c:v libx264 -preset veryfast -crf 24 -tune film -movflags +faststart "$tmp"; then
+    -c:v libx264 -preset veryfast -crf 24 -tune film -g 60 -threads 2 -movflags +faststart "$tmp"; then
     mv -f "$tmp" "$salida"
   else
     rm -f "$tmp"

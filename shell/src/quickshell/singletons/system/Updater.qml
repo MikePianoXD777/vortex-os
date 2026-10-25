@@ -39,6 +39,14 @@ Item {
         return matches.map(function(n) { return parseInt(n, 10); });
     }
 
+    // NixOS y Vortexine's OS actualizan el shell por su cuenta (Vortex: «vortex actualizar»): no se consulta
+    // la versión de Serpantinum en GitHub ni se avisa de una actualización que no aplica.
+    function managedElsewhere() {
+        if (typeof SystemInfo === "undefined" || !SystemInfo.osName) return false;
+        let os = SystemInfo.osName.toLowerCase();
+        return os.indexOf("nixos") !== -1 || os.indexOf("vortexine") !== -1;
+    }
+
     function isRemoteNewer(remote, local) {
         let r = parseVersion(remote);
         let l = parseVersion(local);
@@ -53,7 +61,7 @@ Item {
     }
 
     function reevaluateUpdate() {
-        if (typeof SystemInfo !== "undefined" && SystemInfo.osName.toLowerCase().indexOf("nixos") !== -1) {
+        if (root.managedElsewhere()) {
             root.updateAvailable = false;
             return;
         }
@@ -102,7 +110,7 @@ Item {
     }
 
     function checkUpdate() {
-        if (typeof SystemInfo !== "undefined" && SystemInfo.osName.toLowerCase().indexOf("nixos") !== -1) return;
+        if (root.managedElsewhere()) return;
         if (typeof Caching === "undefined" || !Caching.serpantinumDir) return;
         if (updateProc.running) return;
         root.isChecking = true;
@@ -110,7 +118,7 @@ Item {
     }
 
     function scheduleInitialCheck() {
-        if (typeof SystemInfo !== "undefined" && SystemInfo.osName.toLowerCase().indexOf("nixos") !== -1) return;
+        if (root.managedElsewhere()) return;
         if (typeof Caching === "undefined" || !Caching.serpantinumDir) return;
         if (checkDelayProc.running) return;
         checkDelayProc.running = true;
@@ -181,7 +189,7 @@ Item {
         id: periodicTimer
         interval: 60 * 60 * 1000
         repeat: true
-        running: true
+        running: !root.managedElsewhere()
         onTriggered: root.checkUpdate()
     }
 

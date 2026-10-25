@@ -22,7 +22,9 @@ Item {
     property bool blurBackground: false
     property string blurStyle: "blur"
     readonly property real liquidGlassOpacity: 0.1
-    readonly property bool glassActive: blurBackground && elementOpacity < 0.999
+    // Vortex: con 97 % o más de opacidad el desenfoque no se ve y su FrameAnimation corría a la frecuencia
+    // del monitor sin parar (WallpaperBlur): desde ahí se apaga.
+    readonly property bool glassActive: blurBackground && elementOpacity < 0.97
     readonly property bool liquidGlass: blurBackground && blurStyle === "liquid"
 
     property color base: "#1e1e2e"
