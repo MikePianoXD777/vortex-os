@@ -177,7 +177,14 @@ case "${1:-}" in
     iso="${2:-$ISO_ARCH}"
     [[ -f "$iso" ]] || { echo "No encuentro la ISO: $iso" >&2; exit 1; }
     qemu_comun
-    lanzar "${QEMU[@]}" -drive "file=$iso,media=cdrom,index=2" -drive "file=$VM/semilla.iso,media=cdrom,index=3" -boot d
+    if [[ "${VORTEX_VM_USB:-0}" == 1 ]]; then
+      # La ISO como memoria USB, como en una PC: desde un CD archiso nunca copia el sistema a la RAM
+      # (copytoram), desde una USB sí (y así se vio el fallo del instalador de las ISO hasta la 1.6.1).
+      lanzar "${QEMU[@]}" -device qemu-xhci -drive "if=none,id=usb,format=raw,readonly=on,file=$iso" \
+        -device usb-storage,drive=usb,bootindex=0 -drive "file=$VM/semilla.iso,media=cdrom,index=3"
+    else
+      lanzar "${QEMU[@]}" -drive "file=$iso,media=cdrom,index=2" -drive "file=$VM/semilla.iso,media=cdrom,index=3" -boot d
+    fi
     echo "VM arrancando desde $(basename "$iso")"
     ;;
   disco)
