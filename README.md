@@ -3,9 +3,9 @@
 Parte de **Vortex Suite**: las funciones de los grandes, pero fáciles de usar.
 La capacidad sí; la complejidad no.
 
-Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hyprland con el shell
-[Serpantinum](https://github.com/ilyamiro/serpantinum) (barra arriba, paneles animados, colores que salen
-de tu fondo) optimizado, y **Claude integrado** para que pueda ver lo que haces (con tu permiso) y ayudarte.
+Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hyprland con Vortex Shell
+(basado en [Serpantinum](https://github.com/ilyamiro/serpantinum): barra arriba, paneles animados, colores
+que salen de tu fondo), y **Claude integrado** para que pueda ver lo que haces (con tu permiso) y ayudarte.
 
 > Estado: **0.2 en desarrollo**. En una VM (QEMU/KVM, UEFI, Arch limpio) el instalador corre completo, arranca
 > con `linux-cachyos` y `scx_lavd` en ~3 s, y el shell funciona en español con 0 avisos en su registro.
@@ -80,7 +80,7 @@ piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 | Kernel | `linux-cachyos` (BORE) + `scx_lavd` | baja latencia en juegos; los repos se eligen solos según tu CPU (genérico, v3, v4 o znver4) |
 | Ajustes | `cachyos-settings` + extras de Vortex | zram, sysctl y límites ya probados por CachyOS; sin `ananicy-cpp` (sobra con `scx_lavd`) |
 | Drivers | `chwd` | detecta NVIDIA, AMD, Intel e híbridas |
-| Escritorio | Hyprland + Serpantinum (`shell/`) | barra arriba, calendario y clima, panel de red, centro de control, música con ecualizador, carrusel de fondos, app de Ajustes |
+| Escritorio | Hyprland + Vortex Shell (Serpantinum con los parches de Vortex, `shell/`) | barra arriba, calendario y clima, panel de red, centro de control, música con ecualizador, carrusel de fondos, app de Ajustes |
 | Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
