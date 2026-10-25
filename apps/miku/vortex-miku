@@ -415,17 +415,20 @@ NATURAL_QWENTTS_CPU = ("qwentts-cpp-python @ https://huggingface.co/datasets/and
 NATURAL_PAQUETES_CPU = NATURAL_PAQUETES + [NATURAL_QWENTTS_CPU]
 # Modo CUDA (NVIDIA de la serie 10 o una de 4-5 GB, donde el PyTorch de la GPU no corre): el mismo modelo 1.7B
 # que en modo GPU (la misma voz), cuantizado en GGUF, con qwentts.cpp en la GPU. Ninguna rueda publicada trae las
-# Pascal (sm_61): Vortex publica su propia compilación de qwentts.cpp (el commit que espera la rueda 0.5.0, con
-# CUDA 12.9 para sm_61 y sm_86), fijada con sha256. CUDA 12 (runtime y cuBLAS) llega con pip.
+# Pascal (sm_61). CUDA 12 (runtime y cuBLAS) llega con pip.
+# En los modos cpu y cuda, qwentts.cpp es una compilación de Vortex (el commit que espera la rueda 0.5.0, la de CUDA
+# con CUDA 12.9 para sm_61 y sm_86) con un parche: QWENTTS_MIN_NEW_TOKENS impide que el modelo termine antes de
+# tantos pasos. Sin él, las frases cortas («Hola, ¿cómo estás?») muchas veces salían vacías. Fijadas con sha256.
 NATURAL_CC_MIN_CUDA = 6.1       # GTX 10 (Pascal)
 NATURAL_GIB_MIN_CUDA = 4.0      # el 1.7B en Q4_K_M ocupa ~4,1 GB de VRAM; en Q8_0 ~4,9 GB
 NATURAL_GIB_Q8 = 7.5            # con 8 GB o más, Q8_0 (la más parecida a la de modo GPU); con menos, Q4_K_M
 NATURAL_PAQUETES_CUDA = NATURAL_PAQUETES_CPU + ["nvidia-cuda-runtime-cu12==12.9.79", "nvidia-cublas-cu12==12.9.2.10"]
-NATURAL_LIBS_CUDA = {
-    "url": os.environ.get("VORTEX_MIKU_QWENTTS_CUDA_URL") or
-           "https://github.com/MikePianoXD777/vortex-os/releases/download/miku-qwentts-cuda-1/"
-           "vortex-miku-qwentts-cuda-1.tar.gz",
-    "sha256": os.environ.get("VORTEX_MIKU_QWENTTS_CUDA_SHA256") or "62bde96dcdfb7a4c9b58189a63aaca46d5a886b8b7342c350c2f8dfab907f523",
+NATURAL_LIBS = {
+    modo: {"url": os.environ.get(f"VORTEX_MIKU_QWENTTS_{modo.upper()}_URL") or
+                  f"https://github.com/MikePianoXD777/vortex-os/releases/download/miku-qwentts-2/"
+                  f"vortex-miku-qwentts-{modo}-2.tar.gz",
+           "sha256": os.environ.get(f"VORTEX_MIKU_QWENTTS_{modo.upper()}_SHA256") or sha}
+    for modo, sha in (("cuda", "5a42d5ac901e07ab888b4d2ec9ffd4ad6243d2fa6867d09798d4a0f6e9c658f5"), ("cpu", "532d54cc64f6ef340dc84940d1194f2f0017c8b2b276d833d4d2e7f6c5842c4e"))
 }
 # Las bibliotecas de CUDA 12 que pide libggml-cuda: enlaces junto a ella, a las que puso pip en el entorno.
 NATURAL_CUDA_ENLACES = {"libcudart.so.12": "cuda_runtime", "libcublas.so.12": "cublas", "libcublasLt.so.12": "cublas"}
@@ -485,7 +488,23 @@ def gpu_vieja_para_natural() -> tuple[bool, str, str]:
     return True, f"{nombre} ({gib:.0f} GB)", "Q8_0" if gib >= NATURAL_GIB_Q8 else "Q4_K_M"
 
 
-NATURAL_RAM_CPU_GIB = 7.0       # en la CPU ocupa ~4 GB mientras Miku está abierta: hace falta una PC de 8 GB
+NATURAL_RAM_CPU_GIB = 7.0       # en la CPU el 0.6B ocupa ~4 GB mientras Miku está abierta: hace falta una PC de 8 GB
+NATURAL_RAM_17_GIB = 11.0       # el 1.7B (la voz de las GPU) ocupa ~5,5 GB: con 12 GB o más. Igual de rápido en la CPU
+
+
+def ram_gib() -> float:
+    try:
+        for linea in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if linea.startswith("MemTotal:"):
+                return int(linea.split()[1]) / 1024 / 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0.0
+
+
+def modelo_para_cpu(voz: dict) -> str:
+    """En la CPU: el 1.7B (la misma voz que en la GPU) si hay RAM; si no, el 0.6B."""
+    return voz["modelo"] if ram_gib() >= NATURAL_RAM_17_GIB else voz["modelo_cpu"]
 
 
 def generacion_cpu(nombre: str) -> tuple[bool, str] | None:
@@ -523,14 +542,7 @@ def cpu_para_natural() -> tuple[bool, str]:
                 break
     except OSError:
         pass
-    ram = 0.0
-    try:
-        for linea in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
-            if linea.startswith("MemTotal:"):
-                ram = int(linea.split()[1]) / 1024 / 1024
-                break
-    except (OSError, ValueError, IndexError):
-        pass
+    ram = ram_gib()
     if not nombre:
         return False, "no pude leer qué procesador tienes."
     gen = generacion_cpu(nombre)
@@ -562,26 +574,32 @@ def elegir_modo(args: list[str]) -> tuple[str, str]:
     return "", f"GPU: no sirve ({gpu.rstrip('.')}). Procesador: {cpu}"
 
 
-def bajar_libs_cuda() -> int:
-    """Baja la compilación de qwentts.cpp con CUDA (comprobada con sha256) a NATURAL/cuda y la enlaza con el
-    CUDA 12 que puso pip. 0 si quedó lista."""
+def libs_listas() -> bool:
+    """¿Tiene la compilación de qwentts.cpp de Vortex? (las instalaciones en la CPU de antes de la 1.7, no)."""
+    return (rutas.NATURAL / "qwentts" / "libqwen.so").is_file()
+
+
+def bajar_libs(modo: str) -> int:
+    """Baja la compilación de qwentts.cpp de ese modo (comprobada con sha256) a NATURAL/qwentts; la de CUDA, la
+    enlaza con el CUDA 12 que puso pip. 0 si quedó lista."""
     import hashlib
     import tarfile
     import urllib.request
-    destino = rutas.NATURAL / "cuda"
-    archivo = rutas.NATURAL / "qwentts-cuda.tar.gz"
+    paquete = NATURAL_LIBS[modo]
+    destino = rutas.NATURAL / "qwentts"
+    archivo = rutas.NATURAL / "qwentts.tar.gz"
     try:
-        with urllib.request.urlopen(NATURAL_LIBS_CUDA["url"], timeout=60) as r, open(archivo, "wb") as f:
+        with urllib.request.urlopen(paquete["url"], timeout=60) as r, open(archivo, "wb") as f:
             shutil.copyfileobj(r, f, 1 << 20)
         h = hashlib.sha256()
         with open(archivo, "rb") as f:
             for trozo in iter(lambda: f.read(1 << 20), b""):
                 h.update(trozo)
-        if h.hexdigest() != NATURAL_LIBS_CUDA["sha256"]:
+        if h.hexdigest() != paquete["sha256"]:
             print("La descarga no coincide con su sha256: no la uso.", file=sys.stderr)
             return 1
         shutil.rmtree(destino, ignore_errors=True)
-        nuevo = rutas.NATURAL / "cuda.nuevo"
+        nuevo = rutas.NATURAL / "qwentts.nuevo"
         shutil.rmtree(nuevo, ignore_errors=True)
         nuevo.mkdir(parents=True)
         with tarfile.open(archivo) as tar:
@@ -593,8 +611,8 @@ def bajar_libs_cuda() -> int:
             print("La descarga no trae libqwen.so.", file=sys.stderr)
             return 1
         sitio = next((rutas.NATURAL / "venv" / "lib").glob("python3*/site-packages"), None)
-        for nombre, paquete in NATURAL_CUDA_ENLACES.items():
-            real = sitio / "nvidia" / paquete / "lib" / nombre if sitio else None
+        for nombre, carpeta in (NATURAL_CUDA_ENLACES.items() if modo == "cuda" else ()):
+            real = sitio / "nvidia" / carpeta / "lib" / nombre if sitio else None
             if real is None or not real.exists():
                 print(f"Falta {nombre} (pip no puso CUDA 12).", file=sys.stderr)
                 return 1
@@ -610,27 +628,32 @@ def bajar_libs_cuda() -> int:
 
 
 def mejorar_natural() -> int:
-    """Si la voz natural quedó en la CPU (la 0.6B, lenta y menos natural) pero la GPU sí sirve (GPU o, desde la 1.7,
-    las NVIDIA serie 10 en modo cuda), la rehace con la voz 1.7B de las GPU. La ventana de Miku la lanza sola. Se
-    arma en otra carpeta y se cambia al final: mientras, Miku sigue hablando con la de antes."""
+    """Si la voz natural quedó en la CPU y ahora la GPU sirve (GPU o, desde la 1.7, las NVIDIA serie 10 en modo
+    cuda), la rehace en la GPU; si sigue en la CPU con el 0.6B y hay RAM para el 1.7B, la rehace con el 1.7B (la
+    misma voz que en las GPU). La ventana de Miku la lanza sola. Se arma en otra carpeta y se cambia al final:
+    mientras, Miku sigue hablando con la de antes. Una voz en modo gpu o cuda no se toca."""
     voz = voces.buscar("miku-natural")
     if voz is None or not voces.disponible(voz) or voces.modo_natural() != "cpu" or not config.cargar()["voz_natural_auto"]:
         print("No hace falta: la voz natural no está en modo CPU.")
         return 0
     modo, porque = elegir_modo([])
-    if modo not in ("gpu", "cuda"):
-        print(f"No hace falta: la GPU no sirve. {porque}")
+    if modo == "cpu" and voces.modelo_natural_cpu(voz) != voz["modelo"] and modelo_para_cpu(voz) == voz["modelo"]:
+        porque = "Sigue en la CPU, pero con la voz 1.7B (la misma que en las GPU)."
+    elif modo == "cpu" and not libs_listas():
+        porque = "Sigue en la CPU, con el arreglo de las frases cortas que salían vacías."
+    elif modo not in ("gpu", "cuda"):
+        print(f"No hace falta: la GPU no sirve y ya tiene el mejor modelo para la CPU. {porque}")
         return 0
     actual = rutas.NATURAL
     nueva = actual.with_name(actual.name + "-nueva")
-    nombres = ("NATURAL", "NATURAL_PYTHON", "NATURAL_LISTO", "NATURAL_MODO", "NATURAL_CUANT")
+    nombres = ("NATURAL", "NATURAL_PYTHON", "NATURAL_LISTO", "NATURAL_MODO", "NATURAL_CUANT", "NATURAL_MODELO")
     antes = {n: getattr(rutas, n) for n in nombres}
     for n in nombres:
         setattr(rutas, n, nueva / antes[n].relative_to(actual) if n != "NATURAL" else nueva)
     try:
-        print(f"{time.strftime('%F %T')} la voz natural está en la CPU y tu GPU sí sirve: la rehago en modo "
-              f"{modo.upper()}.", flush=True)
-        rc = orden_natural(["instalar", "--auto", "--nueva"])
+        print(f"{time.strftime('%F %T')} la voz natural está en la CPU: la rehago en modo "
+              f"{modo.upper()}. {porque}", flush=True)
+        rc = orden_natural(["instalar", "--auto", "--nueva"] + (["--cpu"] if modo == "cpu" else []))
         listo = rutas.NATURAL_LISTO.is_file()
     finally:
         for n, valor in antes.items():
@@ -642,9 +665,10 @@ def mejorar_natural() -> int:
     actual.rename(vieja)
     nueva.rename(actual)
     shutil.rmtree(vieja, ignore_errors=True)
-    print("Listo: la voz natural ya va en la GPU; Miku la usa la próxima vez que la abras.")
+    donde = "en tu GPU" if modo != "cpu" else "con la voz completa (1.7B)"
+    print(f"Listo: la voz natural ya va {donde}; Miku la usa la próxima vez que la abras.")
     subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "Miku mejoró su voz natural",
-                    "Ahora va en tu GPU: la usa la próxima vez que la abras (Super+O)."], capture_output=True, check=False)
+                    f"Ahora va {donde}: la usa la próxima vez que la abras (Super+O)."], capture_output=True, check=False)
     return 0
 
 
@@ -661,7 +685,8 @@ def orden_natural(args: list[str]) -> int:
               f"{' y en uso' if config.cargar()['voz'] == 'miku-natural' else ''}.")
         if instalada:
             print("  Modo: " + {"gpu": "GPU", "cuda": f"GPU con qwentts.cpp ({voces.cuantizacion_natural()})"}.get(
-                voces.modo_natural(), "CPU (lento: cada frase tarda unos 6 s más lo que dura)"))
+                voces.modo_natural(), "CPU (lento: cada frase tarda unos 7 s más lo que dura)"
+                + ("" if voces.modelo_natural_cpu(voz) == voz["modelo"] else ", con el modelo ligero 0.6B")))
         print(f"  GPU: {gpu if ok else 'no sirve: ' + gpu}")
         if not ok and modo == "cuda":
             print(f"  Pero sirve con qwentts.cpp: {gpu_vieja_para_natural()[1]}")
@@ -672,7 +697,7 @@ def orden_natural(args: list[str]) -> int:
             if modo:
                 print("  Instálala con: vortex-miku natural instalar   " + {
                     "gpu": "(~7 GB, una sola vez)", "cuda": "(~4 GB, una sola vez)"}.get(
-                    modo, "(en la CPU, lenta; ~3 GB, una sola vez)"))
+                    modo, "(en la CPU, lenta; ~3,5 GB, una sola vez)"))
                 if config.cargar()["voz_natural_auto"]:
                     print("  (Miku la instala sola en segundo plano la próxima vez que la abras.)")
             else:
@@ -715,7 +740,7 @@ def orden_natural(args: list[str]) -> int:
     if auto:
         print(f"{time.strftime('%F %T')} instalación automática ({modo.upper()}). {porque}", flush=True)
         subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "Miku está preparando su voz natural",
-                        "Una sola vez (" + {"gpu": "~7 GB", "cuda": "~4 GB"}.get(modo, "~3 GB, en el procesador: será lenta")
+                        "Una sola vez (" + {"gpu": "~7 GB", "cuda": "~4 GB"}.get(modo, "~3,5 GB, en el procesador: será lenta")
                         + "). Mientras, habla con la de siempre."], capture_output=True, check=False)
     if not modo:
         return error(f"tu PC no aguanta la voz natural. {porque}\nMiku sigue con la voz de siempre. Si igual la "
@@ -727,18 +752,26 @@ def orden_natural(args: list[str]) -> int:
               "+ el modelo ~1,5-2,5 GB; una sola vez). Es la misma voz que en las GPU nuevas.")
     else:
         print(f"{porque} Instalo la voz natural en la CPU, en {rutas.NATURAL}\n(PyTorch de CPU y lo demás ~2 GB + el "
-              "modelo ~0,9 GB; una sola vez).")
-        print("Ojo: en la CPU es lenta. Cada frase tarda en salir unos 6 s más lo que dura (en un i7 de 8 núcleos),\n"
+              "modelo ~1,5 GB; una sola vez).")
+        print("Ojo: en la CPU es lenta. Cada frase tarda en salir unos 7 s más lo que dura (en un i7 de 8 núcleos),\n"
               "así que Miku tarda más en contestar.")
     rutas.NATURAL.mkdir(parents=True, exist_ok=True)
     rutas.NATURAL_LISTO.unlink(missing_ok=True)
     if voces.modo_natural() != modo and (rutas.NATURAL / "venv").exists():
         # El PyTorch de un modo no sirve para el otro (el de CPU no trae CUDA) y los modelos son otros.
         print(f"Estaba instalada en modo {voces.modo_natural().upper()}: la rehago para {modo.upper()}.")
-        for d in ("venv", "hf", "referencias", "cuda"):
+        for d in ("venv", "hf", "referencias", "qwentts"):
             shutil.rmtree(rutas.NATURAL / d, ignore_errors=True)
     rutas.NATURAL_MODO.write_text(modo + "\n", encoding="utf-8")
     cuant = voz["cuantizacion_cpu"]
+    modelo_cpu = modelo_para_cpu(voz)
+    if modo == "cpu":
+        if voces.modelo_natural_cpu(voz) != modelo_cpu:
+            shutil.rmtree(rutas.NATURAL / "referencias", ignore_errors=True)    # la muestra procesada es del modelo
+        rutas.NATURAL_MODELO.write_text(modelo_cpu + "\n", encoding="utf-8")
+        if modelo_cpu != voz["modelo"]:
+            print(f"Con {ram_gib():.0f} GB de RAM uso el modelo ligero (0.6B); con 12 GB o más sería la misma voz que en "
+                  "las GPU.")
     if modo == "cuda":
         ok_cuda, _, cuant = gpu_vieja_para_natural()
         cuant = cuant or "Q4_K_M"                       # con --cuda y una GPU que no se pudo leer
@@ -765,12 +798,11 @@ def orden_natural(args: list[str]) -> int:
             ("Instalando Qwen3-TTS y qwentts.cpp" + (" con CUDA 12" if modo == "cuda" else ""),
              pip + (NATURAL_PAQUETES_CUDA if modo == "cuda" else NATURAL_PAQUETES_CPU)),
         ]
-        if modo == "cuda":
-            pasos.append(("Bajando qwentts.cpp para tu GPU", bajar_libs_cuda))
+        pasos.append(("Bajando qwentts.cpp" + (" para tu GPU" if modo == "cuda" else ""), lambda: bajar_libs(modo)))
         pasos.append(("Bajando el modelo de la voz", [str(venv_py), "-I", "-c",
                                                      "import sys; from qwentts_cpp.models import resolve_gguf_paths; "
                                                      "resolve_gguf_paths(sys.argv[1], quant=sys.argv[2], cache_dir=sys.argv[3])",
-                                                     voz["modelo" if modo == "cuda" else "modelo_cpu"], cuant,
+                                                     voz["modelo"] if modo == "cuda" else modelo_cpu, cuant,
                                                      str(rutas.NATURAL / "hf")]))
     for titulo, cmd in pasos:
         print(f"\n==> {titulo}…", flush=True)
@@ -778,7 +810,7 @@ def orden_natural(args: list[str]) -> int:
             forzado = " --cpu" if "--cpu" in args else " --cuda" if "--cuda" in args else ""
             return error(f"falló «{titulo}». Lo bajado se conserva: vuelve a correr «vortex-miku natural instalar"
                          f"{forzado}».")
-    print("\n==> Probando la voz…" + (" (en la CPU tarda unos 20 s)" if modo == "cpu" else ""), flush=True)
+    print("\n==> Probando la voz…" + (" (en la CPU tarda unos 30 s)" if modo == "cpu" else ""), flush=True)
     prueba = rutas.temporales() / f"natural-{os.getpid()}.wav"
     r = subprocess.run([str(venv_py), "-I", str(RAIZ / "miku" / "voz_natural.py"), "--salida", str(prueba),
                         "Hola... ya estoy lista."], env={**os.environ, "HF_HUB_OFFLINE": "1"})
@@ -789,10 +821,10 @@ def orden_natural(args: list[str]) -> int:
         rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_PAQUETES) + f"\n{voz['modelo']}\n", encoding="utf-8")
     elif modo == "cuda":
         rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_TORCH_CPU + NATURAL_PAQUETES_CUDA)
-                                       + f"\n{NATURAL_LIBS_CUDA['sha256']}\n{voz['modelo']} {cuant}\n", encoding="utf-8")
+                                       + f"\n{NATURAL_LIBS['cuda']['sha256']}\n{voz['modelo']} {cuant}\n", encoding="utf-8")
     else:
         rutas.NATURAL_LISTO.write_text(" ".join(NATURAL_TORCH_CPU + NATURAL_PAQUETES_CPU)
-                                       + f"\n{voz['modelo_cpu']} {voz['cuantizacion_cpu']}\n", encoding="utf-8")
+                                       + f"\n{NATURAL_LIBS['cpu']['sha256']}\n{modelo_cpu} {voz['cuantizacion_cpu']}\n", encoding="utf-8")
     if "--nueva" in args:
         return 0
     if auto and config.cargar()["voz"] != voces.VOZ_DEFECTO:
@@ -807,8 +839,8 @@ def orden_natural(args: list[str]) -> int:
     if modo in ("gpu", "cuda"):
         print("\nListo: Miku ya habla con su voz natural. Solo usa la GPU mientras Miku está abierta.")
     else:
-        print("\nListo: Miku ya habla con su voz natural, en la CPU (modo lento). Solo ocupa memoria (~4 GB) "
-              "mientras Miku está abierta.")
+        print("\nListo: Miku ya habla con su voz natural, en la CPU (modo lento). Solo ocupa memoria ("
+              + ("~5,5 GB" if modelo_cpu == voz["modelo"] else "~4 GB") + ") mientras Miku está abierta.")
     print("Pruébala con: vortex-miku decir \"Hola... ¿cómo estás?\"")
     if reabrir_si_esta_abierta():
         print("Miku estaba abierta: la volví a abrir con la voz nueva.")

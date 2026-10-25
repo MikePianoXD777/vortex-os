@@ -60,6 +60,16 @@ def modo_natural() -> str:
     return modo if modo in ("gpu", "cuda", "cpu") else "gpu"
 
 
+def modelo_natural_cpu(voz: dict) -> str:
+    """Modo cpu: qué modelo se bajó. Desde la 1.7, el 1.7B (la misma voz que en la GPU) si hay RAM; las
+    instalaciones de antes (sin el archivo) tienen el 0.6B."""
+    try:
+        modelo = rutas.NATURAL_MODELO.read_text(encoding="utf-8").strip()
+    except OSError:
+        return voz["modelo_cpu"]
+    return modelo if modelo in (voz["modelo"], voz["modelo_cpu"]) else voz["modelo_cpu"]
+
+
 def cuantizacion_natural() -> str:
     """Modo cuda: con qué cuantización se bajó el modelo (Q8_0 o Q4_K_M)."""
     try:

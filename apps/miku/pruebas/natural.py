@@ -172,7 +172,7 @@ class SubprocesoFalso:
 
 
 def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = True, vieja: str = "",
-             orden: str = "instalar"):
+             orden: str = "instalar", ram: float = 16.0):
     """Corre «vortex-miku natural instalar ARGS» de mentira. Devuelve (código, texto, subproceso, módulo)."""
     rutas, voces, _ = recargar(carpeta)
     m = cargar_comando()
@@ -188,13 +188,14 @@ def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = 
     m.gpu_vieja_para_natural = lambda: ((True, "NVIDIA GeForce GTX 1060 6GB (6 GB)", vieja) if vieja else
                                         (False, "no hay una GPU NVIDIA con su driver.", ""))
     m.libs_bajadas = []
+    m.ram_gib = lambda: ram
 
-    def bajar_libs():
-        m.libs_bajadas.append(str(m.rutas.NATURAL))
-        (m.rutas.NATURAL / "cuda").mkdir(parents=True, exist_ok=True)
-        (m.rutas.NATURAL / "cuda" / "libqwen.so").write_text("")
+    def bajar_libs(modo):
+        m.libs_bajadas.append((modo, str(m.rutas.NATURAL)))
+        (m.rutas.NATURAL / "qwentts").mkdir(parents=True, exist_ok=True)
+        (m.rutas.NATURAL / "qwentts" / "libqwen.so").write_text("")
         return 0
-    m.bajar_libs_cuda = bajar_libs
+    m.bajar_libs = bajar_libs
     m.reabrir_si_esta_abierta = lambda: False
     m.reabrio = False
 
@@ -241,8 +242,16 @@ def eleccion() -> None:
         probar("luego faster-qwen3-tts y la rueda de CPU de qwentts.cpp, fijada con sha256 (nada de CUDA)",
                len(pip) == 2 and "faster-qwen3-tts==0.5.4" in pip[1] and "qwentts_cpp_python-0.5.0%2Bcpu" in pip[1]
                and "#sha256=" in pip[1] and "nvidia" not in pip[1] and "download.pytorch.org" not in pip[1])
-        probar("baja el GGUF del 0.6B en Q4_K_M", any("resolve_gguf_paths" in " ".join(c) and "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-                                                     in c and "Q4_K_M" in c for c in falso.ordenes))
+        probar("baja la compilación de qwentts.cpp de CPU (la del arreglo de las frases cortas)",
+               m.libs_bajadas == [("cpu", str(base / "cpu"))])
+        probar("con 16 GB de RAM baja el GGUF del 1.7B (la misma voz que en la GPU) en Q4_K_M",
+               any("resolve_gguf_paths" in " ".join(c) and "Qwen/Qwen3-TTS-12Hz-1.7B-Base" in c and "Q4_K_M" in c
+                   for c in falso.ordenes) and (base / "cpu/modelo").read_text().strip() == "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
+        rc, texto, falso, m = instalar(base / "cpu8", [], gpu_sirve=False, ram=7.6)
+        probar("con 8 GB, el 0.6B (y lo dice)", rc == 0 and "modelo ligero" in texto
+               and any("Qwen/Qwen3-TTS-12Hz-0.6B-Base" in c for c in falso.ordenes)
+               and (base / "cpu8/modelo").read_text().strip() == "Qwen/Qwen3-TTS-12Hz-0.6B-Base")
+        probar("«natural estado» lo dice", "modelo ligero 0.6B" in estado(m))
         e = estado(m)
         probar("«natural estado» dice CPU (lento) y que la GPU no sirve", "Modo: CPU (lento" in e and "no sirve" in e)
 
@@ -311,7 +320,7 @@ def eleccion() -> None:
         probar("PyTorch de CPU y luego qwentts.cpp con el CUDA 12 de pip (sin el PyTorch de CUDA)",
                len(pip) == 2 and "download.pytorch.org/whl/cpu" in pip[0] and "nvidia-cublas-cu12==" in pip[1]
                and "nvidia-cuda-runtime-cu12==" in pip[1] and "qwentts_cpp_python-0.5.0%2Bcpu" in pip[1])
-        probar("baja la compilación de qwentts.cpp para CUDA", m.libs_bajadas == [str(base / "cuda")])
+        probar("baja la compilación de qwentts.cpp para CUDA", m.libs_bajadas == [("cuda", str(base / "cuda"))])
         probar("baja el GGUF del 1.7B (la voz de las GPU) en Q4_K_M",
                any("resolve_gguf_paths" in " ".join(c) and "Qwen/Qwen3-TTS-12Hz-1.7B-Base" in c and "Q4_K_M" in c
                    for c in falso.ordenes))
@@ -320,9 +329,11 @@ def eleccion() -> None:
         rc, texto, falso, m = instalar(base / "cuda8", [], gpu_sirve=False, vieja="Q8_0")
         probar("con 8 GB o más, Q8_0", rc == 0 and (base / "cuda8/cuantizacion").read_text().strip() == "Q8_0"
                and any("Q8_0" in c for c in falso.ordenes))
-        print("== Cambiar de CUDA a CPU borra también las bibliotecas de CUDA")
+        print("== Cambiar de CUDA a CPU cambia también qwentts.cpp")
+        (base / "cuda8/qwentts/libggml-cuda.so.0").write_text("")
         rc, texto, falso, m = instalar(base / "cuda8", ["--cpu"], gpu_sirve=False, vieja="Q8_0")
-        probar("CUDA → CPU quita la carpeta cuda", rc == 0 and not (base / "cuda8/cuda").exists())
+        probar("CUDA → CPU baja la de CPU y no deja la de CUDA", rc == 0 and m.libs_bajadas == [("cpu", str(base / "cuda8"))]
+               and not (base / "cuda8/qwentts/libggml-cuda.so.0").exists())
 
         print("== «natural mejorar»: una voz que quedó en la CPU pasa a la GPU si ahora sirve")
         config.guardar({"voz": "miku-natural", "voz_natural_auto": True})
@@ -334,17 +345,34 @@ def eleccion() -> None:
             probar("la rehace en modo cuda", rc == 0 and (real / "natural/modo").read_text().strip() == "cuda"
                    and (real / "natural/listo").is_file())
             probar("la arma en otra carpeta y la cambia al final (sin carpetas sobrantes)",
-                   m.libs_bajadas == [str(real / "natural-nueva")] and not (real / "natural/venv/marca-cpu").exists()
+                   m.libs_bajadas == [("cuda", str(real / "natural-nueva"))] and not (real / "natural/venv/marca-cpu").exists()
                    and not (real / "natural-nueva").exists() and not (real / "natural-vieja").exists())
             probar("deja la voz natural elegida y avisa con una notificación", config.cargar()["voz"] == "miku-natural"
                    and any("mejoró" in " ".join(c) for c in falso.ordenes if c[0] == "notify-send"))
             probar("rutas vuelve a apuntar a la carpeta de siempre", str(m.rutas.NATURAL) == str(real / "natural"))
             rc, texto, falso, m = instalar(real / "natural", [], gpu_sirve=False, vieja="Q4_K_M", orden="mejorar")
             probar("ya en modo cuda: no hace nada", rc == 0 and not falso.ordenes and "No hace falta" in texto)
-            instalar(real / "otra", ["--cpu"], gpu_sirve=False, vieja="")
-            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar")
-            probar("en la CPU y sin GPU que sirva: no hace nada",
+            instalar(real / "otra", ["--cpu"], gpu_sirve=False, vieja="", ram=7.6)
+            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar", ram=7.6)
+            probar("en la CPU con el 0.6B, sin GPU que sirva y con 8 GB: no hace nada",
                    rc == 0 and not falso.ordenes and (real / "otra/modo").read_text().strip() == "cpu")
+            shutil.rmtree(real / "otra/qwentts")      # en la CPU, sin la compilación de Vortex (antes de la 1.7)
+            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar", ram=7.6)
+            probar("en la CPU sin la compilación de Vortex: la rehace (aun con 8 GB)",
+                   rc == 0 and m.libs_bajadas == [("cpu", str(real / "otra-nueva"))]
+                   and (real / "otra/qwentts/libqwen.so").is_file())
+            (real / "otra/modelo").unlink()          # como las instalaciones de antes de la 1.7 (0.6B, sin archivo)
+            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar", ram=16.0)
+            probar("con 16 GB: la rehace en la CPU con el 1.7B",
+                   rc == 0 and (real / "otra/modo").read_text().strip() == "cpu"
+                   and (real / "otra/modelo").read_text().strip() == "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+                   and not (real / "otra-nueva").exists())
+            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar", ram=16.0)
+            probar("ya con el 1.7B: no hace nada", rc == 0 and not falso.ordenes)
+            instalar(real / "gpu", [], gpu_sirve=True)
+            rc, texto, falso, m = instalar(real / "gpu", [], gpu_sirve=True, orden="mejorar")
+            probar("una voz en modo GPU (como la de Mike) no se toca", rc == 0 and not falso.ordenes
+                   and (real / "gpu/modo").read_text().strip() == "gpu")
         finally:
             shutil.rmtree(real, ignore_errors=True)
 
@@ -399,7 +427,8 @@ def cpu_de_verdad(app) -> None:
     probar("carga en la CPU y queda lista (no cae a la F1)", getattr(a, "_voz_id", "") == "miku-natural" and a._voz_lista)
     probar("avisa una vez que va en modo lento", sum("modo lento" in t for t in avisos) == 1)
     wavs = list(sono.glob("*.wav")) if sono.is_dir() else []
-    probar("la frase suena", len(wavs) == 1 and wavs[0].stat().st_size > 24000)
+    if not probar("la frase suena", len(wavs) == 1 and wavs[0].stat().st_size > 24000):
+        print(f"      audios: {[(w.name, w.stat().st_size) for w in wavs]}")
     if "lista" in marcas and "sono" in marcas:
         print(f"      lista a los {marcas['lista']:.1f} s; la primera frase sonó a los {marcas['sono']:.1f} s")
     else:

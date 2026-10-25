@@ -47,6 +47,7 @@ NATURAL_PYTHON = NATURAL / "venv" / "bin" / "python"
 NATURAL_LISTO = NATURAL / "listo"      # lo escribe la instalación al terminar bien (con las versiones)
 NATURAL_MODO = NATURAL / "modo"        # «gpu», «cuda» o «cpu»: lo elige la instalación (sin el archivo, gpu: las de la 1.3)
 NATURAL_CUANT = NATURAL / "cuantizacion"   # modo cuda: Q8_0 o Q4_K_M (según la VRAM)
+NATURAL_MODELO = NATURAL / "modelo"    # modo cpu: el 1.7B (la voz de las GPU) o, con poca RAM, el 0.6B
 
 
 def runtime() -> Path:

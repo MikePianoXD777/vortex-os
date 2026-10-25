@@ -283,8 +283,8 @@ class Asistente(QObject):
         if not cfg["voz_natural_auto"] or natural is None:
             return
         if voces.disponible(natural):
-            # Quedó en la CPU (antes de la 1.7 las GTX 10 no tenían voz en la GPU): «natural mejorar» la pasa a la
-            # GPU si ahora sirve, sin quitarle la voz mientras.
+            # Quedó en la CPU (antes de la 1.7, las GTX 10 no tenían voz en la GPU y la CPU usaba el 0.6B):
+            # «natural mejorar» la pasa a la GPU o al 1.7B si ahora se puede, sin quitarle la voz mientras.
             orden = ["natural", "mejorar"] if voces.modo_natural() == "cpu" else None
         else:
             orden = ["natural", "instalar", "--auto"] if cfg["voz"] == voces.VOZ_DEFECTO else None
@@ -367,7 +367,7 @@ class Asistente(QObject):
             if m.get("listo"):
                 self._voz_lista = True
                 self._precargar_ia()
-                if m.get("modo") == "cpu":       # sin una GPU que sirva: ~6 s más lo que dura cada frase
+                if m.get("modo") == "cpu":       # sin una GPU que sirva: ~7 s más lo que dura cada frase
                     self._avisar_una_vez("voz-lenta", "Voz natural en modo lento (en la CPU): tardo un poco en contestar.")
             elif "wav" in m:
                 texto, turno = self._pedidos.pop(m.get("id"), ("", -1))      # -1: pedido descartado, no suena
