@@ -3,7 +3,7 @@
     {
       "id": "miku-natural",
       "nombre": "Miku natural",
-      "descripcion": "Natural y expresiva, melancólica y un poco grave, sin internet. Corre en tu GPU NVIDIA (serie 20 o más nueva, 6 GB o más; ~7 GB de disco) o, sin una GPU que sirva, en la CPU: ahí es lenta (cada frase tarda en salir unos 6 s más lo que dura; ~3 GB de disco). Se instala con «vortex-miku natural instalar».",
+      "descripcion": "Natural y expresiva, melancólica y un poco grave, sin internet. Corre en tu GPU NVIDIA (serie 20 o más nueva con 6 GB, ~7 GB de disco; o serie 10 con 4 GB o más, como la GTX 1060, con la misma voz y ~4 GB de disco) o, sin una GPU que sirva, en la CPU: ahí es lenta (cada frase tarda en salir unos 6 s más lo que dura; ~3 GB de disco). Se instala con «vortex-miku natural instalar».",
       "motor": "qwen",
       "incluida": false,
       "modelo": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",

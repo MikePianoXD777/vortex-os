@@ -280,15 +280,21 @@ class Asistente(QObject):
             return
         cfg = config.cargar()
         natural = voces.buscar("miku-natural")
-        if not cfg["voz_natural_auto"] or cfg["voz"] != voces.VOZ_DEFECTO or natural is None or voces.disponible(natural):
+        if not cfg["voz_natural_auto"] or natural is None:
             return
+        if voces.disponible(natural):
+            # Quedó en la CPU (antes de la 1.7 las GTX 10 no tenían voz en la GPU): «natural mejorar» la pasa a la
+            # GPU si ahora sirve, sin quitarle la voz mientras.
+            orden = ["natural", "mejorar"] if voces.modo_natural() == "cpu" else None
+        else:
+            orden = ["natural", "instalar", "--auto"] if cfg["voz"] == voces.VOZ_DEFECTO else None
         cli = os.environ.get("VORTEX_MIKU_CLI") or shutil.which("vortex-miku")
-        if not cli:
+        if not cli or orden is None:
             return
         try:
             rutas.DATOS.mkdir(parents=True, exist_ok=True)
             with open(rutas.DATOS / "natural-auto.log", "ab") as log:
-                subprocess.Popen([cli, "natural", "instalar", "--auto"], stdin=subprocess.DEVNULL, stdout=log,
+                subprocess.Popen([cli, *orden], stdin=subprocess.DEVNULL, stdout=log,
                                  stderr=subprocess.STDOUT, start_new_session=True)
         except OSError:
             pass

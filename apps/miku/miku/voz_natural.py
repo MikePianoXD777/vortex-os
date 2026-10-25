@@ -6,15 +6,17 @@ No corre con el Python del sistema sino con el de ~/.local/share/vortex/miku/nat
 voces/miku-natural.wav: una voz inventada con Qwen3-TTS VoiceDesign a partir de una descripción
 (no es la de ninguna persona), que el modelo Base repite con cualquier texto.
 
-Dos modos (el archivo «modo» de esa carpeta, lo elige la instalación):
+Tres modos (el archivo «modo» de esa carpeta, lo elige la instalación):
   gpu   el modelo 1.7B en PyTorch con CUDA graphs. Carga al abrir a Miku (~8 s, ~5 GB de VRAM) y lo
         suelta al cerrarla: sin Miku abierta no ocupa la GPU.
+  cuda  el mismo 1.7B (la misma voz) cuantizado en GGUF (Q8_0, o Q4_K_M con menos de 8 GB) con
+        qwentts.cpp en la GPU: para las NVIDIA serie 10 (GTX 1060) o de 4-5 GB. ~4-5 GB de VRAM.
   cpu   el modelo 0.6B cuantizado (GGUF Q4_K_M) con qwentts.cpp (ggml), para PCs sin una GPU que
         sirva. Lenta: cada frase tarda unos 6 s más lo que dura (casi todo es leer la voz de
         muestra, que va delante de cada frase). Carga en ~8 s y usa ~4 GB de RAM.
 
   entra   {"id": 1, "texto": "Hola."}                 (o {"cmd": "salir"})
-  sale    {"listo": true, "voz": "miku-natural", "modo": "gpu"|"cpu"}
+  sale    {"listo": true, "voz": "miku-natural", "modo": "gpu"|"cuda"|"cpu"}
           {"id": 1, "wav": "...", "seg": 1.8, "visemas": [...]}  o  {"id": 1, "error": "..."}
 
 También: voz_natural.py --voz miku-natural --salida frase.wav "Hola."
@@ -54,11 +56,15 @@ class VozNatural:
         self.modo = voces.modo_natural()
         self.muestra = str(rutas.RAIZ / self.voz["muestra"])
         self.muestra_texto = self.voz["muestra_texto"]
-        if self.modo == "cpu":
-            # La rueda de qwentts.cpp que pone la instalación es la de CPU: no carga nada de CUDA.
+        if self.modo in ("cpu", "cuda"):
+            # En modo cpu, la rueda de qwentts.cpp que pone la instalación es la de CPU: no carga nada de CUDA. En
+            # modo cuda, el mismo modelo que en modo gpu, con la compilación de qwentts.cpp para CUDA de NATURAL/cuda.
             from faster_qwen3_tts import FasterQwen3TTS
+            cuda = self.modo == "cuda"
             self.modelo = FasterQwen3TTS.from_pretrained(
-                self.voz["modelo_cpu"], backend="ggml", quant=self.voz["cuantizacion_cpu"],
+                self.voz["modelo" if cuda else "modelo_cpu"], backend="ggml",
+                quant=voces.cuantizacion_natural() if cuda else self.voz["cuantizacion_cpu"],
+                qwentts_library_path=str(rutas.NATURAL / "cuda" / "libqwen.so") if cuda else None,
                 cache_dir=str(rutas.NATURAL / "hf"), local_files_only=True,
                 qwentts_ref_cache_dir=str(rutas.NATURAL / "referencias"))   # la voz de muestra ya procesada
             # Calienta con pocos pasos: procesa la muestra (la 1.ª vez, y la guarda) sin generar una frase entera.

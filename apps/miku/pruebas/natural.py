@@ -171,7 +171,8 @@ class SubprocesoFalso:
         return [" ".join(c) for c in self.ordenes if "pip" in c]
 
 
-def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = True):
+def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = True, vieja: str = "",
+             orden: str = "instalar"):
     """Corre «vortex-miku natural instalar ARGS» de mentira. Devuelve (código, texto, subproceso, módulo)."""
     rutas, voces, _ = recargar(carpeta)
     m = cargar_comando()
@@ -183,6 +184,17 @@ def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = 
     m.cpu_para_natural = lambda: ((True, "Intel(R) Core(TM) i9-11900K (Intel Core de 11.ª generación)") if cpu_sirve else
                                   (False, "tu Intel(R) Core(TM) i7-4790K no llega: en la CPU hace falta un Intel Core "
                                           "de 10.ª generación o más nuevo, o un Ryzen 3000 o más nuevo."))
+    # vieja: la cuantización si la NVIDIA sirve en modo cuda («» = no hay); la descarga de qwentts.cpp, de mentira.
+    m.gpu_vieja_para_natural = lambda: ((True, "NVIDIA GeForce GTX 1060 6GB (6 GB)", vieja) if vieja else
+                                        (False, "no hay una GPU NVIDIA con su driver.", ""))
+    m.libs_bajadas = []
+
+    def bajar_libs():
+        m.libs_bajadas.append(str(m.rutas.NATURAL))
+        (m.rutas.NATURAL / "cuda").mkdir(parents=True, exist_ok=True)
+        (m.rutas.NATURAL / "cuda" / "libqwen.so").write_text("")
+        return 0
+    m.bajar_libs_cuda = bajar_libs
     m.reabrir_si_esta_abierta = lambda: False
     m.reabrio = False
 
@@ -192,7 +204,7 @@ def instalar(carpeta: Path, args: list[str], gpu_sirve: bool, cpu_sirve: bool = 
     m.reabrir_si_esta_abierta = reabrir
     texto = io.StringIO()
     with contextlib.redirect_stdout(texto), contextlib.redirect_stderr(texto):
-        rc = m.orden_natural(["instalar", *args])
+        rc = m.orden_natural([orden, *args])
     return rc, texto.getvalue(), falso, m
 
 
@@ -290,6 +302,52 @@ def eleccion() -> None:
         probar("después de «natural quitar» no la vuelve a instalar sola",
                config.cargar()["voz_natural_auto"] is False and rc == 0 and not falso.ordenes)
 
+        print("== Instalar con una GTX 1060 (sin GPU para PyTorch): modo CUDA, la misma voz 1.7B")
+        rc, texto, falso, m = instalar(base / "cuda", [], gpu_sirve=False, vieja="Q4_K_M")
+        pip = falso.pip()
+        probar("termina bien", rc == 0)
+        probar("guarda el modo cuda y la cuantización", (base / "cuda/modo").read_text().strip() == "cuda"
+               and (base / "cuda/cuantizacion").read_text().strip() == "Q4_K_M" and (base / "cuda/listo").is_file())
+        probar("PyTorch de CPU y luego qwentts.cpp con el CUDA 12 de pip (sin el PyTorch de CUDA)",
+               len(pip) == 2 and "download.pytorch.org/whl/cpu" in pip[0] and "nvidia-cublas-cu12==" in pip[1]
+               and "nvidia-cuda-runtime-cu12==" in pip[1] and "qwentts_cpp_python-0.5.0%2Bcpu" in pip[1])
+        probar("baja la compilación de qwentts.cpp para CUDA", m.libs_bajadas == [str(base / "cuda")])
+        probar("baja el GGUF del 1.7B (la voz de las GPU) en Q4_K_M",
+               any("resolve_gguf_paths" in " ".join(c) and "Qwen/Qwen3-TTS-12Hz-1.7B-Base" in c and "Q4_K_M" in c
+                   for c in falso.ordenes))
+        probar("no avisa que será lenta", "lenta" not in texto)
+        probar("«natural estado» dice GPU con qwentts.cpp", "Modo: GPU con qwentts.cpp (Q4_K_M)" in estado(m))
+        rc, texto, falso, m = instalar(base / "cuda8", [], gpu_sirve=False, vieja="Q8_0")
+        probar("con 8 GB o más, Q8_0", rc == 0 and (base / "cuda8/cuantizacion").read_text().strip() == "Q8_0"
+               and any("Q8_0" in c for c in falso.ordenes))
+        print("== Cambiar de CUDA a CPU borra también las bibliotecas de CUDA")
+        rc, texto, falso, m = instalar(base / "cuda8", ["--cpu"], gpu_sirve=False, vieja="Q8_0")
+        probar("CUDA → CPU quita la carpeta cuda", rc == 0 and not (base / "cuda8/cuda").exists())
+
+        print("== «natural mejorar»: una voz que quedó en la CPU pasa a la GPU si ahora sirve")
+        config.guardar({"voz": "miku-natural", "voz_natural_auto": True})
+        real = Path(tempfile.mkdtemp(prefix="vortex-miku-mejorar."))
+        try:
+            instalar(real / "natural", ["--cpu"], gpu_sirve=False, vieja="")
+            (real / "natural/venv/marca-cpu").write_text("")
+            rc, texto, falso, m = instalar(real / "natural", [], gpu_sirve=False, vieja="Q4_K_M", orden="mejorar")
+            probar("la rehace en modo cuda", rc == 0 and (real / "natural/modo").read_text().strip() == "cuda"
+                   and (real / "natural/listo").is_file())
+            probar("la arma en otra carpeta y la cambia al final (sin carpetas sobrantes)",
+                   m.libs_bajadas == [str(real / "natural-nueva")] and not (real / "natural/venv/marca-cpu").exists()
+                   and not (real / "natural-nueva").exists() and not (real / "natural-vieja").exists())
+            probar("deja la voz natural elegida y avisa con una notificación", config.cargar()["voz"] == "miku-natural"
+                   and any("mejoró" in " ".join(c) for c in falso.ordenes if c[0] == "notify-send"))
+            probar("rutas vuelve a apuntar a la carpeta de siempre", str(m.rutas.NATURAL) == str(real / "natural"))
+            rc, texto, falso, m = instalar(real / "natural", [], gpu_sirve=False, vieja="Q4_K_M", orden="mejorar")
+            probar("ya en modo cuda: no hace nada", rc == 0 and not falso.ordenes and "No hace falta" in texto)
+            instalar(real / "otra", ["--cpu"], gpu_sirve=False, vieja="")
+            rc, texto, falso, m = instalar(real / "otra", [], gpu_sirve=False, vieja="", orden="mejorar")
+            probar("en la CPU y sin GPU que sirva: no hace nada",
+                   rc == 0 and not falso.ordenes and (real / "otra/modo").read_text().strip() == "cpu")
+        finally:
+            shutil.rmtree(real, ignore_errors=True)
+
         print("== Qué procesadores aguantan la voz natural en la CPU")
         for nombre, sirve in (("Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz", True),
                               ("11th Gen Intel(R) Core(TM) i9-11900K @ 3.50GHz", True),
@@ -386,6 +444,18 @@ def auto_desde_ventana() -> None:
         config.guardar({"voz_natural_auto": True, "voz": "supertonic-f2"})
         a._natural_en_segundo_plano()
         probar("con otra voz elegida: no", llamado() == "")
+        # Ya instalada: en la CPU pide «natural mejorar» (por si ahora la GPU sirve); en la GPU, nada.
+        (base / "natural/venv/bin").mkdir(parents=True)
+        (base / "natural/venv/bin/python").write_text("")
+        (base / "natural/listo").write_text("")
+        (base / "natural/modo").write_text("cpu\n")
+        config.guardar({"voz": "miku-natural"})
+        a._natural_en_segundo_plano()
+        probar("instalada en la CPU: lanza «natural mejorar»", llamado().strip() == "natural mejorar")
+        (base / "natural/modo").write_text("cuda\n")
+        a._natural_en_segundo_plano()
+        probar("instalada en modo cuda: no", llamado() == "")
+        (base / "natural/listo").unlink()
         config.guardar({"voz": voces.VOZ_DEFECTO})
         os.environ["VORTEX_MIKU_NATURAL_AUTO"] = "0"
         a._natural_en_segundo_plano()

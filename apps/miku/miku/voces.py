@@ -51,12 +51,22 @@ def disponible(voz: dict) -> bool:
 
 
 def modo_natural() -> str:
-    """Dónde corre la voz natural: «gpu» (rápida) o «cpu» (lenta). Lo guarda «vortex-miku natural instalar»."""
+    """Dónde corre la voz natural: «gpu» (PyTorch en una NVIDIA serie 20+), «cuda» (qwentts.cpp en una NVIDIA
+    serie 10+, la misma voz) o «cpu» (lenta). Lo guarda «vortex-miku natural instalar»."""
     try:
         modo = rutas.NATURAL_MODO.read_text(encoding="utf-8").strip()
     except OSError:
         return "gpu"
-    return modo if modo in ("gpu", "cpu") else "gpu"
+    return modo if modo in ("gpu", "cuda", "cpu") else "gpu"
+
+
+def cuantizacion_natural() -> str:
+    """Modo cuda: con qué cuantización se bajó el modelo (Q8_0 o Q4_K_M)."""
+    try:
+        cuant = rutas.NATURAL_CUANT.read_text(encoding="utf-8").strip()
+    except OSError:
+        return "Q4_K_M"
+    return cuant if cuant in ("Q8_0", "Q4_K_M") else "Q4_K_M"
 
 
 def descargar_estilo(voz: dict, progreso=None) -> None:

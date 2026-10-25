@@ -45,7 +45,8 @@ CEREBRO_CWD = DATOS / "cerebro"        # carpeta neutra y vacía desde donde cor
 NATURAL = Path(os.environ.get("VORTEX_MIKU_NATURAL") or DATOS / "natural")
 NATURAL_PYTHON = NATURAL / "venv" / "bin" / "python"
 NATURAL_LISTO = NATURAL / "listo"      # lo escribe la instalación al terminar bien (con las versiones)
-NATURAL_MODO = NATURAL / "modo"        # «gpu» o «cpu»: lo elige la instalación (sin el archivo, gpu: las de la 1.3)
+NATURAL_MODO = NATURAL / "modo"        # «gpu», «cuda» o «cpu»: lo elige la instalación (sin el archivo, gpu: las de la 1.3)
+NATURAL_CUANT = NATURAL / "cuantizacion"   # modo cuda: Q8_0 o Q4_K_M (según la VRAM)
 
 
 def runtime() -> Path:
