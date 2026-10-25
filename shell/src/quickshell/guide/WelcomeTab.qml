@@ -197,6 +197,7 @@ GuideTab {
             spacing: rootObj.s(4)
 
             Row {
+                id: titleRow
                 Layout.alignment: Qt.AlignHCenter
                 spacing: 0
 
@@ -212,12 +213,12 @@ GuideTab {
 
                         text: modelData === " " ? "\u00A0" : modelData
                         font.family: ThemeBackend.fontFamily
-                        font.weight: index < 11 ? Font.Black : Font.Bold
-                        font.pixelSize: index < 11 ? rootObj.s(32) : rootObj.s(14)
-                        color: index < 11 ? ThemeBackend.text : ThemeBackend.subtext0
+                        font.weight: index < titleRow.mainTitle.length ? Font.Black : Font.Bold
+                        font.pixelSize: index < titleRow.mainTitle.length ? rootObj.s(32) : rootObj.s(14)
+                        color: index < titleRow.mainTitle.length ? ThemeBackend.text : ThemeBackend.subtext0
 
                         anchors.bottom: parent.bottom
-                        anchors.bottomMargin: index < 11 ? 0 : rootObj.s(4)
+                        anchors.bottomMargin: index < titleRow.mainTitle.length ? 0 : rootObj.s(4)
 
                         transform: Translate {
                             y: Math.sin(welcomeTabRoot.titleWavePhase - index * 0.35) * rootObj.s(2.5)

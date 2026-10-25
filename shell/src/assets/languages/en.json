@@ -1,10 +1,10 @@
 {
   "guide": {
     "about": {
-      "title": "Serpantinum",
+      "title": "Vortex Shell",
       "loading": "Loading...",
       "unknown": "Unknown",
-      "version_by": "v{version} • by {author}",
+      "version_by": "v{version} • based on Serpantinum, by {author}",
       "hardware": {
         "device_name": "Device name",
         "processor": "Processor",
@@ -177,7 +177,7 @@
       }
     },
     "welcome": {
-      "by_author": "by @{author}",
+      "by_author": "based on Serpantinum, by @{author}",
       "about": "About",
       "hold_for_tutorial": "Hold for tutorial",
       "start_tutorial": "Start tutorial"
