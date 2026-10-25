@@ -35,6 +35,12 @@ GuideTab {
         return false;
     }
 
+    // Vortex: íconos de las apps en los escritorios (bar.workspaceIcons; encendido si no está).
+    property bool workspaceIcons: {
+        let bs = Config.getSetting("bar", {});
+        return !(bs && bs.workspaceIcons === false);
+    }
+
     property string timeStyle: {
         let bs = Config.getSetting("bar", {});
         if (bs && bs.timeStyle) return bs.timeStyle;
@@ -252,6 +258,7 @@ GuideTab {
         } else {
             barModulesRoot.hideEmptyWorkspaces = false;
         }
+        barModulesRoot.workspaceIcons = !(bs && bs.workspaceIcons === false);
 
         if (bs && bs.timeStyle) {
             barModulesRoot.timeStyle = bs.timeStyle;
@@ -448,6 +455,13 @@ GuideTab {
         barModulesRoot.hideEmptyWorkspaces = val;
         let current = Config.getSetting("bar", {});
         current.hideEmptyWorkspaces = val;
+        Config.setSetting("bar", current);
+    }
+
+    function setWorkspaceIcons(val) {
+        barModulesRoot.workspaceIcons = val;
+        let current = Config.getSetting("bar", {});
+        current.workspaceIcons = val;
         Config.setSetting("bar", current);
     }
 

@@ -178,4 +178,24 @@ BarModuleCard {
             }
         }
     }
+    SettingsRow {
+        rootObj: card.rootObj
+        baseColor: Qt.alpha(ThemeBackend.surface1, 0.35)
+        icon: "󰀻"
+        title: I18n.t("guide.bar.workspaces.app_icons.title", "App icons")
+        description: I18n.t("guide.bar.workspaces.app_icons.desc", "Show the icons of the apps open in each workspace (pills style)")
+        searchKeywords: "workspace app icons apps caelestia"
+
+        Toggle {
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            checked: card.tab.workspaceIcons
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function(c) {
+                card.tab.setWorkspaceIcons(c);
+            }
+        }
+    }
 }

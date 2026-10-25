@@ -13,6 +13,20 @@ Item {
     implicitWidth: wsLayout.implicitWidth
     implicitHeight: wsLayout.implicitHeight
 
+    // Vortex: un escritorio con apps crece para que quepan sus íconos (WorkspacesFace.appIconsFor).
+    readonly property real iconSize: widget ? widget.s(widget.isCompact ? 12 : 13) : 13
+    readonly property real iconGap: widget ? widget.s(3) : 3
+    readonly property real iconPad: widget ? widget.s(5) : 5
+    function iconsOf(index) {
+        return (widget && typeof widget.appIconsFor === "function") ? widget.appIconsFor(index) : [];
+    }
+    function pillLength(index, active) {
+        let base = widget ? widget.s(widget.isCompact ? (active ? 34 : 16) : (active ? 36 : 18)) : (active ? 36 : 18);
+        let n = iconsOf(index).length;
+        if (n === 0) return base;
+        return Math.max(base, n * iconSize + (n - 1) * iconGap + 2 * iconPad);
+    }
+
     Rectangle {
         id: activeHighlight
         z: 3
@@ -50,12 +64,10 @@ Item {
             if (index < 0 || !widget) return 0;
             let pos = 0;
             let spacing = widget.s(widget.isCompact ? 7 : 8);
-            let activeLen = widget.s(widget.isCompact ? 34 : 36);
-            let inactiveLen = widget.s(widget.isCompact ? 16 : 18);
             for (let i = 0; i < index; i++) {
                 if (typeof widget.isShown === "function" && !widget.isShown(i))
                     continue;
-                pos += (i === activeIndex ? activeLen : inactiveLen) + spacing;
+                pos += pillsFaceRoot.pillLength(i, i === activeIndex) + spacing;
             }
             return pos;
         }
@@ -70,7 +82,7 @@ Item {
             }
             return (curIdx >= 0 && widget) ? getPos(curIdx, curIdx) : 0;
         }
-        property real targetEnd: (curIdx >= 0 && widget) ? targetStart + widget.s(widget.isCompact ? 34 : 36) : 0
+        property real targetEnd: (curIdx >= 0 && widget) ? targetStart + pillsFaceRoot.pillLength(curIdx, true) : 0
         property real actualStart: targetStart
         property real actualEnd: targetEnd
 
@@ -115,9 +127,7 @@ Item {
                 property bool shown: widget && typeof widget.isShown === "function" ? widget.isShown(index) : true
 
                 visible: shown
-                readonly property real length: shown
-                    ? (isActive ? (widget ? widget.s(widget.isCompact ? 34 : 36) : 36) : (widget ? widget.s(widget.isCompact ? 16 : 18) : 18))
-                    : 0
+                readonly property real length: shown ? pillsFaceRoot.pillLength(index, isActive) : 0
                 readonly property real thickness: widget ? widget.s(widget.isCompact ? 16 : 18) : 18
                 width: pillsFaceRoot.isVertical ? thickness : length
                 height: pillsFaceRoot.isVertical ? length : thickness
@@ -187,6 +197,66 @@ Item {
                     anchors.fill: parent
                     onClicked: {
                         if (widget) widget.focusWorkspace(wsPill.index);
+                    }
+                }
+            }
+        }
+    }
+    // Los íconos van en su propia capa, encima del resaltado del escritorio activo (que tapa a las pills),
+    // con los mismos tamaños que las pills de abajo.
+    AxisFlow {
+        id: iconLayer
+        vertical: pillsFaceRoot.isVertical
+        horizontalItemAlignment: Grid.AlignHCenter
+        verticalItemAlignment: Grid.AlignVCenter
+        z: 4
+        anchors.centerIn: wsLayout
+        spacing: wsLayout.spacing
+        visible: widget ? widget.showAppIcons === true : false
+
+        Repeater {
+            model: widget ? widget.workspaceCount : 0
+
+            delegate: Item {
+                id: iconSlot
+                required property int index
+                readonly property bool shown: widget && typeof widget.isShown === "function" ? widget.isShown(index) : true
+                readonly property bool isActive: index === pillsFaceRoot.activeIdx
+                readonly property var icons: pillsFaceRoot.iconsOf(index)
+                readonly property real length: shown ? pillsFaceRoot.pillLength(index, isActive) : 0
+                readonly property real thickness: widget ? widget.s(widget.isCompact ? 16 : 18) : 18
+                visible: shown
+                width: pillsFaceRoot.isVertical ? thickness : length
+                height: pillsFaceRoot.isVertical ? length : thickness
+                Behavior on width {
+                    enabled: !pillsFaceRoot.isVertical
+                    NumberAnimation { duration: 400; easing.type: Easing.OutQuint }
+                }
+                Behavior on height {
+                    enabled: pillsFaceRoot.isVertical
+                    NumberAnimation { duration: 400; easing.type: Easing.OutQuint }
+                }
+
+                AxisFlow {
+                    vertical: pillsFaceRoot.isVertical
+                    anchors.centerIn: parent
+                    spacing: pillsFaceRoot.iconGap
+                    Repeater {
+                        model: iconSlot.icons
+                        delegate: Image {
+                            required property string modelData
+                            width: pillsFaceRoot.iconSize
+                            height: pillsFaceRoot.iconSize
+                            sourceSize: Qt.size(pillsFaceRoot.iconSize * 2, pillsFaceRoot.iconSize * 2)
+                            source: modelData
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                            mipmap: true
+                            cache: true
+                            opacity: status === Image.Ready ? (iconSlot.isActive ? 1.0 : 0.85) : 0.0
+                            Behavior on opacity { NumberAnimation { duration: 200 } }
+                        }
                     }
                 }
             }

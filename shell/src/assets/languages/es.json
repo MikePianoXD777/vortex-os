@@ -393,6 +393,10 @@
         "title": "Elegir cantidad de espacios de trabajo a mostrar",
         "disc": "Nota: esto no afecta la cantidad real de espacios de trabajo en el compositor",
         "desc": "Número de espacios de trabajo a mostrar",
+        "app_icons": {
+          "title": "Íconos de las apps",
+          "desc": "Muestra los íconos de las apps abiertas en cada escritorio (estilo «pills»)"
+        },
         "hide_empty": {
           "title": "Ocultar escritorios vacíos",
           "desc": "Mostrar solo los escritorios ocupados y el activo"

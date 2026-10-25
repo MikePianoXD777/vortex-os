@@ -112,6 +112,57 @@ Item {
         return false;
     }
 
+    // Vortex: los íconos de las apps abiertas en cada escritorio, como en Caelestia (solo Hyprland y el
+    // estilo «pills»). Ajustes > Barra > Escritorios lo apaga (bar.workspaceIcons).
+    property bool showAppIcons: {
+        let dummy = configRevision;
+        if (isNiri || isSway || isMango) return false;
+        let bs = (typeof Config !== "undefined" && Config.rawSettings) ? Config.rawSettings.bar : null;
+        return !(bs && bs.workspaceIcons === false);
+    }
+    readonly property int maxAppIcons: 3
+    property var _iconCache: ({})
+
+    Connections {
+        target: (typeof AppMatcher !== "undefined") ? AppMatcher : null
+        function onIndexChanged() { root._iconCache = ({}); }
+    }
+
+    // La fuente del ícono de una app («image://icon/…» o un archivo), o "" si no tiene. Con caché: se
+    // pide en cada cambio de ventanas y buscar en las .desktop no es gratis.
+    function iconForApp(appId) {
+        if (!appId) return "";
+        let cache = _iconCache;
+        if (cache[appId] !== undefined) return cache[appId];
+        let ic = "";
+        if (typeof AppMatcher !== "undefined") {
+            let e = AppMatcher.entry(AppMatcher.resolve(appId));
+            if (e && e.icon) ic = String(e.icon);
+        }
+        if (ic === "") ic = String(appId).toLowerCase();
+        let src = (ic.startsWith("/")) ? "file://" + ic : (ic.indexOf("://") !== -1 ? ic : "image://icon/" + ic);
+        cache[appId] = src;
+        return src;
+    }
+
+    // Hasta maxAppIcons íconos distintos de las ventanas del escritorio (en el orden en que se abrieron).
+    function appIconsFor(index) {
+        if (!showAppIcons) return [];
+        let ws = wsForId(index + 1);
+        if (!ws || !ws.toplevels || !ws.toplevels.values) return [];
+        let vistos = {};
+        let out = [];
+        let tops = ws.toplevels.values;
+        for (let i = 0; i < tops.length && out.length < maxAppIcons; i++) {
+            let t = tops[i];
+            let id = (t.wayland && t.wayland.appId) ? t.wayland.appId : (t.lastIpcObject && t.lastIpcObject["class"] ? t.lastIpcObject["class"] : "");
+            if (!id || vistos[id]) continue;
+            vistos[id] = true;
+            out.push(iconForApp(id));
+        }
+        return out;
+    }
+
     ListModel {
         id: workspaceListModel
     }
