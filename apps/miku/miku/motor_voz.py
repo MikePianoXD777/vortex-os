@@ -121,7 +121,7 @@ class MotorSupertonic:
         self.compresion = int(cfg["ttl"]["chunk_compress_factor"])
         self.latente = int(cfg["ttl"]["latent_dim"])
         so = ort.SessionOptions()
-        so.intra_op_num_threads = int(os.environ.get("VORTEX_MIKU_HILOS", min(8, os.cpu_count() or 4)))
+        so.intra_op_num_threads = rutas.hilos()
         so.log_severity_level = 3
 
         def sesion(nombre):

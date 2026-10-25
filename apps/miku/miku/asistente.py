@@ -850,6 +850,7 @@ class Asistente(QObject):
         self.cerebro.olvidar()
         if self.cfg.get("ia") == "local":
             ia.soltar(ia.elegido(self.cfg)["modelo"])     # la GPU libre al cerrar, como todo lo demás
+        ia.parar_ollama_propio()
         if self._sonando is not None and self._sonando.state() != QProcess.ProcessState.NotRunning:
             self._sonando.kill()
         if self._voz is not None and self._voz.state() != QProcess.ProcessState.NotRunning:

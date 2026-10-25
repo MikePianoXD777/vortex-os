@@ -74,7 +74,7 @@ def transcribir(pcm: bytes) -> str:
         f.setsampwidth(2)
         f.setframerate(RATE)
         f.writeframes(pcm)
-    hilos = os.environ.get("VORTEX_MIKU_HILOS", str(min(8, os.cpu_count() or 4)))
+    hilos = str(rutas.hilos())
     try:
         # -otxt hace que imprima el texto por stdout cuando la entrada es stdin (-f -).
         # cwd en la carpeta en memoria del usuario: si whisper llegara a escribir algo, no sería en su carpeta de trabajo.

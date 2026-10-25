@@ -39,6 +39,13 @@ os.environ["HF_HUB_CACHE"] = str(rutas.NATURAL / "hf")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 
+def tope_tokens(texto: str) -> int:
+    """Cuántos pasos puede generar como mucho: el códec da 12 pasos por segundo de audio, y se calcula para
+    hablar muy despacio (8 letras por segundo). Sin tope, a veces el modelo se desboca y genera los 2048
+    pasos (casi 3 minutos de audio sin sentido); en la CPU eso traba a Miku varios minutos."""
+    return min(2048, int(12.5 * max(4.0, len(texto) / 8)) + 24)
+
+
 class VozNatural:
     def __init__(self, id_voz: str):
         self.voz = voces.buscar(id_voz)
@@ -75,7 +82,7 @@ class VozNatural:
         hablado = motor_voz.texto_hablado(elevenlabs.quitar_etiquetas(texto))
         if not hablado:
             raise ValueError("no hay nada que decir")
-        x, sr = self.decir_crudo(hablado)
+        x, sr = self.decir_crudo(hablado, max_new_tokens=tope_tokens(hablado))
         x = np.asarray(x, dtype=np.float32)
         return audio.nivelar(x, sr, rms_db=-22.0, relacion=1.6), sr
 

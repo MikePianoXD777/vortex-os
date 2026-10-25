@@ -143,6 +143,11 @@ def ollama_corriendo() -> bool:
         return False
 
 
+# Lo que arrancó Miku (la unidad o un «ollama serve» suelto): se para al cerrarla (parar_ollama_propio).
+# Si Ollama ya corría (lo usas por tu cuenta), no se toca.
+_arranque_propio: dict = {}
+
+
 def arrancar_ollama(espera: float = 20.0) -> bool:
     """Deja corriendo Ollama para tu usuario (los modelos quedan en ~/.ollama). True si ya contesta.
 
@@ -158,12 +163,15 @@ def arrancar_ollama(espera: float = 20.0) -> bool:
         arrancada = r.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         arrancada = False
-    if not arrancada:
+    if arrancada:
+        _arranque_propio["unidad"] = True
+    else:
         env = dict(os.environ, OLLAMA_HOST=OLLAMA.split("://", 1)[-1], OLLAMA_VULKAN="1", OLLAMA_KEEP_ALIVE="10m",
-                   OLLAMA_CONTEXT_LENGTH=CONTEXTO_LOCAL)
+                   OLLAMA_CONTEXT_LENGTH=CONTEXTO_LOCAL, OLLAMA_NUM_PARALLEL="1", OLLAMA_MAX_LOADED_MODELS="1")
         try:
-            subprocess.Popen(["ollama", "serve"], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL, start_new_session=True)
+            _arranque_propio["proceso"] = subprocess.Popen(
+                ["ollama", "serve"], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, start_new_session=True)
         except OSError:
             return False
     limite = time.monotonic() + espera
@@ -213,6 +221,18 @@ def soltar(modelo: str = MODELO_LOCAL) -> None:
         _ollama_json("/api/generate", {"model": modelo, "keep_alive": 0}, timeout=3)
     except (OSError, ValueError):
         pass
+
+
+def parar_ollama_propio() -> None:
+    """Al cerrar Miku: para el Ollama que arrancó ella (sin Miku abierta no queda nada corriendo)."""
+    if _arranque_propio.pop("unidad", False):
+        try:
+            subprocess.run(["systemctl", "--user", "stop", "--no-block", UNIDAD_OLLAMA], capture_output=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    proceso = _arranque_propio.pop("proceso", None)
+    if proceso is not None and proceso.poll() is None:
+        proceso.terminate()
 
 
 def preparar_local(modelo: str = MODELO_LOCAL) -> None:

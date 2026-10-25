@@ -193,14 +193,18 @@ async function iniciar() {
   }
 
   // ---- Bucle con tope de cuadros por segundo ----
-  let ultimo = performance.now(), activo = true;
+  let ultimo = performance.now(), activo = true, vuelta = 0;   // vuelta: al reanudar, la cadena vieja se suelta
   const t0 = ultimo;
-  function bucle(ahora) {
-    if (!activo) return;
-    requestAnimationFrame(bucle);
+  // Entre cuadro y cuadro duerme con setTimeout y pide el siguiente con requestAnimationFrame: sigue
+  // sincronizado con la pantalla, pero no despierta 144 veces por segundo para dibujar 30.
+  function pedir(v) { requestAnimationFrame((ahora) => bucle(ahora, v)); }
+  function bucle(ahora, v) {
+    if (!activo || v !== vuelta) return;
     const dt = (ahora - ultimo) / 1000;
-    if (dt < 1 / FPS - 0.002) return;
+    if (dt < 1 / FPS - 0.002) { pedir(v); return; }
     ultimo = ahora;
+    const falta = 1000 / FPS - (performance.now() - ahora) - 4;
+    if (falta > 1) setTimeout(() => pedir(v), falta); else pedir(v);
     if (!vrm) return;
     const paso = Math.min(dt, 0.1);
     vivir(paso, (ahora - t0) / 1000);
@@ -209,11 +213,11 @@ async function iniciar() {
     estado.cuadros++;
   }
   ajustarTamano();
-  requestAnimationFrame(bucle);
+  pedir(vuelta);
 
   // Para pausar al ocultar la ventana y para las pruebas.
   miku.pausar = () => { activo = false; };
-  miku.reanudar = () => { if (!activo) { activo = true; ultimo = performance.now(); requestAnimationFrame(bucle); } };
+  miku.reanudar = () => { if (!activo) { activo = true; ultimo = performance.now(); pedir(++vuelta); } };
   miku.captura = () => {                            // pinta un cuadro y devuelve el PNG con alfa (pruebas)
     vivir(0.016, (performance.now() - t0) / 1000); vrm.update(0.016); renderer.render(escena, camara);
     return lienzo.toDataURL('image/png');

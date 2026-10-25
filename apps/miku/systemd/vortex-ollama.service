@@ -10,6 +10,11 @@ Environment=OLLAMA_VULKAN=1
 Environment=OLLAMA_KEEP_ALIVE=10m
 # Contexto de 8K: con 4K una plática corta ya corta las instrucciones de Miku (ver ia.py, CONTEXTO_LOCAL)
 Environment=OLLAMA_CONTEXT_LENGTH=8192
+# Una plática a la vez y un solo modelo cargado: con paralelismo automático el contexto se multiplica en
+# la VRAM y en una GPU de 4-6 GB (GTX 1060) ya no cabe junto con la voz.
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_MAX_LOADED_MODELS=1
+Nice=10
 ExecStart=/usr/bin/ollama serve
 Restart=on-failure
 RestartSec=3

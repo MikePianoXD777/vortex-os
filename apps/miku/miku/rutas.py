@@ -57,6 +57,20 @@ def runtime() -> Path:
     return Path(base)
 
 
+def hilos() -> int:
+    """Hilos para la voz y el oído: los núcleos físicos (máximo 8). Con los lógicos (SMT) los dos hilos de un
+    núcleo se pelean por la misma unidad de cálculo, no va más rápido y el resto del sistema se traba."""
+    if os.environ.get("VORTEX_MIKU_HILOS", "").isdigit():
+        return max(1, int(os.environ["VORTEX_MIKU_HILOS"]))
+    nucleos = set()
+    for cpu in Path("/sys/devices/system/cpu").glob("cpu[0-9]*/topology"):
+        try:
+            nucleos.add(((cpu / "physical_package_id").read_text().strip(), (cpu / "core_id").read_text().strip()))
+        except OSError:
+            pass
+    return max(1, min(8, len(nucleos) or os.cpu_count() or 4))
+
+
 def temporales() -> Path:
     """Audios de la voz mientras se reproducen; se borran en cuanto suenan."""
     d = runtime() / "vortex-miku"
