@@ -566,6 +566,18 @@ traer_vortex() {
   git_vortex pull --ff-only
 }
 
+# El shell que corre se quedó con el QML de antes (los textos sí se recargan solos: salía a medias).
+# Se reinicia como con Ctrl+Super+Alt+R: lo lanza Hyprland, con el comando de su config (y su entorno),
+# así no muere al cerrar la terminal de «vortex actualizar». Sin shell corriendo o sin Hyprland, nada.
+reiniciar_shell() {
+  pgrep -u "$(id -u)" -x quickshell >/dev/null 2>&1 && hypr_corriendo || return 0
+  # shellcheck disable=SC2016
+  hypr eval 'local a = package.loaded["atajos"]
+local c = (type(a) == "table" and a.comando_shell) and a.comando_shell() or "serpantinumd start"
+hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; " .. c))' >/dev/null 2>&1 &&
+    printf 'vortex: %s\n' "reinicié el shell para que cargue la versión nueva" || true
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
@@ -601,11 +613,13 @@ cmd_actualizar() {
         tar -C "$VORTEX_DIR" --exclude=./.git -cf - . | tar -C "$base" -xf - ||
         { aviso "no pude copiar el código para construir $pkg"; continue; }
     fi
-    (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
+    local nuevo=0
+    if (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm); then nuevo=1; else aviso "no se pudo actualizar $pkg"; fi
     rm -rf "$base/packaging/$pkg/"{pkg,src} "$base/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
+    [[ "$pkg" == vortex-shell ]] && ((nuevo)) && reiniciar_shell
   done
   # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
   # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
