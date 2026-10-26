@@ -1679,6 +1679,10 @@
     "celular": {
       "name": "Tu celular",
       "desc": "Notificaciones, archivos y batería de tu celular (Super+Shift+P)"
+    },
+    "juegos": {
+      "name": "Tus juegos",
+      "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)"
     }
   },
   "cli": {
@@ -1899,5 +1903,14 @@
     "send_clipboard": "Mandar portapapeles",
     "unpair": "Desvincular",
     "turn_off": "Apagar KDE Connect"
+  },
+  "juegos": {
+    "title": "Tus juegos",
+    "count": "{n} juegos",
+    "count_one": "1 juego",
+    "loading": "Buscando tus juegos…",
+    "search": "Buscar un juego…",
+    "empty": "Todavía no hay juegos. Instálalos con Steam o Heroic (o un Flatpak de la Tienda) y aparecerán aquí.",
+    "no_match": "Ningún juego coincide con tu búsqueda."
   }
 }

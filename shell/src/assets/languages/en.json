@@ -1635,6 +1635,10 @@
     "celular": {
       "name": "Your phone",
       "desc": "Your phone's notifications, files and battery (Super+Shift+P)"
+    },
+    "juegos": {
+      "name": "Your games",
+      "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)"
     }
   },
   "cli": {
@@ -1857,5 +1861,14 @@
     "send_clipboard": "Send clipboard",
     "unpair": "Unpair",
     "turn_off": "Turn off KDE Connect"
+  },
+  "juegos": {
+    "title": "Your games",
+    "count": "{n} games",
+    "count_one": "1 game",
+    "loading": "Looking for your games…",
+    "search": "Search your games…",
+    "empty": "No games yet. Install them with Steam or Heroic (or a Flatpak from the Shop) and they will show up here.",
+    "no_match": "No game matches your search."
   }
 }

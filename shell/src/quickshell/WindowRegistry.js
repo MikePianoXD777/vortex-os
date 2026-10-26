@@ -69,6 +69,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌌"
         },
         {
+            // Vortex 1.8: la biblioteca de juegos (Super+Shift+G).
+            id: "juegos",
+            name: tr("widgets.juegos.name", "Your games"),
+            description: tr("widgets.juegos.desc", "Steam, Heroic and your other games, with covers"),
+            icon: "applications-games",
+            fontIcon: "󰊴"
+        },
+        {
             // Vortex 1.8: tu celular con KDE Connect (Super+Shift+P).
             id: "celular",
             name: tr("widgets.celular.name", "Your phone"),
@@ -176,6 +184,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex (1.7.7): hoja de atajos (keybinds/KeybindsPopup.qml), al centro como Ajustes.
         "keybinds": {
             w: 1360, h: 820, comp: "keybinds/KeybindsPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.8: biblioteca de juegos (juegos/JuegosPopup.qml), al centro como la hoja de atajos.
+        "juegos": {
+            w: 1180, h: 780, comp: "juegos/JuegosPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

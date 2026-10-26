@@ -197,7 +197,7 @@ cmd_celular() {
 # (marcada con X-Vortex-Fps, la única que «off» borra); los Flatpak, con «flatpak override --user».
 # La config de Vortex va en ~/.config/MangoHud/MangoHud.conf solo si la persona no tiene una. Vale al
 # volver a abrir el lanzador.
-FPS_DESKTOP=(steam.desktop heroic.desktop net.lutris.Lutris.desktop)
+FPS_DESKTOP=(steam.desktop com.heroicgameslauncher.hgl.desktop heroic.desktop net.lutris.Lutris.desktop)
 FPS_FLATPAKS=(com.valvesoftware.Steam com.heroicgameslauncher.hgl net.lutris.Lutris com.usebottles.bottles
   org.vinegarhq.Sober org.prismlauncher.PrismLauncher io.mrarm.mcpelauncher)
 
