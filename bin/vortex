@@ -35,6 +35,7 @@ Uso: vortex <comando>
                                        avisa (con notificación y un botón «Actualizar») cuando hay
                                        actualizaciones del sistema, de tus apps o de Vortexine's
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
+  fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
@@ -87,6 +88,58 @@ carpeta_fondos() {
   printf '%s\n' "${dir:-$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos}"
 }
 
+# ---- Fondos que cambian solos (1.8) ---------------------------------------------------------------
+# Cada «autoWallpaper.minutes» minutos de settings.json (Ajustes → Tema; 0 o nada = apagado) pone un
+# fondo al azar de la carpeta de fondos, el mismo en todos los monitores y nunca el que ya estaba. Solo
+# imágenes: si el fondo de ahora es un video (fondos animados), lo eligió la persona y no se cambia.
+# Tampoco con el modo juego (no distraer ni gastar) ni con el modo otaku (pone los suyos). Lo arranca
+# hyprland.lua al entrar: un bash dormido (~3 MB), una sola copia por sesión, que lee el ajuste cada
+# minuto (así un cambio en Ajustes vale sin reiniciar nada).
+minutos_fondos() {
+  local m
+  m="$(jq -r '.autoWallpaper.minutes // 0' "${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" 2>/dev/null)"
+  [[ "$m" =~ ^[0-9]+$ ]] && printf '%s\n' "$m" || echo 0
+}
+
+fondo_al_azar() {
+  local actual
+  actual="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper/current_$(monitores | head -n1)" 2>/dev/null)"
+  case "${actual,,}" in *.mp4 | *.webm | *.mkv | *.mov) return 1 ;; esac
+  find "$(carpeta_fondos)" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
+    2>/dev/null | grep -vxF -- "${actual:-/}" | shuf -n1
+}
+
+cambiar_fondo_al_azar() {
+  [[ -e "$ESTADO/modo-juego" || -e "$CONF/otaku" ]] && return 0
+  local fondo
+  fondo="$(fondo_al_azar)" || return 0
+  [[ -n "$fondo" ]] && cmd_fondo "$fondo"
+}
+
+cmd_fondos_auto() {
+  case "${1:-estado}" in
+    estado)
+      local m
+      m="$(minutos_fondos)"
+      if ((m > 0)); then echo "cada $m min"; else echo "apagado"; fi
+      ;;
+    ya) cambiar_fondo_al_azar ;;
+    correr)
+      exec 9>"${XDG_RUNTIME_DIR:-/tmp}/vortex-fondos-auto.lock"
+      flock -n 9 || exit 0
+      local pasados=0 m
+      while sleep 60; do
+        m="$(minutos_fondos)"
+        if ((m <= 0)); then pasados=0; continue; fi
+        ((++pasados >= m)) || continue
+        pasados=0
+        cambiar_fondo_al_azar
+      done
+      ;;
+    *) aviso "usa: vortex fondos-auto [estado|ya|correr]"; exit 1 ;;
+  esac
+}
+
 # Los fondos que trae una versión nueva (Gargantua en la 1.7) se copian a Imágenes/Fondos una sola
 # vez: si después borras uno, no vuelve. Los de antes de la 1.7 ya los copió la instalación.
 fondos_nuevos() {
@@ -118,9 +171,6 @@ cmd_fondo() {
   done
 }
 
-# Al iniciar sesión: enciende el aviso de actualizaciones si nunca se encendió y, si todavía no hay
-# fondo, pone el primero de la carpeta de Vortex (así el primer arranque ya tiene fondo y colores).
-# Espera a que el shell responda.
 # 1.7.7: una sola vez por usuario, al entrar, un aviso de dónde están los atajos (Super+F1, la hoja de
 # atajos del shell): quien viene de Windows no sabe que existen. Se reintenta mientras arranca el
 # servidor de notificaciones (el shell, que sube al mismo tiempo que esto).
@@ -135,6 +185,9 @@ aviso_atajos() {
     </dev/null >/dev/null 2>&1 &
 }
 
+# Al iniciar sesión: enciende el aviso de actualizaciones si nunca se encendió y, si todavía no hay
+# fondo, pone el primero de la carpeta de Vortex (así el primer arranque ya tiene fondo y colores).
+# Espera a que el shell responda.
 cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
@@ -1008,6 +1061,7 @@ case "${1:-ayuda}" in
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
+  fondos-auto) shift; cmd_fondos_auto "$@" ;;
   saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)

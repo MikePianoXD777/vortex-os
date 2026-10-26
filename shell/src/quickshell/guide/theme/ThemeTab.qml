@@ -55,6 +55,9 @@ ThemeTabState {
             // Vortex: «Fondos animados», ver ThemeAnimatedSection.qml.
             ThemeAnimatedSection { tab: themeTabRoot }
 
+            // Vortex 1.8: «Fondos que cambian solos», ver ThemeAutoWallpaperSection.qml.
+            ThemeAutoWallpaperSection { tab: themeTabRoot }
+
             // Vortex: «Modo otaku» (easter egg), ver ThemeOtakuSection.qml.
             ThemeOtakuSection { tab: themeTabRoot }
 

@@ -76,6 +76,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("vortex primer-inicio")
     -- Vortex 1.8: memorias USB y tarjetas SD: las monta y avisa con «Abrir» y «Expulsar» (bin/vortex-usb).
     hl.exec_cmd("vortex-usb")
+    -- Vortex 1.8: fondos que cambian solos (si se encendió en Ajustes → Tema; si no, solo duerme).
+    hl.exec_cmd("vortex fondos-auto correr")
     -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
     -- presión de memoria). «vortex gestor apagar» lo deshabilita.
     hl.exec_cmd("systemctl --user -q is-enabled vortex-gestor.service && systemctl --user start vortex-gestor.service")

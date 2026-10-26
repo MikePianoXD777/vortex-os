@@ -713,6 +713,15 @@
         "title": "Modo otaku",
         "desc": "Fondo de Miku Nakano, otra fuente y bordes más suaves. Se descarga al encenderlo; al apagarlo todo vuelve como estaba",
         "working": "Trabajando…"
+      },
+      "auto_wallpaper": {
+        "title": "Fondos que cambian solos",
+        "desc": "Cada cierto tiempo, una imagen al azar de tu carpeta de fondos",
+        "off": "Apagado",
+        "m15": "Cada 15 min",
+        "m30": "Cada 30 min",
+        "h1": "Cada hora",
+        "h3": "Cada 3 horas"
       }
     },
     "file_picker": {

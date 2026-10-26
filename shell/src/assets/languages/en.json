@@ -715,6 +715,15 @@
         "select_wallpaper": "Select wallpaper",
         "no_wallpaper_selected": "No wallpaper selected",
         "select": "Wallpaper"
+      },
+      "auto_wallpaper": {
+        "title": "Wallpapers that change on their own",
+        "desc": "Every so often, a random image from your wallpaper folder",
+        "off": "Off",
+        "m15": "Every 15 min",
+        "m30": "Every 30 min",
+        "h1": "Every hour",
+        "h3": "Every 3 hours"
       }
     },
     "file_picker": {
