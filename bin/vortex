@@ -526,7 +526,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -733,6 +733,7 @@ end' >/dev/null 2>&1 || true
 # trae la ISO o install.sh, pero una instalación vieja no los tiene). Solo se instalan los que falten.
 PAQUETES_NUEVOS=(
   udisks2 # 1.8: vortex-usb
+  tesseract tesseract-data-spa tesseract-data-eng # 1.8: vortex-texto (copiar texto de la pantalla)
 )
 paquetes_nuevos() {
   local p faltan=()

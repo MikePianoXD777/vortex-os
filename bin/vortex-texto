@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# vortex-texto (Vortex 1.8): copia el texto que se ve en una parte de la pantalla (OCR). Congela la
+# pantalla como la captura de región (vortex-captura), eliges la zona con el ratón y el texto que
+# haya ahí queda en el portapapeles. Sirve para PDFs que no dejan copiar, capturas, videos o juegos.
+# Super+Shift+T. Lee español e inglés con tesseract (paquetes tesseract-data-spa y -eng).
+#
+#   vortex-texto            elige la zona y copia su texto
+#   vortex-texto ARCHIVO    el texto de una imagen (lo imprime; no copia ni avisa)
+set -uo pipefail
+
+avisar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" "$@" || true; }
+
+if ! command -v tesseract >/dev/null; then
+  avisar -u critical "Copiar texto de la pantalla" "Falta tesseract. Instálalo con: sudo pacman -S tesseract tesseract-data-spa tesseract-data-eng"
+  exit 1
+fi
+
+# Idiomas: español e inglés si están; si no, los que haya (menos «osd», que no es un idioma).
+idiomas() {
+  local hay quiero=() l
+  hay="$(tesseract --list-langs 2>/dev/null | tail -n +2)"
+  for l in spa eng; do grep -qx "$l" <<<"$hay" && quiero+=("$l"); done
+  if ((!${#quiero[@]})); then
+    mapfile -t quiero < <(grep -vx osd <<<"$hay" | head -n 2)
+  fi
+  local IFS=+
+  printf '%s' "${quiero[*]}"
+}
+
+# El texto de la imagen ARCHIVO, sin renglones vacíos al principio ni al final. La imagen se agranda al
+# doble y pasa a grises antes (si está ImageMagick): con letra de pantalla, chica, lee mucho mejor.
+leer() {
+  local imagen="$1" lang preparada texto
+  lang="$(idiomas)"
+  [[ -n "$lang" ]] || return 2
+  preparada="$imagen"
+  if command -v magick >/dev/null && preparada="$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/vortex-texto-XXXXXX.png")"; then
+    magick "$imagen" -colorspace Gray -resize 200% "$preparada" 2>/dev/null || { rm -f "$preparada"; preparada="$imagen"; }
+  fi
+  # psm 3 (automático) para párrafos y columnas; si no encuentra nada, psm 6 (un bloque), que lee
+  # mejor una sola línea o un botón.
+  texto="$(tesseract "$preparada" - -l "$lang" --psm 3 2>/dev/null)"
+  [[ -n "${texto//[[:space:]]/}" ]] || texto="$(tesseract "$preparada" - -l "$lang" --psm 6 2>/dev/null)"
+  [[ "$preparada" != "$imagen" ]] && rm -f "$preparada"
+  # Sin espacios al final de cada renglón ni renglones vacíos al principio o al final (los de en medio,
+  # entre párrafos, se quedan).
+  awk '{ sub(/[[:space:]]+$/, "") } NF { while (vacios > 0) { print ""; vacios-- } print; empezo = 1; next }
+       empezo { vacios++ }' <<<"$texto"
+}
+
+if [[ -n "${1:-}" ]]; then
+  leer "$1"
+  exit $?
+fi
+
+tmp="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/vortex-texto.XXXXXX")" || exit 1
+trap 'rm -rf "$tmp"' EXIT
+
+# Igual que vortex-captura: hyprpicker -r -z congela la imagen mientras se elige la zona.
+congelado=""
+if command -v hyprpicker >/dev/null; then
+  hyprpicker -r -z >/dev/null 2>&1 &
+  congelado=$!
+  sleep 0.12
+fi
+region="$(slurp -d 2>/dev/null)"
+[[ -n "$congelado" ]] && kill "$congelado" 2>/dev/null
+[[ -n "$region" ]] || exit 0          # Esc o clic sin arrastrar: no hace nada
+grim -g "$region" "$tmp/zona.png" || { avisar -u critical "Copiar texto" "No se pudo capturar la zona"; exit 1; }
+
+texto="$(leer "$tmp/zona.png")"
+if [[ -z "${texto//[[:space:]]/}" ]]; then
+  avisar -u low "Copiar texto" "No encontré texto en esa zona. Prueba con una zona más grande o con letra más clara."
+  exit 0
+fi
+printf '%s' "$texto" | wl-copy
+# El aviso muestra el principio, en una línea.
+muestra="$(tr '\n' ' ' <<<"$texto" | tr -s ' ' | sed 's/^ //' | cut -c1-140)"
+((${#texto} > 140)) && muestra+="…"
+extra=""
+grep -qx spa < <(tesseract --list-langs 2>/dev/null) ||
+  extra=$'\n\n'"Para leer bien acentos y ñ: sudo pacman -S tesseract-data-spa"
+avisar "Texto copiado" "$muestra$extra"

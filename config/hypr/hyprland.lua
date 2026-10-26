@@ -13,6 +13,7 @@ local reemplazados = {
     ["SUPER + E"] = true, -- nautilus
     ["SUPER + O"] = true, -- hoy libre en Serpantinum; si algún día lo usa, el atajo es de Miku (el asistente)
     ["SUPER + F1"] = true, -- hoy libre; es la hoja de atajos de Vortex (1.7.7)
+    ["SUPER + SHIFT + T"] = true, -- hoy libre; copiar el texto de la pantalla (1.8)
 }
 
 -- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
@@ -252,6 +253,9 @@ hl.bind("SUPER + O", hl.dsp.exec_cmd("vortex-miku"))
 -- Hoja de atajos (1.7.7): el panel «keybinds» del shell, con los atajos de shell/src/assets/atajos.json
 -- (pruebas/atajos.lua comprueba que cada uno exista). F1 es la tecla de ayuda de siempre.
 hl.bind("SUPER + F1", hl.dsp.event("serpantinum:toggle keybinds"))
+
+-- Vortex 1.8: copiar el texto de una zona de la pantalla (OCR, bin/vortex-texto). T de «texto».
+hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("vortex-texto"))
 
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)

@@ -14,3 +14,6 @@ nvtop                  # monitor de la GPU (NVIDIA, AMD, Intel)
 fastfetch              # datos del sistema en la terminal
 fuse2                  # para abrir AppImage
 udisks2                # montar memorias USB sin root (vortex-usb, 1.8)
+tesseract              # copiar el texto de la pantalla (vortex-texto, Super+Shift+T, 1.8)
+tesseract-data-spa
+tesseract-data-eng
