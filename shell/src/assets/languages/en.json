@@ -1627,6 +1627,10 @@
     "keybinds": {
       "name": "Keyboard shortcuts",
       "desc": "Every Vortexine's OS shortcut (Super+F1)"
+    },
+    "celular": {
+      "name": "Your phone",
+      "desc": "Your phone's notifications, files and battery (Super+Shift+P)"
     }
   },
   "cli": {
@@ -1826,5 +1830,28 @@
     "yesterday": "Yesterday",
     "just_now": "Just now",
     "minutes_ago": "{n} min ago"
+  },
+  "celular": {
+    "title": "Your phone",
+    "subtitle": "With KDE Connect, over your Wi-Fi",
+    "search": "Search",
+    "intro": "See your phone's notifications here, send it files or what you copied, and make it ring when you can't find it.",
+    "step1": "Install KDE Connect on your phone (Play Store or F-Droid).",
+    "step2": "Connect it to the same Wi-Fi as this PC.",
+    "step3": "Turn it on here and accept the pairing on your phone.",
+    "turn_on": "Turn on",
+    "turning_on": "Turning on…",
+    "empty": "No phones yet. Open KDE Connect on your phone, on the same Wi-Fi, and it will show up here.",
+    "wants_pair": "Wants to pair",
+    "not_paired": "Not paired",
+    "offline": "Not connected",
+    "connected": "Connected",
+    "accept": "Accept",
+    "pair": "Pair",
+    "ring": "Ring",
+    "send_file": "Send files",
+    "send_clipboard": "Send clipboard",
+    "unpair": "Unpair",
+    "turn_off": "Turn off KDE Connect"
   }
 }

@@ -1671,6 +1671,10 @@
     "keybinds": {
       "name": "Atajos de teclado",
       "desc": "Todos los atajos de Vortexine's OS (Super+F1)"
+    },
+    "celular": {
+      "name": "Tu celular",
+      "desc": "Notificaciones, archivos y batería de tu celular (Super+Shift+P)"
     }
   },
   "cli": {
@@ -1868,5 +1872,28 @@
     "yesterday": "Ayer",
     "just_now": "Ahora",
     "minutes_ago": "hace {n} min"
+  },
+  "celular": {
+    "title": "Tu celular",
+    "subtitle": "Con KDE Connect, por tu Wi-Fi",
+    "search": "Buscar",
+    "intro": "Mira aquí las notificaciones de tu celular, mándale archivos o lo que copiaste, y hazlo sonar cuando no lo encuentres.",
+    "step1": "Instala KDE Connect en tu celular (Play Store o F-Droid).",
+    "step2": "Conéctalo al mismo Wi-Fi que esta PC.",
+    "step3": "Enciéndelo aquí y acepta la vinculación en tu celular.",
+    "turn_on": "Encender",
+    "turning_on": "Encendiendo…",
+    "empty": "Todavía no hay celulares. Abre KDE Connect en tu celular, en el mismo Wi-Fi, y aparecerá aquí.",
+    "wants_pair": "Quiere vincularse",
+    "not_paired": "Sin vincular",
+    "offline": "No conectado",
+    "connected": "Conectado",
+    "accept": "Aceptar",
+    "pair": "Vincular",
+    "ring": "Hacer sonar",
+    "send_file": "Mandar archivos",
+    "send_clipboard": "Mandar portapapeles",
+    "unpair": "Desvincular",
+    "turn_off": "Apagar KDE Connect"
   }
 }

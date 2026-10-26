@@ -99,6 +99,9 @@ udisks2
 tesseract
 tesseract-data-spa
 tesseract-data-eng
+# Tu celular (KDE Connect, Super+Shift+P, 1.8; viene apagado) y zenity para elegir archivos
+kdeconnect
+zenity
 grim
 slurp
 wl-clipboard

@@ -128,7 +128,7 @@ PanelWindow {
 
     function queueWidgetLaunchLog(target) {
         let names = [target];
-        let known = ["network", "volume", "guide", "calendar", "music", "notifications", "system", "keybinds"];
+        let known = ["network", "volume", "guide", "calendar", "music", "notifications", "system", "keybinds", "celular"];
         if (known.indexOf(target) !== -1 && typeof I18n !== "undefined") {
             let shown = I18n.t("widgets." + target + ".name", "");
             if (shown && shown !== target && shown.indexOf("widgets.") !== 0) names.push(shown);
@@ -449,7 +449,7 @@ PanelWindow {
     // Vortex 1.7.5: todos los paneles, no solo esos dos, y a los 20 s: los demás (red, volumen,
     // reloj, música, notificaciones, sistema) se quedaban en memoria para siempre tras abrirlos
     // una vez (~10-25 MB cada uno). Reabrirlos cuesta un instante.
-    readonly property var releasableWidgets: ["guide", "wallpaper", "network", "volume", "calendar", "music", "notifications", "system", "keybinds"]
+    readonly property var releasableWidgets: ["guide", "wallpaper", "network", "volume", "calendar", "music", "notifications", "system", "keybinds", "celular"]
     readonly property int widgetReleaseDelay: 20000
     property string _previousActive: "hidden"
     property var widgetHiddenSince: ({})

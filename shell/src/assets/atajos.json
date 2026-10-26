@@ -47,6 +47,7 @@
       { "teclas": ["SUPER + Period"], "es": "Emojis", "en": "Emoji" },
       { "teclas": ["SUPER + SHIFT + W"], "es": "Fondos de pantalla", "en": "Wallpapers" },
       { "teclas": ["SUPER + ALT + M"], "es": "Música", "en": "Music" },
+      { "teclas": ["SUPER + SHIFT + P"], "es": "Tu celular (KDE Connect)", "en": "Your phone (KDE Connect)" },
       { "teclas": ["CTRL + ALT + Delete"], "es": "Apagar, reiniciar, bloquear o cerrar sesión", "en": "Shut down, restart, lock or log out" }
     ]
   },
