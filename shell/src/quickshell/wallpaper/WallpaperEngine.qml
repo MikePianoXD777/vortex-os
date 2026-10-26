@@ -711,11 +711,14 @@ ShellRoot {
                         Image {
                             id: imgA
                             anchors.fill: parent
-                            source: !barWindow.isVideoA && barWindow.pathA ? "file://" + barWindow.pathA : ""
+                            // Vortex 1.7.5: sin tamaño todavía (al arrancar) se decodificaba la foto completa
+                            // (una 4K son ~33 MB) antes de ajustarla a la pantalla; ahora espera al tamaño. Y
+                            // sin caché: cada fondo que pasaba por aquí se quedaba guardado.
+                            source: parent.width > 0 && !barWindow.isVideoA && barWindow.pathA ? "file://" + barWindow.pathA : ""
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             visible: !barWindow.isVideoA && barWindow.pathA !== ""
-                            cache: true
+                            cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
                         }
@@ -779,11 +782,14 @@ ShellRoot {
                         Image {
                             id: imgB
                             anchors.fill: parent
-                            source: !barWindow.isVideoB && barWindow.pathB ? "file://" + barWindow.pathB : ""
+                            // Vortex 1.7.5: sin tamaño todavía (al arrancar) se decodificaba la foto completa
+                            // (una 4K son ~33 MB) antes de ajustarla a la pantalla; ahora espera al tamaño. Y
+                            // sin caché: cada fondo que pasaba por aquí se quedaba guardado.
+                            source: parent.width > 0 && !barWindow.isVideoB && barWindow.pathB ? "file://" + barWindow.pathB : ""
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             visible: !barWindow.isVideoB && barWindow.pathB !== ""
-                            cache: true
+                            cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
                         }

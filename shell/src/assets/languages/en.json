@@ -259,6 +259,13 @@
       }
     },
     "display": {
+      "window_manager": {
+        "title": "Window manager",
+        "desc": "Tiling (like qtile): each window takes its own spot without overlapping. KDE: floating windows with a title bar, like KDE or Windows. Changing it restarts the shell",
+        "tiling": "Tiling",
+        "floating": "KDE",
+        "working": "Switching…"
+      },
       "bluelight": {
         "title": "Blue light filter",
         "desc": "Toggle warm screen lighting"

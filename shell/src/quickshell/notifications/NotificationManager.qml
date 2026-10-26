@@ -18,6 +18,7 @@ Item {
     ListModel { id: groupedHistoryModel }
 
     property alias globalNotificationHistory: historyModel
+    readonly property int historyLimit: 100
     property alias activePopupsModel: popupsModel
     property alias groupedHistory: groupedHistoryModel
 
@@ -389,6 +390,14 @@ Item {
             };
 
             historyModel.insert(0, notifData);
+            // Vortex 1.7.5: el historial no tenía tope y cada entrada guarda la notificación viva (con
+            // su imagen): con los avisos de WhatsApp, Discord… crecía toda la sesión. Se quedan 100.
+            while (historyModel.count > root.historyLimit) {
+                let vieja = historyModel.get(historyModel.count - 1);
+                if (!vieja) break;
+                root.dismissNotification(vieja.uid);
+                if (historyModel.count > root.historyLimit) historyModel.remove(historyModel.count - 1, 1);
+            }
 
             if (!root.isStartup && !root.sysPanelOpen) {
                 let newPopup = {

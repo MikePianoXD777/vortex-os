@@ -41,6 +41,9 @@ Uso: vortex <comando>
   miku [avatar on|off|estado]          Miku, el asistente de voz (Super+O): la abre o la cierra del todo;
                                        «avatar off» la deja solo como voz y gasta menos RAM
   java [aplicar]                       muestra o aplica a Minecraft los ajustes de Java para jugar
+  ventanas [estado|mosaico|kde]        gestor de ventanas: mosaico (como qtile, de fábrica) o kde
+                                       (flotantes con barra de título, como KDE o Windows). También
+                                       desde Ajustes → Pantalla
   version
 EOF
 }
@@ -604,6 +607,88 @@ hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; '"$previo"'" .. c))' >/
     printf 'vortex: %s\n' "reinicié el shell para que cargue lo nuevo" || true
 }
 
+# Gestor de ventanas (1.7.5): «mosaico» (de fábrica: Hyprland en mosaico, como qtile) o «kde» (cada
+# ventana flotante y encimada, con barra de título y botones, como KDE o Windows). config/hypr/hyprland.lua
+# lee ~/.config/vortex/ventanas al cargar. Lo cambia Ajustes → Pantalla → Gestor de ventanas.
+VENTANAS="$CONF/ventanas"
+BARRAS="${XDG_DATA_HOME:-$HOME/.local/share}/vortex/hyprbars"
+URL_PLUGINS=https://github.com/hyprwm/hyprland-plugins
+
+modo_ventanas() { [[ "$(cat "$VENTANAS" 2>/dev/null)" == kde ]] && echo kde || echo mosaico; }
+
+# Versión y commit del Hyprland instalado («0.56.2 efb5099…»), los que dice «Hyprland --version».
+hyprland_instalado() {
+  Hyprland --version 2>/dev/null | sed -n '1s/^Hyprland \([^ ]*\) .* at commit \([0-9a-f]*\).*/\1 \2/p'
+}
+
+# La barra de título del modo kde es el plugin hyprbars (de hyprland-plugins, de los autores de
+# Hyprland). Un plugin solo carga en el Hyprland para el que se compiló, así que se compila aquí para
+# el tuyo, sin root, en ~/.local/share/vortex/hyprbars/hyprbars-<versión>.so (el nombre que busca
+# hyprland.lua); «vortex actualizar» lo rehace cuando cambia Hyprland. Sin él las ventanas flotan igual.
+barras_titulo() {
+  local inst v commit so src pin
+  inst="$(hyprland_instalado)"
+  v="${inst%% *}" commit="${inst#* }"
+  [[ -n "$v" ]] || { aviso "no pude leer la versión de Hyprland"; return 1; }
+  so="$BARRAS/hyprbars-$v.so"
+  [[ -s "$so" ]] && return 0
+  echo "Compilando la barra de título (hyprbars) para Hyprland $v; tarda un minuto…"
+  src="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/hyprland-plugins"
+  rm -rf "$src"
+  git clone -q "$URL_PLUGINS" "$src" || { aviso "no pude bajar hyprland-plugins (¿sin internet?)"; return 1; }
+  # hyprpm.toml fija qué commit de los plugins va con cada commit de Hyprland; si el tuyo no está, el
+  # de la etiqueta de tu versión.
+  pin="$(grep -o "\[\"${commit}[0-9a-f]*\", *\"[0-9a-f]*\"\]" "$src/hyprpm.toml" 2>/dev/null | head -1 | sed 's/.*, *"\([0-9a-f]*\)"\]/\1/')"
+  if [[ -n "$pin" ]]; then
+    git -C "$src" -c advice.detachedHead=false checkout -q "$pin"
+  else
+    git -C "$src" -c advice.detachedHead=false checkout -q "v$v" 2>/dev/null || true
+  fi
+  mkdir -p "$BARRAS"
+  if make -C "$src/hyprbars" -j"$(nproc)" >"$BARRAS/compilar.log" 2>&1 && [[ -s "$src/hyprbars/hyprbars.so" ]]; then
+    # Las de otras versiones se quedan (pesan poco): el Hyprland que corre sigue siendo el viejo hasta
+    # que vuelves a entrar, y su recarga busca la suya.
+    install -m644 "$src/hyprbars/hyprbars.so" "$so"
+    rm -rf "$src"
+    return 0
+  fi
+  aviso "no se pudo compilar hyprbars (detalles en $BARRAS/compilar.log): las ventanas flotan sin barra de título"
+  return 1
+}
+
+cmd_ventanas() {
+  case "${1:-estado}" in
+    estado) modo_ventanas ;;
+    mosaico | kde)
+      [[ "$1" == kde ]] && { barras_titulo || true; }
+      mkdir -p "$CONF"
+      printf '%s\n' "$1" >"$VENTANAS"
+      if hypr_corriendo; then
+        hypr reload >/dev/null 2>&1 || true
+        # Las reglas solo valen para las ventanas nuevas: las que ya estaban se sueltan o se acomodan aquí.
+        # shellcheck disable=SC2016
+        hypr eval 'local flotar = '"$([[ "$1" == kde ]] && echo true || echo false)"'
+for _, w in ipairs(hl.get_windows()) do
+    if w.floating ~= flotar and w.class ~= "vortex-miku" and not w.pinned then
+        hl.dispatch(hl.dsp.window.float({ action = flotar and "set" or "unset", window = "address:" .. w.address }))
+    end
+end' >/dev/null 2>&1 || true
+      fi
+      reiniciar_shell >/dev/null
+      local titulo="Ventanas en mosaico" texto="Cada ventana toma su lugar en el mosaico."
+      [[ "$1" == kde ]] && titulo="Ventanas como en KDE" \
+        texto="Flotantes, con barra de título. Se arrastran de la barra y se pegan a las orillas."
+      # Las notificaciones las muestra el shell, que se está reiniciando: se reintenta hasta que vuelva
+      # (en su propia sesión, para que no la corte el reinicio).
+      # shellcheck disable=SC2016
+      command -v notify-send >/dev/null &&
+        setsid bash -c 'for _ in $(seq 1 20); do sleep 1; notify-send -a "Vortexine'"'"'s OS" -t 4000 "$1" "$2" 2>/dev/null && exit 0; done' \
+          _ "$titulo" "$texto" </dev/null >/dev/null 2>&1 &
+      ;;
+    *) aviso "usa: vortex ventanas [estado|mosaico|kde]"; exit 1 ;;
+  esac
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
@@ -619,6 +704,8 @@ cmd_actualizar() {
   instalar_comandos
   paru -Syu
   version_sistema
+  # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió.
+  [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; }
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
@@ -881,6 +968,7 @@ case "${1:-ayuda}" in
     exec vortex-miku "$@"
     ;;
   java) shift; cmd_java "$@" ;;
+  ventanas) shift; cmd_ventanas "$@" ;;
   primer-inicio) cmd_primer_inicio ;;
   # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
   version)

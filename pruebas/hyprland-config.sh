@@ -21,14 +21,21 @@ cp "$AQUI"/config/hypr/*.lua "$T/home/.config/hypr/"
 sed -i "s|^local serp = \"/usr/share/serpantinum/compositors/hyprland\"|local serp = \"$AQUI/shell/compositors/hyprland\"|" \
   "$T/home/.config/hypr/hyprland.lua"
 grep -q "^local serp = \"$AQUI/shell/" "$T/home/.config/hypr/hyprland.lua" || { echo "No encontré «local serp» en hyprland.lua" >&2; exit 1; }
-salida="$(cd "$T" && HOME="$T/home" XDG_RUNTIME_DIR="$T/run" XDG_CONFIG_HOME="$T/home/.config" \
-  timeout 60 Hyprland --verify-config -c "$T/home/.config/hypr/hyprland.lua" 2>&1)"
-resultado="$(sed -n '/Config parsing result/,$p' <<<"$salida" | grep -v -e '^=*$' -e 'Config parsing result')"
-if [[ "$resultado" == "config ok" ]]; then
-  echo "  ok  Hyprland --verify-config: config ok"
-  echo "Todo bien"
-else
-  echo "  MAL Hyprland --verify-config:"
-  printf '%s\n' "${resultado:-$salida}" | sed 's/^/        /'
-  exit 1
-fi
+# Con los dos gestores de ventanas (1.7.5, ~/.config/vortex/ventanas): mosaico (de fábrica) y kde.
+mkdir -p "$T/home/.config/vortex"
+fallos=0
+for modo in mosaico kde; do
+  printf '%s\n' "$modo" >"$T/home/.config/vortex/ventanas"
+  salida="$(cd "$T" && HOME="$T/home" XDG_RUNTIME_DIR="$T/run" XDG_CONFIG_HOME="$T/home/.config" \
+    timeout 60 Hyprland --verify-config -c "$T/home/.config/hypr/hyprland.lua" 2>&1)"
+  resultado="$(sed -n '/Config parsing result/,$p' <<<"$salida" | grep -v -e '^=*$' -e 'Config parsing result')"
+  if [[ "$resultado" == "config ok" ]]; then
+    echo "  ok  Hyprland --verify-config ($modo): config ok"
+  else
+    echo "  MAL Hyprland --verify-config ($modo):"
+    printf '%s\n' "${resultado:-$salida}" | sed 's/^/        /'
+    fallos=$((fallos + 1))
+  fi
+done
+((fallos == 0)) || exit 1
+echo "Todo bien"

@@ -446,8 +446,11 @@ PanelWindow {
     // carga ~17 pestañas para la búsqueda). Se crean al abrirlos (R2) y, si siguen
     // cerrados un minuto después, se destruyen para devolver la memoria. Al reabrirlos
     // se vuelven a crear desde el componente ya compilado (componentCache).
-    readonly property var releasableWidgets: ["guide", "wallpaper"]
-    readonly property int widgetReleaseDelay: 60000
+    // Vortex 1.7.5: todos los paneles, no solo esos dos, y a los 20 s: los demás (red, volumen,
+    // reloj, música, notificaciones, sistema) se quedaban en memoria para siempre tras abrirlos
+    // una vez (~10-25 MB cada uno). Reabrirlos cuesta un instante.
+    readonly property var releasableWidgets: ["guide", "wallpaper", "network", "volume", "calendar", "music", "notifications", "system"]
+    readonly property int widgetReleaseDelay: 20000
     property string _previousActive: "hidden"
     property var widgetHiddenSince: ({})
 
@@ -480,6 +483,17 @@ PanelWindow {
             if (hasRunningProcess(kids[i])) return true;
         }
         return false;
+    }
+
+    // Vortex 1.7.5: lo pide el gestor de recursos cuando falta memoria (IPC «vortex soltarMemoria»,
+    // Shell.qml): suelta ya los paneles cerrados, sin esperar sus 20 s, y recoge la basura de JS.
+    function soltarMemoria() {
+        let now = Date.now();
+        for (let i = 0; i < releasableWidgets.length; i++) {
+            if (widgetCache[releasableWidgets[i]]) widgetHiddenSince[releasableWidgets[i]] = now - widgetReleaseDelay;
+        }
+        releaseIdleWidgets();
+        gc();
     }
 
     function releaseIdleWidgets() {

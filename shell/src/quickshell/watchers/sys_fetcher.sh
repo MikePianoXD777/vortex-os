@@ -69,25 +69,29 @@ save_prev_stat() {
     prev_time=$NOW; u1=$u2; n1=$n2; s1=$s2; i1=$i2; io1=$io2; ir1=$ir2; so1=$so2; st1=$st2; rx1=$rx2; tx1=$tx2
 }
 
+# Vortex 1.7.5: «usada» como htop y «vortex bench»: total − libre − búferes − caché recuperable
+# (Cached sin Shmem, más SReclaimable). Antes era total − disponible, que además cuenta el colchón
+# libre que el kernel reserva (vm.watermark_scale_factor; ~0,6 GB en 32 GB) y parte de la caché de
+# archivos: salía ~1 GB más que en htop, como si esa RAM no se soltara.
 read_mem() {
     local key val
+    local free=0 buffers=0 cached=0 shmem=0 sreclaim=0
     TOTAL_MEM=0
-    AVAIL_MEM=0
     while IFS=":" read -r key val; do
+        val="${val% kB}"
+        val="${val//[[:space:]]/}"
         case "$key" in
-            MemTotal)
-                val="${val% kB}"
-                TOTAL_MEM="${val//[[:space:]]/}"
-                ;;
-            MemAvailable)
-                val="${val% kB}"
-                AVAIL_MEM="${val//[[:space:]]/}"
-                ;;
+            MemTotal) TOTAL_MEM="$val" ;;
+            MemFree) free="$val" ;;
+            Buffers) buffers="$val" ;;
+            Cached) cached="$val" ;;
+            Shmem) shmem="$val" ;;
+            SReclaimable) sreclaim="$val"; break ;;
         esac
-        [ "$TOTAL_MEM" -gt 0 ] && [ "$AVAIL_MEM" -gt 0 ] && break
     done < /proc/meminfo
 
-    local used=$((TOTAL_MEM - AVAIL_MEM))
+    local used=$((TOTAL_MEM - free - buffers - (cached - shmem) - sreclaim))
+    [ "$used" -lt 0 ] && used=0
     if [ "$TOTAL_MEM" -gt 0 ]; then
         RAM_PCT=$(( 100 * used / TOTAL_MEM ))
         RAM_GB="$(( used / 1048576 )).$(( (used % 1048576) * 10 / 1048576 ))"

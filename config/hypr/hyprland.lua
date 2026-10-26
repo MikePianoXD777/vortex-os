@@ -56,7 +56,11 @@ local function comando_shell()
     local reglas = "qt.qpa.services.warning=false;qt.qpa.wayland.textinput.warning=false"
     local bt = io.open("/sys/class/bluetooth/hci0/address")
     if bt then bt:close() else reglas = reglas .. ";quickshell.dbus.objectmanager.warning=false" end
-    return "QT_LOGGING_RULES='" .. reglas .. "' serpantinumd start"
+    -- Vortex 1.7.5: quickshell usa jemalloc, que guardaba la memoria que el shell soltaba (al cerrar un
+    -- panel) en vez de devolverla; así la devuelve al segundo. (MALLOC_ARENA_MAX/MALLOC_TRIM_* son de
+    -- glibc y aquí no hacen nada.)
+    local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
+    return "QT_LOGGING_RULES='" .. reglas .. "' " .. memoria .. " serpantinumd start"
 end
 if ok_atajos then atajos.comando_shell = comando_shell end
 
@@ -157,6 +161,77 @@ hl.window_rule({
     rounding = 0,
     move = "monitor_w-window_w-7 41",
 })
+
+-- Gestor de ventanas (1.7.5, Ajustes → Pantalla o «vortex ventanas mosaico|kde»). De fábrica, mosaico
+-- (como qtile). En «kde», para quien viene de KDE o Windows: cada ventana se abre flotante y encimada, se
+-- arrastra de su barra de título (minimizar, maximizar y cerrar), se pega a las orillas y a las otras
+-- ventanas, y el teclado sigue al clic, no al mouse. La barra es el plugin hyprbars, que «vortex ventanas
+-- kde» compila para tu Hyprland; si falta o no carga, las ventanas flotan igual, sin barra.
+local f_ventanas = io.open(home .. "/.config/vortex/ventanas")
+local modo_ventanas = f_ventanas and f_ventanas:read("l") or "mosaico"
+if f_ventanas then f_ventanas:close() end
+-- Con un Hyprland sin plugins por Lua (o el falso de las pruebas) no hay barra, sin romper la config.
+local plugins = type(hl.plugin) == "table" and hl.plugin or {}
+local version = type(hl.version) == "function" and hl.version() or nil
+local barras = version and (home .. "/.local/share/vortex/hyprbars/hyprbars-" .. version .. ".so")
+if modo_ventanas == "kde" then
+    hl.window_rule({ name = "vortex-kde", match = { class = ".*" }, float = true })
+    hl.config({
+        general = { snap = { enabled = true, respect_gaps = true }, resize_on_border = true },
+        input = { follow_mouse = 2 },
+    })
+    local f_barras = barras and plugins.load and io.open(barras)
+    if f_barras then
+        f_barras:close()
+        pcall(plugins.load, barras)
+    end
+    if plugins.hyprbars then
+        -- Los botones corren un comando; antes de correrlo, hyprbars le da el foco a su ventana.
+        local function orden(lua) return "hyprctl dispatch '" .. lua .. "'" end
+        local maximizar = orden('hl.dsp.window.fullscreen({ mode = "maximized" })')
+        hl.config({ plugin = { hyprbars = {
+            enabled = true,
+            bar_height = 30,
+            bar_color = "rgba(1e1e2ef2)",
+            col = { text = "rgb(cdd6f4)" },
+            bar_text_font = "Sans",
+            bar_text_size = 11,
+            bar_text_weight = "medium",
+            bar_part_of_window = true,
+            bar_precedence_over_border = true,
+            bar_padding = 10,
+            bar_button_padding = 8,
+            on_double_click = maximizar,
+        } } })
+        -- De derecha a izquierda: cerrar, maximizar y minimizar (manda la ventana a un escritorio
+        -- escondido; vuelve al picarle en la barra o en el dock, ver abajo).
+        plugins.hyprbars.add_button({ bg_color = "rgb(f38ba8)", fg_color = "rgb(1e1e2e)", size = 16, icon = "✕",
+            action = orden("hl.dsp.window.close()") })
+        plugins.hyprbars.add_button({ bg_color = "rgb(45475a)", fg_color = "rgb(cdd6f4)", size = 16, icon = "□",
+            action = maximizar })
+        plugins.hyprbars.add_button({ bg_color = "rgb(45475a)", fg_color = "rgb(cdd6f4)", size = 16, icon = "–",
+            action = orden('hl.dsp.window.move({ workspace = "special:minimizadas", follow = false })') })
+        -- Miku no lleva barra: es una ventana sin marco.
+        hl.window_rule({ name = "vortex-kde-miku", match = { class = "^vortex-miku$" }, ["hyprbars:no_bar"] = true })
+    end
+    -- Una ventana minimizada que recibe el foco (la barra y el dock enfocan la ventana) vuelve al
+    -- escritorio en el que estás, en vez de quedarse en el escondido.
+    hl.on("window.active", function(ventana)
+        local escritorio = ventana and ventana.workspace
+        if not (escritorio and escritorio.name == "special:minimizadas") then return end
+        local destino = hl.get_active_workspace()
+        if not destino then return end
+        hl.dispatch(hl.dsp.window.move({ workspace = tostring(destino.id), window = "address:" .. ventana.address }))
+        local especial = hl.get_active_special_workspace()
+        if especial and especial.name == "special:minimizadas" then
+            hl.dispatch(hl.dsp.workspace.toggle_special("minimizadas"))
+        end
+        hl.dispatch(hl.dsp.focus({ window = "address:" .. ventana.address }))
+    end)
+elseif plugins.hyprbars then
+    -- De vuelta en mosaico sin cerrar sesión: el plugin sigue cargado hasta que vuelvas a entrar.
+    hl.config({ plugin = { hyprbars = { enabled = false } } })
+end
 
 -- Atajos de Vortex.
 hl.bind("SUPER + A", hl.dsp.exec_cmd("vortex claude"))

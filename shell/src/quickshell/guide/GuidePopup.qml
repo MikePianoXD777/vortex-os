@@ -706,10 +706,9 @@ Item {
         introTabs = 0.0;
         startupSequence.restart();
         Updater.checkUpdate();
-        if (searchLoadCursor < totalTabSlots && !searchLoadTimer.running) {
-            searchLoadTimer.interval = 1400;
-            searchLoadTimer.restart();
-        }
+        // Vortex 1.7.5: ya no se cargan todas las pestañas en segundo plano al abrir (eran ~100 MB que
+        // se quedaban aunque no buscaras nada): cada una se carga al abrirla y todas al buscar
+        // (openSearch()).
     }
 
     function nextTab() {
@@ -837,10 +836,6 @@ Item {
     }
 
     Component.onCompleted: {
-        if (searchLoadCursor < totalTabSlots && !searchLoadTimer.running) {
-            searchLoadTimer.interval = 300;
-            searchLoadTimer.restart();
-        }
         if (visible) {
             forceActiveFocus();
             focusTimer.restart();

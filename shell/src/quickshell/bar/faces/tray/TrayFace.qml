@@ -126,6 +126,9 @@ Item {
                 id: trayIcon
                 source: modelData.icon || ""
                 fillMode: Image.PreserveAspectFit
+                // Vortex 1.7.5: cada ícono nuevo de la bandeja (WhatsApp con mensajes, Discord…) llega con
+                // otra dirección y se quedaba en la caché de imágenes toda la sesión.
+                cache: false
 
                 sourceSize: Qt.size(root.iconSize, root.iconSize)
                 width: root.iconSize

@@ -42,7 +42,26 @@ ShellRoot {
         }
     }
 
-    Main {}
+    Main { id: mainShell }
+
+    // Vortex 1.7.5: bin/vortex-gestor, cuando el sistema se queda sin memoria, llama a
+    // «quickshell ipc call vortex soltarMemoria» (antes no había quién contestara).
+    IpcHandler {
+        target: "vortex"
+
+        function soltarMemoria(): void {
+            mainShell.soltarMemoria();
+        }
+    }
+
+    // Vortex 1.7.5: el JavaScript del shell junta basura en reposo (eventos de ventanas, música,
+    // bandeja) y solo se recogía al cerrar Ajustes; cada 5 min se recoge (es rápido, ~ms).
+    Timer {
+        interval: 300000
+        running: true
+        repeat: true
+        onTriggered: gc()
+    }
     Bar {}
     Lock {}
     WidgetRedactor {}

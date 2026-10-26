@@ -81,6 +81,7 @@ piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 | Ajustes | `cachyos-settings` + extras de Vortex | zram, sysctl y límites ya probados por CachyOS; sin `ananicy-cpp` (sobra con `scx_lavd`) |
 | Drivers | `chwd` | detecta NVIDIA, AMD, Intel e híbridas |
 | Escritorio | Hyprland + Vortex Shell (Serpantinum con los parches de Vortex, `shell/`) | barra arriba, calendario y clima, panel de red, centro de control, música con ecualizador, carrusel de fondos, app de Ajustes |
+| Ventanas | mosaico (como qtile) o KDE: flotantes con barra de título (plugin hyprbars) | se elige en Ajustes → Pantalla o con `vortex ventanas mosaico\|kde`, sin cerrar sesión |
 | Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |

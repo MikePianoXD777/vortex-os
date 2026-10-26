@@ -260,6 +260,13 @@
       }
     },
     "display": {
+      "window_manager": {
+        "title": "Gestor de ventanas",
+        "desc": "Mosaico (como qtile): cada ventana toma su lugar sin encimarse. KDE: ventanas flotantes con barra de título, como en KDE o Windows. Al cambiarlo se reinicia el shell",
+        "tiling": "Mosaico",
+        "floating": "KDE",
+        "working": "Cambiando…"
+      },
       "bluelight": {
         "title": "Filtro de luz azul",
         "desc": "Activar iluminación cálida de pantalla"

@@ -38,6 +38,9 @@ DisplayMainState {
                 model: displayTabRoot.monitorsList
                 delegate: DisplayMonitorCard { tab: displayTabRoot }
             }
+
+            // Vortex (1.7.5): mosaico o ventanas flotantes como KDE, abajo de los monitores.
+            DisplayWindowManagerSection { tab: displayTabRoot }
         }
     }
 }
