@@ -278,6 +278,20 @@ ok("Super+Shift+0 desde el 1 manda la ventana al 10", pulsar("SUPER + SHIFT + 0"
 estado.escritorio = nil
 ok("sin escritorio activo no falla", pulsar("SUPER + 1") == "")
 
+print("== Super+D (maximizar y volver al mosaico)")
+estado.escritorio = { id = 1, has_fullscreen = false }
+local s = pulsar("SUPER + D")
+ok("sin maximizada, maximiza la activa (la del mouse)", s:find("mode=maximized", 1, true) and s:find("action=set", 1, true), s)
+estado.escritorio = { id = 1, has_fullscreen = true, fullscreen_mode = 1, fullscreen_window = { address = "0xabc" } }
+s = pulsar("SUPER + D")
+ok("con una maximizada, la suelta aunque el foco esté en otra", s:find("action=unset", 1, true)
+    and s:find("address:0xabc", 1, true) and s:find("mode=maximized", 1, true), s)
+estado.escritorio.fullscreen_mode = 2
+s = pulsar("SUPER + D")
+ok("con una en pantalla completa (Super+F), también la suelta", s:find("action=unset", 1, true) and s:find("mode=fullscreen", 1, true), s)
+estado.escritorio = nil
+ok("sin escritorio activo no falla", pcall(pulsar, "SUPER + D"))
+
 print("== Escritorios especiales")
 estado.especial, estado.ventanas = nil, {}
 ok("Super+S abre el especial genérico", pulsar("SUPER + S") == "workspace.toggle_special(special)")
@@ -285,7 +299,7 @@ estado.especial = { name = "special:music" }
 ok("Super+S cierra el que esté abierto", pulsar("SUPER + S") == "workspace.toggle_special(music)")
 
 estado.especial, estado.ventanas = nil, {}
-local s = pulsar("SUPER + M")
+s = pulsar("SUPER + M")
 ok("Super+M va a special:music", s:find("focus({workspace=special:music})", 1, true), s)
 ok("Super+M lanza Spotify (Flatpak) en ese escritorio", s:find("flatpak run com.spotify.Client", 1, true), s)
 estado.ventanas = { { class = "Spotify", initial_title = "Spotify", title = "x", workspace = { name = "3" } } }
@@ -298,14 +312,6 @@ estado.especial = { name = "special:music" }
 ok("estando abierto lo esconde", pulsar("SUPER + M") == "workspace.toggle_special(music)")
 estado.especial, estado.ventanas = nil, {}
 ok("Ctrl+Shift+Esc lanza btop en kitty", pulsar("CTRL + SHIFT + Escape"):find("'kitty' '--class' 'btop' '--title' 'btop' 'btop'", 1, true))
-s = pulsar("SUPER + D")
-ok("Super+D lanza Discord: el de Arch, o Vesktop, o su Flatpak", s:find("exec discord;", 1, true) and s:find("exec vesktop;", 1, true)
-    and s:find("flatpak run com.discordapp.Discord", 1, true), s)
-ok("Super+D lanza también WhatsApp (Flatpak)", s:find("'flatpak' 'run' 'io.github.mimbrero.WhatsAppDesktop'", 1, true), s)
-estado.ventanas = { { class = "vesktop", initial_title = "Vesktop", title = "x", workspace = { name = "2" } },
-    { class = "whatsapp-desktop-linux", initial_title = "WhatsApp", title = "x", workspace = { name = "4" } } }
-s = pulsar("SUPER + D")
-ok("con Vesktop y WhatsApp abiertos los trae y no lanza nada", s:find("window.move", 1, true) and not s:find("exec_cmd", 1, true), s)
 estado.especial, estado.ventanas = nil, {}
 ok("Super+R lanza todoist", pulsar("SUPER + R"):find("'todoist'", 1, true))
 estado.ventanas = { { class = "btop", title = "btop", workspace = { name = "special:sysmon" } } }

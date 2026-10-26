@@ -410,6 +410,23 @@ atajo("SUPER + ALT + Backslash", function()
 end)
 atajo("SUPER + P", hl.dsp.window.pin())
 atajo("SUPER + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+-- Vortex (pedido de Mike): Super+D maximiza la ventana bajo el mouse (con follow_mouse la activa) y las
+-- demás del escritorio se esconden detrás sin cerrarse, así que la barra sigue mostrando sus íconos.
+-- Otra vez Super+D y vuelven al mosaico: si el escritorio ya tiene una maximizada, se suelta esa,
+-- tenga o no el foco (con un simple «alternar» se quedaba así si el foco estaba en otro lado).
+-- (En Caelestia Super+D era el escritorio especial de comunicación.)
+atajo("SUPER + D", function()
+    local escritorio = hl.get_active_workspace()
+    local maximizada = escritorio and escritorio.has_fullscreen and escritorio.fullscreen_window
+    if maximizada then
+        hl.dispatch(hl.dsp.window.fullscreen({
+            mode = escritorio.fullscreen_mode == 2 and "fullscreen" or "maximized",
+            action = "unset", window = "address:" .. maximizada.address,
+        }))
+    else
+        hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized", action = "set" }))
+    end
+end)
 atajo("SUPER + ALT + Space", hl.dsp.window.float())
 
 ---------------------------------------------------------------------------------------------
@@ -419,7 +436,6 @@ atajo("SUPER + ALT + Space", hl.dsp.window.float())
 atajo("SUPER + S", alternar_especial("specialws"))
 atajo("CTRL + SHIFT + Escape", alternar_especial("sysmon"))
 atajo("SUPER + M", alternar_especial("music"))
-atajo("SUPER + D", alternar_especial("communication"))
 atajo("SUPER + R", alternar_especial("todo"))
 
 ---------------------------------------------------------------------------------------------
