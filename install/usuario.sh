@@ -103,6 +103,9 @@ for f in "$VORTEX_DIR"/config/fondos/*.{jpg,mp4}; do
   run cp "$f" "$fondos/"
 done
 
+# El saludo de la terminal: «Vortexine's OS» en morado, el logo y los componentes (bash y fish).
+run bash "$VORTEX_DIR/config/terminal/poner-saludo.sh"
+
 # Dónde está el shell instalado (otra ruta solo para pruebas).
 serpantinum="${VORTEX_SERPANTINUM:-/usr/share/serpantinum}"
 

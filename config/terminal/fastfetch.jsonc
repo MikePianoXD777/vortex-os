@@ -1,0 +1,30 @@
+// Fastfetch del saludo de la terminal de Vortexine's OS (config/terminal/saludo.sh).
+// Los colores son los del logo: morado, lavanda y azul.
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "color": { "1": "#7c6cf0", "2": "#a78bfa", "3": "#c4b5fd" },
+    "padding": { "top": 1, "left": 2, "right": 3 }
+  },
+  "display": {
+    "separator": "  ",
+    "color": { "separator": "#a78bfa", "output": "#e5e1ff" }
+  },
+  "modules": [
+    "break",
+    { "type": "title", "format": "{1}@{2}", "color": { "user": "#a78bfa", "at": "#7c6cf0", "host": "#a78bfa" } },
+    "break",
+    { "type": "os", "key": "󱄅 os    ", "keyColor": "#a78bfa" },
+    { "type": "kernel", "key": " kernel", "keyColor": "#9d8cf8" },
+    { "type": "wm", "key": " wm    ", "keyColor": "#9389f5" },
+    { "type": "cpu", "key": " cpu   ", "keyColor": "#8a86f3" },
+    { "type": "gpu", "key": "󰢮 gpu   ", "keyColor": "#8183f1" },
+    { "type": "memory", "key": "󰘚 ram   ", "keyColor": "#7c6cf0" },
+    { "type": "disk", "key": "󰋊 disco ", "folders": "/", "keyColor": "#7c80ee" },
+    { "type": "shell", "key": " shell ", "keyColor": "#787dec" },
+    { "type": "uptime", "key": "󰅐 activo", "keyColor": "#747ae9" },
+    "break",
+    { "type": "colors", "symbol": "circle" }
+  ]
+}

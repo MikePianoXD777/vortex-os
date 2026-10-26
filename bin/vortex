@@ -35,6 +35,7 @@ Uso: vortex <comando>
                                        avisa (con notificación y un botón «Actualizar») cuando hay
                                        actualizaciones del sistema, de tus apps o de Vortexine's
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
+  saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
   miku [avatar on|off|estado]          Miku, el asistente de voz (Super+O): la abre o la cierra del todo;
@@ -623,6 +624,8 @@ cmd_actualizar() {
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
   avisos_primera_vez
   fondos_nuevos
+  # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
+  bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
@@ -842,6 +845,7 @@ case "${1:-ayuda}" in
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
+  saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)
     shift

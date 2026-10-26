@@ -176,8 +176,20 @@ end
 
 local especiales = {
     communication = {
-        discord = { match = { { class = "discord" } }, command = { "discord" }, move = true },
-        whatsapp = { match = { { class = "whatsapp" } }, move = true },
+        -- Vortex: Discord de Arch, su Flatpak o Vesktop, el primero que haya (Caelestia solo «discord»).
+        discord = {
+            match = { { class = "discord" }, { class = "vesktop" } },
+            command = { "sh", "-c", "command -v discord >/dev/null && exec discord; command -v vesktop >/dev/null && exec vesktop; " ..
+                "flatpak info com.discordapp.Discord >/dev/null 2>&1 && exec flatpak run com.discordapp.Discord; " ..
+                "exec flatpak run dev.vencord.Vesktop" },
+            move = true,
+        },
+        -- Vortex: el Flatpak de WhatsApp (su ventana es «whatsapp-desktop-linux»); antes no se abría solo.
+        whatsapp = {
+            match = { { class = "whatsapp" }, { class = "whatsapp-desktop-linux" } },
+            command = { "flatpak", "run", "io.github.mimbrero.WhatsAppDesktop" },
+            move = true,
+        },
     },
     music = {
         spotify = {
