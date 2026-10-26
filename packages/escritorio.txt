@@ -13,3 +13,4 @@ btop                   # monitor del sistema (CTRL+SHIFT+Esc)
 nvtop                  # monitor de la GPU (NVIDIA, AMD, Intel)
 fastfetch              # datos del sistema en la terminal
 fuse2                  # para abrir AppImage
+udisks2                # montar memorias USB sin root (vortex-usb, 1.8)

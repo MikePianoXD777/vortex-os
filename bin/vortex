@@ -526,7 +526,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -729,6 +729,19 @@ end' >/dev/null 2>&1 || true
   esac
 }
 
+# Paquetes que llegaron con una versión de Vortexine's después de que se instaló el sistema (los
+# trae la ISO o install.sh, pero una instalación vieja no los tiene). Solo se instalan los que falten.
+PAQUETES_NUEVOS=(
+  udisks2 # 1.8: vortex-usb
+)
+paquetes_nuevos() {
+  local p faltan=()
+  for p in "${PAQUETES_NUEVOS[@]}"; do pacman -Q "$p" >/dev/null 2>&1 || faltan+=("$p"); done
+  ((${#faltan[@]})) || return 0
+  sudo pacman -S --needed --noconfirm "${faltan[@]}" ||
+    aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
@@ -747,6 +760,7 @@ cmd_actualizar() {
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
   [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
+  paquetes_nuevos
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"

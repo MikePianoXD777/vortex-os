@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# vortex-usb (Vortex 1.8): al conectar una memoria USB o una tarjeta SD, la monta y avisa con dos
+# botones, como en Windows: «Abrir» (en Archivos) y «Expulsar» (la desmonta y la apaga: ya se puede
+# sacar sin perder nada). Escucha a udev (udevadm monitor) y monta con udisks (udisksctl, sin root:
+# polkit se lo deja a la sesión activa). En bash y no en Python para que dormido gaste ~3 MB.
+# Lo arranca hyprland.lua al entrar; hay una sola copia por sesión.
+#
+#   vortex-usb             escucha (se queda corriendo)
+#   vortex-usb --eventos   lee los eventos de udev de la entrada estándar (lo usan las pruebas)
+set -uo pipefail
+
+APP="Vortexine's OS"
+
+avisar() { notify-send -a "$APP" -i drive-removable-media "$@" 2>/dev/null || true; }
+
+# «15,9 GB» a partir del tamaño en sectores de 512 bytes que da /sys.
+tamano() {
+  local sectores
+  sectores="$(cat "/sys/class/block/$(basename "$1")/size" 2>/dev/null)" || return 0
+  [[ "$sectores" =~ ^[0-9]+$ ]] || return 0
+  awk -v b="$((sectores * 512))" 'BEGIN {
+    if (b >= 1e9) printf "%.1f GB", b / 1e9; else printf "%.0f MB", b / 1e6 }' | tr . ,
+}
+
+# Desmonta todas las particiones montadas del disco de DISPOSITIVO y lo apaga.
+expulsar() {
+  local dispositivo="$1" nombre="$2" disco particion
+  disco="$(lsblk -dno PKNAME "$dispositivo" 2>/dev/null | head -n1)"
+  disco="${disco:+/dev/$disco}"
+  disco="${disco:-$dispositivo}"
+  while read -r particion; do
+    [[ -n "$particion" ]] || continue
+    if ! udisksctl unmount -b "$particion" --no-user-interaction >/dev/null 2>&1; then
+      avisar "No se puede expulsar «$nombre»" \
+        "Algo la está usando: cierra los archivos o ventanas que tengan algo de ella y vuelve a intentar."
+      return 1
+    fi
+  done < <(lsblk -lnpo NAME,MOUNTPOINT "$disco" 2>/dev/null | awk 'NF > 1 {print $1}')
+  # Apagarla no siempre se puede (lectores de tarjetas, algunas memorias): desmontada ya es segura.
+  udisksctl power-off -b "$disco" --no-user-interaction >/dev/null 2>&1 || true
+  avisar "Ya puedes sacar «$nombre»"
+}
+
+# Monta DISPOSITIVO (si no lo montó ya alguien) y avisa con los botones.
+montar_y_avisar() {
+  local dispositivo="$1" etiqueta="$2" modelo="$3" punto="" salida="" nombre accion _
+  nombre="${etiqueta:-${modelo//_/ }}"
+  nombre="${nombre:-la memoria}"
+  # udisks se entera del dispositivo un momento después que udev: se reintenta unos segundos.
+  for _ in 1 2 3 4 5; do
+    punto="$(findmnt -nro TARGET --source "$dispositivo" 2>/dev/null | head -n1)"
+    [[ -n "$punto" ]] && break
+    if salida="$(udisksctl mount -b "$dispositivo" --no-user-interaction 2>&1)"; then
+      # «Mounted /dev/sdb1 at /run/media/mike/MEMORIA» (algunas versiones terminan con punto).
+      punto="${salida##* at }"
+      punto="${punto%.}"
+      break
+    fi
+    sleep 1
+  done
+  if [[ -z "$punto" ]]; then
+    avisar "No pude abrir «$nombre»" "${salida:-udisks no la reconoce}"
+    return 1
+  fi
+  accion="$(notify-send -a "$APP" -i drive-removable-media -A abrir=Abrir -A expulsar=Expulsar \
+    "Memoria conectada" "«$nombre» ($(tamano "$dispositivo"))" 2>/dev/null)" || accion=""
+  case "$accion" in
+    abrir) xdg-open "$punto" >/dev/null 2>&1 || thunar "$punto" >/dev/null 2>&1 ;;
+    expulsar) expulsar "$dispositivo" "$nombre" ;;
+  esac
+}
+
+# Un evento de udev ya leído (en P): ¿es un sistema de archivos que se acaba de conectar por USB o
+# en un lector de tarjetas? Los discos internos (SATA, NVMe) no.
+declare -A P
+manejar() {
+  [[ "${P[ACTION]:-}" == add && "${P[SUBSYSTEM]:-}" == block ]] || return 0
+  [[ "${P[ID_FS_USAGE]:-}" == filesystem && "${P[UDISKS_IGNORE]:-}" != 1 ]] || return 0
+  [[ "${P[ID_BUS]:-}" == usb || "${P[ID_PATH]:-}" == *usb* || "${P[DEVNAME]:-}" == /dev/mmcblk* ]] || return 0
+  [[ -n "${P[DEVNAME]:-}" ]] || return 0
+  montar_y_avisar "${P[DEVNAME]}" "${P[ID_FS_LABEL]:-}" "${P[ID_MODEL]:-}" </dev/null &
+}
+
+# Lee bloques «CLAVE=valor» separados por una línea vacía (el formato de udevadm monitor --property).
+leer_eventos() {
+  local linea
+  P=()
+  while IFS= read -r linea; do
+    if [[ -z "$linea" ]]; then
+      ((${#P[@]})) && manejar
+      P=()
+    elif [[ "$linea" == *=* && "$linea" != *" "*"="* ]]; then
+      P["${linea%%=*}"]="${linea#*=}"
+    fi
+  done
+  ((${#P[@]})) && manejar
+  wait
+}
+
+if [[ "${1:-}" == --eventos ]]; then
+  leer_eventos
+  exit 0
+fi
+
+command -v udevadm >/dev/null && command -v udisksctl >/dev/null || exit 0
+candado="${XDG_RUNTIME_DIR:-/tmp}/vortex-usb.lock"
+exec 9>"$candado"
+flock -n 9 || exit 0
+udevadm monitor --udev --subsystem-match=block --property | leer_eventos

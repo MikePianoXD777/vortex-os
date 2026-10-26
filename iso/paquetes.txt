@@ -93,6 +93,8 @@ nvtop
 fastfetch
 # AppImage (casi todas usan FUSE 2)
 fuse2
+# Memorias USB: vortex-usb las monta sin root (1.8)
+udisks2
 grim
 slurp
 wl-clipboard
