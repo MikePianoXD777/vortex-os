@@ -257,6 +257,10 @@
         "claude_off": "Claude está apagado: actívalo en la sección de arriba, o en la ventana de Miku toca «Usar IA local» para que piense en tu PC sin cuenta",
         "internet_title": "Miku con internet",
         "internet_desc": "Puede buscar en la web y leer páginas; cada vez te pide permiso"
+      },
+      "fps": {
+        "title": "Contador de FPS en los juegos",
+        "desc": "Los FPS, la GPU y la CPU en la esquina de tus juegos (MangoHud). Shift derecho + F12 lo esconde. Vuelve a abrir Steam después de cambiarlo"
       }
     },
     "display": {

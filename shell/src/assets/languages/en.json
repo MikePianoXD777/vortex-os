@@ -256,6 +256,10 @@
         "claude_off": "Claude is off: turn it on in the section above, or tap «Use local AI» in Miku's window so she thinks on your PC without an account",
         "internet_title": "Miku with internet",
         "internet_desc": "She can search the web and read pages; each time she asks for your permission"
+      },
+      "fps": {
+        "title": "FPS counter in games",
+        "desc": "FPS, GPU and CPU in the corner of your games (MangoHud). Right Shift + F12 hides it. Reopen Steam after changing it"
       }
     },
     "display": {

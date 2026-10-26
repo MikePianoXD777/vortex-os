@@ -84,7 +84,7 @@ piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 | Ventanas | mosaico (como qtile) o KDE: flotantes con barra de título (plugin hyprbars) y barra de tareas abajo (el dock, se esconde y sale al bajar el mouse) | se elige en Ajustes → Pantalla o con `vortex ventanas mosaico\|kde`, sin cerrar sesión |
 | Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
-| Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
+| Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; contador de FPS con un interruptor (Ajustes → General o `vortex fps on`; Shift derecho+F12 lo esconde); `vortex java aplicar` pone ZGC en tus launchers de Minecraft |
 | Recursos | `vortex-gestor` (servicio de usuario, ~2 MB de RAM) | reparte solo la CPU y la RAM: prioridad a la ventana enfocada, modo juego al abrir un juego y memoria liberada cuando falta |
 | Programación | Zed, Neovim, mise, uv, GitHub CLI; Docker opcional | Docker arranca por socket: no consume nada hasta que lo usas |
 | Claude | Claude Code + servidor MCP `vortex` | viene apagado (Ajustes → General → Claude); Super+A, le hablas con el micrófono y ve tu pantalla cuando se lo pides |

@@ -38,6 +38,7 @@ Uso: vortex <comando>
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
+  fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
@@ -185,6 +186,98 @@ cmd_celular() {
     estado) if [[ -e "$marca" ]]; then echo "encendido"; else echo "apagado"; fi ;;
     *) aviso "usa: vortex celular [estado|on|off]"; exit 1 ;;
   esac
+}
+
+# ---- Contador de FPS (1.8) -------------------------------------------------------------------------
+# MangoHud en los juegos: con «vortex fps on» (o Ajustes → General) Steam, Heroic, Lutris y los
+# juegos de Flatpak conocidos arrancan con MANGOHUD=1, y la capa Vulkan de MangoHud pinta los FPS,
+# la GPU y la CPU arriba a la izquierda; Shift derecho + F12 lo esconde dentro del juego. Solo esos
+# lanzadores y no todo el escritorio: con MANGOHUD=1 para todos saldría también en las apps GTK 4,
+# que dibujan con Vulkan. Los nativos van con una copia de su .desktop en ~/.local/share/applications
+# (marcada con X-Vortex-Fps, la única que «off» borra); los Flatpak, con «flatpak override --user».
+# La config de Vortex va en ~/.config/MangoHud/MangoHud.conf solo si la persona no tiene una. Vale al
+# volver a abrir el lanzador.
+FPS_DESKTOP=(steam.desktop heroic.desktop net.lutris.Lutris.desktop)
+FPS_FLATPAKS=(com.valvesoftware.Steam com.heroicgameslauncher.hgl net.lutris.Lutris com.usebottles.bottles
+  org.vinegarhq.Sober org.prismlauncher.PrismLauncher io.mrarm.mcpelauncher)
+
+fps_desktop_sistema() { # NOMBRE.desktop → ruta del sistema, si existe
+  local d
+  local IFS=:
+  for d in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+    [[ -f "$d/applications/$1" ]] && { printf '%s\n' "$d/applications/$1"; return 0; }
+  done
+  return 1
+}
+
+fps_flatpaks_instalados() {
+  command -v flatpak >/dev/null || return 0
+  local instalados app
+  instalados="$(flatpak list --app --columns=application 2>/dev/null)"
+  for app in "${FPS_FLATPAKS[@]}"; do
+    grep -qxF "$app" <<<"$instalados" && printf '%s\n' "$app"
+  done
+  return 0
+}
+
+cmd_fps() {
+  local marca="$CONF/fps" apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+  local mango="${XDG_CONFIG_HOME:-$HOME/.config}/MangoHud/MangoHud.conf" f origen app flatpaks
+  case "${1:-estado}" in
+    on)
+      command -v mangohud >/dev/null || { aviso "falta MangoHud (sudo pacman -S mangohud lib32-mangohud)"; exit 1; }
+      mkdir -p "$CONF" "$apps" && : >"$marca"
+      if [[ ! -e "$mango" ]]; then
+        mkdir -p "${mango%/*}"
+        cat >"$mango" <<'MANGO'
+# Vortexine's OS (vortex fps): el contador de FPS de los juegos. Es tuyo: cámbialo como quieras
+# (https://github.com/flightlessmango/MangoHud#hud-configuration); Vortex ya no lo toca.
+legacy_layout=0
+horizontal
+hud_compact
+fps
+gpu_stats
+gpu_temp
+cpu_stats
+cpu_temp
+frame_timing=0
+position=top-left
+font_size=20
+background_alpha=0.4
+round_corners=8
+toggle_hud=Shift_R+F12
+MANGO
+      fi
+      for f in "${FPS_DESKTOP[@]}"; do
+        origen="$(fps_desktop_sistema "$f")" || continue
+        # Una copia propia de la persona (sin la marca) no se pisa.
+        [[ -e "$apps/$f" ]] && ! grep -q '^X-Vortex-Fps=' "$apps/$f" && continue
+        sed -E 's|^Exec=|Exec=env MANGOHUD=1 |; /^\[Desktop Entry\]$/a X-Vortex-Fps=true' "$origen" >"$apps/$f"
+      done
+      flatpaks="$(fps_flatpaks_instalados)"
+      while IFS= read -r app; do
+        [[ -n "$app" ]] && flatpak override --user --env=MANGOHUD=1 "$app" 2>/dev/null
+      done <<<"$flatpaks"
+      if [[ -n "$flatpaks" ]] && ! flatpak info org.freedesktop.Platform.VulkanLayer.MangoHud >/dev/null 2>&1; then
+        notificar "Contador de FPS" "Para verlo en los juegos de Flatpak instala la capa de MangoHud: flatpak install flathub org.freedesktop.Platform.VulkanLayer.MangoHud"
+      fi
+      if pgrep -u "$(id -u)" -x steam >/dev/null 2>&1; then
+        notificar "Contador de FPS" "Cierra y vuelve a abrir Steam para que salga en tus juegos (Shift derecho + F12 lo esconde)."
+      fi
+      ;;
+    off)
+      rm -f "$marca"
+      for f in "${FPS_DESKTOP[@]}"; do
+        [[ -f "$apps/$f" ]] && grep -q '^X-Vortex-Fps=' "$apps/$f" && rm -f "$apps/$f"
+      done
+      while IFS= read -r app; do
+        [[ -n "$app" ]] && flatpak override --user --unset-env=MANGOHUD "$app" 2>/dev/null
+      done <<<"$(fps_flatpaks_instalados)"
+      ;;
+    estado) if [[ -e "$marca" ]]; then echo "encendido"; else echo "apagado"; fi ;;
+    *) aviso "usa: vortex fps [estado|on|off]"; exit 1 ;;
+  esac
+  return 0
 }
 
 # ---- Fondos que cambian solos (1.8) ---------------------------------------------------------------
@@ -1164,6 +1257,7 @@ case "${1:-ayuda}" in
   fondos-auto) shift; cmd_fondos_auto "$@" ;;
   bateria) shift; cmd_bateria "$@" ;;
   celular) shift; cmd_celular "$@" ;;
+  fps) shift; cmd_fps "$@" ;;
   saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)
