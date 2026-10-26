@@ -97,8 +97,10 @@ fi
 # --- Fondos y ajustes del shell ---
 fondos="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
 run mkdir -p "$fondos"
-for f in "$VORTEX_DIR"/config/fondos/*.jpg; do
-  [[ -e "$fondos/${f##*/}" ]] || run cp "$f" "$fondos/"
+# Los .mp4 son fondos animados (Gargantua): se ven con Ajustes > Tema > Fondos animados.
+for f in "$VORTEX_DIR"/config/fondos/*.{jpg,mp4}; do
+  [[ -e "$f" && ! -e "$fondos/${f##*/}" ]] || continue
+  run cp "$f" "$fondos/"
 done
 
 # Dónde está el shell instalado (otra ruta solo para pruebas).

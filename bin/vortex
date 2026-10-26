@@ -83,6 +83,21 @@ carpeta_fondos() {
   printf '%s\n' "${dir:-$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos}"
 }
 
+# Los fondos que trae una versión nueva (Gargantua en la 1.7) se copian a Imágenes/Fondos una sola
+# vez: si después borras uno, no vuelve. Los de antes de la 1.7 ya los copió la instalación.
+fondos_nuevos() {
+  local vistos="$CONF/fondos-vistos" dir f
+  dir="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
+  mkdir -p "$CONF"
+  [[ -f "$vistos" ]] || printf '%s\n' vortex-ambar.jpg vortex-azul.jpg vortex-turquesa.jpg vortex-violeta.jpg >"$vistos"
+  for f in "$VORTEX_DIR"/config/fondos/*.{jpg,mp4}; do
+    [[ -e "$f" ]] || continue
+    grep -qxF "${f##*/}" "$vistos" && continue
+    mkdir -p "$dir" && { [[ -e "$dir/${f##*/}" ]] || cp "$f" "$dir/"; } &&
+      echo "${f##*/}" >>"$vistos" && bien "Fondo nuevo en $dir: ${f##*/}"
+  done
+}
+
 cmd_fondo() {
   local archivo="${1:-}"
   if [[ -z "$archivo" ]]; then
@@ -597,6 +612,7 @@ cmd_actualizar() {
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
   avisos_primera_vez
+  fondos_nuevos
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
   # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
