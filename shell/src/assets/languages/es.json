@@ -335,6 +335,10 @@
           "follows_hint": "Sigue el fondo de pantalla",
           "none": "Ningún fondo seleccionado"
         }
+      },
+      "laptop": {
+        "title": "Modo laptop",
+        "desc": "Al desenchufarla: ahorro de energía, sin animaciones, pantalla más tenue y a 60 Hz. Todo regresa al enchufarla"
       }
     },
     "bar": {

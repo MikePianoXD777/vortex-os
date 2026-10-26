@@ -36,6 +36,7 @@ Uso: vortex <comando>
                                        actualizaciones del sistema, de tus apps o de Vortexine's
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
+  bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
@@ -86,6 +87,75 @@ carpeta_fondos() {
   local dir
   dir="$(jq -r '.wallpaperDir // empty' "${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" 2>/dev/null)"
   printf '%s\n' "${dir:-$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos}"
+}
+
+# ---- Modo laptop (1.8) -----------------------------------------------------------------------------
+# Al desenchufar la laptop (lo avisa el shell, que ve la batería por UPower: Shell.qml) se gasta menos:
+# perfil de energía «ahorro», sin animaciones, desenfoque ni sombras, brillo a 60 % como mucho y la
+# pantalla de la laptop (eDP/LVDS) a 60 Hz. Al enchufarla vuelve todo: Hyprland recarga su config
+# (animaciones y Hz de la config), vortex-pantallas pone la frecuencia más alta y se restauran el perfil
+# y el brillo de antes. Se apaga en Ajustes → Pantalla («modoLaptop»: false en settings.json). En una PC
+# de escritorio nunca se dispara. Mientras está el modo juego no se tocan las animaciones (ya están
+# apagadas y el modo juego las devuelve al salir).
+cmd_bateria() {
+  local marca="$ESTADO/bateria" perfil
+  mkdir -p "$ESTADO"
+  case "${1:-estado}" in
+    on)
+      [[ "$(jq -r '.modoLaptop == false' "${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" 2>/dev/null)" == true ]] && return 0
+      [[ -e "$marca" ]] && return 0
+      : >"$marca"
+      if command -v powerprofilesctl >/dev/null; then
+        perfil="$(powerprofilesctl get 2>/dev/null)" || perfil=""
+        [[ -n "$perfil" ]] && printf '%s\n' "$perfil" >"$marca.perfil"
+        powerprofilesctl set power-saver 2>/dev/null || true
+      fi
+      if hypr_corriendo && [[ ! -e "$ESTADO/modo-juego" ]]; then
+        hypr eval 'hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false } } })' >/dev/null 2>&1 || true
+      fi
+      if command -v brightnessctl >/dev/null; then
+        local brillo
+        brillo="$(brightnessctl -m 2>/dev/null | awk -F, '{gsub("%", "", $4); print $4}' | head -n1)"
+        if [[ "$brillo" =~ ^[0-9]+$ ]] && ((brillo > 60)); then
+          printf '%s\n' "$brillo" >"$marca.brillo"
+          brightnessctl -q set 60% 2>/dev/null || true
+        fi
+      fi
+      # La pantalla interna a 60 Hz (o lo más cercano por arriba), a su resolución de ahora.
+      if hypr_corriendo; then
+        local nombre modo escala
+        while IFS=$'\t' read -r nombre modo escala; do
+          [[ "$nombre" =~ ^[A-Za-z0-9._-]+$ && "$modo" =~ ^[0-9]+x[0-9]+@[0-9.]+$ && "$escala" =~ ^[0-9.]+$ ]] || continue
+          hypr eval "hl.monitor({ output = \"$nombre\", mode = \"$modo\", position = \"auto\", scale = $escala })" >/dev/null 2>&1 || true
+        done < <(hypr -j monitors 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) |
+          .width as $w | .height as $h |
+          ([.availableModes[] | capture("^(?<w>[0-9]+)x(?<h>[0-9]+)@(?<hz>[0-9.]+)Hz$")
+            | select((.w | tonumber) == $w and (.h | tonumber) == $h and (.hz | tonumber) >= 59)
+            | .hz | tonumber] | min) as $hz |
+          select($hz != null and $hz < .refreshRate - 1) | [.name, "\($w)x\($h)@\($hz)", (.scale | tostring)] | @tsv')
+      fi
+      ;;
+    off)
+      [[ -e "$marca" ]] || return 0
+      rm -f "$marca"
+      if [[ -s "$marca.perfil" ]] && command -v powerprofilesctl >/dev/null; then
+        powerprofilesctl set "$(cat "$marca.perfil")" 2>/dev/null || true
+      fi
+      if [[ -s "$marca.brillo" ]] && command -v brightnessctl >/dev/null; then
+        brightnessctl -q set "$(cat "$marca.brillo")%" 2>/dev/null || true
+      fi
+      rm -f "$marca.perfil" "$marca.brillo"
+      if hypr_corriendo; then
+        hypr reload >/dev/null 2>&1 || true
+        # La recarga devuelve las animaciones: con el modo juego puesto se vuelven a quitar.
+        [[ -e "$ESTADO/modo-juego" ]] && hypr eval 'hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false } } })' >/dev/null 2>&1
+        command -v vortex-pantallas >/dev/null && vortex-pantallas >/dev/null 2>&1
+      fi
+      return 0
+      ;;
+    estado) if [[ -e "$marca" ]]; then echo "ahorro (desenchufada)"; else echo "normal"; fi ;;
+    *) aviso "usa: vortex bateria [estado|on|off]"; exit 1 ;;
+  esac
 }
 
 # ---- Fondos que cambian solos (1.8) ---------------------------------------------------------------
@@ -1062,6 +1132,7 @@ case "${1:-ayuda}" in
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
   fondos-auto) shift; cmd_fondos_auto "$@" ;;
+  bateria) shift; cmd_bateria "$@" ;;
   saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)

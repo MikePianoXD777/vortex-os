@@ -334,6 +334,10 @@
           "follows_hint": "Follows wallpaper",
           "none": "No background selected"
         }
+      },
+      "laptop": {
+        "title": "Laptop mode",
+        "desc": "When unplugged: power saving, no animations, dimmer screen and 60 Hz. Everything comes back when you plug it in"
       }
     },
     "bar": {

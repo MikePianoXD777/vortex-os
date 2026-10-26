@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.UPower
 import "widgets"
 
 ShellRoot {
@@ -97,6 +98,19 @@ ShellRoot {
     Loader {
         active: !performanceMode && quickactionsEnabled
         sourceComponent: Floating {}
+    }
+
+    // Vortex 1.8: modo laptop. Al desenchufar o enchufar la laptop, «vortex bateria on|off» (bin/vortex):
+    // ahorro de energía, sin animaciones, brillo y Hz más bajos; al enchufar vuelve todo. También al
+    // arrancar, por si se entró ya desenchufada. En una PC de escritorio onBattery nunca es true.
+    Item {
+        id: vortexBateria
+        readonly property bool enBateria: UPower.onBattery
+        function avisar() {
+            Quickshell.execDetached(["vortex", "bateria", vortexBateria.enBateria ? "on" : "off"]);
+        }
+        onEnBateriaChanged: avisar()
+        Component.onCompleted: if (enBateria) avisar()
     }
 
     Component.onCompleted: {
