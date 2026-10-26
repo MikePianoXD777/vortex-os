@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vortex-otaku: «Modo otaku» de Vortexine's OS (un easter egg para un amigo de Mike).
 #
-#   vortex-otaku on|off|alternar|estado|otro|elegir|bajar|borrar|reparar      (también: vortex otaku ...)
+#   vortex-otaku on|off|alternar|estado|otro|elegir|bajar|borrar|reparar|sonido      (también: vortex otaku ...)
 #
 # «on» baja 10 fondos de las quintillizas («Go-Toubun no Hanayome»), pone uno y le da un toque suave al
 # shell (fuente y bordes más redondeados); mientras está encendido, el selector de fondos (Super+Shift+W,
@@ -12,6 +12,8 @@
 # carpeta de imágenes de tu idioma), y se quedan al apagar («borrar» los quita). De cada uno se guarda su URL en
 # fuentes.json. Sin red usa un fondo ORIGINAL de Vortex (config/fondos/otaku/): audífonos
 # estilizados, sin el personaje.
+# Tampoco lleva audio: el sonido que suena al encender lo pone cada quien en su PC con
+# «sonido ARCHIVO» (se guardan 15 s en ~/.local/state/vortex/sonidos/otaku.ogg).
 #
 # Estado:   ~/.config/vortex/otaku           (existe = encendido; lo lee la app de Ajustes)
 # Antes:    ~/.config/vortex/otaku-antes.json (fondo y ajustes previos, para «off»; si «off» no
@@ -38,6 +40,8 @@ FONDOS="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")/Fondos"
 # Fuera de Fondos, en su propia carpeta: así no salen en el selector en el modo normal (se usan
 # eligiéndola en Ajustes > Tema > Carpeta de fondos), y no se borran al apagar.
 DESTINO="$(dirname "$FONDOS")/Fondos otaku"
+SONIDO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/sonidos/otaku.ogg"
+SONIDO_SEGUNDOS=15
 
 # Wallhaven: búsqueda pública, solo SFW (purity=100) y categoría anime (categories=010).
 API="https://wallhaven.cc/api/v1/search?q=Go-Toubun%20no%20Hanayome&categories=010&purity=100&sorting=favorites&atleast=1920x1080"
@@ -83,6 +87,8 @@ Uso: vortex otaku <comando>
   bajar              baja los fondos otaku sin encender el modo (para el modo normal)
   borrar             borra los fondos otaku bajados (con el modo apagado)
   reparar            si el modo está apagado pero los ajustes se quedaron con los suyos, los devuelve
+  sonido ARCHIVO [S] el audio que suena al encender: guarda 15 s de ARCHIVO desde el segundo S (0)
+  sonido off         quita ese audio
 
 Los fondos se descargan de Wallhaven al encender, a Imágenes/Fondos otaku, y se quedan ahí al
 apagar: en el modo normal los eliges en Ajustes > Tema > Carpeta de fondos. Sin red se usa un
@@ -384,6 +390,39 @@ imagenes() { find "$DESTINO" -maxdepth 1 -type f \( -name '*.jpg' -o -name '*.pn
 
 # Un solo vortex-otaku a la vez (un doble clic en el interruptor no debe bajar dos veces).
 # El candado va en /run/user (se borra solo); si no se puede, se sigue sin él.
+# Suena aparte (no espera a que termine) mientras se encienden los fondos.
+sonar() {
+  [[ -s "$SONIDO" ]] && command -v pw-play >/dev/null || return 0
+  setsid -f timeout $((SONIDO_SEGUNDOS + 1)) pw-play -P '{"media.role":"event","application.name":"vortex-otaku"}' \
+    "$SONIDO" </dev/null >/dev/null 2>&1 || true
+}
+
+cmd_sonido() {
+  local archivo="${1:-}" inicio="${2:-0}" fin
+  case "$archivo" in
+    off | quitar)
+      rm -f "$SONIDO"
+      echo "Listo: el modo otaku ya no suena al encender."
+      return 0
+      ;;
+    "") aviso "uso: vortex otaku sonido ARCHIVO [SEGUNDO_INICIAL] | sonido off"; exit 2 ;;
+  esac
+  [[ -f "$archivo" ]] || { aviso "no encuentro $archivo"; exit 1; }
+  [[ "$inicio" =~ ^[0-9]+([.][0-9]+)?$ ]] || { aviso "el segundo inicial va en número (por ejemplo 12 o 12.5)"; exit 2; }
+  command -v ffmpeg >/dev/null || { aviso "falta ffmpeg"; exit 1; }
+  mkdir -p "${SONIDO%/*}"
+  fin=$((SONIDO_SEGUNDOS - 2))
+  # 15 s, con un desvanecido de 2 s al final para que no se corte de golpe.
+  if ! ffmpeg -v error -nostdin -y -ss "$inicio" -t "$SONIDO_SEGUNDOS" -i "$archivo" -vn \
+    -af "afade=t=in:d=0.05,afade=t=out:st=$fin:d=2" -c:a libopus -b:a 96k "$SONIDO.nuevo.ogg"; then
+    rm -f "$SONIDO.nuevo.ogg"
+    aviso "no pude leer el audio de $archivo"
+    exit 1
+  fi
+  mv -f "$SONIDO.nuevo.ogg" "$SONIDO"
+  echo "Listo: al encender el modo otaku sonarán $SONIDO_SEGUNDOS s de ${archivo##*/}."
+}
+
 un_solo_proceso() {
   mkdir -p "$CONF"
   exec 9>"${XDG_RUNTIME_DIR:-$CONF}/vortex-otaku.lock" || return 0
@@ -397,6 +436,7 @@ cmd_on() {
     echo "El modo otaku ya está encendido (otro fondo: vortex otaku otro; apagarlo: vortex otaku off)."
     return 0
   fi
+  sonar
   mkdir -p "$DESTINO"
   echo "Trayendo fondos de Wallhaven..."
   if ! descargar_wallhaven "$DESTINO" &&
@@ -533,6 +573,7 @@ case "${1:-ayuda}" in
   borrar) cmd_borrar ;;
   reparar) un_solo_proceso; reparar_restos ;;
   bajar) cmd_bajar ;;
+  sonido) shift; cmd_sonido "$@" ;;
   ayuda | -h | --help) ayuda ;;
   *) aviso "comando desconocido: $1"; ayuda; exit 1 ;;
 esac

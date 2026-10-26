@@ -42,10 +42,11 @@ if python3 -c 'import PIL' 2>/dev/null; then
 else
   echo "  --  python-pillow no está instalado: no se mide el jpg"
 fi
+# El ícono de la app Miku (apps/miku/icono/vortex-miku.svg) es original: una nota musical, sin el personaje.
 # Solo imágenes y modelos: el asistente Miku (apps/miku, packaging/vortex-miku, pruebas/miku*.sh...) lleva
 # «miku» en el nombre de sus scripts. El modelo 3D (*.vrm) nunca va a git: pruebas/miku.sh.
 probar "ninguna imagen del personaje en el repo (solo el respaldo original)" \
-  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -i -E '\\.(jpe?g|png|webp|gif|bmp|avif|svg|vrm|glb|gltf|fbx|psd)\$' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/)' || true)\" ]]"
+  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -i -E '\\.(jpe?g|png|webp|gif|bmp|avif|svg|vrm|glb|gltf|fbx|psd)\$' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/|apps/miku/icono/vortex-miku\\.svg\$)' || true)\" ]]"
 
 # --- Entorno falso ---
 mkdir -p "$T/bin"
@@ -471,6 +472,50 @@ probar "no crea atajos.lua si no lo tenías" "[[ ! -e '$H/.config/hypr/atajos.lu
 lista_instalador="$(sed -n 's/^for comando in \(.*\); do$/\1/p' "$AQUI/install/30-escritorio.sh")"
 lista_vortex="$(sed -n 's/^COMANDOS_VORTEX=(\(.*\))$/\1/p' "$AQUI/bin/vortex")"
 probar "la lista de bin/vortex es la misma que la de install/30-escritorio.sh" "[[ -n '$lista_instalador' && '$lista_instalador' == '$lista_vortex' ]]"
+
+echo "== El sonido al encender (vortex otaku sonido)"
+if command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null; then
+  cat >"$T/bin/pw-play" <<FALSO
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$T/pw-play.log"
+FALSO
+  chmod +x "$T/bin/pw-play"
+  rm -f "$T/pw-play.log"
+  ffmpeg -v error -nostdin -y -f lavfi -i "sine=frequency=440:duration=40" "$T/canción de prueba.mp3"
+  SONIDO_OTAKU="$H/.local/state/vortex/sonidos/otaku.ogg"
+  duracion() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$SONIDO_OTAKU" 2>/dev/null | cut -d. -f1; }
+  sonidos() { if [[ -f "$T/pw-play.log" ]]; then wc -l <"$T/pw-play.log"; else echo 0; fi; }
+  esperar_sonido() { for _ in $(seq 20); do [[ "$(sonidos)" -ge "$1" ]] && return; sleep .1; done; }
+  nueva_sesion
+  # shellcheck disable=SC2034  # rc lo lee probar (eval)
+  otaku sonido >/dev/null; rc=$?
+  probar "«sonido» sin archivo dice cómo se usa" "((rc == 2))"
+  otaku sonido "$T/canción de prueba.mp3" abc >/dev/null; rc=$?
+  probar "un segundo inicial que no es número se rechaza" "((rc == 2)) && [[ ! -e '$SONIDO_OTAKU' ]]"
+  otaku sonido "$T/no-existe.mp3" >/dev/null; rc=$?
+  probar "un archivo que no existe se rechaza" "((rc == 1))"
+  otaku sonido "$T/canción de prueba.mp3" >/dev/null; rc=$?
+  probar "guarda solo 15 s del audio (con espacios y tilde en el nombre)" "((rc == 0)) && [[ \"\$(duracion)\" == 15 || \"\$(duracion)\" == 14 ]]"
+  otaku sonido "$T/canción de prueba.mp3" 30 >/dev/null; rc=$?
+  probar "desde el segundo 30 de 40 quedan 10 s" "((${rc} == 0)) && [[ \"\$(duracion)\" == 10 || \"\$(duracion)\" == 9 ]]"
+  otaku sonido "$T/canción de prueba.mp3" 2 >/dev/null
+  otaku on >/dev/null
+  esperar_sonido 1
+  probar "al encender suena ese audio" "[[ \"\$(sonidos)\" == 1 ]] && grep -qF '$SONIDO_OTAKU' '$T/pw-play.log'"
+  otaku on >/dev/null
+  sleep .3
+  probar "un segundo «on» (ya encendido) no suena otra vez" "[[ \"\$(sonidos)\" == 1 ]]"
+  otaku off >/dev/null
+  sleep .3
+  probar "al apagar no suena" "[[ \"\$(sonidos)\" == 1 ]]"
+  otaku sonido off >/dev/null
+  otaku on >/dev/null
+  sleep .3
+  probar "con «sonido off» ya no suena al encender" "[[ ! -e '$SONIDO_OTAKU' && \"\$(sonidos)\" == 1 ]]"
+  otaku off >/dev/null
+else
+  echo "  (sin ffmpeg: se saltan)"
+fi
 
 echo
 if ((FALLOS)); then
