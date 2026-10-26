@@ -666,6 +666,8 @@ cmd_actualizar() {
     printf 'vortex: %s\n' "config de Hyprland al día (la anterior quedó en ${respaldo/#"$HOME"/\~})"
     { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   fi
+  # Lo que dijo la última revisión del sistema ya no vale: la próxima pregunta de nuevo.
+  rm -f "$AVISOS_SISTEMA"
   # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
   # config) se ve de inmediato y no hasta el próximo inicio de sesión.
   reiniciar_shell
@@ -673,12 +675,16 @@ cmd_actualizar() {
 }
 
 # ---- Aviso de actualizaciones ----------------------------------------------------------------------
-# Un temporizador de tu usuario (systemd --user) corre «vortex actualizaciones revisar» 10 min después de
-# entrar y luego cada 6 h: si hay actualizaciones nuevas (del sistema, de tus apps de Flatpak o de
-# Vortexine's) avisa una vez, con el sonido que elijas y un botón «Actualizar» que abre una terminal con
-# «vortex actualizar». No actualiza nada solo.
+# Un temporizador de tu usuario (systemd --user) corre «vortex actualizaciones revisar» 2 min después de
+# entrar y luego cada 10 min: si hay actualizaciones nuevas (del sistema, de tus apps de Flatpak o de
+# Vortexine's) avisa una vez, con su propio sonido (config/sonidos/actualizacion.wav, o el que elijas) y
+# un botón «Actualizar» que abre una terminal con «vortex actualizar». No actualiza nada solo.
+# Vortexine's se revisa cada vez (una consulta mínima a GitHub: llega en minutos); el sistema y Flatpak,
+# que bajan sus listas de paquetes, cada 6 h (AVISOS_CADA_SISTEMA).
 AVISOS_CONF="$CONF/actualizaciones.conf"
 AVISOS_ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+AVISOS_SISTEMA="$AVISOS_ESTADO/actualizaciones-sistema"   # lo último que dijeron pacman y Flatpak
+AVISOS_CADA_SISTEMA=360                                   # min
 
 avisos_unidades() {
   local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
@@ -701,11 +707,11 @@ CPUSchedulingPolicy=idle
 UNIDAD
   cat >"$d/vortex-actualizaciones.timer" <<'UNIDAD'
 [Unit]
-Description=Vortexine's OS: revisar actualizaciones cada 6 h
+Description=Vortexine's OS: revisar actualizaciones cada 10 min
 
 [Timer]
-OnStartupSec=10min
-OnUnitActiveSec=6h
+OnStartupSec=2min
+OnUnitActiveSec=10min
 Persistent=true
 
 [Install]
@@ -718,14 +724,19 @@ UNIDAD
 # la ISO, que nunca han corrido «vortex actualizar». En el live no, que se borra al apagar.
 avisos_primera_vez() {
   [[ -e /etc/vortex/live ]] && return 0
-  # Unidades de antes de la 1.6.3 (la revisión se quedaba colgada esperando la notificación): se
-  # reescriben y se suelta la que esté atorada.
-  local unidad="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/vortex-actualizaciones.service"
-  if [[ -f "$unidad" ]] && ! grep -q '^KillMode=process' "$unidad"; then
+  # Unidades viejas: las de antes de la 1.6.3 (la revisión se quedaba colgada esperando la
+  # notificación) y las de antes de la 1.7.2 (revisaban cada 6 h). Se reescriben, se suelta la que
+  # esté atorada y, si el aviso está encendido, el temporizador sigue con el ritmo nuevo.
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  if [[ -f "$d/vortex-actualizaciones.service" ]] &&
+    { ! grep -q '^KillMode=process' "$d/vortex-actualizaciones.service" ||
+      ! grep -qs '^OnUnitActiveSec=10min' "$d/vortex-actualizaciones.timer"; }; then
     avisos_unidades
     systemctl --user daemon-reload >/dev/null 2>&1 || true
     systemctl --user stop vortex-actualizaciones.service >/dev/null 2>&1 || true
-    systemctl --user restart vortex-actualizaciones.timer >/dev/null 2>&1 || true
+    if systemctl --user is-enabled --quiet vortex-actualizaciones.timer 2>/dev/null; then
+      systemctl --user restart vortex-actualizaciones.timer >/dev/null 2>&1 || true
+    fi
   fi
   [[ -e "$AVISOS_ESTADO/actualizaciones-configurado" ]] && return 0
   # subshell: su «exit» no corta a quien lo llama. Si systemd --user no responde, se reintenta la
@@ -736,13 +747,20 @@ avisos_primera_vez() {
 
 # Lo que hay por actualizar, una línea por cosa (vacío = nada). Sin red, nada.
 avisos_pendientes() {
-  if command -v checkupdates >/dev/null; then
-    checkupdates 2>/dev/null | awk '{print "sistema " $1}'
+  # El sistema y Flatpak, cada AVISOS_CADA_SISTEMA min; entre medias se repite lo último que dijeron.
+  if [[ ! -f "$AVISOS_SISTEMA" || -n "$(find "$AVISOS_SISTEMA" -mmin +"$AVISOS_CADA_SISTEMA" 2>/dev/null)" ]]; then
+    mkdir -p "$AVISOS_ESTADO"
+    {
+      if command -v checkupdates >/dev/null; then
+        checkupdates 2>/dev/null | awk '{print "sistema " $1}'
+      fi
+      if command -v flatpak >/dev/null; then
+        flatpak remote-ls --updates --user --columns=application 2>/dev/null | sed 's/^/app /'
+        flatpak remote-ls --updates --system --columns=application 2>/dev/null | sed 's/^/app /'
+      fi
+    } >"$AVISOS_SISTEMA.nuevo" && mv -f "$AVISOS_SISTEMA.nuevo" "$AVISOS_SISTEMA"
   fi
-  if command -v flatpak >/dev/null; then
-    flatpak remote-ls --updates --user --columns=application 2>/dev/null | sed 's/^/app /'
-    flatpak remote-ls --updates --system --columns=application 2>/dev/null | sed 's/^/app /'
-  fi
+  cat "$AVISOS_SISTEMA" 2>/dev/null
   local remoto local_ pkg instalado
   remoto="$(GIT_TERMINAL_PROMPT=0 timeout 30 git ls-remote "$URL_VORTEX" refs/heads/main 2>/dev/null | cut -f1)"
   if [[ -n "$remoto" ]]; then
@@ -765,7 +783,7 @@ cmd_actualizaciones() {
       systemctl --user daemon-reload 2>/dev/null || true
       systemctl --user enable --now vortex-actualizaciones.timer >/dev/null 2>&1 ||
         { aviso "no pude encender el aviso de actualizaciones"; exit 1; }
-      echo "Te avisaré cuando haya actualizaciones (se revisa cada 6 h)."
+      echo "Te avisaré cuando haya actualizaciones (Vortexine's se revisa cada 10 min; el sistema, cada 6 h)."
       ;;
     off)
       systemctl --user disable --now vortex-actualizaciones.timer >/dev/null 2>&1 || true
@@ -801,6 +819,8 @@ cmd_actualizaciones() {
       cuerpo+="Toca «Actualizar» o corre: vortex actualizar"
       # shellcheck disable=SC1090
       [[ -r "$AVISOS_CONF" ]] && sonido="$(. "$AVISOS_CONF"; printf '%s' "${SONIDO:-}")"
+      # Sin uno elegido, el de Vortex: distinto del de las notificaciones normales.
+      [[ -n "$sonido" && -f "$sonido" ]] || sonido="$VORTEX_DIR/config/sonidos/actualizacion.wav"
       local args=(-a "Vortexine's OS" -i system-software-update -A "actualizar=Actualizar" -w)
       [[ -n "$sonido" && -f "$sonido" ]] && args+=(-h "string:sound-file:$sonido")
       # La espera del botón va aparte (setsid) y con tope de 6 h: hasta la 1.6.3 «revisar» se quedaba
