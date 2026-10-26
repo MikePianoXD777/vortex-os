@@ -61,6 +61,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰝚"
         },
         {
+            // Vortex (1.7.7): la hoja de atajos (Super+F1), para buscarla en el lanzador.
+            id: "keybinds",
+            name: tr("widgets.keybinds.name", "Keyboard shortcuts"),
+            description: tr("widgets.keybinds.desc", "Every Vortexine's OS shortcut"),
+            icon: "preferences-desktop-keyboard-shortcuts",
+            fontIcon: "󰌌"
+        },
+        {
             id: "system",
             name: tr("widgets.system.name", "System Controls"),
             description: tr("widgets.system.desc", "Performance monitor, power, and quick settings"),
@@ -146,6 +154,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
                 "left": { anchor: "right" }, 
                 "right": { anchor: "left" } 
             } 
+        },
+        // Vortex (1.7.7): hoja de atajos (keybinds/KeybindsPopup.qml), al centro como Ajustes.
+        "keybinds": {
+            w: 1360, h: 820, comp: "keybinds/KeybindsPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
         },
         "hidden": { 
             w: 1, h: 1, comp: "", 

@@ -12,6 +12,7 @@ local reemplazados = {
     ["SUPER + A"] = true, -- autohide de la barra → Claude (va a SUPER + SHIFT + A)
     ["SUPER + E"] = true, -- nautilus
     ["SUPER + O"] = true, -- hoy libre en Serpantinum; si algún día lo usa, el atajo es de Miku (el asistente)
+    ["SUPER + F1"] = true, -- hoy libre; es la hoja de atajos de Vortex (1.7.7)
 }
 
 -- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
@@ -245,6 +246,10 @@ hl.bind("SUPER + I", hl.dsp.exec_cmd("vortex-shop"))
 -- (ni Serpantinum ni atajos.lua lo usan); aun así está en «reemplazados», por si una actualización de
 -- Serpantinum lo estrena.
 hl.bind("SUPER + O", hl.dsp.exec_cmd("vortex-miku"))
+
+-- Hoja de atajos (1.7.7): el panel «keybinds» del shell, con los atajos de shell/src/assets/atajos.json
+-- (pruebas/atajos.lua comprueba que cada uno exista). F1 es la tecla de ayuda de siempre.
+hl.bind("SUPER + F1", hl.dsp.event("serpantinum:toggle keybinds"))
 
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)

@@ -121,8 +121,23 @@ cmd_fondo() {
 # Al iniciar sesión: enciende el aviso de actualizaciones si nunca se encendió y, si todavía no hay
 # fondo, pone el primero de la carpeta de Vortex (así el primer arranque ya tiene fondo y colores).
 # Espera a que el shell responda.
+# 1.7.7: una sola vez por usuario, al entrar, un aviso de dónde están los atajos (Super+F1, la hoja de
+# atajos del shell): quien viene de Windows no sabe que existen. Se reintenta mientras arranca el
+# servidor de notificaciones (el shell, que sube al mismo tiempo que esto).
+aviso_atajos() {
+  local marca="$ESTADO/atajos-avisado"
+  [[ -e "$marca" ]] && return 0
+  command -v notify-send >/dev/null || return 0
+  mkdir -p "$ESTADO" && : >"$marca" || return 0
+  # shellcheck disable=SC2016
+  setsid bash -c 'for _ in $(seq 1 30); do sleep 2; notify-send -a "Vortexine'"'"'s OS" -i preferences-desktop-keyboard-shortcuts "$1" "$2" 2>/dev/null && exit 0; done' \
+    _ "Atajos de teclado" "Super + F1 muestra todos los atajos. Super solo (tócala y suéltala) abre las apps." \
+    </dev/null >/dev/null 2>&1 &
+}
+
 cmd_primer_inicio() {
   avisos_primera_vez
+  aviso_atajos
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _

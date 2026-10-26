@@ -1610,6 +1610,10 @@
     },
     "battery": {
       "none": "No battery found"
+    },
+    "keybinds": {
+      "name": "Keyboard shortcuts",
+      "desc": "Every Vortexine's OS shortcut (Super+F1)"
     }
   },
   "cli": {

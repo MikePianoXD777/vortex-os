@@ -146,6 +146,28 @@ for _, valores in ipairs(registro.config) do
 end
 ok("misc.allow_session_lock_restore activo (sin él Super+Alt+L no puede recuperar el bloqueo)", restaurar_bloqueo)
 
+print("== Hoja de atajos (shell/src/assets/atajos.json, Super+F1)")
+do
+    local f = io.open(RAIZ .. "/shell/src/assets/atajos.json")
+    ok("existe atajos.json", f ~= nil)
+    if f then
+        local hoja = f:read("a")
+        f:close()
+        local faltan, total = {}, 0
+        -- Cada «"teclas": [...]» de la hoja: todas sus combinaciones tienen que estar registradas.
+        for lista in hoja:gmatch('"teclas"%s*:%s*(%b[])') do
+            for teclas in lista:gmatch('"([^"]+)"') do
+                total = total + 1
+                if not binds[normalizar(teclas)] then faltan[#faltan + 1] = teclas end
+            end
+        end
+        ok("la hoja trae atajos (" .. total .. ")", total > 40)
+        ok("cada atajo de la hoja existe", #faltan == 0, table.concat(faltan, ", "))
+        ok("Super+F1 abre la hoja", (binds[normalizar("SUPER + F1")] or ""):find("serpantinum:toggle keybinds", 1, true) ~= nil,
+            binds[normalizar("SUPER + F1")])
+    end
+end
+
 print("== Qué hace cada atajo")
 -- [atajo] = texto que debe aparecer en lo que hace
 local esperado = {

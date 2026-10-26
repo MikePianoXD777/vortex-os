@@ -1,0 +1,77 @@
+[
+  {
+    "icono": "󰌌", "es": "Lo básico", "en": "The basics",
+    "atajos": [
+      { "teclas": ["SUPER + SUPER_L"], "ver": "SUPER", "es": "Abrir las apps (suelta Super)", "en": "Open apps (tap Super)" },
+      { "teclas": ["SUPER + Q"], "es": "Cerrar la ventana", "en": "Close the window" },
+      { "teclas": ["SUPER + T"], "es": "Terminal", "en": "Terminal" },
+      { "teclas": ["SUPER + E"], "es": "Archivos", "en": "Files" },
+      { "teclas": ["SUPER + W"], "es": "Navegador (Firefox)", "en": "Browser (Firefox)" },
+      { "teclas": ["SUPER + I"], "es": "Vortexine's Shop: instalar apps", "en": "Vortexine's Shop: install apps" },
+      { "teclas": ["SUPER + H"], "es": "Ajustes", "en": "Settings" },
+      { "teclas": ["SUPER + F1"], "es": "Esta hoja de atajos", "en": "This shortcut sheet" }
+    ]
+  },
+  {
+    "icono": "󰖯", "es": "Ventanas", "en": "Windows",
+    "atajos": [
+      { "teclas": ["ALT + TAB"], "es": "Cambiar de ventana", "en": "Switch windows" },
+      { "teclas": ["SUPER + Left", "SUPER + Right", "SUPER + Up", "SUPER + Down"], "ver": "SUPER + ←→↑↓", "es": "Ir a la ventana de al lado", "en": "Focus the next window" },
+      { "teclas": ["SUPER + D"], "es": "Maximizar la ventana bajo el mouse (otra vez: regresa)", "en": "Maximize the window under the mouse (again: restore)" },
+      { "teclas": ["SUPER + F"], "es": "Pantalla completa", "en": "Fullscreen" },
+      { "teclas": ["SUPER + ALT + Space"], "es": "Ventana flotante o en mosaico", "en": "Floating or tiled window" },
+      { "teclas": ["SUPER + mouse:272"], "es": "Mover la ventana con el mouse", "en": "Move the window with the mouse" },
+      { "teclas": ["SUPER + mouse:273"], "es": "Cambiar el tamaño con el mouse", "en": "Resize with the mouse" },
+      { "teclas": ["SUPER + ALT + Left", "SUPER + ALT + Right", "SUPER + ALT + Up", "SUPER + ALT + Down"], "ver": "SUPER + ALT + ←→↑↓", "es": "Cambiar el tamaño con el teclado", "en": "Resize with the keyboard" },
+      { "teclas": ["SUPER + P"], "es": "Fijar la ventana en todos los escritorios", "en": "Pin the window to every desktop" }
+    ]
+  },
+  {
+    "icono": "󰍹", "es": "Escritorios", "en": "Desktops",
+    "atajos": [
+      { "teclas": ["SUPER + 1", "SUPER + 2", "SUPER + 3", "SUPER + 4", "SUPER + 5", "SUPER + 6", "SUPER + 7", "SUPER + 8", "SUPER + 9", "SUPER + 0"], "ver": "SUPER + 1…0", "es": "Ir al escritorio 1 a 10", "en": "Go to desktop 1 to 10" },
+      { "teclas": ["SUPER + SHIFT + 1", "SUPER + SHIFT + 2", "SUPER + SHIFT + 3", "SUPER + SHIFT + 4", "SUPER + SHIFT + 5", "SUPER + SHIFT + 6", "SUPER + SHIFT + 7", "SUPER + SHIFT + 8", "SUPER + SHIFT + 9", "SUPER + SHIFT + 0"], "ver": "SUPER + SHIFT + 1…0", "es": "Mandar la ventana a ese escritorio", "en": "Send the window to that desktop" },
+      { "teclas": ["CTRL + SUPER + Left", "CTRL + SUPER + Right"], "ver": "CTRL + SUPER + ←→", "es": "Escritorio anterior o siguiente", "en": "Previous or next desktop" },
+      { "teclas": ["SUPER + mouse_up", "SUPER + mouse_down"], "ver": "SUPER + mouse_wheel", "es": "Cambiar de escritorio con la rueda", "en": "Switch desktops with the wheel" },
+      { "teclas": ["SUPER + S"], "es": "Escritorio rápido (aparece y se esconde)", "en": "Scratch desktop (shows and hides)" }
+    ]
+  },
+  {
+    "icono": "󰕮", "es": "Paneles", "en": "Panels",
+    "atajos": [
+      { "teclas": ["SUPER + SHIFT + N"], "es": "Internet y wifi", "en": "Internet and Wi-Fi" },
+      { "teclas": ["CTRL + ALT + V"], "es": "Volumen y bocinas", "en": "Volume and speakers" },
+      { "teclas": ["SUPER + N"], "es": "Notificaciones", "en": "Notifications" },
+      { "teclas": ["SUPER + K"], "es": "Calendario, reloj y clima", "en": "Calendar, clock and weather" },
+      { "teclas": ["SUPER + V"], "es": "Portapapeles (lo que copiaste)", "en": "Clipboard (what you copied)" },
+      { "teclas": ["SUPER + Period"], "es": "Emojis", "en": "Emoji" },
+      { "teclas": ["SUPER + SHIFT + W"], "es": "Fondos de pantalla", "en": "Wallpapers" },
+      { "teclas": ["SUPER + ALT + M"], "es": "Música", "en": "Music" },
+      { "teclas": ["CTRL + ALT + Delete"], "es": "Apagar, reiniciar, bloquear o cerrar sesión", "en": "Shut down, restart, lock or log out" }
+    ]
+  },
+  {
+    "icono": "󰄀", "es": "Capturas", "en": "Screenshots",
+    "atajos": [
+      { "teclas": ["Print", "SUPER + SHIFT + S"], "ver": "Print", "es": "Capturar una parte (se copia y se guarda en Imágenes)", "en": "Capture an area (copied and saved to Pictures)" },
+      { "teclas": ["SUPER + Print"], "es": "Capturar la pantalla", "en": "Capture the screen" },
+      { "teclas": ["ALT + Sys_Req"], "ver": "ALT + Print", "es": "Capturar la ventana", "en": "Capture the window" },
+      { "teclas": ["SHIFT + Print"], "es": "Capturar y editar", "en": "Capture and edit" },
+      { "teclas": ["CTRL + ALT + R"], "es": "Grabar la pantalla (otra vez: parar)", "en": "Record the screen (again: stop)" },
+      { "teclas": ["SUPER + SHIFT + C"], "es": "Tomar un color de la pantalla", "en": "Pick a color from the screen" }
+    ]
+  },
+  {
+    "icono": "󰀘", "es": "Vortexine's", "en": "Vortexine's",
+    "atajos": [
+      { "teclas": ["SUPER + G"], "es": "Modo juego", "en": "Game mode" },
+      { "teclas": ["CTRL + SHIFT + Escape"], "es": "Monitor del sistema (como el Administrador de tareas)", "en": "System monitor (like Task Manager)" },
+      { "teclas": ["SUPER + O"], "es": "Miku, la asistente de voz", "en": "Miku, the voice assistant" },
+      { "teclas": ["SUPER + A"], "es": "Claude", "en": "Claude" },
+      { "teclas": ["SUPER + L"], "es": "Bloquear", "en": "Lock" },
+      { "teclas": ["SUPER + SHIFT + L"], "es": "Dormir", "en": "Sleep" },
+      { "teclas": ["SUPER + SHIFT + A"], "es": "Esconder o mostrar la barra", "en": "Hide or show the bar" },
+      { "teclas": ["CTRL + SUPER + ALT + R"], "es": "Reiniciar el shell si algo se traba", "en": "Restart the shell if something gets stuck" }
+    ]
+  }
+]

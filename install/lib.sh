@@ -2,7 +2,7 @@
 # Funciones comunes del instalador de Vortexine's OS.
 
 # shellcheck disable=SC2034  # la usan los pasos que cargan lib.sh
-VORTEX_VERSION="1.7.6"
+VORTEX_VERSION="1.7.7"
 VORTEX_DRY_RUN="${VORTEX_DRY_RUN:-0}"
 VORTEX_SI="${VORTEX_SI:-0}"
 VORTEX_LOG="${VORTEX_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/vortex/instalacion.log}"

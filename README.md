@@ -116,6 +116,10 @@ Discord, Firefox, OBS...).
 
 ### Atajos de teclado
 
+**Super+F1 abre la hoja de atajos** (también «Atajos de teclado» en el lanzador): los más útiles, por
+secciones y con buscador, en español o inglés. Al entrar la primera vez sale un aviso que lo dice. La lista
+está en `shell/src/assets/atajos.json`.
+
 Son los mismos que usaba el autor en CachyOS con Caelestia, con cada acción llevada a su equivalente en
 Serpantinum. Viven en `~/.config/hypr/atajos.lua` (junto a `hyprland.lua`); lo tuyo va en
 `~/.config/vortex/hypr-mio.lua`, que se carga al final. Los atajos de Serpantinum que chocaban con estos se

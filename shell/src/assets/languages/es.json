@@ -1654,6 +1654,10 @@
     "style": {
       "circle": "Círculo",
       "wave": "Onda"
+    },
+    "keybinds": {
+      "name": "Atajos de teclado",
+      "desc": "Todos los atajos de Vortexine's OS (Super+F1)"
     }
   },
   "cli": {
