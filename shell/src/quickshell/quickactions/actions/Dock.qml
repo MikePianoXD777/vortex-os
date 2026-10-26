@@ -46,7 +46,7 @@ Item {
     Process {
         id: appFetcher
         running: true
-        command: ["bash", "-c", "python3 " + Caching.qsDir + "/applauncher/app_fetcher.py"]
+        command: ["python3", Caching.qsDir + "/applauncher/app_fetcher.py"] // Vortex: rutas con espacios
         stdout: StdioCollector {
             onStreamFinished: {
                 try {

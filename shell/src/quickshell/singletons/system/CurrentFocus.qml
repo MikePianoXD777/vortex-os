@@ -42,7 +42,7 @@ Item {
 
     Process {
         id: focusDaemon
-        command: ["bash", "-c", "exec " + Caching.serpantinumDir + "/scripts/current_focus.sh"]
+        command: ["bash", Caching.serpantinumDir + "/scripts/current_focus.sh"] // Vortex: rutas con espacios
         running: root.subscribers > 0 && typeof Caching !== "undefined" && Caching.serpantinumDir !== undefined && Caching.serpantinumDir !== ""
         stdout: SplitParser {
             onRead: data => root.updateFocus(data)

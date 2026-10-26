@@ -653,7 +653,8 @@ PanelWindow {
                                 DesktopMenuController.hide();
                                 let dir = (typeof Caching !== "undefined" && Caching.serpantinumDir) ? Caching.serpantinumDir : "";
                                 if (dir) {
-                                    Quickshell.execDetached(["bash", "-c", dir + "/scripts/qs_manager.sh toggle wallpaper"]);
+                                    // Vortex: la ruta va aparte; dentro de «bash -c» se partía si tenía espacios.
+                                    Quickshell.execDetached(["bash", dir + "/scripts/qs_manager.sh", "toggle", "wallpaper"]);
                                 } else {
                                     Quickshell.execDetached(["bash", "-c", "qs_manager.sh toggle wallpaper"]);
                                 }

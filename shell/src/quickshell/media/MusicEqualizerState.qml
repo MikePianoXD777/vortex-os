@@ -237,7 +237,7 @@ MusicPlayerState {
     Process {
         id: eqInitProc
         running: false
-        command: ["bash", "-c", Caching.qsDir + "/media/equalizer.sh get"]
+        command: ["bash", Caching.qsDir + "/media/equalizer.sh", "get"] // Vortex: rutas con espacios
         onExited: eqStateFile.reload()
     }
 }
