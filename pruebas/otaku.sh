@@ -448,7 +448,9 @@ case "\$2" in
 esac
 EOF
 printf '#!/usr/bin/env bash\nbasename "$PWD" >>"$T/makepkg.log"\n' >"$T/bin/makepkg"
-printf '#!/usr/bin/env bash\necho "hyprctl $*" >>"$T/makepkg.log"\n' >"$T/bin/hyprctl"
+# En una línea: «actualizar» reinicia el shell con un «hyprctl eval» de varias líneas, y cada línea
+# suelta se contaría como un paquete reconstruido (pasaba al correr la prueba dentro de Hyprland).
+printf '#!/usr/bin/env bash\necho "hyprctl ${*//$'"'"'\\n'"'"'/ }" >>"$T/makepkg.log"\n' >"$T/bin/hyprctl"
 chmod +x "$T/bin/pacman" "$T/bin/makepkg" "$T/bin/hyprctl"
 env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1; rc=$?
 probar "reconstruye la tienda (otro pkgrel) e instala Miku (faltaba), no el shell al día" \

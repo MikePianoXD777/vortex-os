@@ -1057,6 +1057,12 @@ cmd_actualizar() {
   fi
   # Lo que dijo la última revisión del sistema ya no vale: la próxima pregunta de nuevo.
   rm -f "$AVISOS_SISTEMA"
+  # 1.8: lo que hyprland.lua arranca al entrar (aviso de USB, fondos que cambian solos) también
+  # ahora, para no esperar al próximo inicio de sesión. Cada uno tiene su candado: si ya corre, sale.
+  if hypr_corriendo; then
+    command -v vortex-usb >/dev/null && setsid -f vortex-usb </dev/null >/dev/null 2>&1
+    setsid -f vortex fondos-auto correr </dev/null >/dev/null 2>&1
+  fi
   # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
   # config) se ve de inmediato y no hasta el próximo inicio de sesión.
   reiniciar_shell
