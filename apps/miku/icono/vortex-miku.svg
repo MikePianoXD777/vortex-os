@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Ícono de Miku (asistente de Vortexine's OS): nota musical con dos «coletas» de onda. Original. -->
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#39c5bb"/>
+      <stop offset="1" stop-color="#e45ca8"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="30" fill="url(#fondo)"/>
+  <path d="M22 70c8-14 8-28 0-42M30 64c5-9 5-21 0-30" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5" stroke-linecap="round"/>
+  <path d="M106 70c-8-14-8-28 0-42M98 64c-5-9-5-21 0-30" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5" stroke-linecap="round"/>
+  <path d="M56 32v46.5a13 13 0 1 0 8 12V50l20 6V42z" fill="#fff"/>
+</svg>

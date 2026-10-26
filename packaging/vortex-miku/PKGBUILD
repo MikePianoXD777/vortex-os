@@ -11,7 +11,7 @@
 #   cd packaging/vortex-miku && makepkg -si
 pkgname=vortex-miku
 pkgver=1.7.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Miku, la asistente de voz de Vortexine's OS: 3D, voz y oído locales, y Claude como cerebro (SUPER + O)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -68,6 +68,8 @@ package() {
 
     # El comando: la app lo reconoce instalado porque no hay miku/app.py junto a él.
     install -Dm755 "$origen/vortex-miku" "$pkgdir/usr/bin/vortex-miku"
+    # El ícono: la barra (íconos de los escritorios) lo busca por el app_id «vortex-miku».
+    install -Dm644 "$origen/icono/vortex-miku.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-miku.svg"
     # La IA local: Ollama para tu usuario (no arranca sola; la levanta Miku cuando la necesita).
     install -Dm644 "$origen/systemd/vortex-ollama.service" "$pkgdir/usr/lib/systemd/user/vortex-ollama.service"
 
