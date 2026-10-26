@@ -586,11 +586,21 @@ traer_vortex() {
 # así no muere al cerrar la terminal de «vortex actualizar». Sin shell corriendo o sin Hyprland, nada.
 reiniciar_shell() {
   pgrep -u "$(id -u)" -x quickshell >/dev/null 2>&1 && hypr_corriendo || return 0
+  # Un shell lanzado desde otra carpeta (el repo, con SERPANTINUM_DIR) vuelve a arrancar desde ahí,
+  # no desde el paquete. La ruta va escapada para bash y, encima, para la cadena de Lua.
+  local qml dir previo=""
+  qml="$(shell_qml_activo)"
+  dir="${qml%/quickshell/Shell.qml}"
+  if [[ "$qml" == */quickshell/Shell.qml && "$dir" != /usr/share/serpantinum/src ]]; then
+    previo="SERPANTINUM_DIR=$(printf %q "$dir") "
+    previo="${previo//\\/\\\\}"
+    previo="${previo//\"/\\\"}"
+  fi
   # shellcheck disable=SC2016
   hypr eval 'local a = package.loaded["atajos"]
 local c = (type(a) == "table" and a.comando_shell) and a.comando_shell() or "serpantinumd start"
-hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; " .. c))' >/dev/null 2>&1 &&
-    printf 'vortex: %s\n' "reinicié el shell para que cargue la versión nueva" || true
+hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; '"$previo"'" .. c))' >/dev/null 2>&1 &&
+    printf 'vortex: %s\n' "reinicié el shell para que cargue lo nuevo" || true
 }
 
 cmd_actualizar() {
@@ -631,13 +641,11 @@ cmd_actualizar() {
         tar -C "$VORTEX_DIR" --exclude=./.git -cf - . | tar -C "$base" -xf - ||
         { aviso "no pude copiar el código para construir $pkg"; continue; }
     fi
-    local nuevo=0
-    if (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm); then nuevo=1; else aviso "no se pudo actualizar $pkg"; fi
+    (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
     rm -rf "$base/packaging/$pkg/"{pkg,src} "$base/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
-    [[ "$pkg" == vortex-shell ]] && ((nuevo)) && reiniciar_shell
   done
   # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
   # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
@@ -655,6 +663,9 @@ cmd_actualizar() {
     printf 'vortex: %s\n' "config de Hyprland al día (la anterior quedó en ${respaldo/#"$HOME"/\~})"
     { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   fi
+  # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
+  # config) se ve de inmediato y no hasta el próximo inicio de sesión.
+  reiniciar_shell
   return 0
 }
 
