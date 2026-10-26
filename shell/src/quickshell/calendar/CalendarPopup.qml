@@ -17,7 +17,7 @@ Item {
         return Scaler.s(val);
     }
 
-    property real targetMasterHeight: window.s(510)
+    property real targetMasterHeight: window.s(630) // Vortex: 510 + el panel de rendimiento
     property real targetMasterWidth: window.s(1360)
     implicitWidth: targetMasterWidth
     implicitHeight: targetMasterHeight
@@ -130,7 +130,30 @@ Item {
         introAnim.restart();
     }
 
+    // Vortex: el panel de rendimiento mide (SysData) solo mientras el panel del reloj está abierto.
+    property bool midiendoRendimiento: false
+    function medirRendimiento(si) {
+        if (si && !midiendoRendimiento) {
+            SysData.subscribe();
+            midiendoRendimiento = true;
+        } else if (!si && midiendoRendimiento) {
+            SysData.unsubscribe();
+            midiendoRendimiento = false;
+        }
+    }
+    Component.onDestruction: medirRendimiento(false)
+
+    // Vortex: al picarle al panel de rendimiento se abre el monitor del sistema, como Ctrl+Shift+Esc
+    // (atajos.lua exporta «especial»; si no está, btop en kitty).
+    function abrirMonitor() {
+        Quickshell.execDetached(["hyprctl", "eval",
+            "hl.dispatch(hl.dsp.event(\"serpantinum:close\")); local a = package.loaded[\"atajos\"]; " +
+            "if type(a) == \"table\" and a.especial then a.especial(\"sysmon\") " +
+            "else hl.dispatch(hl.dsp.exec_cmd(\"kitty --class btop --title btop btop\")) end"]);
+    }
+
     onVisibleChanged: {
+        medirRendimiento(visible);
         if (visible) {
             forceActiveFocus();
             focusTimer.restart();
@@ -1085,6 +1108,50 @@ Item {
 
                                 accentColor: window.surface0
                                 textColor: isHoveredOrHighlighted ? window.textAccent : window.overlay0
+                            }
+                        }
+                    }
+
+                    // Vortex (pedido de Mike, 1.7.4): el panel de rendimiento, abajo de los cuadros del clima.
+                    Text {
+                        Layout.alignment: Qt.AlignRight
+                        Layout.topMargin: window.s(14)
+                        text: I18n.t("calendar.performance.title")
+                        font.family: ThemeBackend.fontFamily
+                        font.weight: Font.Bold
+                        font.pixelSize: window.s(12)
+                        color: window.overlay1
+                    }
+
+                    GridLayout {
+                        Layout.alignment: Qt.AlignRight | Qt.AlignBottom
+                        columns: 2
+                        rowSpacing: window.s(8)
+                        columnSpacing: window.s(8)
+                        layoutDirection: I18n.layoutDirection
+
+                        Repeater {
+                            model: 4
+
+                            ClickButton {
+                                Layout.preferredWidth: window.s(118)
+                                Layout.preferredHeight: window.s(42)
+                                cornerRadius: window.s(9)
+                                horizontalPadding: window.s(8)
+
+                                buttonIcon: index === 0 ? "" : index === 1 ? "" : index === 2 ? "" : ""
+                                buttonText: index === 0 ? SysData.cpu + "%" :
+                                    index === 1 ? SysData.ramPercent + "% · " + SysData.ramGb.toFixed(1) + "G" :
+                                    index === 2 ? SysData.temp + "°C" :
+                                    SysData.diskPercent + "%"
+                                subText: index === 0 ? I18n.t("calendar.performance.cpu") : index === 1 ? I18n.t("calendar.performance.ram") : index === 2 ? I18n.t("calendar.performance.temp") : I18n.t("calendar.performance.disk")
+
+                                iconFontSize: window.s(14)
+                                textFontSize: window.s(11.5)
+
+                                accentColor: window.surface0
+                                textColor: isHoveredOrHighlighted ? window.textAccent : window.overlay0
+                                onClicked: window.abrirMonitor()
                             }
                         }
                     }

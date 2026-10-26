@@ -295,6 +295,9 @@ local function alternar_especial(nombre)
         end
     end
 end
+-- Vortex: para el panel de rendimiento del shell (panel del reloj): abre un escritorio especial igual que
+-- su atajo (hyprctl eval 'package.loaded["atajos"].especial("sysmon")').
+M.especial = function(nombre) alternar_especial(nombre)() end
 
 ---------------------------------------------------------------------------------------------
 -- Lanzador, paneles y sesión

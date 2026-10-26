@@ -1042,6 +1042,13 @@
       "rain": "Rain",
       "feels": "Feels"
     },
+    "performance": {
+      "title": "Performance panel",
+      "cpu": "Processor",
+      "ram": "Memory",
+      "temp": "Temperature",
+      "disk": "Disk"
+    },
     "days": {
       "mo": "Mo",
       "tu": "Tu",

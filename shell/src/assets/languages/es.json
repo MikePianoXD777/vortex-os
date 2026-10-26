@@ -1083,6 +1083,13 @@
       "rain": "Lluvia",
       "feels": "Sensación"
     },
+    "performance": {
+      "title": "Panel de rendimiento",
+      "cpu": "Procesador",
+      "ram": "Memoria",
+      "temp": "Temperatura",
+      "disk": "Disco"
+    },
     "days": {
       "mo": "Lu",
       "tu": "Ma",

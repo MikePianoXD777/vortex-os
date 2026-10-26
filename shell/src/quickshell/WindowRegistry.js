@@ -103,7 +103,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
             } 
         },
         "calendar": { 
-            w: 1360, h: 510, comp: "calendar/CalendarPopup.qml", 
+            w: 1360, h: 630, comp: "calendar/CalendarPopup.qml", // Vortex: +120 por el panel de rendimiento 
             pos: { 
                 "top": { anchor: "top-center", mt: 52 }, 
                 "bottom": { anchor: "bottom-center", mb: 52 }, 
