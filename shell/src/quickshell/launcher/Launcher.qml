@@ -10,6 +10,7 @@ import Quickshell.Io
 import "../"
 import "../reusables"
 import "../WindowRegistry.js" as WindowRegistry
+import "Calculadora.js" as Calculadora
 import "./EmojiData.js" as EmojiData
 
 PanelWindow {
@@ -379,6 +380,32 @@ PanelWindow {
                         }
                     }
                 } catch(e) {}
+            }
+        }
+    }
+
+    // Vortex 1.9: tipos de cambio para «100 usd a mxn» (Calculadora.js). Se piden la primera vez que
+    // hacen falta (divisas.sh los guarda 12 h) y, si no hay internet, no se reintenta antes de 10 min.
+    property var tasas: ({})
+    property double tasasPedidas: 0
+
+    function pedirTasas() {
+        if (divisasProc.running || Date.now() - tasasPedidas < 600000) return;
+        tasasPedidas = Date.now();
+        divisasProc.running = true;
+    }
+
+    Process {
+        id: divisasProc
+        running: false
+        command: ["bash", Caching.qsDir + "/launcher/divisas.sh"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    let t = JSON.parse(this.text);
+                    if (t && typeof t === "object") launcherWindow.tasas = t;
+                } catch (e) {}
+                if (launcherWindow.currentTabIndex === 0) launcherWindow.executeFilter(searchInput.text);
             }
         }
     }
@@ -926,6 +953,36 @@ PanelWindow {
                 filePath: "",
                 isDir: false
             });
+        } else {
+            // Vortex 1.9: porcentajes, unidades y divisas (Calculadora.js).
+            let c = Calculadora.calcular(rawTrimmed, launcherWindow.tasas);
+            if (c !== null) {
+                if (c.faltanTasas) launcherWindow.pedirTasas();
+                let desc = "";
+                if (typeof I18n !== "undefined") {
+                    desc = !c.divisa ? I18n.t("applauncher.calc_result")
+                        : !c.faltanTasas ? I18n.t("applauncher.calc_currency", "Today's exchange rate (Enter to copy)")
+                        : divisasProc.running ? I18n.t("applauncher.calc_currency_loading", "Getting the exchange rate…")
+                        : I18n.t("applauncher.calc_currency_offline", "No exchange rate: check your internet connection");
+                }
+                filtered.push({
+                    name: c.mostrar,
+                    description: desc,
+                    desktop_id: "",
+                    icon: "",
+                    fontIcon: c.divisa ? "󰈀" : "󰃬",
+                    score: 9000000,
+                    isCommand: false,
+                    command: "",
+                    isCalc: true,
+                    calcResult: c.valor,
+                    isWidget: false,
+                    widgetTarget: "",
+                    isFile: false,
+                    filePath: "",
+                    isDir: false
+                });
+            }
         }
 
         for (let i = 0; i < allApps.length; i++) {
@@ -1030,6 +1087,7 @@ PanelWindow {
         }
 
         if (item.isCalc) {
+            if (item.calcResult === "") return; // divisas sin tipo de cambio todavía
             Quickshell.execDetached(["wl-copy", "--", item.calcResult]);
             closeLauncher();
             return;

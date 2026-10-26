@@ -1053,7 +1053,10 @@
     "calc_result": "Calculation result (Enter to copy)",
     "command_hint": "Type a command to execute",
     "command_run": "Execute command: {cmd}",
-    "no_emojis_found": "No emojis found"
+    "no_emojis_found": "No emojis found",
+    "calc_currency": "Today's exchange rate (Enter to copy)",
+    "calc_currency_loading": "Getting the exchange rate…",
+    "calc_currency_offline": "No exchange rate: check your internet connection"
   },
   "calendar": {
     "loading": "Loading...",

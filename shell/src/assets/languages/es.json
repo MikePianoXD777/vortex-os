@@ -1094,7 +1094,10 @@
     "calc_result": "Resultado del cálculo (Enter para copiar)",
     "command_hint": "Escribe un comando para ejecutarlo",
     "command_run": "Ejecutar comando: {cmd}",
-    "no_emojis_found": "No se encontraron emojis"
+    "no_emojis_found": "No se encontraron emojis",
+    "calc_currency": "Tipo de cambio de hoy (Enter para copiar)",
+    "calc_currency_loading": "Buscando el tipo de cambio…",
+    "calc_currency_offline": "Sin tipo de cambio: revisa tu conexión a internet"
   },
   "calendar": {
     "loading": "Cargando...",
