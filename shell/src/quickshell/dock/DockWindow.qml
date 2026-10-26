@@ -34,7 +34,10 @@ DockWindowApps {
         dockWindowRoot._recomputeRunningInfo();
     }
 
-    readonly property bool isEffectivelyExclusive: dockWindowRoot.initialized && dockEnabled && dockExclusive && !effectiveAutohide && !isFullscreenActive && !editMode && (dockAppsModel.count > 0)
+    // Vortex 1.7.6: reserva su espacio también con solo apps abiertas (barra de tareas del modo KDE), para
+    // que una ventana maximizada no quede debajo.
+    readonly property bool isEffectivelyExclusive: dockWindowRoot.initialized && dockEnabled && dockExclusive && !effectiveAutohide && !isFullscreenActive && !editMode
+        && (dockAppsModel.count > 0 || (showRunningApps && runningAppsModel.count > 0))
     readonly property int dockReservedSpace: Math.round(dockContainerItem.fullThickness + effectiveMargin)
 
     Connections {
@@ -103,7 +106,10 @@ DockWindowApps {
         positionChangeTimer.restart();
     }
 
-    visible: dockWindowRoot.initialized && dockEnabled && !isFullscreenActive && (dockAppsModel.count > 0 || editMode)
+    // Vortex 1.7.6: también sin apps fijadas, si muestra las abiertas (el modo de ventanas KDE lo usa
+    // como barra de tareas, para volver a abrir las minimizadas).
+    visible: dockWindowRoot.initialized && dockEnabled && !isFullscreenActive
+        && (dockAppsModel.count > 0 || (showRunningApps && runningAppsModel.count > 0) || editMode)
 
     property real dockTotalLength: {
         let len = (isVertical ? dockContainerItem.baseHeight : dockContainerItem.baseWidth) + (dockContainerItem.isAttached ? outerCornerRadius * 2 : 0) + s(12);

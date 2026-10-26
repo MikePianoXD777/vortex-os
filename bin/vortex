@@ -656,6 +656,30 @@ barras_titulo() {
   return 1
 }
 
+# En «kde» el dock de abajo hace de barra de tareas, como en Windows: muestra las apps abiertas (también
+# las minimizadas, que vuelven al picarles) y las fijadas (clic derecho → Fijar en el dock). Se esconde y
+# sale al bajar el mouse; si la barra del shell está abajo, sale encima de ella. Lo que tenía el dock se
+# guarda en ~/.config/vortex/dock-mosaico.json y vuelve al regresar a mosaico; mientras ese archivo exista
+# no se vuelve a tocar (lo que la persona cambie del dock en kde se queda). settings.json se escribe en el
+# mismo archivo (como en vortex-otaku): el shell lo vigila y, si se reemplaza, ya no se entera.
+dock_ventanas() {
+  local ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" guardado="$CONF/dock-mosaico.json" tmp
+  [[ -f "$ajustes" ]] || return 0
+  tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || return 0
+  if [[ "$1" == kde ]]; then
+    [[ -f "$guardado" ]] && { rm -f "$tmp"; return 0; }
+    jq '.dock // null' "$ajustes" >"$guardado" 2>/dev/null || { rm -f "$guardado" "$tmp"; return 0; }
+    jq '.dock = ((.dock // {}) + {enabled: true, position: "bottom", showRunningApps: true, runningScope: "auto",
+        autohide: true, smartAutohide: false, exclusive: false})' "$ajustes" >"$tmp" 2>/dev/null
+  else
+    [[ -f "$guardado" ]] || { rm -f "$tmp"; return 0; }
+    jq --slurpfile previo "$guardado" 'if $previo[0] == null then del(.dock) else .dock = $previo[0] end' \
+      "$ajustes" >"$tmp" 2>/dev/null && rm -f "$guardado"
+  fi
+  [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes"
+  rm -f "$tmp"
+}
+
 cmd_ventanas() {
   case "${1:-estado}" in
     estado) modo_ventanas ;;
@@ -663,6 +687,7 @@ cmd_ventanas() {
       [[ "$1" == kde ]] && { barras_titulo || true; }
       mkdir -p "$CONF"
       printf '%s\n' "$1" >"$VENTANAS"
+      dock_ventanas "$1"
       if hypr_corriendo; then
         hypr reload >/dev/null 2>&1 || true
         # Las reglas solo valen para las ventanas nuevas: las que ya estaban se sueltan o se acomodan aquí.
@@ -704,8 +729,9 @@ cmd_actualizar() {
   instalar_comandos
   paru -Syu
   version_sistema
-  # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió.
-  [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; }
+  # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
+  # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
+  [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
