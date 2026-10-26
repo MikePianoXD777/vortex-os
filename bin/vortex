@@ -38,6 +38,7 @@ Uso: vortex <comando>
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
+  arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
@@ -771,7 +772,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -980,6 +981,7 @@ PAQUETES_NUEVOS=(
   udisks2 # 1.8: vortex-usb
   tesseract tesseract-data-spa tesseract-data-eng # 1.8: vortex-texto (copiar texto de la pantalla)
   kdeconnect zenity # 1.8: tu celular (Super+Shift+P); zenity elige los archivos que se le mandan
+  pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1257,6 +1259,7 @@ case "${1:-ayuda}" in
   claude) shift; cmd_claude "$@" ;;
   windows) shift; cmd_windows "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
+  arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;

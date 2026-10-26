@@ -19,3 +19,4 @@ tesseract-data-spa
 tesseract-data-eng
 kdeconnect             # tu celular en la PC (Super+Shift+P, 1.8); viene apagado
 zenity                 # elegir archivos para mandar al celular
+pacman-contrib         # paccache: «Algo no funciona → Disco» limpia la caché de pacman (1.9)

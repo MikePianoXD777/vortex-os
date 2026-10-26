@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# vortex-arreglar (1.9): «Algo no funciona». Revisa lo que más falla y lo explica en palabras simples;
+# lo que se puede arreglar solo, lo arregla. Lo usa el panel «Algo no funciona» del shell
+# (shell/src/quickshell/arreglar/), y también sirve en la terminal.
+#
+#   vortex-arreglar              la lista, para leerla
+#   vortex-arreglar revisar      la lista en JSON (la lee el panel)
+#   vortex-arreglar arreglar ID  sonido | microfono | red | wifi | portal | bluetooth | disco | hora | pacman
+#
+# Cada revisión: {"id", "titulo", "estado": "bien" | "aviso" | "mal", "detalle", "arreglo": ID o ""}.
+# Lo que necesita root (encender el Bluetooth, la hora automática, la caché de pacman, el candado de
+# pacman) pasa por pkexec: pide la contraseña con la ventana del shell. Nada se borra de tus archivos.
+set -uo pipefail
+export LC_ALL=C
+
+SYS="${VORTEX_SYS:-/sys}"
+CANDADO="${VORTEX_RAIZ:-}/var/lib/pacman/db.lck"
+
+item() { # ID TITULO ESTADO DETALLE [ARREGLO]
+  jq -cn --arg id "$1" --arg titulo "$2" --arg estado "$3" --arg detalle "$4" --arg arreglo "${5:-}" \
+    '{id: $id, titulo: $titulo, estado: $estado, detalle: $detalle, arreglo: $arreglo}'
+}
+
+volumen() { # @DEFAULT_SINK@ | @DEFAULT_SOURCE@ → el % del primer canal
+  local tipo=sink
+  [[ "$1" == *SOURCE* ]] && tipo=source
+  pactl "get-$tipo-volume" "$1" 2>/dev/null | grep -o '[0-9]*%' | head -n1 | tr -d %
+}
+
+# ---- Revisiones -----------------------------------------------------------------------------------
+
+rev_sonido() {
+  command -v pactl >/dev/null || return 0
+  if ! pactl info >/dev/null 2>&1; then
+    item sonido "Sonido" mal "El sistema de sonido no responde." sonido
+    return
+  fi
+  local sink nombre
+  sink="$(pactl get-default-sink 2>/dev/null)"
+  if [[ -z "$sink" || "$sink" == auto_null ]]; then
+    item sonido "Sonido" mal "No se encuentra ninguna salida de sonido (bocinas o audífonos)." sonido
+    return
+  fi
+  nombre="$(pactl -f json list sinks 2>/dev/null | jq -r --arg n "$sink" '.[] | select(.name == $n) | .description' 2>/dev/null)"
+  nombre="${nombre:-$sink}"
+  if pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | grep -q 'yes'; then
+    item sonido "Sonido" mal "Está silenciado ($nombre)." sonido
+  elif [[ "$(volumen @DEFAULT_SINK@)" == 0 ]]; then
+    item sonido "Sonido" mal "El volumen está en 0 ($nombre)." sonido
+  else
+    item sonido "Sonido" bien "Sale por: $nombre, al $(volumen @DEFAULT_SINK@) %."
+  fi
+}
+
+rev_microfono() {
+  command -v pactl >/dev/null && pactl info >/dev/null 2>&1 || return 0
+  local src
+  src="$(pactl get-default-source 2>/dev/null)"
+  if [[ -z "$src" || "$src" == *.monitor || "$src" == auto_null ]]; then
+    item microfono "Micrófono" aviso "No hay ningún micrófono conectado."
+  elif pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | grep -q 'yes'; then
+    item microfono "Micrófono" mal "Está silenciado." microfono
+  elif [[ "$(volumen @DEFAULT_SOURCE@)" == 0 ]]; then
+    item microfono "Micrófono" mal "Su volumen está en 0." microfono
+  else
+    item microfono "Micrófono" bien "Funciona, al $(volumen @DEFAULT_SOURCE@) %."
+  fi
+}
+
+# Tipo (wlan, bluetooth) bloqueado: «soft» (apagado desde el sistema) o «hard» (tecla o botón).
+bloqueado() { # TIPO soft|hard
+  local r
+  for r in "$SYS"/class/rfkill/rfkill*; do
+    [[ -f "$r/type" && "$(cat "$r/type")" == "$1" && "$(cat "$r/$2" 2>/dev/null)" == 1 ]] && return 0
+  done
+  return 1
+}
+
+rev_internet() {
+  command -v nmcli >/dev/null || return 0
+  if [[ "$(nmcli networking 2>/dev/null)" != enabled ]]; then
+    item internet "Internet" mal "La red está apagada." red
+    return
+  fi
+  local estado conectada
+  estado="$(nmcli networking connectivity check 2>/dev/null || nmcli networking connectivity 2>/dev/null)"
+  conectada="$(nmcli -t -f TYPE,STATE,CONNECTION device 2>/dev/null | awk -F: '($1 == "ethernet" || $1 == "wifi") && $2 == "connected" {print $3; exit}')"
+  case "$estado" in
+    full) item internet "Internet" bien "Conectado${conectada:+ a «$conectada»}." ;;
+    portal) item internet "Internet" aviso "Esta red pide iniciar sesión (hotel, escuela, café): ábrela en el navegador." portal ;;
+    *)
+      if [[ -n "$conectada" ]]; then
+        item internet "Internet" mal "Conectado a «$conectada», pero sin internet." red
+      elif bloqueado wlan hard; then
+        item internet "Internet" mal "El Wi-Fi está apagado con la tecla o el botón del equipo (busca el ícono de antena o avión)."
+      elif [[ -d "$SYS/class/ieee80211" && -n "$(ls -A "$SYS/class/ieee80211" 2>/dev/null)" ]] &&
+        { [[ "$(nmcli radio wifi 2>/dev/null)" != enabled ]] || bloqueado wlan soft; }; then
+        item internet "Internet" mal "El Wi-Fi está apagado." wifi
+      else
+        item internet "Internet" mal "No estás conectado a ninguna red: elige tu Wi-Fi o conecta el cable." elegir-red
+      fi
+      ;;
+  esac
+}
+
+rev_bluetooth() {
+  [[ -n "$(ls -A "$SYS/class/bluetooth" 2>/dev/null)" ]] || return 0
+  if bloqueado bluetooth hard; then
+    item bluetooth "Bluetooth" mal "Está apagado con la tecla o el botón del equipo."
+  elif ! systemctl is-active --quiet bluetooth 2>/dev/null; then
+    item bluetooth "Bluetooth" mal "El servicio de Bluetooth está apagado." bluetooth
+  elif bloqueado bluetooth soft; then
+    item bluetooth "Bluetooth" mal "Está apagado." bluetooth
+  else
+    item bluetooth "Bluetooth" bien "Encendido."
+  fi
+}
+
+rev_disco() {
+  local uso libre
+  read -r uso libre < <(df -P "$HOME" 2>/dev/null | awk 'NR == 2 {gsub("%", "", $5); printf "%s %.1f\n", $5, $4 / 1048576}')
+  [[ "$uso" =~ ^[0-9]+$ ]] || return 0
+  if ((uso >= 95)); then
+    item disco "Disco" mal "Está casi lleno: quedan $libre GB. Con el disco lleno fallan las actualizaciones y las apps." disco
+  elif ((uso >= 90)); then
+    item disco "Disco" aviso "Se está llenando: quedan $libre GB." disco
+  else
+    item disco "Disco" bien "Quedan $libre GB libres ($uso % usado)."
+  fi
+}
+
+rev_hora() {
+  command -v timedatectl >/dev/null || return 0
+  if [[ "$(timedatectl show -p NTP --value 2>/dev/null)" == no ]]; then
+    item hora "Fecha y hora" mal "La hora no se pone sola: si está mal, fallan las páginas seguras y las actualizaciones." hora
+  else
+    item hora "Fecha y hora" bien "Se pone sola por internet."
+  fi
+}
+
+rev_actualizaciones() {
+  [[ -e "$CANDADO" ]] || { item pacman "Actualizaciones" bien "Nada trabado."; return; }
+  if pgrep -x 'pacman|paru|yay|pamac' >/dev/null 2>&1; then
+    item pacman "Actualizaciones" aviso "Se está instalando algo ahora mismo: espera a que termine."
+  else
+    item pacman "Actualizaciones" mal "Una actualización quedó a medias y no deja instalar nada más." pacman
+  fi
+}
+
+rev_servicios() {
+  local fallas
+  fallas="$({ systemctl --failed --no-legend --plain 2>/dev/null; systemctl --user --failed --no-legend --plain 2>/dev/null; } |
+    awk '{print $1}' | grep -v '^$' | sed 's/\.service$//' | sort -u | paste -sd, - | sed 's/,/, /g')"
+  [[ -n "$fallas" ]] && item servicios "Servicios" aviso "Fallaron al arrancar: $fallas. Si algo no funciona, reinicia el equipo."
+  return 0
+}
+
+revisar() {
+  { rev_sonido; rev_microfono; rev_internet; rev_bluetooth; rev_disco; rev_hora; rev_actualizaciones; rev_servicios; } |
+    jq -s '.'
+}
+
+# ---- Arreglos -------------------------------------------------------------------------------------
+
+arreglar() {
+  case "$1" in
+    sonido)
+      if ! pactl info >/dev/null 2>&1 || [[ "$(pactl get-default-sink 2>/dev/null)" =~ ^(|auto_null)$ ]]; then
+        systemctl --user restart wireplumber pipewire pipewire-pulse 2>/dev/null
+        local _
+        for _ in 1 2 3 4 5 6; do pactl info >/dev/null 2>&1 && break; sleep 0.5; done
+        sleep 1
+      fi
+      pactl set-sink-mute @DEFAULT_SINK@ 0 2>/dev/null
+      [[ "$(volumen @DEFAULT_SINK@)" == 0 ]] && pactl set-sink-volume @DEFAULT_SINK@ 50% 2>/dev/null
+      ;;
+    microfono)
+      pactl set-source-mute @DEFAULT_SOURCE@ 0 2>/dev/null
+      [[ "$(volumen @DEFAULT_SOURCE@)" == 0 ]] && pactl set-source-volume @DEFAULT_SOURCE@ 80% 2>/dev/null
+      ;;
+    red)
+      nmcli networking off 2>/dev/null
+      sleep 2
+      nmcli networking on 2>/dev/null
+      sleep 5
+      ;;
+    wifi)
+      bloqueado wlan soft && rfkill unblock wlan 2>/dev/null
+      nmcli radio wifi on 2>/dev/null
+      sleep 4
+      ;;
+    portal) setsid -f xdg-open "http://neverssl.com" >/dev/null 2>&1 ;;
+    elegir-red) hyprctl dispatch 'hl.dsp.event("serpantinum:toggle network")' >/dev/null 2>&1 ;;
+    bluetooth)
+      bloqueado bluetooth soft && rfkill unblock bluetooth 2>/dev/null
+      systemctl is-active --quiet bluetooth || pkexec systemctl enable --now bluetooth
+      ;;
+    hora) pkexec timedatectl set-ntp true ;;
+    pacman)
+      pgrep -x 'pacman|paru|yay|pamac' >/dev/null 2>&1 && { echo "Hay una instalación corriendo: espera a que termine." >&2; return 1; }
+      pkexec rm -f "$CANDADO"
+      ;;
+    disco)
+      # Lo tuyo no se toca: cachés que se rehacen solas, apps de Flatpak que nadie usa y, con tu
+      # contraseña, la caché de pacman (deja la versión instalada) y los registros viejos del sistema.
+      local antes despues
+      antes="$(df -P --output=avail "$HOME" | tail -n1)"
+      rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails" 2>/dev/null
+      command -v flatpak >/dev/null && flatpak uninstall --unused -y --noninteractive >/dev/null 2>&1
+      pkexec sh -c 'command -v paccache >/dev/null && paccache -rk1 -q; paccache -ruk0 -q 2>/dev/null; journalctl --vacuum-size=200M -q' >/dev/null 2>&1
+      despues="$(df -P --output=avail "$HOME" | tail -n1)"
+      awk -v a="$antes" -v d="$despues" 'BEGIN {l = (d - a) / 1048576; if (l < 0) l = 0; printf "Se liberaron %.1f GB.\n", l}'
+      ;;
+    *) echo "uso: vortex-arreglar arreglar sonido|microfono|red|wifi|portal|elegir-red|bluetooth|disco|hora|pacman" >&2; return 2 ;;
+  esac
+}
+
+case "${1:-}" in
+  revisar) revisar ;;
+  arreglar) arreglar "${2:-}" ;;
+  "")
+    revisar | jq -r '.[] | (if .estado == "bien" then "✓" elif .estado == "aviso" then "!" else "✗" end) + " " + .titulo + ": " + .detalle
+      + (if .arreglo != "" and .estado != "bien" then "   (vortex-arreglar arreglar " + .arreglo + ")" else "" end)'
+    ;;
+  *) echo "uso: vortex-arreglar [revisar | arreglar ID]" >&2; exit 2 ;;
+esac

@@ -69,6 +69,15 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌌"
         },
         {
+            // Vortex 1.9: «Algo no funciona» (vortex-arreglar). La descripción lleva las palabras
+            // con las que alguien lo buscaría: sonido, internet, wifi…
+            id: "arreglar",
+            name: tr("widgets.arreglar.name", "Something's not working"),
+            description: tr("widgets.arreglar.desc", "Check and fix sound, internet, Wi-Fi, Bluetooth, disk and time"),
+            icon: "system-help",
+            fontIcon: "󰁨"
+        },
+        {
             // Vortex 1.8: la biblioteca de juegos (Super+Shift+G).
             id: "juegos",
             name: tr("widgets.juegos.name", "Your games"),
@@ -194,6 +203,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.8: biblioteca de juegos (juegos/JuegosPopup.qml), al centro como la hoja de atajos.
         "juegos": {
             w: 1180, h: 780, comp: "juegos/JuegosPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.9: «Algo no funciona» (arreglar/ArreglarPopup.qml), al centro.
+        "arreglar": {
+            w: 720, h: 720, comp: "arreglar/ArreglarPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

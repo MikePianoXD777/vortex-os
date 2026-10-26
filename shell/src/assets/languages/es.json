@@ -1686,6 +1686,10 @@
     "juegos": {
       "name": "Tus juegos",
       "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)"
+    },
+    "arreglar": {
+      "name": "Algo no funciona",
+      "desc": "Revisa y arregla el sonido, internet, wifi, Bluetooth, disco y hora"
     }
   },
   "cli": {
@@ -1915,5 +1919,18 @@
     "search": "Buscar un juego…",
     "empty": "Todavía no hay juegos. Instálalos con Steam o Heroic (o un Flatpak de la Tienda) y aparecerán aquí.",
     "no_match": "Ningún juego coincide con tu búsqueda."
+  },
+  "arreglar": {
+    "title": "¿Algo no funciona?",
+    "checking": "Revisando tu equipo…",
+    "all_good": "Todo se ve bien.",
+    "all_good_notes": "Todo funciona; hay unas notas.",
+    "one_problem": "Encontré 1 problema.",
+    "problems": "Encontré {n} problemas.",
+    "fix": "Arreglar",
+    "fixing": "Arreglando…",
+    "open": "Abrir",
+    "again": "Revisar otra vez",
+    "hint": "Si sigue fallando, reiniciar el equipo arregla casi todo."
   }
 }

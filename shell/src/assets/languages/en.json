@@ -1642,6 +1642,10 @@
     "juegos": {
       "name": "Your games",
       "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)"
+    },
+    "arreglar": {
+      "name": "Something's not working",
+      "desc": "Check and fix sound, internet, Wi-Fi, Bluetooth, disk and time"
     }
   },
   "cli": {
@@ -1873,5 +1877,18 @@
     "search": "Search your games…",
     "empty": "No games yet. Install them with Steam or Heroic (or a Flatpak from the Shop) and they will show up here.",
     "no_match": "No game matches your search."
+  },
+  "arreglar": {
+    "title": "Something's not working?",
+    "checking": "Checking your computer…",
+    "all_good": "Everything looks fine.",
+    "all_good_notes": "Everything works; there are a few notes.",
+    "one_problem": "I found 1 problem.",
+    "problems": "I found {n} problems.",
+    "fix": "Fix it",
+    "fixing": "Fixing…",
+    "open": "Open",
+    "again": "Check again",
+    "hint": "If it keeps failing, restarting the computer fixes most things."
   }
 }
