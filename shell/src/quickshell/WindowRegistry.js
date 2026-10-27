@@ -69,6 +69,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌌"
         },
         {
+            // Vortex 1.10: OneDrive como la carpeta ~/OneDrive (vortex-onedrive).
+            id: "onedrive",
+            name: "OneDrive",
+            description: tr("widgets.onedrive.desc", "Your OneDrive files as a folder (Microsoft, Office)"),
+            icon: "folder-remote",
+            fontIcon: "󰏊"
+        },
+        {
             // Vortex 1.9: «Algo no funciona» (vortex-arreglar). La descripción lleva las palabras
             // con las que alguien lo buscaría: sonido, internet, wifi…
             id: "arreglar",
@@ -116,6 +124,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
                 "left": { anchor: "bottom-left", ml: 52, mb: 4 }, 
                 "right": { anchor: "bottom-right", mr: 52, mb: 4 } 
             } 
+        },
+        // Vortex 1.10: OneDrive (onedrive/OneDrivePopup.qml), donde la red y el celular.
+        "onedrive": {
+            w: 520, h: 560, comp: "onedrive/OneDrivePopup.qml",
+            pos: {
+                "top": { anchor: "top-right", mt: 52, mr: 4 },
+                "bottom": { anchor: "bottom-right", mb: 52, mr: 4 },
+                "left": { anchor: "bottom-left", ml: 52, mb: 4 },
+                "right": { anchor: "bottom-right", mr: 52, mb: 4 }
+            }
         },
         // Vortex 1.8: «Tu celular» (celular/CelularPopup.qml), donde la red.
         "celular": {

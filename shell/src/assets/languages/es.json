@@ -1690,6 +1690,9 @@
     "arreglar": {
       "name": "Algo no funciona",
       "desc": "Revisa y arregla el sonido, internet, wifi, Bluetooth, disco y hora"
+    },
+    "onedrive": {
+      "desc": "Tus archivos de OneDrive como una carpeta (Microsoft, Office)"
     }
   },
   "cli": {
@@ -1932,5 +1935,24 @@
     "open": "Abrir",
     "again": "Revisar otra vez",
     "hint": "Si sigue fallando, reiniciar el equipo arregla casi todo."
+  },
+  "onedrive": {
+    "connecting": "Conectando…",
+    "not_connected": "Sin conectar",
+    "not_mounted": "Conectado, pero la carpeta no está disponible",
+    "connected_personal": "Conectado · cuenta personal",
+    "connected_work": "Conectado · cuenta del trabajo o escuela",
+    "connected": "Conectado",
+    "browser": "Se abrió el navegador: inicia sesión con tu cuenta de Microsoft y dale «Aceptar». Sirve con cuentas personales, del trabajo y de la escuela.",
+    "browser_install": "Si antes te pide tu contraseña, es para instalar lo que OneDrive necesita (solo la primera vez).",
+    "intro": "Tus archivos de OneDrive como una carpeta normal, «OneDrive» en tu carpeta personal: ábrelos, edítalos y guarda; lo que guardas se sube solo. No se baja nada hasta que lo abres.",
+    "connect": "Conectar OneDrive",
+    "space": "{u} usados de {t}",
+    "open_folder": "Abrir carpeta",
+    "retry": "Intentar otra vez",
+    "open_web": "Abrir en la web",
+    "shared_title": "¿Te compartieron algo?",
+    "shared_desc": "Lo compartido no aparece solo en la carpeta. En la web, entra a «Compartido», dale clic derecho y elige «Agregar acceso directo a Mis archivos»: desde ahí ya está en tu carpeta OneDrive.",
+    "disconnect": "Desconectar OneDrive de esta computadora"
   }
 }

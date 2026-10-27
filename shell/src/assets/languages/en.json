@@ -1646,6 +1646,9 @@
     "arreglar": {
       "name": "Something's not working",
       "desc": "Check and fix sound, internet, Wi-Fi, Bluetooth, disk and time"
+    },
+    "onedrive": {
+      "desc": "Your OneDrive files as a folder (Microsoft, Office)"
     }
   },
   "cli": {
@@ -1890,5 +1893,24 @@
     "open": "Open",
     "again": "Check again",
     "hint": "If it keeps failing, restarting the computer fixes most things."
+  },
+  "onedrive": {
+    "connecting": "Connecting…",
+    "not_connected": "Not connected",
+    "not_mounted": "Connected, but the folder isn't available",
+    "connected_personal": "Connected · personal account",
+    "connected_work": "Connected · work or school account",
+    "connected": "Connected",
+    "browser": "A browser window opened: sign in with your Microsoft account and press «Accept». It works with personal, work and school accounts.",
+    "browser_install": "If it asks for your password first, it's to install what OneDrive needs (only the first time).",
+    "intro": "Your OneDrive files as a normal folder, «OneDrive» in your home: open them, edit them and save; what you save goes up by itself. Nothing is downloaded until you open it.",
+    "connect": "Connect OneDrive",
+    "space": "{u} of {t} used",
+    "open_folder": "Open folder",
+    "retry": "Try again",
+    "open_web": "Open on the web",
+    "shared_title": "Did someone share something with you?",
+    "shared_desc": "Shared files don't show up in the folder by themselves. On the web, go to «Shared», right-click it and choose «Add shortcut to My files»: from then on it's in your OneDrive folder.",
+    "disconnect": "Disconnect OneDrive from this computer"
   }
 }

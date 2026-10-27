@@ -107,7 +107,7 @@ install -Dm644 "$cfg/scx_loader.toml" "$raiz/etc/scx_loader.toml"
 sed 's|start-hyprland </dev/null|vortex-sesion|' "$cfg/greetd.toml" | install -Dm644 /dev/stdin "$raiz/etc/greetd/config.toml"
 install -Dm644 "$RAIZ/config/systemd/vortex-gestor.service" "$raiz/etc/systemd/user/vortex-gestor.service"
 install -Dm644 "$RAIZ/config/systemd/vortex-flatpaks.service" "$raiz/etc/systemd/system/vortex-flatpaks.service"
-for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-flatpaks vortex-sesion vortex-otaku vortex-pantallas vortex-firmar vortex-os-release vortex-captura vortex-usb vortex-texto vortex-arreglar; do
+for c in vortex vortex-bench vortex-mcp vortex-gestor vortex-flatpaks vortex-sesion vortex-otaku vortex-pantallas vortex-firmar vortex-os-release vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive; do
   install -Dm755 "$RAIZ/bin/$c" "$raiz/usr/local/bin/$c"
 done
 cc -O2 -s -o "$raiz/usr/local/bin/vortex-eventos" "$RAIZ/src/vortex-eventos.c"

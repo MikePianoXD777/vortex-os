@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+# vortex-onedrive (1.10): OneDrive como una carpeta más (~/OneDrive), con rclone. Sirve con cualquier
+# cuenta de Microsoft (personal, del trabajo o de la escuela). Lo usa el panel «OneDrive» del shell
+# (shell/src/quickshell/onedrive/) y también sirve en la terminal («vortex onedrive ...»).
+#
+#   vortex-onedrive estado        JSON para el panel
+#   vortex-onedrive conectar      instala rclone si falta (pkexec), abre el navegador para iniciar
+#                                 sesión y monta la carpeta; se queda montada en cada inicio de sesión
+#   vortex-onedrive montar        vuelve a montar la carpeta (si se cayó)
+#   vortex-onedrive abrir         abre la carpeta en el gestor de archivos
+#   vortex-onedrive desconectar   desmonta y olvida la cuenta (los archivos siguen en OneDrive)
+#
+# La carpeta se monta con «rclone mount» y caché completa: los archivos se bajan al abrirlos y lo que
+# guardas se sube solo. La cuenta (token de rclone) queda en ~/.config/vortex/onedrive/rclone.conf
+# (0600) y no en ~/.config/rclone, para no mezclarse con el rclone de la persona. rclone no ve
+# «Compartido conmigo»: lo compartido se agrega a «Mis archivos» desde la web (el panel lo explica).
+set -uo pipefail
+
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/onedrive"
+RC="$CONF_DIR/rclone.conf"
+ESTADO_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+CONECTANDO="$ESTADO_DIR/onedrive-conectando"
+ERROR="$ESTADO_DIR/onedrive-error"
+ABOUT="$ESTADO_DIR/onedrive-espacio.json"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/onedrive"
+CARPETA="${VORTEX_ONEDRIVE_CARPETA:-$HOME/OneDrive}"
+UNIDAD=vortex-onedrive.service
+UNIDAD_ARCHIVO="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$UNIDAD"
+MARCADORES="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/bookmarks"
+WEB="https://onedrive.live.com/"
+
+notificar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" -i folder-remote "$@" 2>/dev/null; return 0; }
+
+fallo() {
+  mkdir -p "$ESTADO_DIR"
+  printf '%s\n' "$1" >"$ERROR"
+  notificar "OneDrive" "$1"
+  echo "vortex-onedrive: $1" >&2
+  exit 1
+}
+
+conectado() { [[ -f "$RC" ]] && grep -q '^\[onedrive\]' "$RC" && grep -q '^token = ' "$RC"; }
+montado() { mountpoint -q "$CARPETA" 2>/dev/null; }
+conectando() { [[ -f "$CONECTANDO" ]] && kill -0 "$(cat "$CONECTANDO" 2>/dev/null)" 2>/dev/null; }
+
+marcador() { # poner | quitar: el acceso a la carpeta en el panel lateral de Thunar
+  local linea="file://${CARPETA// /%20} OneDrive"
+  case "$1" in
+    poner)
+      grep -qxF "$linea" "$MARCADORES" 2>/dev/null && return 0
+      mkdir -p "${MARCADORES%/*}" && printf '%s\n' "$linea" >>"$MARCADORES"
+      ;;
+    quitar) [[ -f "$MARCADORES" ]] && sed -i "\\|^file://${CARPETA// /%20} OneDrive\$|d" "$MARCADORES" ;;
+  esac
+  return 0
+}
+
+escribir_unidad() {
+  mkdir -p "${UNIDAD_ARCHIVO%/*}"
+  cat >"$UNIDAD_ARCHIVO" <<FIN
+# Vortexine's OS (vortex onedrive): OneDrive en $CARPETA. Lo crea y lo borra vortex-onedrive.
+[Unit]
+Description=OneDrive en la carpeta $CARPETA
+After=network-online.target
+
+[Service]
+Type=notify
+ExecStartPre=/usr/bin/mkdir -p "$CARPETA"
+ExecStart=/usr/bin/rclone mount onedrive: "$CARPETA" --config "$RC" --cache-dir "$CACHE" --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 168h --dir-cache-time 1m --poll-interval 1m --volname OneDrive
+ExecStop=/usr/bin/fusermount3 -uz "$CARPETA"
+Restart=on-failure
+RestartSec=20
+
+[Install]
+WantedBy=default.target
+FIN
+}
+
+montar() {
+  conectado || fallo "OneDrive no está conectado."
+  montado && return 0
+  if [[ -d "$CARPETA" && -n "$(ls -A "$CARPETA" 2>/dev/null)" ]]; then
+    fallo "Ya tienes una carpeta ${CARPETA/#"$HOME"/\~} con archivos: muévela o cámbiale el nombre y vuelve a intentar."
+  fi
+  mkdir -p "$CARPETA" "$CACHE"
+  escribir_unidad
+  systemctl --user daemon-reload
+  systemctl --user enable "$UNIDAD" >/dev/null 2>&1
+  systemctl --user restart "$UNIDAD" || fallo "No se pudo montar la carpeta de OneDrive (mira: journalctl --user -u $UNIDAD)."
+  local _
+  for _ in $(seq 1 20); do montado && break; sleep 0.5; done
+  montado || fallo "No se pudo montar la carpeta de OneDrive (mira: journalctl --user -u $UNIDAD)."
+  marcador poner
+  rm -f "$ERROR"
+}
+
+conectar() {
+  conectando && { echo "Ya se está conectando." >&2; exit 0; }
+  mkdir -p "$ESTADO_DIR" "$CONF_DIR"
+  printf '%s\n' "$$" >"$CONECTANDO"
+  trap 'rm -f "$CONECTANDO"' EXIT
+  rm -f "$ERROR"
+
+  local faltan=()
+  command -v rclone >/dev/null || faltan+=(rclone)
+  command -v fusermount3 >/dev/null || faltan+=(fuse3)
+  if ((${#faltan[@]})); then
+    notificar "OneDrive" "Instalando lo necesario (te pide tu contraseña)…"
+    pkexec pacman -S --needed --noconfirm "${faltan[@]}" >/dev/null 2>&1 ||
+      fallo "No se pudo instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})."
+  fi
+
+  if ! conectado; then
+    rm -f "$RC"
+    notificar "OneDrive" "Se abrió el navegador: inicia sesión con tu cuenta de Microsoft y acepta."
+    # Abre el navegador e inicia sesión; lo demás (tipo de cuenta, cuál OneDrive) toma lo de siempre.
+    timeout 900 rclone --config "$RC" config create onedrive onedrive config_is_local=true \
+      >"$CONF_DIR/conectar.log" 2>&1 ||
+      fallo "No se completó el inicio de sesión. Vuelve a intentarlo y acepta los permisos en el navegador."
+    conectado || fallo "No se completó el inicio de sesión. Vuelve a intentarlo y acepta los permisos en el navegador."
+  fi
+  chmod 600 "$RC"
+  montar
+  espacio >/dev/null 2>&1
+  rm -f "$CONECTANDO" # ya conectó: el aviso de abajo espera el clic y el panel no debe seguir en «Conectando…»
+  local r
+  r="$(notify-send -a "Vortexine's OS" -i folder-remote -A abrir=Abrir "OneDrive listo" \
+    "Tus archivos de OneDrive están en la carpeta OneDrive (también en Thunar, a la izquierda)." 2>/dev/null)"
+  [[ "$r" == abrir ]] && abrir
+  return 0
+}
+
+# Espacio usado y total, guardado 5 min (pide a internet: el panel no debe esperarlo).
+espacio() {
+  conectado && command -v rclone >/dev/null || return 0
+  if [[ -s "$ABOUT" ]] && (($(date +%s) - $(stat -c %Y "$ABOUT") < 300)); then cat "$ABOUT"; return 0; fi
+  local j
+  j="$(timeout 20 rclone --config "$RC" about onedrive: --json 2>/dev/null)" || return 0
+  jq -e '.total' >/dev/null 2>&1 <<<"$j" || return 0
+  mkdir -p "$ESTADO_DIR" && printf '%s\n' "$j" >"$ABOUT" && cat "$ABOUT"
+}
+
+estado() {
+  local tipo="" esp='{}' error=""
+  [[ -f "$RC" ]] && tipo="$(sed -n 's/^drive_type = //p' "$RC" | head -n1)"
+  [[ -s "$ABOUT" ]] && esp="$(cat "$ABOUT")"
+  jq -e . >/dev/null 2>&1 <<<"$esp" || esp='{}'
+  [[ -f "$ERROR" ]] && error="$(cat "$ERROR")"
+  # El espacio se pone al día por detrás, sin hacer esperar al panel.
+  if conectado && { [[ ! -s "$ABOUT" ]] || (($(date +%s) - $(stat -c %Y "$ABOUT") >= 300)); }; then
+    setsid -f "$0" espacio >/dev/null 2>&1 </dev/null
+  fi
+  jq -cn --argjson rclone "$(command -v rclone >/dev/null && echo true || echo false)" \
+    --argjson conectado "$(conectado && echo true || echo false)" \
+    --argjson montado "$(montado && echo true || echo false)" \
+    --argjson conectando "$(conectando && echo true || echo false)" \
+    --arg tipo "$tipo" --arg error "$error" --arg carpeta "$CARPETA" --argjson espacio "$esp" \
+    '{rclone: $rclone, conectado: $conectado, montado: $montado, conectando: $conectando, tipo: $tipo,
+      error: $error, carpeta: $carpeta, usado: ($espacio.used // -1), total: ($espacio.total // -1)}'
+}
+
+abrir() {
+  if montado; then
+    setsid -f xdg-open "$CARPETA" >/dev/null 2>&1
+  else
+    setsid -f xdg-open "$WEB" >/dev/null 2>&1
+  fi
+}
+
+desconectar() {
+  # La caché no se borra: si quedó algo por subir, rclone lo sube al volver a conectar.
+  systemctl --user disable --now "$UNIDAD" >/dev/null 2>&1
+  montado && fusermount3 -uz "$CARPETA" 2>/dev/null
+  rm -f "$UNIDAD_ARCHIVO" "$ABOUT" "$ERROR"
+  systemctl --user daemon-reload 2>/dev/null
+  rm -f "$RC" "$CONF_DIR/conectar.log"
+  rmdir "$CONF_DIR" 2>/dev/null
+  [[ -d "$CARPETA" ]] && ! montado && rmdir "$CARPETA" 2>/dev/null
+  marcador quitar
+  return 0
+}
+
+case "${1:-estado}" in
+  estado) estado ;;
+  conectar) conectar ;;
+  montar) montar ;;
+  espacio) espacio ;;
+  abrir) abrir ;;
+  desconectar) desconectar ;;
+  *) echo "uso: vortex-onedrive [estado | conectar | montar | abrir | desconectar]" >&2; exit 2 ;;
+esac

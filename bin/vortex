@@ -39,6 +39,7 @@ Uso: vortex <comando>
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
+  onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
@@ -772,7 +773,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1259,6 +1260,7 @@ case "${1:-ayuda}" in
   claude) shift; cmd_claude "$@" ;;
   windows) shift; cmd_windows "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
+  onedrive) shift; exec "$VORTEX_DIR/bin/vortex-onedrive" "$@" ;;
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
