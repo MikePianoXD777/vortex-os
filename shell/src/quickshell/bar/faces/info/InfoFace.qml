@@ -27,7 +27,8 @@ Item {
     property string recTimeFormatted: String(Math.floor(recSeconds / 60)).padStart(2, "0") + ":" + String(recSeconds % 60).padStart(2, "0")
     readonly property string recCacheDir: Caching.cacheDir ? Caching.getCacheDir("recording") : ""
 
-    readonly property var timerEntries: TimerState.entries
+    // Vortex 1.10: primero el temporizador de estudio (Estudio), con clic abre su panel.
+    readonly property var timerEntries: Estudio.barra.concat(TimerState.entries)
     readonly property bool isTimerActive: timerEntries.length > 0
     readonly property color greenColor: (typeof ThemeBackend !== "undefined" && ThemeBackend.green !== undefined) ? ThemeBackend.green : Qt.rgba(166/255, 227/255, 161/255, 1.0)
 
@@ -227,6 +228,14 @@ Item {
                             font.weight: Font.Bold
                             color: root.isCompact ? Qt.lighter(timerItem.entryColor, 1.08) : timerItem.entryColor
                             Behavior on color { ColorAnimation { duration: 250 } }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -6
+                                enabled: timerItem.modelData.estudio === true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["bash", Caching.serpantinumDir + "/scripts/qs_manager.sh", "toggle", "estudio"])
+                            }
                         }
                     }
                 }

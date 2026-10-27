@@ -61,6 +61,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰝚"
         },
         {
+            // Vortex 1.10: temporizador de estudio (el singleton Estudio; la cuenta sale en la barra).
+            id: "estudio",
+            name: tr("widgets.estudio.name", "Study timer"),
+            description: tr("widgets.estudio.desc", "Pomodoro: study blocks with breaks, with no notifications while you study"),
+            icon: "chronometer",
+            fontIcon: "󰔛"
+        },
+        {
             // Vortex (1.7.7): la hoja de atajos (Super+F1), para buscarla en el lanzador.
             id: "keybinds",
             name: tr("widgets.keybinds.name", "Keyboard shortcuts"),
@@ -75,6 +83,15 @@ function getWidgetLauncherEntries(i18n) {
             description: tr("widgets.onedrive.desc", "Your OneDrive files as a folder (Microsoft, Office)"),
             icon: "folder-remote",
             fontIcon: "󰏊"
+        },
+        {
+            // Vortex 1.10: metrónomo y afinador (musica/musica.py). La descripción lleva las palabras
+            // con las que se buscaría: tempo, compás, afinar, guitarra, solfeo.
+            id: "musica",
+            name: tr("widgets.musica.name", "Metronome and tuner"),
+            description: tr("widgets.musica.desc", "Tempo, time signature and tap; tune your voice or instrument (solfège, guitar)"),
+            icon: "audio-x-generic",
+            fontIcon: "󰝚"
         },
         {
             // Vortex 1.9: «Algo no funciona» (vortex-arreglar). La descripción lleva las palabras
@@ -221,6 +238,26 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.8: biblioteca de juegos (juegos/JuegosPopup.qml), al centro como la hoja de atajos.
         "juegos": {
             w: 1180, h: 780, comp: "juegos/JuegosPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: temporizador de estudio (estudio/EstudioPopup.qml), al centro.
+        "estudio": {
+            w: 520, h: 680, comp: "estudio/EstudioPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: metrónomo y afinador (musica/MusicaPopup.qml), al centro.
+        "musica": {
+            w: 620, h: 600, comp: "musica/MusicaPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

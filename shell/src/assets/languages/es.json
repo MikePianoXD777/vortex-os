@@ -1693,6 +1693,14 @@
     },
     "onedrive": {
       "desc": "Tus archivos de OneDrive como una carpeta (Microsoft, Office)"
+    },
+    "musica": {
+      "name": "Metrónomo y afinador",
+      "desc": "Tempo, compás y tap; afina tu voz o tu instrumento (solfeo, guitarra)"
+    },
+    "estudio": {
+      "name": "Temporizador de estudio",
+      "desc": "Pomodoro: bloques de estudio con descansos, sin notificaciones mientras estudias"
     }
   },
   "cli": {
@@ -1954,5 +1962,48 @@
     "shared_title": "¿Te compartieron algo?",
     "shared_desc": "Lo compartido no aparece solo en la carpeta. En la web, entra a «Compartido», dale clic derecho y elige «Agregar acceso directo a Mis archivos»: desde ahí ya está en tu carpeta OneDrive.",
     "disconnect": "Desconectar OneDrive de esta computadora"
+  },
+  "musica": {
+    "title": "Metrónomo y afinador",
+    "metronome": "Metrónomo",
+    "tuner": "Afinador",
+    "bpm": "pulsos por minuto",
+    "stop": "Parar",
+    "start": "Empezar",
+    "tap": "Tap",
+    "keeps_playing": "Sigue sonando aunque cierres esto. Espacio lo para.",
+    "keys": "Espacio empieza y para · ↑↓ ←→ cambian el tempo · T o «Tap»: marca el pulso",
+    "note_names": "Do,Do♯,Re,Re♯,Mi,Fa,Fa♯,Sol,Sol♯,La,La♯,Si",
+    "flat": "grave",
+    "sharp": "agudo",
+    "in_tune": "Afinado",
+    "go_up": "Sube un poco",
+    "go_down": "Baja un poco",
+    "no_mic": "No se oye el micrófono. Revísalo en el panel de volumen.",
+    "sing": "Canta o toca una nota cerca del micrófono."
+  },
+  "estudio": {
+    "title": "Temporizador de estudio",
+    "subtitle": "Estudia en bloques con descansos entre ellos. Sigue contando en la barra.",
+    "ready": "Listo",
+    "paused": "En pausa",
+    "studying": "Estudiando",
+    "resting": "Descanso",
+    "start": "Empezar",
+    "resume": "Seguir",
+    "pause": "Pausar",
+    "skip_to_break": "Descansar ya",
+    "skip_to_study": "Estudiar ya",
+    "option": "minutos de estudio / descanso",
+    "dnd": "Silenciar las notificaciones mientras estudias",
+    "today_none": "Hoy todavía no hay bloques de estudio",
+    "today_one": "Hoy: 1 bloque de estudio",
+    "today": "Hoy: {n} bloques de estudio",
+    "app": "Temporizador de estudio",
+    "break_title": "Hora de descansar",
+    "break_body": "Descansa {m} minutos. Hoy llevas {n} bloques de estudio.",
+    "long_break_body": "Hoy llevas {n} bloques de estudio. Descansa {m} minutos: párate y toma agua.",
+    "study_title": "A estudiar",
+    "study_body": "{m} minutos. Páralo desde la barra o el panel cuando termines."
   }
 }

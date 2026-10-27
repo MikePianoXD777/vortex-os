@@ -1649,6 +1649,14 @@
     },
     "onedrive": {
       "desc": "Your OneDrive files as a folder (Microsoft, Office)"
+    },
+    "musica": {
+      "name": "Metronome and tuner",
+      "desc": "Tempo, time signature and tap; tune your voice or instrument (solfège, guitar)"
+    },
+    "estudio": {
+      "name": "Study timer",
+      "desc": "Pomodoro: study blocks with breaks, with no notifications while you study"
     }
   },
   "cli": {
@@ -1912,5 +1920,48 @@
     "shared_title": "Did someone share something with you?",
     "shared_desc": "Shared files don't show up in the folder by themselves. On the web, go to «Shared», right-click it and choose «Add shortcut to My files»: from then on it's in your OneDrive folder.",
     "disconnect": "Disconnect OneDrive from this computer"
+  },
+  "musica": {
+    "title": "Metronome and tuner",
+    "metronome": "Metronome",
+    "tuner": "Tuner",
+    "bpm": "beats per minute",
+    "stop": "Stop",
+    "start": "Start",
+    "tap": "Tap",
+    "keeps_playing": "It keeps playing if you close this. Space starts and stops it.",
+    "keys": "Space starts and stops · ↑↓ ←→ change the tempo · T or «Tap»: tap the beat",
+    "note_names": "C,C♯,D,D♯,E,F,F♯,G,G♯,A,A♯,B",
+    "flat": "low",
+    "sharp": "high",
+    "in_tune": "In tune",
+    "go_up": "A little higher",
+    "go_down": "A little lower",
+    "no_mic": "Can't hear the microphone. Check it in the volume panel.",
+    "sing": "Sing or play a note near the microphone."
+  },
+  "estudio": {
+    "title": "Study timer",
+    "subtitle": "Study in blocks with breaks in between. It keeps counting in the bar.",
+    "ready": "Ready",
+    "paused": "Paused",
+    "studying": "Studying",
+    "resting": "Break",
+    "start": "Start",
+    "resume": "Resume",
+    "pause": "Pause",
+    "skip_to_break": "Break now",
+    "skip_to_study": "Study now",
+    "option": "minutes of study / break",
+    "dnd": "Silence notifications while you study",
+    "today_none": "No study blocks yet today",
+    "today_one": "Today: 1 study block",
+    "today": "Today: {n} study blocks",
+    "app": "Study timer",
+    "break_title": "Time for a break",
+    "break_body": "Rest {m} minutes. You studied {n} blocks today.",
+    "long_break_body": "You studied {n} blocks today. Rest {m} minutes: stand up, drink water.",
+    "study_title": "Back to studying",
+    "study_body": "{m} minutes. Stop it from the bar or the panel when you are done."
   }
 }
