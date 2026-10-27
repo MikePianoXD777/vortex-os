@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Vortex 1.10: el metrónomo y el afinador del panel «Metrónomo y afinador» (musica/MusicaPopup.qml).
 
-  musica.py DIR metronomo BPM COMPAS   empieza a sonar (o, si ya suena, cambia el tempo y el compás)
+  musica.py DIR metronomo BPM COMPAS [FIGURA]
+                                       empieza a sonar (o, si ya suena, cambia el tempo, el compás y la
+                                       figura: negras, octavos, tresillos, dieciseisavos o sincopa)
   musica.py DIR parar                  lo detiene
   musica.py afinador                   escucha el micrófono: una línea JSON por lectura, 10 por segundo
 
@@ -64,17 +66,22 @@ def golpe(frecuencia, volumen):
                        for i in range(n)))
 
 
+# Cuántos golpes caben en cada pulso. La síncopa son octavos con el fuerte a contratiempo (en el «y»).
+FIGURAS = {"negras": 1, "octavos": 2, "tresillos": 3, "dieciseisavos": 4, "sincopa": 2}
+
+
 def ajustes(control):
     bpm = max(20, min(300, int(control.get("bpm", 100))))
     compas = max(1, min(12, int(control.get("compas", 4))))
-    return bpm, compas
+    figura = control.get("figura", "negras")
+    return bpm, compas, figura if figura in FIGURAS else "negras"
 
 
-def metronomo(carpeta, bpm, compas):
+def metronomo(carpeta, bpm, compas, figura="negras"):
     os.makedirs(carpeta, exist_ok=True)
     ruta_control = os.path.join(carpeta, "metronomo-control.json")
     ruta_estado = os.path.join(carpeta, "metronomo.json")
-    escribir_json(ruta_control, {"bpm": bpm, "compas": compas, "sonando": True})
+    escribir_json(ruta_control, {"bpm": bpm, "compas": compas, "figura": figura, "sonando": True})
 
     candado = open(os.path.join(carpeta, "metronomo.lock"), "w")
     try:
@@ -98,16 +105,20 @@ def metronomo(carpeta, bpm, compas):
         pass
 
     acento, normal = golpe(1760, 0.9), golpe(1175, 0.6)
+    division = golpe(880, 0.3)  # los golpes de en medio, más bajitos
+    suave_acento, suave = golpe(1760, 0.3), golpe(1175, 0.3)  # el pulso en la síncopa
     silencio = bytes(BLOQUE * 2)
     muestra = 0  # muestras escritas
-    siguiente = 0.0  # muestra del próximo pulso
-    ultimo = 0.0
+    siguiente = 0.0  # muestra del próximo golpe
+    ultimo = 0.0  # del último golpe
+    ultimo_pulso = 0.0  # del último pulso (el golpe con que empieza cada tiempo)
     pulso = 0
+    paso = 0  # qué golpe del tiempo toca: 0 es el pulso
     cuenta = 0
     resto = array("h")
     pendientes = []  # (cuándo se oye, número de pulso, pulso en el compás)
     marca = None
-    estado = {"sonando": True, "bpm": bpm, "compas": compas, "pulso": -1, "n": 0, "t": time.time()}
+    estado = {"sonando": True, "bpm": bpm, "compas": compas, "figura": figura, "pulso": -1, "n": 0, "t": time.time()}
     escribir_json(ruta_estado, estado)
 
     while not salir:
@@ -120,15 +131,22 @@ def metronomo(carpeta, bpm, compas):
             control = leer_json(ruta_control)
             if not control.get("sonando", True):
                 break
-            nuevo_bpm, nuevo_compas = ajustes(control)
+            nuevo_bpm, nuevo_compas, nueva_figura = ajustes(control)
             if nuevo_bpm != bpm and cuenta:
-                siguiente = max(float(muestra), ultimo + TASA * 60 / nuevo_bpm)
+                siguiente = max(float(muestra), ultimo + TASA * 60 / nuevo_bpm / FIGURAS[figura])
+            if nueva_figura != figura and cuenta and paso:
+                # La figura nueva empieza en el siguiente pulso, no a media división.
+                siguiente = max(float(muestra), ultimo_pulso + TASA * 60 / nuevo_bpm)
+                paso = 0
+                pulso = (pulso + 1) % compas
             if nuevo_compas != compas:
                 pulso = 0
-            bpm, compas = nuevo_bpm, nuevo_compas
-            estado.update(bpm=bpm, compas=compas)
+            bpm, compas, figura = nuevo_bpm, nuevo_compas, nueva_figura
+            estado.update(bpm=bpm, compas=compas, figura=figura)
             escribir_json(ruta_estado, estado)
-        periodo = TASA * 60 / bpm
+        golpes = FIGURAS[figura]
+        sincopa = figura == "sincopa"
+        periodo = TASA * 60 / bpm / golpes
 
         buf = array("h", silencio)
         if resto:
@@ -137,15 +155,23 @@ def metronomo(carpeta, bpm, compas):
             resto = resto[k:]
         while siguiente < muestra + BLOQUE:
             desde = max(0, int(round(siguiente)) - muestra)
-            g = acento if compas > 1 and pulso == 0 else normal
+            primero = compas > 1 and pulso == 0
+            if paso == 0:
+                g = (suave_acento if primero else suave) if sincopa else (acento if primero else normal)
+                pendientes.append((time.monotonic() + ADELANTO + desde / TASA, cuenta, pulso))
+                cuenta += 1
+                ultimo_pulso = siguiente
+            else:
+                g = normal if sincopa else division
             k = min(len(g), BLOQUE - desde)
             buf[desde:desde + k] = g[0:k]
             resto = g[k:]
-            pendientes.append((time.monotonic() + ADELANTO + desde / TASA, cuenta, pulso))
             ultimo = siguiente
-            cuenta += 1
-            pulso = (pulso + 1) % compas
             siguiente += periodo
+            paso += 1
+            if paso >= golpes:
+                paso = 0
+                pulso = (pulso + 1) % compas
         try:
             cat.stdin.write(buf.tobytes())
             cat.stdin.flush()
@@ -271,8 +297,9 @@ def main(args):
     if len(args) >= 2 and args[1] == "parar":
         return parar(args[0])
     if len(args) >= 2 and args[1] == "metronomo":
-        bpm, compas = ajustes({"bpm": args[2] if len(args) > 2 else 100, "compas": args[3] if len(args) > 3 else 4})
-        return metronomo(args[0], bpm, compas)
+        bpm, compas, figura = ajustes({"bpm": args[2] if len(args) > 2 else 100, "compas": args[3] if len(args) > 3 else 4,
+                                       "figura": args[4] if len(args) > 4 else "negras"})
+        return metronomo(args[0], bpm, compas, figura)
     print(__doc__.split("\n\n")[1], file=sys.stderr)
     return 2
 

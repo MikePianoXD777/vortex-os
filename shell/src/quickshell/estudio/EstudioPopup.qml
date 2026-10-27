@@ -6,7 +6,8 @@ import "../reusables"
 
 // Vortex 1.10: panel «Temporizador de estudio» (lanzador → «Estudio», o clic en la cuenta de la barra).
 // Solo muestra y maneja el singleton Estudio, que es el que cuenta: cerrar el panel no lo detiene.
-// Espacio empieza, pausa y sigue.
+// Espacio empieza, pausa y sigue. Mientras corre, un clic afuera no lo cierra (Main.qml lee
+// mantenerAbierto): se cierra con Esc o con la ✕.
 Item {
     id: window
     visible: false
@@ -27,6 +28,7 @@ Item {
         ? (Estudio.sesionesHoy % 4 === 0 ? Estudio.minutosDescansoLargo : Estudio.minutosDescanso)
         : Estudio.minutosEstudio) * 60000
     readonly property real avance: Estudio.activo ? Math.max(0, Math.min(1, 1 - Estudio.restante / Math.max(1, total))) : 0
+    readonly property bool mantenerAbierto: Estudio.activo
     readonly property color tinte: Estudio.fase === "descanso" ? ThemeBackend.green : ThemeBackend.mauve
 
     onAvanceChanged: anillo.requestPaint()
@@ -195,6 +197,12 @@ Item {
                         font.pixelSize: window.s(12)
                         color: ThemeBackend.subtext0
                     }
+                }
+                Boton {
+                    Layout.alignment: Qt.AlignTop
+                    icono: "󰅖"
+                    tinte: ThemeBackend.overlay1
+                    onPulsado: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"])
                 }
             }
 

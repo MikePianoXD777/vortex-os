@@ -1931,8 +1931,8 @@
     "stop": "Stop",
     "start": "Start",
     "tap": "Tap",
-    "keeps_playing": "It keeps playing if you close this. Space starts and stops it.",
-    "keys": "Space starts and stops · ↑↓ ←→ change the tempo · T or «Tap»: tap the beat",
+    "keeps_playing": "It keeps playing if you close this (Esc or ✕). Space stops it.",
+    "keys": "Space starts and stops · ↑↓ ←→ tempo · T: tap the beat · F: next figure",
     "note_names": "C,C♯,D,D♯,E,F,F♯,G,G♯,A,A♯,B",
     "flat": "low",
     "sharp": "high",
@@ -1940,7 +1940,12 @@
     "go_up": "A little higher",
     "go_down": "A little lower",
     "no_mic": "Can't hear the microphone. Check it in the volume panel.",
-    "sing": "Sing or play a note near the microphone."
+    "sing": "Sing or play a note near the microphone.",
+    "fig_quarter": "Quarters",
+    "fig_eighth": "Eighths",
+    "fig_triplet": "Triplets",
+    "fig_sixteenth": "Sixteenths",
+    "fig_syncopation": "Syncopation"
   },
   "estudio": {
     "title": "Study timer",

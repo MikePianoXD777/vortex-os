@@ -1973,8 +1973,8 @@
     "stop": "Parar",
     "start": "Empezar",
     "tap": "Tap",
-    "keeps_playing": "Sigue sonando aunque cierres esto. Espacio lo para.",
-    "keys": "Espacio empieza y para · ↑↓ ←→ cambian el tempo · T o «Tap»: marca el pulso",
+    "keeps_playing": "Sigue sonando aunque cierres esto (Esc o ✕). Espacio lo para.",
+    "keys": "Espacio empieza y para · ↑↓ ←→ tempo · T: marca el pulso · F: otra figura",
     "note_names": "Do,Do♯,Re,Re♯,Mi,Fa,Fa♯,Sol,Sol♯,La,La♯,Si",
     "flat": "grave",
     "sharp": "agudo",
@@ -1982,7 +1982,12 @@
     "go_up": "Sube un poco",
     "go_down": "Baja un poco",
     "no_mic": "No se oye el micrófono. Revísalo en el panel de volumen.",
-    "sing": "Canta o toca una nota cerca del micrófono."
+    "sing": "Canta o toca una nota cerca del micrófono.",
+    "fig_quarter": "Negras",
+    "fig_eighth": "Octavos",
+    "fig_triplet": "Tresillos",
+    "fig_sixteenth": "Dieciseisavos",
+    "fig_syncopation": "Síncopa"
   },
   "estudio": {
     "title": "Temporizador de estudio",

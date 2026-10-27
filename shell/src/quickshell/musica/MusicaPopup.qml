@@ -9,7 +9,9 @@ import "../reusables"
 // aparte (musica.py metronomo): sigue sonando con el panel cerrado y el panel solo le cambia el tempo
 // y lee el pulso de metronomo.json. El afinador escucha el micrófono solo mientras su pestaña está a la
 // vista y da la nota en do-re-mi con los cents.
-// Teclas: Espacio suena/para, ↑↓ ±1, ←→ ±5, T marca el tempo, Tab cambia de pestaña.
+// Teclas: Espacio suena/para, ↑↓ ±1, ←→ ±5, T marca el tempo, F cambia la figura, Tab cambia de pestaña.
+// Mientras suena o escucha, un clic afuera no lo cierra (Main.qml lee mantenerAbierto): se cierra con
+// Esc o con la ✕.
 Item {
     id: window
     visible: false
@@ -27,10 +29,12 @@ Item {
     readonly property string carpeta: Caching.getRunDir("musica")
 
     property int pestana: 0 // 0 metrónomo, 1 afinador
+    readonly property bool mantenerAbierto: sonando || pestana === 1
 
     // ------------------------------------------------------------ metrónomo
     property int bpm: 90
     property int compas: 4
+    property string figura: "negras"
     property var est: ({})
     property bool leido: false
     readonly property bool sonando: Boolean(est.sonando) && (Date.now() / 1000 - (est.t || 0)) < Math.max(3, 120 / Math.max(20, est.bpm || bpm))
@@ -40,6 +44,19 @@ Item {
     readonly property var compases: [
         { n: 1, txt: "—" }, { n: 2, txt: "2/4" }, { n: 3, txt: "3/4" }, { n: 4, txt: "4/4" }, { n: 5, txt: "5/4" }, { n: 6, txt: "6/8" }
     ]
+
+    readonly property var figuras: [
+        { id: "negras", txt: t("fig_quarter", "Quarters") },
+        { id: "octavos", txt: t("fig_eighth", "Eighths") },
+        { id: "tresillos", txt: t("fig_triplet", "Triplets") },
+        { id: "dieciseisavos", txt: t("fig_sixteenth", "Sixteenths") },
+        { id: "sincopa", txt: t("fig_syncopation", "Syncopation") }
+    ]
+
+    function ponerFigura(f) {
+        figura = f;
+        if (sonando) envio.restart();
+    }
 
     function nombreTempo(b) {
         if (b < 40) return "Grave";
@@ -64,7 +81,7 @@ Item {
     }
 
     function sonar() {
-        Quickshell.execDetached(["python3", script, carpeta, "metronomo", String(bpm), String(compas)]);
+        Quickshell.execDetached(["python3", script, carpeta, "metronomo", String(bpm), String(compas), figura]);
     }
 
     function alternar() {
@@ -105,6 +122,7 @@ Item {
                     window.leido = true;
                     if (e.bpm) window.bpm = e.bpm;
                     if (e.compas) window.compas = e.compas;
+                    if (e.figura) window.figura = e.figura;
                 }
                 if (e.n !== antes && e.pulso >= 0) {
                     window.pulso = e.pulso;
@@ -160,6 +178,9 @@ Item {
             ponerBpm(bpm - 5);
         } else if (pestana === 0 && event.key === Qt.Key_T) {
             marcar();
+        } else if (pestana === 0 && event.key === Qt.Key_F) {
+            let i = figuras.findIndex(f => f.id === figura);
+            ponerFigura(figuras[(i + 1) % figuras.length].id);
         } else {
             return;
         }
@@ -334,6 +355,11 @@ Item {
                         elegido: window.pestana === 1
                         onPulsado: window.pestana = 1
                     }
+                    Boton {
+                        icono: "󰅖"
+                        tinte: ThemeBackend.overlay1
+                        onPulsado: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"])
+                    }
                 }
             }
 
@@ -459,6 +485,21 @@ Item {
                     }
                 }
 
+                Row {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: window.s(6)
+                    Repeater {
+                        model: window.figuras
+                        Boton {
+                            required property var modelData
+                            texto: modelData.txt
+                            tinte: ThemeBackend.peach
+                            elegido: window.figura === modelData.id
+                            onPulsado: window.ponerFigura(modelData.id)
+                        }
+                    }
+                }
+
                 Item { Layout.fillHeight: true }
 
                 RowLayout {
@@ -484,7 +525,7 @@ Item {
 
                 Parrafo {
                     text: window.sonando ? window.t("keeps_playing", "It keeps playing if you close this. Space starts and stops it.")
-                                         : window.t("keys", "Space starts and stops · ↑↓ ←→ change the tempo · T or «Tap»: tap the beat")
+                                         : window.t("keys", "Space starts and stops · ↑↓ ←→ tempo · T: tap the beat · F: next figure")
                 }
             }
 

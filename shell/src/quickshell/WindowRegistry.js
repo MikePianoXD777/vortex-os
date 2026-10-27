@@ -257,7 +257,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         },
         // Vortex 1.10: metrónomo y afinador (musica/MusicaPopup.qml), al centro.
         "musica": {
-            w: 620, h: 600, comp: "musica/MusicaPopup.qml", draggable: true,
+            w: 680, h: 640, comp: "musica/MusicaPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

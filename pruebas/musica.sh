@@ -17,7 +17,7 @@ falso() { printf '#!/usr/bin/env bash\n%s\n' "$2" >"$T/bin/$1"; chmod +x "$T/bin
 musica() { PATH="$T/bin:$PATH" python3 "$MUSICA" "$@"; }
 musica_t() { PATH="$T/bin:$PATH" timeout 10 python3 "$MUSICA" "$@"; }
 
-# Dónde empieza cada golpe en lo que «sonó» y qué tan fuerte es (el acento suena más).
+# Dónde empieza cada golpe en lo que «sonó» y qué tan fuerte es: A acento, n normal, s suave.
 golpes() {
   python3 -I - "$1" <<'FIN'
 import sys
@@ -26,9 +26,10 @@ a = array("h")
 a.frombytes(open(sys.argv[1], "rb").read())
 quieto, salida = 10**9, []
 for i, v in enumerate(a):
-    if abs(v) > 2000 and quieto > 2000:
-        salida.append(f"{i}:{'A' if max(abs(x) for x in a[i:i + 200]) > 25000 else 'n'}")
-    quieto = 0 if abs(v) > 2000 else quieto + 1
+    if abs(v) > 500 and quieto > 2000:
+        m = max(abs(x) for x in a[i:i + 200])
+        salida.append(f"{i}:{'A' if m > 25000 else 'n' if m > 15000 else 's'}")
+    quieto = 0 if abs(v) > 500 else quieto + 1
 print(" ".join(salida))
 FIN
 }
@@ -43,9 +44,23 @@ musica_t "$T/run" metronomo 90 3
 [[ "$(golpes "$T/salida")" == "1:A 32001:n 64001:n" ]] && bien "90 en 3/4" || mal "90 en 3/4: $(golpes "$T/salida")"
 musica_t "$T/run" metronomo 180 1
 [[ "$(golpes "$T/salida")" == "1:n 16001:n 32001:n 48001:n 64001:n 80001:n" ]] && bien "sin compás: todos iguales" || mal "sin acento: $(golpes "$T/salida")"
+musica_t "$T/run" metronomo 120 4 octavos
+[[ "$(golpes "$T/salida")" == "1:A 12001:s 24001:n 36001:s 48001:n 60001:s 72001:n 84001:s" ]] &&
+  bien "octavos: dos golpes por pulso, el de en medio suave" || mal "octavos: $(golpes "$T/salida")"
+musica_t "$T/run" metronomo 120 4 tresillos
+[[ "$(golpes "$T/salida")" == "1:A 8001:s 16001:s 24001:n 32001:s 40001:s 48001:n 56001:s 64001:s 72001:n 80001:s 88001:s" ]] &&
+  bien "tresillos: tres por pulso" || mal "tresillos: $(golpes "$T/salida")"
+musica_t "$T/run" metronomo 60 4 dieciseisavos
+[[ "$(golpes "$T/salida")" == "1:A 12001:s 24001:s 36001:s 48001:n 60001:s 72001:s 84001:s" ]] &&
+  bien "dieciseisavos: cuatro por pulso" || mal "dieciseisavos: $(golpes "$T/salida")"
+musica_t "$T/run" metronomo 120 4 sincopa
+[[ "$(golpes "$T/salida")" == "1:s 12001:n 24001:s 36001:n 48001:s 60001:n 72001:s 84001:n" ]] &&
+  bien "síncopa: el fuerte cae a contratiempo" || mal "síncopa: $(golpes "$T/salida")"
+musica_t "$T/run" metronomo 120 4 polka
+[[ "$(jq -r .figura "$T/run/metronomo.json")" == negras ]] && bien "una figura desconocida suena en negras" || mal "figura rara: $(cat "$T/run/metronomo.json")"
 [[ "$(jq -r .sonando "$T/run/metronomo.json")" == false ]] && bien "si se cae el sonido, el panel lo ve parado" || mal "estado: $(cat "$T/run/metronomo.json")"
 musica "$T/run" metronomo 999 99 & sleep 0.5
-[[ "$(jq -c . "$T/run/metronomo-control.json")" == '{"bpm":300,"compas":12,"sonando":true}' ]] && bien "tempo y compás dentro de lo posible" || mal "límites: $(cat "$T/run/metronomo-control.json")"
+[[ "$(jq -c . "$T/run/metronomo-control.json")" == '{"bpm":300,"compas":12,"figura":"negras","sonando":true}' ]] && bien "tempo y compás dentro de lo posible" || mal "límites: $(cat "$T/run/metronomo-control.json")"
 wait
 
 # Un pw-cat que nunca se llena: el metrónomo sigue hasta que lo paran.
@@ -54,11 +69,11 @@ musica "$T/run" metronomo 100 4 &
 DAEMON=$!
 sleep 0.6
 inicio=$(date +%s%N)
-musica "$T/run" metronomo 70 2
+musica "$T/run" metronomo 70 2 tresillos
 fin=$(date +%s%N)
 ((fin - inicio < 1500000000)) && kill -0 "$DAEMON" 2>/dev/null && bien "con uno sonando, otro «metronomo» solo cambia el tempo y sale" || mal "segunda llamada"
 sleep 0.5
-[[ "$(jq -r '"\(.sonando) \(.bpm) \(.compas)"' "$T/run/metronomo.json")" == "true 70 2" ]] && bien "el que suena toma el tempo nuevo" || mal "cambio de tempo: $(cat "$T/run/metronomo.json")"
+[[ "$(jq -r '"\(.sonando) \(.bpm) \(.compas) \(.figura)"' "$T/run/metronomo.json")" == "true 70 2 tresillos" ]] && bien "el que suena toma el tempo y la figura nuevos" || mal "cambio de tempo: $(cat "$T/run/metronomo.json")"
 musica "$T/run" parar
 for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$DAEMON" 2>/dev/null || break; sleep 0.2; done
 ! kill -0 "$DAEMON" 2>/dev/null && [[ "$(jq -r .sonando "$T/run/metronomo.json")" == false ]] && bien "«parar» lo detiene" || { mal "no se detuvo"; kill "$DAEMON"; }

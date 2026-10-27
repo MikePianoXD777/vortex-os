@@ -25,14 +25,24 @@ PanelWindow {
     // HyprlandFocusGrab solo se suelta con un clic en otra superficie (no al pasar el ratón,
     // aunque el foco siga al ratón): entonces se cierra y se recuerda cuál fue, para que el
     // «toggle» de su botón en la barra, que llega justo después, no lo vuelva a abrir.
+    // Vortex 1.10: un panel con mantenerAbierto (el metrónomo sonando, el temporizador de estudio
+    // corriendo) no se cierra con el clic: se queda flotando y se suelta el agarre hasta que deje de
+    // estar activo o se abra otro panel. Se cierra con Esc o con su ✕.
     property string vortexCerradoPorClic: ""
     property double vortexCerradoEn: 0
+    property bool vortexAgarreSuelto: false
+    readonly property bool vortexPanelActivo: Boolean(widgetStack.currentItem && widgetStack.currentItem.mantenerAbierto === true)
     HyprlandFocusGrab {
         id: vortexClicFuera
         windows: [masterWindow]
         active: masterWindow.currentActive !== "hidden" && !masterWindow.isClosing
+                && !(masterWindow.vortexAgarreSuelto && masterWindow.vortexPanelActivo)
         onCleared: {
             if (masterWindow.currentActive === "hidden") return;
+            if (masterWindow.vortexPanelActivo) {
+                masterWindow.vortexAgarreSuelto = true;
+                return;
+            }
             masterWindow.vortexCerradoPorClic = masterWindow.currentActive;
             masterWindow.vortexCerradoEn = Date.now();
             switchWidget("hidden", "");
@@ -433,6 +443,7 @@ PanelWindow {
     property string targetActive: "hidden"
     property string currentActive: "hidden"
     onCurrentActiveChanged: {
+        vortexAgarreSuelto = false;
         reportWidgetState();
         let prev = masterWindow._previousActive;
         masterWindow._previousActive = currentActive;
