@@ -966,6 +966,66 @@ Item {
                 }
             }
 
+            // Vortex 1.10 (pedido de Mike): abajo del calendario, el metrónomo y el temporizador de
+            // estudio. El de estudio muestra la cuenta mientras corre.
+            Row {
+                id: accesosEstudio
+                anchors.top: calendarRect.bottom
+                anchors.topMargin: window.s(12)
+                anchors.left: calendarRect.left
+                spacing: window.s(10)
+                z: 10
+                opacity: introCalendar
+                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+
+                Repeater {
+                    model: [
+                        { id: "musica", icono: "󰝚", texto: I18n.t("widgets.musica.short", "Metronome") },
+                        { id: "estudio", icono: "󰔛", texto: I18n.t("widgets.estudio.short", "Study") }
+                    ]
+                    Rectangle {
+                        id: acceso
+                        required property var modelData
+                        readonly property bool corriendo: modelData.id === "estudio" && Estudio.activo
+                        width: (calendarRect.width - accesosEstudio.spacing) / 2
+                        height: window.s(48)
+                        radius: ThemeBackend.borderRadius
+                        color: accesoMa.containsMouse ? Qt.alpha(window.surface1, 0.45) : Qt.alpha(window.surface0, 0.2)
+                        border.color: Qt.alpha(window.surface1, 0.4)
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: window.s(8)
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: acceso.modelData.icono
+                                font.family: ThemeBackend.iconFont
+                                font.pixelSize: window.s(18)
+                                color: acceso.corriendo ? (Estudio.fase === "descanso" ? ThemeBackend.green : window.textAccent) : window.text
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: acceso.corriendo ? Estudio.texto(Estudio.restante) : acceso.modelData.texto
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: window.s(13)
+                                color: window.text
+                            }
+                        }
+
+                        MouseArea {
+                            id: accesoMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + acceso.modelData.id + "\")"])
+                        }
+                    }
+                }
+            }
+
             Item {
                 id: weatherContainer
                 anchors.right: parent.right

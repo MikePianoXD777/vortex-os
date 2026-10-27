@@ -1652,11 +1652,13 @@
     },
     "musica": {
       "name": "Metronome and tuner",
-      "desc": "Tempo, time signature and tap; tune your voice or instrument (solfège, guitar)"
+      "desc": "Tempo, time signature and tap; tune your voice or instrument (solfège, guitar)",
+      "short": "Metronome"
     },
     "estudio": {
       "name": "Study timer",
-      "desc": "Pomodoro: study blocks with breaks, with no notifications while you study"
+      "desc": "Pomodoro: study blocks with breaks, with no notifications while you study",
+      "short": "Study"
     }
   },
   "cli": {

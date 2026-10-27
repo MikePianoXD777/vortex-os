@@ -1696,11 +1696,13 @@
     },
     "musica": {
       "name": "Metrónomo y afinador",
-      "desc": "Tempo, compás y tap; afina tu voz o tu instrumento (solfeo, guitarra)"
+      "desc": "Tempo, compás y tap; afina tu voz o tu instrumento (solfeo, guitarra)",
+      "short": "Metrónomo"
     },
     "estudio": {
       "name": "Temporizador de estudio",
-      "desc": "Pomodoro: bloques de estudio con descansos, sin notificaciones mientras estudias"
+      "desc": "Pomodoro: bloques de estudio con descansos, sin notificaciones mientras estudias",
+      "short": "Estudio"
     }
   },
   "cli": {
