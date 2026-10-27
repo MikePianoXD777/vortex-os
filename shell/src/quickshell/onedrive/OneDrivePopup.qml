@@ -275,7 +275,7 @@ Item {
 
             // Sin conectar.
             ColumnLayout {
-                visible: !window.conectando && !window.conectado && window.cargado
+                visible: !window.conectando && !window.conectado
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: window.s(12)
