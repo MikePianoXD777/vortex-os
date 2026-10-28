@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# vortex-clips (1.10): los últimos 30 s, como ShadowPlay. gpu-screen-recorder graba siempre en segundo
+# plano con la GPU, en la RAM (no escribe nada al disco), y Alt+F10 guarda lo último en
+# Vídeos/Clips con el nombre del juego. Sale un aviso con «Ver» y «Abrir carpeta».
+#
+#   vortex clips guardar     guarda los últimos 30 s (Alt+F10)
+#   vortex clips estado      si está grabando y en qué monitor
+#   vortex clips apagar      deja de grabar y no vuelve a empezar solo
+#   vortex clips encender    vuelve a grabar (viene encendido)
+#   vortex clips servicio    lo que corre en segundo plano (el shell lo arranca al iniciar sesión)
+#
+# Graba el monitor donde estás. Si cambias de monitor espera 10 s antes de seguirte (un Alt+Tab
+# rápido a Discord no borra el clip), salvo que la ventana esté en pantalla completa: ahí va directo.
+set -uo pipefail
+
+SEGUNDOS="${VORTEX_CLIPS_SEGUNDOS:-30}"
+# Cada cuánto mira el monitor y cuánto espera antes de seguirte, en ms (las pruebas los achican)
+PASO_MS="${VORTEX_CLIPS_PASO_MS:-2000}"
+ESPERA_MS="${VORTEX_CLIPS_ESPERA_MS:-10000}"
+RUN="${XDG_RUNTIME_DIR:-/tmp}/vortex-clips"
+APAGADO="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/clips-apagado"
+DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Clips"
+APP="Vortexine's OS"
+
+aviso() { printf 'vortex clips: %s\n' "$*" >&2; }
+notificar() { command -v notify-send >/dev/null && notify-send -a "$APP" "$@" >/dev/null 2>&1 || true; }
+grabador_pid() {
+  local pid
+  pid="$(cat "$RUN/grabador.pid" 2>/dev/null)"
+  [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && echo "$pid"
+}
+
+# El monitor con el foco y si la ventana activa está en pantalla completa ahí
+monitor_actual() {
+  hyprctl monitors -j 2>/dev/null | jq -r '[.[] | select(.focused)][0].name // empty'
+}
+pantalla_completa() {
+  hyprctl activewindow -j 2>/dev/null | jq -e '(.fullscreen // 0) != 0' >/dev/null 2>&1
+}
+
+empezar() {
+  local monitor="$1"
+  mkdir -p "$DIR" "$RUN"
+  gpu-screen-recorder -w "$monitor" -f 60 -k h264 -c mp4 -q high -a default_output -ac aac \
+    -r "$SEGUNDOS" -replay-storage ram -sc "$0" -o "$DIR" >"$RUN/grabador.log" 2>&1 &
+  echo $! >"$RUN/grabador.pid"
+  echo "$monitor" >"$RUN/monitor"
+}
+
+parar() {
+  local pid
+  pid="$(grabador_pid)" && kill "$pid" 2>/dev/null
+  rm -f "$RUN/grabador.pid" "$RUN/monitor"
+}
+
+cmd_servicio() {
+  command -v gpu-screen-recorder >/dev/null || { aviso "falta gpu-screen-recorder (sudo pacman -S gpu-screen-recorder)"; return 1; }
+  [[ -e "$APAGADO" ]] && return 0
+  mkdir -p "$RUN"
+  # Uno solo por sesión, aunque el shell lo pida otra vez al reiniciarse
+  exec 9>"$RUN/servicio.lock"
+  flock -n 9 || return 0
+  trap 'parar; exit 0' TERM INT
+  local monitor="" quiere esperando=0 fallos=0
+  while true; do
+    [[ -e "$APAGADO" ]] && { parar; return 0; }
+    quiere="$(monitor_actual)" || quiere=""
+    # Sin Hyprland (se cerró la sesión) no hay nada que grabar
+    [[ -z "$quiere" ]] && ! hyprctl version >/dev/null 2>&1 && { parar; return 0; }
+    if [[ -n "$quiere" && "$quiere" != "$monitor" ]]; then
+      esperando=$((esperando + PASO_MS))
+      if [[ -z "$monitor" ]] || ((esperando >= ESPERA_MS)) || pantalla_completa; then
+        parar
+        empezar "$quiere"
+        monitor="$quiere"
+        esperando=0
+      fi
+    else
+      esperando=0
+    fi
+    # Si el grabador se cayó, lo vuelve a levantar (y se rinde si se cae a cada rato)
+    if [[ -n "$monitor" ]] && ! grabador_pid >/dev/null; then
+      fallos=$((fallos + 1))
+      if ((fallos > 5)); then
+        aviso "gpu-screen-recorder se cae solo: $(tail -2 "$RUN/grabador.log" 2>/dev/null | tr '\n' ' ')"
+        return 1
+      fi
+      empezar "$monitor"
+    fi
+    sleep "$((PASO_MS / 1000)).$(printf '%03d' $((PASO_MS % 1000)))"
+  done
+}
+
+cmd_guardar() {
+  local pid
+  if ! pid="$(grabador_pid)"; then
+    if [[ -e "$APAGADO" ]]; then
+      notificar -i video-x-generic "Los clips están apagados" "Para grabar los últimos 30 s: vortex clips encender"
+    else
+      setsid "$0" servicio >/dev/null 2>&1 </dev/null &
+      notificar -i video-x-generic "Los clips no estaban grabando" "Ya empezaron: desde ahora Alt+F10 guarda los últimos $SEGUNDOS s."
+    fi
+    return 1
+  fi
+  kill -USR1 "$pid"
+}
+
+# gpu-screen-recorder llama a este mismo comando con el archivo guardado: le pone el nombre del juego
+# (la ventana activa) y avisa
+cmd_aviso() {
+  local archivo="$1" juego nuevo accion
+  [[ -f "$archivo" ]] || return 0
+  juego="$(hyprctl activewindow -j 2>/dev/null | jq -r '(.initialTitle // .class // "") | gsub("[/\\\\:*?\"<>|]"; "") | .[0:40]')"
+  if [[ -n "$juego" ]]; then
+    nuevo="$(dirname "$archivo")/$juego $(date +%Y-%m-%d_%H-%M-%S).mp4"
+    mv -n "$archivo" "$nuevo" && archivo="$nuevo"
+  fi
+  accion="$(notify-send -a "$APP" -i video-x-generic --action=ver=Ver --action=carpeta="Abrir carpeta" \
+    "Clip guardado" "Los últimos $SEGUNDOS s${juego:+ de $juego}" 2>/dev/null)"
+  case "$accion" in
+    ver) xdg-open "$archivo" >/dev/null 2>&1 & ;;
+    carpeta) xdg-open "$(dirname "$archivo")" >/dev/null 2>&1 & ;;
+  esac
+}
+
+cmd_estado() {
+  local pid
+  if [[ -e "$APAGADO" ]]; then echo "apagado (vortex clips encender)"
+  elif pid="$(grabador_pid)"; then echo "grabando los últimos $SEGUNDOS s de $(cat "$RUN/monitor" 2>/dev/null) (Alt+F10 guarda) → $DIR"
+  else echo "encendido, pero no está grabando ahora"; fi
+}
+
+case "${1:-}" in
+  guardar) cmd_guardar ;;
+  servicio) cmd_servicio ;;
+  estado) cmd_estado ;;
+  apagar)
+    mkdir -p "$(dirname "$APAGADO")"
+    touch "$APAGADO"
+    parar
+    pkill -f "vortex-clips servicio" 2>/dev/null
+    echo "Clips apagados" ;;
+  encender)
+    rm -f "$APAGADO"
+    setsid "$0" servicio >/dev/null 2>&1 </dev/null &
+    echo "Clips encendidos: Alt+F10 guarda los últimos $SEGUNDOS s" ;;
+  # gpu-screen-recorder: ARCHIVO replay
+  /*) [[ "${2:-}" == replay ]] && cmd_aviso "$1" ;;
+  *) sed -n '2,/^set -uo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; [[ -z "${1:-}" ]] ;;
+esac

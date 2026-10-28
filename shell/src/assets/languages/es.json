@@ -1724,6 +1724,10 @@
     "buscaminas": {
       "name": "Buscaminas tryhard",
       "desc": "Buscaminas con récords, 3BV/s y modos para sufrir: niebla, contrarreloj, sin banderas"
+    },
+    "notas": {
+      "name": "Nota rápida",
+      "desc": "Apunta algo al vuelo; se guarda sola (Super+Alt+N)"
     }
   },
   "cli": {
@@ -2213,5 +2217,28 @@
     "lost": "Boom. R para otra",
     "ready": "Dale clic donde sea para empezar",
     "controls": "Izq: abrir · Der: bandera · Clic en número o medio: acorde · Espacio: bandera/acorde · R: otra · 1-4: dificultad"
+  },
+  "recordatorios": {
+    "lang": "es",
+    "app": "Recordatorio",
+    "default_title": "Recordatorio",
+    "body": "Tu recordatorio del lanzador",
+    "missed": "Era para el {hora}: la PC estaba apagada.",
+    "snooze": "5 min más",
+    "launcher_desc": "Te lo recuerdo {falta} · Enter para guardarlo",
+    "none": "No tienes recordatorios",
+    "none_hint": "Escribe «recuérdame en 20 min …» para hacer uno",
+    "list_desc": "{falta} · Enter para quitarlo",
+    "saved": "Listo, te lo recuerdo"
+  },
+  "notas": {
+    "title": "Nota rápida",
+    "file": "Nota rápida",
+    "saving": "Guardando…",
+    "saved": "Guardada",
+    "placeholder": "Escribe lo que sea: se guarda sola.",
+    "where": "Se guarda en Documentos",
+    "copy": "Copiar todo",
+    "open": "Abrir en el editor"
   }
 }

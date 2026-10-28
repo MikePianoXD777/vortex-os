@@ -11,6 +11,7 @@ import "../"
 import "../reusables"
 import "../WindowRegistry.js" as WindowRegistry
 import "Calculadora.js" as Calculadora
+import "Recordatorios.js" as RecordatoriosJs
 import "./EmojiData.js" as EmojiData
 
 PanelWindow {
@@ -934,6 +935,56 @@ PanelWindow {
             }
         }
 
+        // Vortex 1.10: recordatorios («recuérdame en 20 min sacar la pizza»; Recordatorios.js y el
+        // singleton Recordar, que los hace sonar). «recordatorios» lista los pendientes. Van como un
+        // resultado de calculadora cuyo calcResult empieza con «\u0001recordar» o «\u0001quitar».
+        let ingles = typeof I18n !== "undefined" && String(I18n.t("recordatorios.lang", "en")) === "en";
+        let recordatorio = RecordatoriosJs.interpretar(rawTrimmed, Date.now());
+        if (recordatorio !== null) {
+            let ahora = Date.now();
+            filtered.push({
+                name: (recordatorio.texto !== "" ? "«" + recordatorio.texto + "» · " : "")
+                    + RecordatoriosJs.cuandoTexto(recordatorio.cuando, ahora, ingles),
+                description: I18n.t("recordatorios.launcher_desc", "Remind you {falta} · Enter to save it")
+                    .replace("{falta}", RecordatoriosJs.faltaTexto(recordatorio.cuando, ahora, ingles)),
+                desktop_id: "",
+                icon: "",
+                fontIcon: "󰀠",
+                score: 9500000,
+                isCommand: false,
+                command: "",
+                isCalc: true,
+                calcResult: "\u0001recordar\t" + JSON.stringify(recordatorio),
+                isWidget: false,
+                widgetTarget: "",
+                isFile: false,
+                filePath: "",
+                isDir: false
+            });
+        } else if (RecordatoriosJs.esLista(rawTrimmed)) {
+            let ahora = Date.now();
+            let pendientes = Recordar.lista;
+            if (pendientes.length === 0) {
+                filtered.push({
+                    name: I18n.t("recordatorios.none", "You have no reminders"),
+                    description: I18n.t("recordatorios.none_hint", "Type «remind me in 20 min to …» to make one"),
+                    desktop_id: "", icon: "", fontIcon: "󰀠", score: 9500000, isCommand: false, command: "",
+                    isCalc: true, calcResult: "", isWidget: false, widgetTarget: "", isFile: false, filePath: "", isDir: false
+                });
+            }
+            for (let k = 0; k < pendientes.length; k++) {
+                let r = pendientes[k];
+                filtered.push({
+                    name: (r.texto !== "" ? "«" + r.texto + "» · " : "") + RecordatoriosJs.cuandoTexto(r.cuando, ahora, ingles),
+                    description: I18n.t("recordatorios.list_desc", "{falta} · Enter to remove it")
+                        .replace("{falta}", RecordatoriosJs.faltaTexto(r.cuando, ahora, ingles)),
+                    desktop_id: "", icon: "", fontIcon: "󰀠", score: 9500000 - k, isCommand: false, command: "",
+                    isCalc: true, calcResult: "\u0001quitar\t" + r.id,
+                    isWidget: false, widgetTarget: "", isFile: false, filePath: "", isDir: false
+                });
+            }
+        }
+
         let mathResult = evaluateMath(rawTrimmed);
         if (mathResult !== null) {
             filtered.push({
@@ -1088,6 +1139,22 @@ PanelWindow {
 
         if (item.isCalc) {
             if (item.calcResult === "") return; // divisas sin tipo de cambio todavía
+            // Vortex 1.10: guardar o quitar un recordatorio (ver arriba)
+            if (item.calcResult.startsWith("\u0001recordar\t")) {
+                let r = JSON.parse(item.calcResult.slice(10));
+                Recordar.agregar(r.cuando, r.texto);
+                let ingles = String(I18n.t("recordatorios.lang", "en")) === "en";
+                Quickshell.execDetached(["notify-send", "-a", I18n.t("recordatorios.app", "Reminder"), "-i", "alarm-symbolic",
+                    I18n.t("recordatorios.saved", "Done, I'll remind you"),
+                    (r.texto !== "" ? "«" + r.texto + "» · " : "") + RecordatoriosJs.cuandoTexto(r.cuando, Date.now(), ingles)]);
+                closeLauncher();
+                return;
+            }
+            if (item.calcResult.startsWith("\u0001quitar\t")) {
+                Recordar.quitar(item.calcResult.slice(8));
+                closeLauncher();
+                return;
+            }
             Quickshell.execDetached(["wl-copy", "--", item.calcResult]);
             closeLauncher();
             return;

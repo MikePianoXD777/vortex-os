@@ -121,5 +121,9 @@ ShellRoot {
         SysNotif.checkBattery();
         // Vortex: el ecualizador guardado vuelve a sonar después de reiniciar (media/equalizer.sh).
         Quickshell.execDetached(["bash", Caching.qsDir + "/media/equalizer.sh", "restaurar"]);
+        // Vortex 1.10: los recordatorios del lanzador suenan aunque nunca se abra (singletons/system/Recordar.qml).
+        Recordar.iniciar();
+        // Vortex 1.10: los últimos 30 s con Alt+F10 (bin/vortex-clips); si ya corre, no hace nada.
+        Quickshell.execDetached(["vortex", "clips", "servicio"]);
     }
 }

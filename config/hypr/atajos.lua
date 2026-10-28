@@ -311,6 +311,8 @@ atajo("SUPER + Space", panel("launcher"))
 atajo("CTRL + ALT + Delete", panel("system"))
 -- Barra lateral con las notificaciones (Caelestia: sidebar).
 atajo("SUPER + N", panel("notifications"))
+-- Vortex 1.10: la nota rápida (Super+N ya es de las notificaciones).
+atajo("SUPER + ALT + N", panel("notas"))
 atajo("CTRL + ALT + C", ejecutar("serpantinum ipc call main clearNotifications"), bloqueado)
 -- «Mostrar todos los paneles» (Caelestia: showall) no existe; lo más parecido es el panel
 -- grande de calendario, reloj y clima.
@@ -462,6 +464,10 @@ atajo("SUPER + C", ejecutar("command -v zeditor >/dev/null && exec zeditor; exec
 atajo({ "Print", "SUPER + SHIFT + S", "SUPER + SHIFT + ALT + S" }, ejecutar("vortex-captura"))
 atajo("SUPER + Print", ejecutar("vortex-captura pantalla"))
 atajo("ALT + Sys_Req", ejecutar("vortex-captura ventana"))
+
+-- Vortex 1.10: guardar los últimos 30 s (como ShadowPlay, que usa la misma tecla). vortex-clips graba
+-- siempre en la RAM con la GPU; el clip queda en Vídeos/Clips con el nombre del juego.
+atajo("ALT + F10", ejecutar("vortex clips guardar"))
 
 -- Grabar la pantalla (se vuelve a pulsar para parar): sin sonido, con el sonido del equipo y
 -- una región. Caelestia usaba gpu-screen-recorder igual; la región usa wf-recorder.

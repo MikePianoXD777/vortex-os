@@ -119,6 +119,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌝"
         },
         {
+            // Vortex 1.10: una nota para apuntar algo al vuelo (notas/), también con Super+Alt+N.
+            id: "notas",
+            name: tr("widgets.notas.name", "Quick note"),
+            description: tr("widgets.notas.desc", "Jot something down on the fly; it saves itself (Super+Alt+N)"),
+            icon: "accessories-text-editor",
+            fontIcon: "󰎞"
+        },
+        {
             // Vortex 1.10: buscaminas tryhard (buscaminas/), idea de THYRVAREN.
             id: "buscaminas",
             name: tr("widgets.buscaminas.name", "Tryhard Minesweeper"),
@@ -300,6 +308,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: «Widgets en HTML» (htmlwidgets/HtmlWidgetsPopup.qml), al centro.
         "htmlwidgets": {
             w: 1000, h: 680, comp: "htmlwidgets/HtmlWidgetsPopup.qml", draggable: true, sinEscala: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: la nota rápida (notas/NotasPopup.qml), al centro.
+        "notas": {
+            w: 620, h: 640, comp: "notas/NotasPopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

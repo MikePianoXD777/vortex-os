@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# vortex-partida (1.10): el resumen de la partida. Mientras dura el modo juego (gamemode o el gestor
+# lo prenden solos) anota cada 5 s la temperatura de la CPU y de la GPU y qué juego está en pantalla
+# completa; al salir avisa con cuánto jugaste, las temperaturas máximas y, si el contador de FPS está
+# prendido («vortex fps on»), los FPS promedio y el 1 % bajo. Cada partida queda en partidas.csv.
+#
+#   vortex-partida empezar    lo llama «vortex modo-juego on»
+#   vortex-partida terminar   lo llama «vortex modo-juego off»: avisa con el resumen
+#   vortex-partida historial  las últimas partidas
+#
+# Las partidas de menos de 2 minutos no avisan (abrir y cerrar un juego no es jugar).
+set -uo pipefail
+
+ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+PARTIDA="$ESTADO/partida"
+HISTORIAL="$ESTADO/partidas.csv"
+MANGO_LOGS="$ESTADO/mangohud"
+PASO="${VORTEX_PARTIDA_PASO:-5}"
+MINIMO="${VORTEX_PARTIDA_MINIMO:-120}"
+HWMON="${VORTEX_HWMON:-/sys/class/hwmon}"
+
+# Temperatura de la CPU en °C (Intel: coretemp; AMD: k10temp o zenpower), vacía si no hay sensor
+temp_cpu() {
+  local h
+  for h in "$HWMON"/hwmon*; do
+    case "$(cat "$h/name" 2>/dev/null)" in
+      coretemp | k10temp | zenpower)
+        [[ -r "$h/temp1_input" ]] && { echo $(($(cat "$h/temp1_input") / 1000)); return 0; } ;;
+    esac
+  done
+}
+
+# La de la GPU: NVIDIA con nvidia-smi; AMD con su sensor (amdgpu)
+temp_gpu() {
+  local h t
+  if command -v nvidia-smi >/dev/null; then
+    t="$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc 0-9)"
+    [[ -n "$t" ]] && { echo "$t"; return 0; }
+  fi
+  for h in "$HWMON"/hwmon*; do
+    [[ "$(cat "$h/name" 2>/dev/null)" == amdgpu && -r "$h/temp1_input" ]] && { echo $(($(cat "$h/temp1_input") / 1000)); return 0; }
+  done
+}
+
+leer() { sed -n "s/^$1=//p" "$PARTIDA" 2>/dev/null | tail -1; }
+# Solo cambia una partida que sigue abierta (si «terminar» ya la cerró, no la revive)
+poner() {
+  local resto tmp="$PARTIDA.$BASHPID"
+  [[ -s "$PARTIDA" ]] || return 0
+  resto="$(grep -v "^$1=" "$PARTIDA" 2>/dev/null)"
+  printf '%s\n%s=%s\n' "$resto" "$1" "$2" | sed '/^$/d' >"$tmp" && mv -f "$tmp" "$PARTIDA"
+}
+
+# El medidor y «terminar» se turnan para tocar el archivo de la partida
+muestrear() {
+  { flock 8; muestra; } 8>"$ESTADO/partida.datos"
+}
+
+muestra() {
+  local c g cmax gmax juego
+  c="$(temp_cpu)"; g="$(temp_gpu)"
+  cmax="$(leer cpu)"; gmax="$(leer gpu)"
+  [[ -n "$c" ]] && ((c > ${cmax:-0})) && poner cpu "$c"
+  [[ -n "$g" ]] && ((g > ${gmax:-0})) && poner gpu "$g"
+  # El juego: la ventana en pantalla completa (si no hay, la activa que no sea del escritorio)
+  juego="$(hyprctl activewindow -j 2>/dev/null | jq -r 'select((.fullscreen // 0) != 0) | (.initialTitle // .title // .class // "") | gsub("[\\n,]"; " ") | .[0:40]' 2>/dev/null)"
+  [[ -n "$juego" ]] && poner juego "$juego"
+}
+
+cmd_empezar() {
+  mkdir -p "$ESTADO"
+  # Dos «on» seguidos (gamemode y el gestor) son la misma partida
+  [[ -s "$PARTIDA" ]] || printf 'inicio=%s\n' "$(date +%s)" >"$PARTIDA"
+  exec 9>"$ESTADO/partida.lock"
+  flock -n 9 || return 0
+  (
+    while [[ -s "$PARTIDA" ]]; do
+      muestrear
+      sleep "$PASO"
+    done
+  ) </dev/null >/dev/null 2>&1 & # se queda con el candado (fd 9) mientras mide
+  disown
+}
+
+# FPS promedio y 1 % bajo del registro de MangoHud de esta partida (columna «fps»)
+fps_de_partida() {
+  local inicio="$1" f
+  f="$(find "$MANGO_LOGS" -maxdepth 1 -name '*.csv' ! -name '*summary*' -newermt "@$inicio" -printf '%s\t%p\n' 2>/dev/null |
+    sort -rn | head -1 | cut -f2)"
+  [[ -n "$f" ]] || return 0
+  awk -F, 'enc { if ($1 + 0 > 0) v[n++] = $1 + 0; next } $1 == "fps" { enc = 1 }
+    END {
+      if (n < 5) exit
+      s = 0; for (i = 0; i < n; i++) s += v[i]
+      # 1 % bajo: el promedio del 1 % de los peores momentos
+      asort(v); k = int(n / 100); if (k < 1) k = 1
+      b = 0; for (i = 1; i <= k; i++) b += v[i]
+      printf "%d\t%d\n", s / n, b / k
+    }' "$f"
+}
+
+duracion() {
+  local m=$(($1 / 60))
+  if ((m < 60)); then echo "$m min"; else printf '%d h %d min\n' $((m / 60)) $((m % 60)); fi
+}
+
+cmd_terminar() {
+  [[ -s "$PARTIDA" ]] || return 0
+  local inicio fin seg juego cpu gpu fps="" bajo="" lineas=()
+  exec 8>"$ESTADO/partida.datos"
+  flock 8
+  muestra
+  inicio="$(leer inicio)"; fin="$(date +%s)"
+  seg=$((fin - ${inicio:-$fin}))
+  juego="$(leer juego)"; cpu="$(leer cpu)"; gpu="$(leer gpu)"
+  rm -f "$PARTIDA"
+  exec 8>&-
+  [[ -n "$inicio" ]] || return 0
+  ((seg >= MINIMO)) || return 0
+  IFS=$'\t' read -r fps bajo < <(fps_de_partida "$inicio")
+  mkdir -p "$ESTADO"
+  [[ -s "$HISTORIAL" ]] || echo "fecha,juego,minutos,fps,fps_1_bajo,cpu_max,gpu_max" >"$HISTORIAL"
+  printf '%s,%s,%d,%s,%s,%s,%s\n' "$(date -d "@$inicio" '+%Y-%m-%d %H:%M')" "$juego" $((seg / 60)) \
+    "$fps" "$bajo" "$cpu" "$gpu" >>"$HISTORIAL"
+  lineas+=("Jugaste $(duracion "$seg")")
+  [[ -n "$fps" ]] && lineas+=("FPS promedio $fps · 1 % bajo $bajo")
+  [[ -n "$cpu$gpu" ]] && lineas+=("Máximo: ${cpu:+CPU $cpu °C}${cpu:+${gpu:+ · }}${gpu:+GPU $gpu °C}")
+  command -v notify-send >/dev/null &&
+    notify-send -a "Vortexine's OS" -i applications-games "${juego:-Resumen de la partida}" \
+      "$(printf '%s\n' "${lineas[@]}")" >/dev/null 2>&1
+  printf '%s\n' "${juego:-Partida}" "${lineas[@]}"
+}
+
+case "${1:-}" in
+  empezar) cmd_empezar ;;
+  terminar) cmd_terminar ;;
+  historial)
+    if [[ -s "$HISTORIAL" ]]; then
+      { head -1 "$HISTORIAL"; tail -n +2 "$HISTORIAL" | tail -n 20; } | column -s, -t
+    else
+      echo "Todavía no hay partidas"
+    fi ;;
+  *) sed -n '2,/^set -uo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; [[ -z "${1:-}" ]] ;;
+esac

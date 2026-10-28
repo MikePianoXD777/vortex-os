@@ -1680,6 +1680,10 @@
     "buscaminas": {
       "name": "Tryhard Minesweeper",
       "desc": "Minesweeper with records, 3BV/s and modes to suffer: fog, against the clock, no flags"
+    },
+    "notas": {
+      "name": "Quick note",
+      "desc": "Jot something down on the fly; it saves itself (Super+Alt+N)"
     }
   },
   "cli": {
@@ -2171,5 +2175,28 @@
     "lost": "Boom. R for another",
     "ready": "Click anywhere to start",
     "controls": "Left: open · Right: flag · Click a number or middle: chord · Space: flag/chord · R: new · 1-4: difficulty"
+  },
+  "recordatorios": {
+    "lang": "en",
+    "app": "Reminder",
+    "default_title": "Reminder",
+    "body": "Your reminder from the launcher",
+    "missed": "It was for {hora}: the PC was off.",
+    "snooze": "5 more min",
+    "launcher_desc": "Remind you {falta} · Enter to save it",
+    "none": "You have no reminders",
+    "none_hint": "Type «remind me in 20 min to …» to make one",
+    "list_desc": "{falta} · Enter to remove it",
+    "saved": "Done, I'll remind you"
+  },
+  "notas": {
+    "title": "Quick note",
+    "file": "Quick note",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "placeholder": "Write whatever: it saves itself.",
+    "where": "Saved in Documents",
+    "copy": "Copy all",
+    "open": "Open in editor"
   }
 }

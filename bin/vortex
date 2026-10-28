@@ -46,6 +46,10 @@ Uso: vortex <comando>
   emergencia                           si el escritorio no sirve: desde Ctrl+Alt+F3, vuelve a un punto
   mods [instancias|buscar|instalar…]   mods de Minecraft de Modrinth a la instancia que elijas (Prism,
                                        TLauncher…); el panel se abre en el calendario
+  clips [guardar|estado|apagar|encender] los últimos 30 s, como ShadowPlay: Alt+F10 los guarda en
+                                       Vídeos/Clips (graba en la RAM con la GPU; viene encendido)
+  partidas                             tus últimas partidas: cuánto jugaste, FPS y temperaturas (al
+                                       salir de un juego sale el resumen solo)
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
@@ -238,9 +242,14 @@ cmd_fps() {
       mkdir -p "$CONF" "$apps" && : >"$marca"
       if [[ ! -e "$mango" ]]; then
         mkdir -p "${mango%/*}"
-        cat >"$mango" <<'MANGO'
+        mkdir -p "$ESTADO/mangohud"
+        cat >"$mango" <<MANGO
 # Vortexine's OS (vortex fps): el contador de FPS de los juegos. Es tuyo: cámbialo como quieras
 # (https://github.com/flightlessmango/MangoHud#hud-configuration); Vortex ya no lo toca.
+# El registro de FPS es para el resumen de la partida (vortex-partida, 1.10).
+output_folder=$ESTADO/mangohud
+autostart_log=1
+log_interval=500
 legacy_layout=0
 horizontal
 hud_compact
@@ -470,6 +479,8 @@ cmd_modo_juego() {
         touch "$marca.fondo"
       fi
       touch "$marca"
+      # Vortex 1.10: empieza a medir la partida para el resumen del final (bin/vortex-partida)
+      "$VORTEX_DIR/bin/vortex-partida" empezar 2>/dev/null || true
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
     off)
@@ -485,7 +496,10 @@ cmd_modo_juego() {
         shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
       fi
       rm -f "$marca" "$marca.anterior" "$marca.fondo"
-      notificar -t 2000 "Modo juego desactivado"
+      # Vortex 1.10: el resumen de la partida (cuánto jugaste, FPS y temperaturas) en vez del aviso
+      # de siempre; en una partida de menos de 2 min no hay resumen y sale el aviso normal
+      "$VORTEX_DIR/bin/vortex-partida" terminar 2>/dev/null | grep -q . ||
+        notificar -t 2000 "Modo juego desactivado"
       ;;
     alternar)
       if [[ -f "$marca" ]]; then cmd_modo_juego off; else cmd_modo_juego on; fi
@@ -823,7 +837,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1034,6 +1048,7 @@ PAQUETES_NUEVOS=(
   kdeconnect zenity # 1.8: tu celular (Super+Shift+P); zenity elige los archivos que se le mandan
   pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
   easyeffects # 1.10: sin él el ecualizador del panel de música no hace nada
+  gpu-screen-recorder # 1.10: vortex-clips (los últimos 30 s con Alt+F10)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1402,6 +1417,8 @@ case "${1:-ayuda}" in
   restore) shift; exec "$VORTEX_DIR/bin/vortex-restore" "$@" ;;
   emergencia) exec "$VORTEX_DIR/bin/vortex-restore" emergencia ;;
   mods) shift; exec "$VORTEX_DIR/bin/vortex-mods" "$@" ;;
+  clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
+  partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
   reiniciar-shell) reiniciar_shell ;;
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;

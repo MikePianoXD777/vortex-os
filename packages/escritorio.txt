@@ -21,3 +21,4 @@ kdeconnect             # tu celular en la PC (Super+Shift+P, 1.8); viene apagado
 zenity                 # elegir archivos para mandar al celular
 pacman-contrib         # paccache: «Algo no funciona → Disco» limpia la caché de pacman (1.9)
 easyeffects            # el ecualizador del panel de música (sin él las barras no cambian el sonido)
+gpu-screen-recorder    # los últimos 30 s con Alt+F10 (vortex-clips, 1.10)
