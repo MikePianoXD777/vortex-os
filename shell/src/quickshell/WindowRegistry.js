@@ -302,7 +302,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: «Mods de Minecraft» (minecraft/MinecraftPopup.qml), al centro. Los botones del
         // calendario lo abren en su pestaña: «modrinth» o «curseforge».
         "modrinth": {
-            w: 940, h: 720, comp: "minecraft/ModrinthPopup.qml", draggable: true, sinEscala: true,
+            w: 1140, h: 760, comp: "minecraft/ModrinthPopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },
@@ -311,7 +311,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
             }
         },
         "curseforge": {
-            w: 940, h: 720, comp: "minecraft/CurseForgePopup.qml", draggable: true, sinEscala: true,
+            w: 1140, h: 760, comp: "minecraft/CurseForgePopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

@@ -5,6 +5,7 @@
 #
 #   vortex mods instancias                     los Minecraft que encontró, en JSON (con versión y loader)
 #   vortex mods buscar [opciones] [TEXTO]      busca en Modrinth (sin texto: los más bajados), en JSON
+#   vortex mods categorias [--tipo T]          los filtros de Modrinth para ese tipo, con su ícono (JSON)
 #   vortex mods instalar PROYECTO CARPETA [opciones]   baja la versión compatible y sus dependencias
 #   vortex mods instalados CARPETA [--tipo T]  los proyectos de Modrinth que ya están en esa carpeta (JSON)
 #   vortex mods descargas                      los .jar y .zip recién bajados (lo de CurseForge), en JSON
@@ -13,6 +14,7 @@
 #   vortex mods quitar CARPETA                 la quita de la lista (no borra nada)
 #
 #   opciones: --version 1.21.1   --loader fabric|neoforge|forge|quilt   --tipo mod|resourcepack|shader
+#             --categoria optimization (se puede repetir: tiene que cumplir todas)
 #
 # Modrinth tiene una API abierta, así que se busca e instala desde el panel. La de CurseForge pide una
 # llave de desarrollador: su botón abre la página y lo que bajes de ahí se pasa con «mover».
@@ -146,10 +148,12 @@ cmd_quitar() {
 # --- Modrinth --------------------------------------------------------------------------------------
 
 VERSION="" LOADER="" TIPO=mod
+CATEGORIAS=()
 leer_opciones() {
   RESTO=()
   while (($#)); do
     case "$1" in
+      --categoria) [[ -n "${2:-}" ]] && CATEGORIAS+=("$2"); shift 2 ;;
       --version) VERSION="${2:-}"; shift 2 ;;
       --loader) LOADER="${2:-}"; shift 2 ;;
       --tipo) TIPO="${2:-mod}"; shift 2 ;;
@@ -161,13 +165,24 @@ leer_opciones() {
 cmd_buscar() {
   leer_opciones "$@"
   local texto="${RESTO[*]:-}" facetas
-  facetas="$(jq -cn --arg v "$VERSION" --arg l "$LOADER" --arg t "$TIPO" '
+  facetas="$(jq -cn --arg v "$VERSION" --arg l "$LOADER" --arg t "$TIPO" '$ARGS.positional as $c |
     [["project_type:" + $t]]
+    + [$c[] | ["categories:" + .]]
     + (if $v != "" then [["versions:" + $v]] else [] end)
-    + (if $l != "" and $t == "mod" then [["categories:" + $l]] else [] end)')"
+    + (if $l != "" and $t == "mod" then [["categories:" + $l]] else [] end)' --args "${CATEGORIAS[@]}")"
   api "$API/search?limit=30&index=$([[ -n "$texto" ]] && echo relevance || echo downloads)&query=$(urlcod "$texto")&facets=$(urlcod "$facetas")" |
     jq '[.hits[] | {id: .project_id, slug, titulo: .title, descripcion: .description, icono: (.icon_url // ""),
                     descargas: .downloads, autor: .author, tipo: .project_type}]'
+}
+
+# Los filtros de la columna izquierda, como en la página de Modrinth: primero las categorías y luego
+# características, resolución y rendimiento. El ícono es el SVG de Modrinth (con «currentColor»).
+cmd_categorias() {
+  leer_opciones "$@"
+  api "$API/tag/category" | jq --arg t "$TIPO" '
+    ["categories", "features", "resolutions", "performance impact"] as $orden |
+    [.[] | select(.project_type == $t) | {nombre: .name, grupo: .header, icono: (.icon // "")}]
+    | sort_by(.grupo as $g | ($orden | index($g)) // 9, .nombre)'
 }
 
 # La versión estable más nueva que sirve para esa versión de Minecraft y ese loader (una beta solo si no
@@ -268,6 +283,7 @@ cmd_mover() {
 case "${1:-}" in
   instancias) shift; cmd_instancias "$@" ;;
   buscar) shift; cmd_buscar "$@" ;;
+  categorias) shift; cmd_categorias "$@" ;;
   instalar) shift; cmd_instalar "$@" ;;
   instalados) shift; cmd_instalados "$@" ;;
   descargas) shift; cmd_descargas "$@" ;;

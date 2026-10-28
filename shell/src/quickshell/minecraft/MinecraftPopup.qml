@@ -113,11 +113,81 @@ Item {
         return args;
     }
 
+    // Columna izquierda: los filtros de Modrinth para el tipo elegido (se piden una vez por tipo)
+    property var categorias: []
+    property var categoriasPorTipo: ({})
+    property var elegidas: []
+
+    function cargarCategorias() {
+        if (categoriasPorTipo[tipo]) {
+            categorias = categoriasPorTipo[tipo];
+            return;
+        }
+        categorias = [];
+        categoriasProc.running = false;
+        categoriasProc.deTipo = tipo;
+        categoriasProc.command = ["vortex-mods", "categorias", "--tipo", tipo];
+        categoriasProc.running = true;
+    }
+
+    function alternar(nombre) {
+        let lista = elegidas.slice();
+        let i = lista.indexOf(nombre);
+        if (i === -1) lista.push(nombre); else lista.splice(i, 1);
+        elegidas = lista;
+        buscar();
+    }
+
+    function cambiarTipo(nuevo) {
+        tipo = nuevo;
+        elegidas = [];
+        cargarCategorias();
+        buscar();
+        cargarInstalados();
+    }
+
+    function nombreCategoria(nombre) {
+        let ingles = nombre.charAt(0).toUpperCase() + nombre.slice(1).replace(/-/g, " ");
+        return /^[0-9]/.test(nombre) ? nombre : window.t("cat." + nombre, ingles);
+    }
+
+    function nombreGrupo(grupo) {
+        let porDefecto = { "categories": "Categories", "features": "Features", "resolutions": "Resolution",
+                           "performance impact": "Performance impact" };
+        return window.t("group." + grupo.replace(/ /g, "_"), porDefecto[grupo] || grupo);
+    }
+
+    // El ícono de Modrinth es un SVG con «currentColor»: se pinta con el color del tema
+    function iconoCategoria(svg, color) {
+        if (!svg || svg.indexOf("<svg") === -1) return "";
+        return "data:image/svg+xml;base64," + Qt.btoa(svg.replace(/currentColor/g, String(color)));
+    }
+
+    Process {
+        id: categoriasProc
+        property string deTipo: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    let d = JSON.parse(this.text);
+                    if (Array.isArray(d)) {
+                        let c = Object.assign({}, window.categoriasPorTipo);
+                        c[categoriasProc.deTipo] = d;
+                        window.categoriasPorTipo = c;
+                        if (window.tipo === categoriasProc.deTipo) window.categorias = d;
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
     function buscar() {
         if (!instanciasCargadas) return;
         buscarProc.running = false;
         buscando = true;
-        buscarProc.command = ["vortex-mods", "buscar"].concat(filtros()).concat([busquedaInput.text.trim()]);
+        let cats = [];
+        for (let i = 0; i < elegidas.length; i++) cats = cats.concat(["--categoria", elegidas[i]]);
+        buscarProc.command = ["vortex-mods", "buscar"].concat(filtros()).concat(cats).concat([busquedaInput.text.trim()]);
         buscarProc.running = true;
     }
 
@@ -291,6 +361,7 @@ Item {
             busquedaInput.forceActiveFocus();
             instanciasProc.running = true;
             descargasProc.running = true;
+            cargarCategorias();
             resetAndPlayIntro();
         } else {
             introAnim.stop();
@@ -535,9 +606,121 @@ Item {
                 color: window.mensajeError ? ThemeBackend.red : ThemeBackend.green
             }
 
-            // --- Modrinth ---
-            ColumnLayout {
+            // --- Modrinth: filtros a la izquierda, como en su página ---
+            RowLayout {
                 visible: window.pestana === "modrinth"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: window.s(16)
+
+            Rectangle {
+                Layout.preferredWidth: window.s(210)
+                Layout.fillHeight: true
+                radius: window.s(14)
+                color: Qt.alpha(ThemeBackend.surface0, 0.35)
+
+                Flickable {
+                    anchors.fill: parent
+                    anchors.margins: window.s(10)
+                    clip: true
+                    contentHeight: columnaFiltros.height
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: columnaFiltros
+                        width: parent.width
+                        spacing: window.s(2)
+
+                        Text {
+                            visible: window.categorias.length === 0
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            topPadding: window.s(8)
+                            text: categoriasProc.running ? "󰔟" : window.t("no_filters", "No filters (are you online?)")
+                            font.family: ThemeBackend.fontFamily
+                            font.pixelSize: window.s(12)
+                            color: ThemeBackend.overlay1
+                        }
+
+                        Repeater {
+                            model: window.categorias
+                            delegate: Column {
+                                id: filtro
+                                required property var modelData
+                                required property int index
+                                readonly property bool marcado: window.elegidas.indexOf(modelData.nombre) !== -1
+                                readonly property bool grupoNuevo: index === 0 || window.categorias[index - 1].grupo !== modelData.grupo
+                                width: columnaFiltros.width
+
+                                Text {
+                                    visible: filtro.grupoNuevo
+                                    topPadding: filtro.index === 0 ? window.s(4) : window.s(14)
+                                    bottomPadding: window.s(6)
+                                    leftPadding: window.s(6)
+                                    text: window.nombreGrupo(filtro.modelData.grupo)
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: window.s(13)
+                                    font.weight: Font.Bold
+                                    color: ThemeBackend.text
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: window.s(30)
+                                    radius: height / 2
+                                    color: filtro.marcado ? Qt.alpha(ThemeBackend.green, 0.2) : (filtroMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.5) : "transparent")
+
+                                    Row {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: window.s(10)
+                                        spacing: window.s(9)
+                                        Image {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: window.s(16)
+                                            height: window.s(16)
+                                            sourceSize: Qt.size(window.s(16), window.s(16))
+                                            source: window.iconoCategoria(filtro.modelData.icono, filtro.marcado ? ThemeBackend.green : ThemeBackend.subtext0)
+                                        }
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: window.nombreCategoria(filtro.modelData.nombre)
+                                            font.family: ThemeBackend.fontFamily
+                                            font.pixelSize: window.s(12)
+                                            font.weight: filtro.marcado ? Font.Bold : Font.Normal
+                                            color: filtro.marcado ? ThemeBackend.green : ThemeBackend.subtext1
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: filtroMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: window.alternar(filtro.modelData.nombre)
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: window.elegidas.length > 0
+                            topPadding: window.s(12)
+                            leftPadding: window.s(6)
+                            text: "󰅖  " + window.t("clear_filters", "Clear filters")
+                            font.family: ThemeBackend.fontFamily
+                            font.pixelSize: window.s(12)
+                            font.weight: Font.Bold
+                            color: ThemeBackend.peach
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: { window.elegidas = []; window.buscar(); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: window.s(12)
@@ -633,11 +816,7 @@ Item {
                             texto: modelData.icono + "  " + window.t(modelData.clave, modelData.texto)
                             activo: window.tipo === modelData.id
                             fondo: Qt.alpha(ThemeBackend.surface1, activo ? 0.9 : 0.35)
-                            onPulsado: {
-                                window.tipo = modelData.id;
-                                window.buscar();
-                                window.cargarInstalados();
-                            }
+                            onPulsado: window.cambiarTipo(modelData.id)
                         }
                     }
                 }
@@ -745,6 +924,8 @@ Item {
                         }
                     }
                 }
+            }
+
             }
 
             // --- CurseForge ---

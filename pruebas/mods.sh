@@ -83,6 +83,9 @@ echo "== vortex mods buscar / instalar (Modrinth)"
 if curl -fsS --max-time 5 -o /dev/null https://api.modrinth.com/v2/tag/loader; then
   mods buscar --version 1.20.1 --loader fabric sodium >"$T/busca.json"
   probar "busca Sodium para 1.20.1 Fabric" "jq -e '.[] | select(.slug == \"sodium\" and .id == \"AANobbMI\")' '$T/busca.json' >/dev/null"
+  probar "los filtros de mods traen Optimización con su ícono" "bash '$AQUI/bin/vortex-mods' categorias | jq -e '.[] | select(.nombre == \"optimization\" and .grupo == \"categories\" and (.icono | startswith(\"<svg\")))' >/dev/null"
+  probar "los de shaders traen rendimiento (PC lenta)" "bash '$AQUI/bin/vortex-mods' categorias --tipo shader | jq -e '.[-1].grupo == \"performance impact\" and any(.[]; .nombre == \"potato\")' >/dev/null"
+  probar "filtrar por categoría cambia lo que sale" "[[ \$(mods buscar --version 1.20.1 --loader fabric --categoria optimization | jq -r '.[0].id') != \$(mods buscar --version 1.20.1 --loader fabric --categoria magic | jq -r '.[0].id') ]]"
   F="$P/Fabricosa/.minecraft"
   mods instalar AANobbMI "$F" --version 1.20.1 --loader fabric >/dev/null
   probar "instala Sodium en la instancia elegida" "compgen -G '$F/mods/sodium-fabric-*.jar' >/dev/null"
