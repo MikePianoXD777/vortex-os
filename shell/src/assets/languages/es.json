@@ -1685,7 +1685,8 @@
     },
     "juegos": {
       "name": "Tus juegos",
-      "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)"
+      "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)",
+      "short": "Biblioteca de juegos"
     },
     "arreglar": {
       "name": "Algo no funciona",

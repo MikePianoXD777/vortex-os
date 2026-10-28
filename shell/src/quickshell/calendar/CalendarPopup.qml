@@ -966,6 +966,52 @@ Item {
                 }
             }
 
+            // Vortex 1.10 (pedido de Mike): arriba del calendario, la biblioteca de juegos (Super+Shift+G).
+            Rectangle {
+                id: accesoJuegos
+                anchors.bottom: calendarRect.top
+                anchors.bottomMargin: window.s(12)
+                anchors.left: calendarRect.left
+                width: calendarRect.width
+                height: window.s(48)
+                radius: ThemeBackend.borderRadius
+                color: juegosMa.containsMouse ? Qt.alpha(window.surface1, 0.45) : Qt.alpha(window.surface0, 0.2)
+                border.color: Qt.alpha(window.surface1, 0.4)
+                border.width: 1
+                z: 10
+                opacity: introCalendar
+                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: window.s(8)
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "󰊴"
+                        font.family: ThemeBackend.iconFont
+                        font.pixelSize: window.s(18)
+                        color: window.text
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: I18n.t("widgets.juegos.short", "Game library")
+                        font.family: ThemeBackend.fontFamily
+                        font.weight: Font.Black
+                        font.pixelSize: window.s(13)
+                        color: window.text
+                    }
+                }
+
+                MouseArea {
+                    id: juegosMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle juegos\")"])
+                }
+            }
+
             // Vortex 1.10 (pedido de Mike): abajo del calendario, el metrónomo y el temporizador de
             // estudio. El de estudio muestra la cuenta mientras corre.
             Row {

@@ -1641,7 +1641,8 @@
     },
     "juegos": {
       "name": "Your games",
-      "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)"
+      "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)",
+      "short": "Game library"
     },
     "arreglar": {
       "name": "Something's not working",
