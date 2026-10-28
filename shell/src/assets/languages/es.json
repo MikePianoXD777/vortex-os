@@ -1693,6 +1693,10 @@
       "name": "Widgets en HTML",
       "desc": "Programa tus propios widgets del escritorio en HTML sencillo, con vista previa al instante"
     },
+    "minecraft": {
+      "name": "Mods de Minecraft",
+      "desc": "Instala mods de Modrinth y CurseForge en Prism, TLauncher o cualquier carpeta de Minecraft"
+    },
     "restore": {
       "name": "Vortexine Restore",
       "desc": "Puntos de restauración: vuelve a tu Hyprland, tema, barra o widgets de antes si algo se rompe"
@@ -1957,6 +1961,33 @@
     "file": "Archivo: {f}",
     "empty_widget": "Créalo en el lanzador → «Widgets en HTML»",
     "cheatsheet": "<b>Qué sirve</b><br>&lt;h1&gt;…&lt;h6&gt; títulos<br>&lt;p&gt; &lt;br&gt; &lt;hr&gt;<br>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt;<br>&lt;font color=\"#f38ba8\" size=\"5\"&gt;<br>&lt;span style=\"color: red; font-size: 20px\"&gt;<br>&lt;div align=\"center\"&gt;<br>&lt;ul&gt; &lt;ol&gt; &lt;li&gt;<br>&lt;table&gt; &lt;tr&gt; &lt;td&gt;<br>&lt;img src=\"/ruta/imagen.png\" width=\"80\"&gt;<br>&lt;a href=\"https://…\"&gt; enlace<br><br><b>Se llenan solos</b><br>{hora} {hora12} {segundos}<br>{fecha} {fechaLarga}<br>{dia} {mes} {año}<br>{usuario} {equipo}<br><br>Sin JavaScript: casi no gasta memoria. Ctrl+S guarda."
+  },
+  "minecraft": {
+    "title": "Mods de Minecraft",
+    "intro": "Primero elige tu Minecraft: cada launcher tiene su carpeta.",
+    "install_to": "Instalar en:",
+    "other_folder": "Otra carpeta…",
+    "no_instances": "No encontré ningún Minecraft. Abre tu launcher una vez, o agrega su carpeta con «Otra carpeta…».",
+    "search_placeholder": "Busca en Modrinth: sodium, create, jei…",
+    "version": "Versión",
+    "any_loader": "Cualquier loader",
+    "mods": "Mods",
+    "resourcepacks": "Texturas",
+    "shaders": "Shaders",
+    "no_results": "Nada para esa versión. Prueba otra palabra o cambia la versión.",
+    "offline": "No se pudo llegar a Modrinth. ¿Tienes internet?",
+    "by": "de",
+    "install": "Instalar",
+    "installing": "Instalando…",
+    "installed": "Instalado",
+    "installed_in": "Instalado en",
+    "error": "No funcionó.",
+    "cf_title": "1. Baja el mod de CurseForge",
+    "cf_help": "CurseForge no deja que otras apps instalen, así que se abre en tu navegador. Elige el archivo de tu versión; cuando llegue a Descargas aparece aquí abajo.",
+    "cf_open": "Abrir CurseForge",
+    "cf_downloads": "2. Pasa lo que bajaste a",
+    "cf_empty": "No hay .jar ni .zip bajados en los últimos días. Baja uno y aparece aquí solo.",
+    "move": "Pasarlo ahí"
   },
   "restore": {
     "intro": "Puntos de tu escritorio: si algo se rompe, vuelve a uno anterior, todo o solo una parte.",

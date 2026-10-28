@@ -1649,6 +1649,10 @@
       "name": "HTML widgets",
       "desc": "Program your own desktop widgets in simple HTML, with a live preview"
     },
+    "minecraft": {
+      "name": "Minecraft mods",
+      "desc": "Install Modrinth and CurseForge mods into Prism, TLauncher or any Minecraft folder"
+    },
     "restore": {
       "name": "Vortexine Restore",
       "desc": "Restore points: go back to an earlier Hyprland, theme, bar or widgets if something breaks"
@@ -1915,6 +1919,33 @@
     "file": "File: {f}",
     "empty_widget": "Create it in the launcher → «HTML widgets»",
     "cheatsheet": "<b>What works</b><br>&lt;h1&gt;…&lt;h6&gt; titles<br>&lt;p&gt; &lt;br&gt; &lt;hr&gt;<br>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt;<br>&lt;font color=\"#f38ba8\" size=\"5\"&gt;<br>&lt;span style=\"color: red; font-size: 20px\"&gt;<br>&lt;div align=\"center\"&gt;<br>&lt;ul&gt; &lt;ol&gt; &lt;li&gt;<br>&lt;table&gt; &lt;tr&gt; &lt;td&gt;<br>&lt;img src=\"/path/image.png\" width=\"80\"&gt;<br>&lt;a href=\"https://…\"&gt; link<br><br><b>Filled in by itself</b><br>{hora} {hora12} {segundos}<br>{fecha} {fechaLarga}<br>{dia} {mes} {año}<br>{usuario} {equipo}<br><br>No JavaScript: it uses almost no memory. Ctrl+S saves."
+  },
+  "minecraft": {
+    "title": "Minecraft mods",
+    "intro": "Pick your Minecraft first: each launcher has its own folder.",
+    "install_to": "Install to:",
+    "other_folder": "Other folder…",
+    "no_instances": "I didn't find any Minecraft. Open your launcher once, or add its folder with «Other folder…».",
+    "search_placeholder": "Search Modrinth: sodium, create, jei…",
+    "version": "Version",
+    "any_loader": "Any loader",
+    "mods": "Mods",
+    "resourcepacks": "Resource packs",
+    "shaders": "Shaders",
+    "no_results": "Nothing for that version. Try another word or change the version.",
+    "offline": "Couldn't reach Modrinth. Are you online?",
+    "by": "by",
+    "install": "Install",
+    "installing": "Installing…",
+    "installed": "Installed",
+    "installed_in": "Installed in",
+    "error": "It didn't work.",
+    "cf_title": "1. Download the mod from CurseForge",
+    "cf_help": "CurseForge doesn't let other apps install, so it opens in your browser. Pick the file for your version; when it lands in Downloads it shows up below.",
+    "cf_open": "Open CurseForge",
+    "cf_downloads": "2. Move what you downloaded to",
+    "cf_empty": "No .jar or .zip downloaded in the last few days. Download one and it appears here by itself.",
+    "move": "Move there"
   },
   "restore": {
     "intro": "Restore points of your desktop: if something breaks, go back to an earlier one, all of it or just one part.",

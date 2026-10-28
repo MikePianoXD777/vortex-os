@@ -44,6 +44,8 @@ Uso: vortex <comando>
   restore [crear|lista|ver|volver…]    Vortexine Restore: puntos de restauración de Hyprland, tema, barra,
                                        widgets y terminal («vortex restore» sin nada: la lista)
   emergencia                           si el escritorio no sirve: desde Ctrl+Alt+F3, vuelve a un punto
+  mods [instancias|buscar|instalar…]   mods de Minecraft de Modrinth a la instancia que elijas (Prism,
+                                       TLauncher…); el panel se abre en el calendario
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
@@ -820,7 +822,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1360,6 +1362,7 @@ case "${1:-ayuda}" in
   onedrive) shift; exec "$VORTEX_DIR/bin/vortex-onedrive" "$@" ;;
   restore) shift; exec "$VORTEX_DIR/bin/vortex-restore" "$@" ;;
   emergencia) exec "$VORTEX_DIR/bin/vortex-restore" emergencia ;;
+  mods) shift; exec "$VORTEX_DIR/bin/vortex-mods" "$@" ;;
   reiniciar-shell) reiniciar_shell ;;
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;

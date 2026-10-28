@@ -17,7 +17,7 @@ Item {
         return Scaler.s(val);
     }
 
-    property real targetMasterHeight: window.s(630) // Vortex: 510 + el panel de rendimiento
+    property real targetMasterHeight: window.s(694) // Vortex: 510 + el panel de rendimiento + los botones de mods
     property real targetMasterWidth: window.s(1360)
     implicitWidth: targetMasterWidth
     implicitHeight: targetMasterHeight
@@ -827,6 +827,8 @@ Item {
                 id: calendarRect
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
+                // Vortex 1.10: baja la mitad de lo que ocupan los botones de mods (44 + 10), que van arriba
+                anchors.verticalCenterOffset: window.s(27)
                 anchors.leftMargin: window.s(40)
                 width: window.s(310)
                 height: window.s(350)
@@ -969,7 +971,7 @@ Item {
             // Vortex 1.10 (pedido de Mike): arriba del calendario, la biblioteca de juegos (Super+Shift+G).
             Rectangle {
                 id: accesoJuegos
-                anchors.bottom: calendarRect.top
+                anchors.bottom: accesosMods.top
                 anchors.bottomMargin: window.s(12)
                 anchors.left: calendarRect.left
                 width: calendarRect.width
@@ -1009,6 +1011,65 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle juegos\")"])
+                }
+            }
+
+            // Vortex 1.10 (pedido de Mike): bajo la biblioteca, los mods de Minecraft. Los dos abren
+            // «Mods de Minecraft» (minecraft/), cada uno en su pestaña.
+            Row {
+                id: accesosMods
+                anchors.bottom: calendarRect.top
+                anchors.bottomMargin: window.s(12)
+                anchors.left: calendarRect.left
+                spacing: window.s(10)
+                z: 10
+                opacity: introCalendar
+                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+
+                Repeater {
+                    model: [
+                        { id: "modrinth", texto: "Modrinth" },
+                        { id: "curseforge", texto: "CurseForge" }
+                    ]
+                    Rectangle {
+                        id: accesoMods
+                        required property var modelData
+                        width: (calendarRect.width - window.s(10)) / 2
+                        height: window.s(44)
+                        radius: ThemeBackend.borderRadius
+                        color: modsMa.containsMouse ? Qt.alpha(window.surface1, 0.45) : Qt.alpha(window.surface0, 0.2)
+                        border.color: Qt.alpha(window.surface1, 0.4)
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: window.s(8)
+                            Image {
+                                anchors.verticalCenter: parent.verticalCenter
+                                source: "file://" + Caching.serpantinumDir + "/assets/logos/" + accesoMods.modelData.id + ".svg"
+                                sourceSize: Qt.size(window.s(18), window.s(18))
+                                width: window.s(18)
+                                height: window.s(18)
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: accesoMods.modelData.texto
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: window.s(13)
+                                color: window.text
+                            }
+                        }
+
+                        MouseArea {
+                            id: modsMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + accesoMods.modelData.id + "\")"])
+                        }
+                    }
                 }
             }
 

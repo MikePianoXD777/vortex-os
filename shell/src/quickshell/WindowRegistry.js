@@ -119,6 +119,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌝"
         },
         {
+            // Vortex 1.10: mods de Minecraft de Modrinth y CurseForge a la instancia que elijas (minecraft/).
+            id: "modrinth",
+            name: tr("widgets.minecraft.name", "Minecraft mods"),
+            description: tr("widgets.minecraft.desc", "Install Modrinth and CurseForge mods into Prism, TLauncher or any Minecraft folder"),
+            icon: "applications-games",
+            fontIcon: "󰍳"
+        },
+        {
             // Vortex 1.8: la biblioteca de juegos (Super+Shift+G).
             id: "juegos",
             name: tr("widgets.juegos.name", "Your games"),
@@ -197,7 +205,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
             } 
         },
         "calendar": { 
-            w: 1360, h: 630, comp: "calendar/CalendarPopup.qml", // Vortex: +120 por el panel de rendimiento 
+            w: 1360, h: 694, comp: "calendar/CalendarPopup.qml", // Vortex: +120 por el panel de rendimiento y +64 por los botones de mods 
             pos: { 
                 "top": { anchor: "top-center", mt: 52 }, 
                 "bottom": { anchor: "bottom-center", mb: 52 }, 
@@ -284,6 +292,26 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: «Widgets en HTML» (htmlwidgets/HtmlWidgetsPopup.qml), al centro.
         "htmlwidgets": {
             w: 1000, h: 680, comp: "htmlwidgets/HtmlWidgetsPopup.qml", draggable: true, sinEscala: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: «Mods de Minecraft» (minecraft/MinecraftPopup.qml), al centro. Los botones del
+        // calendario lo abren en su pestaña: «modrinth» o «curseforge».
+        "modrinth": {
+            w: 940, h: 720, comp: "minecraft/ModrinthPopup.qml", draggable: true, sinEscala: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        "curseforge": {
+            w: 940, h: 720, comp: "minecraft/CurseForgePopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

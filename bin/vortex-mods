@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+# vortex-mods (1.10): mods de Minecraft desde el calendario (botones Modrinth y CurseForge) o desde la
+# terminal. Primero eliges a qué Minecraft van, porque cada launcher tiene sus instancias (Prism,
+# TLauncher, MultiMC, la app de Modrinth…) y cualquier otra carpeta se agrega a mano.
+#
+#   vortex mods instancias                     los Minecraft que encontró, en JSON (con versión y loader)
+#   vortex mods buscar [opciones] [TEXTO]      busca en Modrinth (sin texto: los más bajados), en JSON
+#   vortex mods instalar PROYECTO CARPETA [opciones]   baja la versión compatible y sus dependencias
+#   vortex mods instalados CARPETA [--tipo T]  los proyectos de Modrinth que ya están en esa carpeta (JSON)
+#   vortex mods descargas                      los .jar y .zip recién bajados (lo de CurseForge), en JSON
+#   vortex mods mover ARCHIVO CARPETA [--tipo T]   pasa un archivo bajado a esa instancia
+#   vortex mods agregar [CARPETA]              agrega otra carpeta de Minecraft (sin CARPETA: la eliges)
+#   vortex mods quitar CARPETA                 la quita de la lista (no borra nada)
+#
+#   opciones: --version 1.21.1   --loader fabric|neoforge|forge|quilt   --tipo mod|resourcepack|shader
+#
+# Modrinth tiene una API abierta, así que se busca e instala desde el panel. La de CurseForge pide una
+# llave de desarrollador: su botón abre la página y lo que bajes de ahí se pasa con «mover».
+set -uo pipefail
+
+API="${VORTEX_MODS_API:-https://api.modrinth.com/v2}"
+CARPETAS="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/minecraft-carpetas"
+AGENTE="MikePianoXD777/vortex-os (Vortexine's OS)"
+
+aviso() { printf 'vortex mods: %s\n' "$*" >&2; }
+
+api() { curl -fsS --max-time 20 -A "$AGENTE" "$@"; }
+
+urlcod() { jq -rn --arg v "$1" '$v|@uri'; }
+
+# Carpeta dentro de la instancia según el tipo de proyecto
+subcarpeta() {
+  case "${1:-mod}" in
+    resourcepack) echo resourcepacks ;;
+    shader) echo shaderpacks ;;
+    *) echo mods ;;
+  esac
+}
+
+# --- instancias --------------------------------------------------------------------------------------
+
+# Una instancia en JSON: nombre, launcher, ruta (la carpeta del juego), versión y loader
+instancia_json() {
+  jq -cn --arg nombre "$1" --arg launcher "$2" --arg ruta "$3" --arg version "$4" --arg loader "$5" \
+    '{nombre: $nombre, launcher: $launcher, ruta: $ruta, version: $version, loader: $loader}'
+}
+
+# Versión y loader de una carpeta tipo .minecraft: la versión instalada más reciente de versions/
+# («fabric-loader-0.19.5-1.21.3», «1.21.1-forge-52.0.1», «neoforge-21.1.77», «1.21.4»…).
+adivinar_version() {
+  local ver nombre version="" loader=""
+  ver="$(find "$1/versions" -mindepth 1 -maxdepth 1 -type d -printf '%T@\t%f\n' 2>/dev/null | sort -rn | head -1 | cut -f2)"
+  nombre="${ver,,}"
+  case "$nombre" in
+    *fabric*) loader=fabric ;;
+    *quilt*) loader=quilt ;;
+    *neoforge*) loader=neoforge ;;
+    *forge*) loader=forge ;;
+  esac
+  # «1.21.3» suelto: no el «1.4» de dentro de un «21.4» ni de un «0.1.4»
+  version="$(grep -oE '(^|[^0-9.])1\.[0-9]+(\.[0-9]+)?' <<<"$nombre" | tail -1 | sed 's/^[^0-9]//')"
+  # NeoForge 21.1.x es la 1.21.1 (desde la 1.20.2 su número es el de Minecraft sin el «1.»)
+  if [[ -z "$version" && "$loader" == neoforge ]]; then
+    version="$(grep -oE '[0-9]+\.[0-9]+' <<<"${nombre#*neoforge-}" | head -1)"
+    [[ -n "$version" ]] && version="1.${version%.0}"
+  fi
+  printf '%s\t%s\n' "$version" "$loader"
+}
+
+# Instancias con mmc-pack.json (Prism, MultiMC, PolyMC)
+instancias_mmc() {
+  local raiz="$1" launcher="$2" dir juego nombre version loader
+  for dir in "$raiz"/*/; do
+    [[ -f "$dir/mmc-pack.json" ]] || continue
+    juego="${dir%/}/minecraft"
+    [[ -d "$juego" ]] || juego="${dir%/}/.minecraft"
+    [[ -d "$juego" ]] || continue
+    nombre="$(sed -n 's/^name=//p' "$dir/instance.cfg" 2>/dev/null | head -1)"
+    version="$(jq -r '[.components[] | select(.uid == "net.minecraft") | .version][0] // ""' "$dir/mmc-pack.json" 2>/dev/null)"
+    loader="$(jq -r '[.components[].uid] |
+      if index("net.fabricmc.fabric-loader") then "fabric"
+      elif index("org.quiltmc.quilt-loader") then "quilt"
+      elif index("net.neoforged") then "neoforge"
+      elif index("net.minecraftforge") then "forge" else "" end' "$dir/mmc-pack.json" 2>/dev/null)"
+    instancia_json "${nombre:-$(basename "$dir")}" "$launcher" "$juego" "$version" "$loader"
+  done
+}
+
+cmd_instancias() {
+  local datos="${XDG_DATA_HOME:-$HOME/.local/share}" flat="$HOME/.var/app" dir launcher version loader
+  {
+    instancias_mmc "$datos/PrismLauncher/instances" "Prism"
+    instancias_mmc "$flat/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances" "Prism"
+    instancias_mmc "$datos/multimc/instances" "MultiMC"
+    instancias_mmc "$datos/PolyMC/instances" "PolyMC"
+    # La app de Modrinth guarda la versión en su base de datos: solo se ve el perfil
+    for dir in "$datos"/ModrinthApp/profiles/*/ "$flat"/com.modrinth.ModrinthApp/data/ModrinthApp/profiles/*/; do
+      [[ -d "$dir" ]] || continue
+      IFS=$'\t' read -r version loader < <(adivinar_version "$dir")
+      instancia_json "$(basename "$dir")" "Modrinth App" "${dir%/}" "$version" "$loader"
+    done
+    for dir in "$datos"/ATLauncher/instances/*/ "$HOME"/ATLauncher/instances/*/; do
+      [[ -d "$dir" ]] || continue
+      IFS=$'\t' read -r version loader < <(adivinar_version "$dir")
+      instancia_json "$(basename "$dir")" "ATLauncher" "${dir%/}" "$version" "$loader"
+    done
+    # El .minecraft de siempre: el launcher oficial y TLauncher usan esa misma carpeta
+    if [[ -d "$HOME/.minecraft" ]]; then
+      launcher=Minecraft
+      [[ -d "$HOME/.tlauncher" ]] && launcher=TLauncher
+      IFS=$'\t' read -r version loader < <(adivinar_version "$HOME/.minecraft")
+      instancia_json ".minecraft" "$launcher" "$HOME/.minecraft" "$version" "$loader"
+    fi
+    # Las que agregaste a mano (otros launchers)
+    if [[ -f "$CARPETAS" ]]; then
+      while IFS= read -r dir; do
+        [[ -n "$dir" && -d "$dir" ]] || continue
+        IFS=$'\t' read -r version loader < <(adivinar_version "$dir")
+        instancia_json "$(basename "$dir")" "Tuya" "$dir" "$version" "$loader"
+      done <"$CARPETAS"
+    fi
+  } | jq -s 'unique_by(.ruta) | sort_by(.launcher == "Tuya", .launcher, .nombre)'
+}
+
+cmd_agregar() {
+  local dir="${1:-}"
+  if [[ -z "$dir" ]]; then
+    command -v zenity >/dev/null || { aviso "falta zenity para elegir la carpeta"; return 1; }
+    dir="$(zenity --file-selection --directory --title="La carpeta de tu Minecraft (la que tiene mods/)" \
+      --filename="$HOME/" 2>/dev/null)" || return 1
+  fi
+  dir="$(realpath -m "$dir")"
+  [[ -d "$dir" ]] || { aviso "no existe la carpeta: $dir"; return 1; }
+  mkdir -p "$(dirname "$CARPETAS")"
+  grep -qxF "$dir" "$CARPETAS" 2>/dev/null || printf '%s\n' "$dir" >>"$CARPETAS"
+  printf '%s\n' "$dir"
+}
+
+cmd_quitar() {
+  local dir="${1:?falta la carpeta}"
+  [[ -f "$CARPETAS" ]] || return 0
+  grep -vxF "$dir" "$CARPETAS" >"$CARPETAS.nuevo" || true
+  mv "$CARPETAS.nuevo" "$CARPETAS"
+}
+
+# --- Modrinth --------------------------------------------------------------------------------------
+
+VERSION="" LOADER="" TIPO=mod
+leer_opciones() {
+  RESTO=()
+  while (($#)); do
+    case "$1" in
+      --version) VERSION="${2:-}"; shift 2 ;;
+      --loader) LOADER="${2:-}"; shift 2 ;;
+      --tipo) TIPO="${2:-mod}"; shift 2 ;;
+      *) RESTO+=("$1"); shift ;;
+    esac
+  done
+}
+
+cmd_buscar() {
+  leer_opciones "$@"
+  local texto="${RESTO[*]:-}" facetas
+  facetas="$(jq -cn --arg v "$VERSION" --arg l "$LOADER" --arg t "$TIPO" '
+    [["project_type:" + $t]]
+    + (if $v != "" then [["versions:" + $v]] else [] end)
+    + (if $l != "" and $t == "mod" then [["categories:" + $l]] else [] end)')"
+  api "$API/search?limit=30&index=$([[ -n "$texto" ]] && echo relevance || echo downloads)&query=$(urlcod "$texto")&facets=$(urlcod "$facetas")" |
+    jq '[.hits[] | {id: .project_id, slug, titulo: .title, descripcion: .description, icono: (.icon_url // ""),
+                    descargas: .downloads, autor: .author, tipo: .project_type}]'
+}
+
+# La versión estable más nueva que sirve para esa versión de Minecraft y ese loader (una beta solo si no
+# hay estable)
+version_compatible() {
+  local proyecto="$1" consulta=""
+  [[ -n "$VERSION" ]] && consulta+="&game_versions=$(urlcod "[\"$VERSION\"]")"
+  # Los paquetes de texturas y los shaders no dependen del loader
+  [[ -n "$LOADER" && "$TIPO" == mod ]] && consulta+="&loaders=$(urlcod "[\"$LOADER\"]")"
+  api "$API/project/$proyecto/version?${consulta#&}" |
+    jq -c '([.[] | select(.version_type == "release")][0]) // .[0] // empty'
+}
+
+# Baja un proyecto (y, si es mod, sus dependencias obligatorias) a CARPETA/mods (o resourcepacks…)
+instalar_uno() {
+  local proyecto="$1" destino="$2" nivel="${3:-0}" version archivo url nombre sha dep
+  version="$(version_compatible "$proyecto")" || { aviso "no se pudo consultar Modrinth"; return 1; }
+  if [[ -z "$version" ]]; then
+    aviso "no hay una versión de «$proyecto» para ${VERSION:-esa versión}${LOADER:+ con $LOADER}"
+    return 1
+  fi
+  archivo="$(jq -c '[.files[] | select(.primary)][0] // .files[0]' <<<"$version")"
+  url="$(jq -r .url <<<"$archivo")"
+  nombre="$(jq -r .filename <<<"$archivo")"
+  sha="$(jq -r .hashes.sha512 <<<"$archivo")"
+  [[ "$nombre" == */* || -z "$nombre" ]] && { aviso "nombre de archivo raro: $nombre"; return 1; }
+  mkdir -p "$destino"
+  if [[ -f "$destino/$nombre" ]]; then
+    printf 'ya estaba: %s\n' "$nombre"
+  else
+    curl -fsSL --max-time 300 -A "$AGENTE" -o "$destino/.$nombre.parcial" "$url" || {
+      rm -f "$destino/.$nombre.parcial"; aviso "no se pudo bajar $nombre"; return 1; }
+    if [[ "$(sha512sum "$destino/.$nombre.parcial" | cut -d' ' -f1)" != "$sha" ]]; then
+      rm -f "$destino/.$nombre.parcial"; aviso "$nombre llegó dañado (la huella no coincide)"; return 1
+    fi
+    mv "$destino/.$nombre.parcial" "$destino/$nombre"
+    printf 'instalado: %s\n' "$nombre"
+  fi
+  # Dependencias obligatorias (Fabric API y compañía), un nivel hacia abajo para no dar vueltas
+  ((nivel < 2)) || return 0
+  for dep in $(jq -r '.dependencies[]? | select(.dependency_type == "required") | .project_id // empty' <<<"$version"); do
+    instalar_uno "$dep" "$destino" $((nivel + 1)) || true
+  done
+}
+
+cmd_instalar() {
+  leer_opciones "$@"
+  local proyecto="${RESTO[0]:-}" carpeta="${RESTO[1]:-}"
+  [[ -n "$proyecto" && -n "$carpeta" ]] || { aviso "uso: vortex mods instalar PROYECTO CARPETA [--version V] [--loader L] [--tipo T]"; return 2; }
+  [[ -d "$carpeta" ]] || { aviso "no existe la carpeta: $carpeta"; return 1; }
+  instalar_uno "$proyecto" "$carpeta/$(subcarpeta "$TIPO")"
+}
+
+# Qué proyectos de Modrinth ya están en la instancia (por la huella de cada archivo)
+cmd_instalados() {
+  leer_opciones "$@"
+  local dir hashes
+  dir="${RESTO[0]:-}/$(subcarpeta "$TIPO")"
+  [[ -d "$dir" ]] || { echo '[]'; return 0; }
+  hashes="$(find "$dir" -maxdepth 1 -type f \( -name '*.jar' -o -name '*.zip' \) -exec sha1sum {} + 2>/dev/null |
+    cut -d' ' -f1 | jq -Rsc 'split("\n") | map(select(. != ""))')"
+  [[ "$hashes" == "[]" ]] && { echo '[]'; return 0; }
+  jq -cn --argjson h "$hashes" '{hashes: $h, algorithm: "sha1"}' |
+    api -X POST -H 'Content-Type: application/json' --data @- "$API/version_files" |
+    jq '[.[] | .project_id] | unique'
+}
+
+# --- CurseForge (a mano) ---------------------------------------------------------------------------
+
+carpeta_descargas() { xdg-user-dir DOWNLOAD 2>/dev/null || echo "$HOME/Descargas"; }
+
+cmd_descargas() {
+  local dir
+  dir="$(carpeta_descargas)"
+  [[ -d "$dir" ]] || { echo '[]'; return 0; }
+  find "$dir" -maxdepth 1 -type f \( -iname '*.jar' -o -iname '*.zip' \) -mtime -3 -printf '%T@\t%f\t%p\n' 2>/dev/null |
+    sort -rn | jq -R 'split("\t") | {nombre: .[1], ruta: .[2]}' | jq -s '.'
+}
+
+cmd_mover() {
+  leer_opciones "$@"
+  local archivo="${RESTO[0]:-}" carpeta="${RESTO[1]:-}" destino
+  [[ -f "$archivo" ]] || { aviso "no existe el archivo: $archivo"; return 1; }
+  [[ -d "$carpeta" ]] || { aviso "no existe la carpeta: $carpeta"; return 1; }
+  # Un .zip de shaders o de texturas no va en mods/ (los .jar sí)
+  if [[ "$TIPO" == mod && "${archivo,,}" == *.zip ]]; then
+    local contenido
+    contenido="$(bsdtar -tf "$archivo" 2>/dev/null)"
+    if grep -q '^shaders/' <<<"$contenido"; then TIPO=shader
+    elif grep -qx 'pack.mcmeta' <<<"$contenido"; then TIPO=resourcepack; fi
+  fi
+  destino="$carpeta/$(subcarpeta "$TIPO")"
+  mkdir -p "$destino"
+  mv -n "$archivo" "$destino/" && [[ ! -e "$archivo" ]] || { aviso "ya hay uno con ese nombre en $destino"; return 1; }
+  printf '%s\n' "$destino/$(basename "$archivo")"
+}
+
+case "${1:-}" in
+  instancias) shift; cmd_instancias "$@" ;;
+  buscar) shift; cmd_buscar "$@" ;;
+  instalar) shift; cmd_instalar "$@" ;;
+  instalados) shift; cmd_instalados "$@" ;;
+  descargas) shift; cmd_descargas "$@" ;;
+  mover) shift; cmd_mover "$@" ;;
+  agregar) shift; cmd_agregar "$@" ;;
+  quitar) shift; cmd_quitar "$@" ;;
+  *) sed -n '2,/^set -uo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//' ; [[ -z "${1:-}" ]] ;;
+esac
