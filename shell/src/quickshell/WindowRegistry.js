@@ -103,6 +103,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰁨"
         },
         {
+            // Vortex 1.10: Vortexine Restore (vortex-restore), puntos de restauración de la configuración.
+            id: "restore",
+            name: tr("widgets.restore.name", "Vortexine Restore"),
+            description: tr("widgets.restore.desc", "Restore points: go back to an earlier Hyprland, theme, bar or widgets if something breaks"),
+            icon: "document-revert",
+            fontIcon: "󰁯"
+        },
+        {
             // Vortex 1.8: la biblioteca de juegos (Super+Shift+G).
             id: "juegos",
             name: tr("widgets.juegos.name", "Your games"),
@@ -258,6 +266,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: metrónomo y afinador (musica/MusicaPopup.qml), al centro.
         "musica": {
             w: 680, h: 640, comp: "musica/MusicaPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: Vortexine Restore (restore/RestorePopup.qml), al centro.
+        "restore": {
+            w: 720, h: 720, comp: "restore/RestorePopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

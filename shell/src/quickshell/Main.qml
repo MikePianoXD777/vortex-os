@@ -138,7 +138,7 @@ PanelWindow {
 
     function queueWidgetLaunchLog(target) {
         let names = [target];
-        let known = ["network", "volume", "guide", "calendar", "music", "notifications", "system", "keybinds", "celular", "juegos", "arreglar", "onedrive", "musica", "estudio"];
+        let known = ["network", "volume", "guide", "calendar", "music", "notifications", "system", "keybinds", "celular", "juegos", "arreglar", "restore", "onedrive", "musica", "estudio"];
         if (known.indexOf(target) !== -1 && typeof I18n !== "undefined") {
             let shown = I18n.t("widgets." + target + ".name", "");
             if (shown && shown !== target && shown.indexOf("widgets.") !== 0) names.push(shown);
@@ -460,7 +460,7 @@ PanelWindow {
     // Vortex 1.7.5: todos los paneles, no solo esos dos, y a los 20 s: los demás (red, volumen,
     // reloj, música, notificaciones, sistema) se quedaban en memoria para siempre tras abrirlos
     // una vez (~10-25 MB cada uno). Reabrirlos cuesta un instante.
-    readonly property var releasableWidgets: ["guide", "wallpaper", "network", "volume", "calendar", "music", "notifications", "system", "keybinds", "celular", "juegos", "arreglar", "onedrive", "musica", "estudio"]
+    readonly property var releasableWidgets: ["guide", "wallpaper", "network", "volume", "calendar", "music", "notifications", "system", "keybinds", "celular", "juegos", "arreglar", "restore", "onedrive", "musica", "estudio"]
     readonly property int widgetReleaseDelay: 20000
     property string _previousActive: "hidden"
     property var widgetHiddenSince: ({})
@@ -634,7 +634,7 @@ PanelWindow {
         if (!result) return null;
 
         let scale = masterWindow.globalUiScale || 1.0;
-        let isFixed = (name === "guide" || name === "keybinds" || name === "juegos" || name === "arreglar" || name === "musica" || name === "estudio" || name === "wallpaper" || name === "notifications" || name === "system" || name === "hidden");
+        let isFixed = (name === "guide" || name === "keybinds" || name === "juegos" || name === "arreglar" || name === "restore" || name === "musica" || name === "estudio" || name === "wallpaper" || name === "notifications" || name === "system" || name === "hidden");
 
         if (effHidden && !isFixed) {
             let offsetAdjustment = Math.round(46 * scale);

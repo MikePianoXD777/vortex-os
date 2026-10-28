@@ -41,6 +41,9 @@ Uso: vortex <comando>
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
+  restore [crear|lista|ver|volver…]    Vortexine Restore: puntos de restauración de Hyprland, tema, barra,
+                                       widgets y terminal («vortex restore» sin nada: la lista)
+  emergencia                           si el escritorio no sirve: desde Ctrl+Alt+F3, vuelve a un punto
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
@@ -428,6 +431,7 @@ aviso_atajos() {
 cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
+  restore_al_iniciar
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _
@@ -816,7 +820,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1049,6 +1053,8 @@ cmd_actualizar() {
     shift
   fi
   instalar_comandos
+  # Vortexine Restore: un punto con tu configuración de antes de actualizar (si cambió algo).
+  [[ -x "$VORTEX_DIR/bin/vortex-restore" ]] && "$VORTEX_DIR/bin/vortex-restore" auto actualizar || true
   paru -Syu
   version_sistema
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
@@ -1164,6 +1170,48 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIDAD
+}
+
+# Vortexine Restore (1.10): un punto cada 30 min, solo si algo cambió (vortex-restore auto). Es un
+# temporizador de systemd: entre una vez y otra no queda nada corriendo.
+restore_unidades() {
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  mkdir -p "$d"
+  cat >"$d/vortex-restore.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine Restore: guardar la configuración si cambió
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vortex-restore auto
+Nice=19
+IOSchedulingClass=idle
+UNIDAD
+  cat >"$d/vortex-restore.timer" <<'UNIDAD'
+[Unit]
+Description=Vortexine Restore: guardar la configuración cada 30 min (si cambió)
+
+[Timer]
+OnStartupSec=5min
+OnUnitActiveSec=30min
+
+[Install]
+WantedBy=timers.target
+UNIDAD
+}
+
+# Al entrar: el temporizador (se escribe y enciende si falta) y, cuando el escritorio ya arrancó
+# (1 min después, si la sesión sigue), el punto «Inicio de sesión»: la emergencia sugiere volver a uno
+# de estos, la última vez que el escritorio arrancó bien. En el live no.
+restore_al_iniciar() {
+  [[ -e /etc/vortex/live ]] && return 0
+  command -v vortex-restore >/dev/null || return 0
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  if [[ ! -f "$d/vortex-restore.timer" ]]; then
+    restore_unidades
+    (systemctl --user daemon-reload && systemctl --user enable --now vortex-restore.timer) >/dev/null 2>&1 || true
+  fi
+  setsid bash -c 'sleep 60; hyprctl -j version >/dev/null 2>&1 && exec vortex-restore auto inicio' </dev/null >/dev/null 2>&1 &
 }
 
 # El aviso se enciende solo la primera vez (si lo apagaste, se respeta). Lo llaman «vortex actualizar» y
@@ -1310,6 +1358,9 @@ case "${1:-ayuda}" in
   windows) shift; cmd_windows "$@" ;;
   bench) shift; exec "$VORTEX_DIR/bin/vortex-bench" "$@" ;;
   onedrive) shift; exec "$VORTEX_DIR/bin/vortex-onedrive" "$@" ;;
+  restore) shift; exec "$VORTEX_DIR/bin/vortex-restore" "$@" ;;
+  emergencia) exec "$VORTEX_DIR/bin/vortex-restore" emergencia ;;
+  reiniciar-shell) reiniciar_shell ;;
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;

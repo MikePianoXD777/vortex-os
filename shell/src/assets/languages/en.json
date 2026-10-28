@@ -1644,6 +1644,10 @@
       "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)",
       "short": "Game library"
     },
+    "restore": {
+      "name": "Vortexine Restore",
+      "desc": "Restore points: go back to an earlier Hyprland, theme, bar or widgets if something breaks"
+    },
     "arreglar": {
       "name": "Something's not working",
       "desc": "Check and fix sound, internet, Wi-Fi, Bluetooth, disk and time"
@@ -1891,6 +1895,41 @@
     "search": "Search your games…",
     "empty": "No games yet. Install them with Steam or Heroic (or a Flatpak from the Shop) and they will show up here.",
     "no_match": "No game matches your search."
+  },
+  "restore": {
+    "intro": "Restore points of your desktop: if something breaks, go back to an earlier one, all of it or just one part.",
+    "manual_note": "Manual point",
+    "created": "Point saved.",
+    "restored": "Done: it's back to that point.",
+    "error": "It didn't work.",
+    "note_placeholder": "Note (optional), e.g. «before changing the bar»",
+    "create": "Create point",
+    "empty": "There are no points yet. Create the first one; from now on one is also saved by itself when something changes.",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "latest": "· the newest",
+    "changed": "Changed:",
+    "cancel": "Cancel",
+    "go_back": "Go back",
+    "what": "What goes back to how it was at this point? What's here now is saved first, so you can undo it.",
+    "hint": "If the desktop doesn't start: press Ctrl+Alt+F3, log in with your user and type «vortex emergencia».",
+    "parts": {
+      "hyprland": "Hyprland",
+      "tema": "Bar and theme",
+      "widgets": "Widgets",
+      "terminal": "Terminal",
+      "apariencia": "App look",
+      "vortex": "Vortexine's",
+      "todo": "Everything"
+    },
+    "types": {
+      "manual": "Yours",
+      "auto": "Automatic",
+      "inicio": "Login",
+      "actualizar": "Before updating",
+      "antes": "Before going back",
+      "volver": "Went back"
+    }
   },
   "arreglar": {
     "title": "Something's not working?",

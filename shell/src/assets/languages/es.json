@@ -1688,6 +1688,10 @@
       "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)",
       "short": "Biblioteca de juegos"
     },
+    "restore": {
+      "name": "Vortexine Restore",
+      "desc": "Puntos de restauración: vuelve a tu Hyprland, tema, barra o widgets de antes si algo se rompe"
+    },
     "arreglar": {
       "name": "Algo no funciona",
       "desc": "Revisa y arregla el sonido, internet, wifi, Bluetooth, disco y hora"
@@ -1933,6 +1937,41 @@
     "search": "Buscar un juego…",
     "empty": "Todavía no hay juegos. Instálalos con Steam o Heroic (o un Flatpak de la Tienda) y aparecerán aquí.",
     "no_match": "Ningún juego coincide con tu búsqueda."
+  },
+  "restore": {
+    "intro": "Puntos de tu escritorio: si algo se rompe, vuelve a uno anterior, todo o solo una parte.",
+    "manual_note": "Punto manual",
+    "created": "Punto guardado.",
+    "restored": "Listo: volvió a ese punto.",
+    "error": "No se pudo.",
+    "note_placeholder": "Nota (opcional), p. ej. «antes de cambiar la barra»",
+    "create": "Crear punto",
+    "empty": "Todavía no hay puntos. Crea el primero; desde ahora también se guarda uno solo cuando algo cambia.",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "latest": "· el más nuevo",
+    "changed": "Cambió:",
+    "cancel": "Cancelar",
+    "go_back": "Volver",
+    "what": "¿Qué vuelve a como estaba en este punto? Lo de ahora se guarda antes, así que se puede deshacer.",
+    "hint": "Si el escritorio no arranca: Ctrl+Alt+F3, entra con tu usuario y escribe «vortex emergencia».",
+    "parts": {
+      "hyprland": "Hyprland",
+      "tema": "Barra y tema",
+      "widgets": "Widgets",
+      "terminal": "Terminal",
+      "apariencia": "Apariencia de apps",
+      "vortex": "Vortexine's",
+      "todo": "Todo"
+    },
+    "types": {
+      "manual": "Tuyo",
+      "auto": "Automático",
+      "inicio": "Inicio de sesión",
+      "actualizar": "Antes de actualizar",
+      "antes": "Antes de volver",
+      "volver": "Volviste"
+    }
   },
   "arreglar": {
     "title": "¿Algo no funciona?",
