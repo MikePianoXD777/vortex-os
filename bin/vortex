@@ -983,6 +983,7 @@ PAQUETES_NUEVOS=(
   tesseract tesseract-data-spa tesseract-data-eng # 1.8: vortex-texto (copiar texto de la pantalla)
   kdeconnect zenity # 1.8: tu celular (Super+Shift+P); zenity elige los archivos que se le mandan
   pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
+  easyeffects # 1.10: sin él el ecualizador del panel de música no hace nada
 )
 paquetes_nuevos() {
   local p faltan=()

@@ -119,5 +119,7 @@ ShellRoot {
         Qt.application.name = "serpantinum";
         FirstLaunch.checkFirstLaunch();
         SysNotif.checkBattery();
+        // Vortex: el ecualizador guardado vuelve a sonar después de reiniciar (media/equalizer.sh).
+        Quickshell.execDetached(["bash", Caching.qsDir + "/media/equalizer.sh", "restaurar"]);
     }
 }

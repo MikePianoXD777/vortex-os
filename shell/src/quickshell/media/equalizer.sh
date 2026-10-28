@@ -3,7 +3,12 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/caching.sh"
 qs_ensure_cache "music"
 
-STATE_FILE="$QS_RUN_MUSIC/eq_state.json"
+# Vortex: el estado va en ~/.local/state (antes en /run/user, que se borra al reiniciar y se perdía el
+# ecualizador); se trae el de la carpeta vieja si existe.
+STATE_FILE="$QS_STATE_MUSIC/eq_state.json"
+if [ ! -f "$STATE_FILE" ] && [ -f "$QS_RUN_MUSIC/eq_state.json" ]; then
+    mv -f "$QS_RUN_MUSIC/eq_state.json" "$STATE_FILE"
+fi
 PRESET_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output"
 PRESET_NAME="live_eq"
 PRESET_FILE="$PRESET_DIR/${PRESET_NAME}.json"
@@ -356,6 +361,16 @@ arg2=$3
 case $cmd in
     "get")
         cat "$STATE_FILE"
+        ;;
+
+    # Vortex: al iniciar sesión (Shell.qml) se vuelve a aplicar el ecualizador guardado, si hay algo que
+    # aplicar y EasyEffects está instalado; plano y sin efectos no arranca nada.
+    "restaurar")
+        command -v easyeffects >/dev/null 2>&1 || exit 0
+        jq -e '([.b1,.b2,.b3,.b4,.b5,.b6,.b7,.b8,.b9,.b10] | map(tonumber) | any(. != 0))
+               or (.balance | tonumber) != 0 or .mono or .swap or .dynamics != "off"' \
+            "$STATE_FILE" >/dev/null 2>&1 || exit 0
+        apply_eq
         ;;
 
     "set_band")
