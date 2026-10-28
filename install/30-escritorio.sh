@@ -77,6 +77,18 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-shop/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shop/"*.pkg.tar.*
 fi
+# Vortex App Installer (1.10): abre lo que descargas y lo instala o descomprime sin terminal. Las
+# asociaciones de archivos las pone «vortex primer-inicio»/«vortex actualizar» (asociar_app_installer).
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-app-installer)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-app-installer" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortex App Installer instalado (vortex-app-installer)"
+  else
+    aviso "No se pudo instalar Vortex App Installer (packaging/vortex-app-installer)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-app-installer/"{pkg,src} "$VORTEX_DIR/packaging/vortex-app-installer/"*.pkg.tar.*
+fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 

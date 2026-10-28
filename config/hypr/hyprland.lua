@@ -172,6 +172,16 @@ hl.window_rule({
     move = "monitor_w-window_w-7 41",
 })
 
+-- Vortex App Installer (1.10): sale flotando al centro, como un diálogo, aunque estés en mosaico (abre
+-- lo que descargas y lo instala o descomprime). Su tamaño es el de la app.
+hl.window_rule({
+    name = "vortex-app-installer",
+    match = { class = "^vortex-app-installer$" },
+    float = true,
+    center = true,
+    size = "760 720",
+})
+
 -- Gestor de ventanas (1.7.5, Ajustes → Pantalla o «vortex ventanas mosaico|kde»). De fábrica, mosaico
 -- (como qtile). En «kde», para quien viene de KDE o Windows: cada ventana se abre flotante y encimada, se
 -- arrastra de su barra de título (minimizar, maximizar y cerrar), se pega a las orillas y a las otras

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortex App Installer: una flecha que baja hacia una caja abierta, en los colores de Vortexine's OS.
+     Dibujo original de este proyecto. Formas gruesas para que se lea igual a 16 px que a 256 px. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vx-caja" x1="20" y1="56" x2="108" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+    <linearGradient id="vx-flecha" x1="64" y1="14" x2="64" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c6a8ff"/>
+      <stop offset="1" stop-color="#9ec5ff"/>
+    </linearGradient>
+    <linearGradient id="vx-borde" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#vx-borde)" stroke-width="1.5"/>
+  <!-- tapas abiertas -->
+  <path d="M24 66 L15 52 a3 3 0 0 1 2.6 -4.5 H46 L54 66 Z" fill="url(#vx-caja)" fill-opacity="0.6"/>
+  <path d="M104 66 L113 52 a3 3 0 0 0 -2.6 -4.5 H82 L74 66 Z" fill="url(#vx-caja)" fill-opacity="0.6"/>
+  <!-- la caja -->
+  <path d="M24 64 h80 v30 a12 12 0 0 1 -12 12 h-56 a12 12 0 0 1 -12 -12 z" fill="url(#vx-caja)"/>
+  <!-- la boca de la caja, para que la flecha entre -->
+  <rect x="24" y="64" width="80" height="6" fill="#0b0d1a" fill-opacity="0.35"/>
+  <!-- la flecha que baja -->
+  <path d="M64 18 V62 M47 47 L64 64 L81 47" fill="none" stroke="#0b0d1a" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 18 V62 M47 47 L64 64 L81 47" fill="none" stroke="url(#vx-flecha)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- una línea en el frente de la caja (la etiqueta) -->
+  <path d="M52 87 H76" fill="none" stroke="#0b0d1a" stroke-opacity="0.5" stroke-width="6" stroke-linecap="round"/>
+</svg>

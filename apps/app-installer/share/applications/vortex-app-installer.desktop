@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortex App Installer
+GenericName=Instalador de apps
+GenericName[en]=App Installer
+Comment=Instala o descomprime lo que bajaste de internet, sin terminal
+Comment[en]=Install or extract what you downloaded, no terminal needed
+Exec=vortex-app-installer %f
+Icon=vortex-app-installer
+Terminal=false
+Categories=Utility;Archiving;Compression;
+Keywords=instalar;descomprimir;comprimido;zip;rar;7z;tar;appimage;deb;rpm;flatpak;exe;mod;minecraft;install;extract;archive;
+MimeType=application/zip;application/x-zip-compressed;application/vnd.rar;application/x-rar;application/x-rar-compressed;application/x-7z-compressed;application/x-tar;application/x-compressed-tar;application/x-gtar;application/x-xz-compressed-tar;application/x-zstd-compressed-tar;application/x-bzip2-compressed-tar;application/x-bzip-compressed-tar;application/x-lzma-compressed-tar;application/x-lz4-compressed-tar;application/gzip;application/x-gzip;application/x-xz;application/x-bzip2;application/x-bzip;application/zstd;application/x-zstd;application/x-cd-image;application/x-iso9660-image;application/vnd.appimage;application/x-iso9660-appimage;application/x-appimage;application/x-shellscript;application/x-sh;application/x-executable;application/x-makeself;application/vnd.debian.binary-package;application/x-deb;application/x-rpm;application/x-redhat-package-manager;application/vnd.flatpak.ref;application/vnd.flatpak;application/x-msdos-program;application/x-ms-dos-executable;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ole-storage;application/x-java-archive;
+StartupNotify=true
+StartupWMClass=vortex-app-installer

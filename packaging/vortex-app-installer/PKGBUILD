@@ -1,0 +1,49 @@
+# Vortex App Installer: abre lo que descargas (comprimidos, AppImage, programas .tar.gz, .run, .deb,
+# Flatpak, .exe, .jar y mods de Minecraft) y lo instala o descomprime sin terminal. Todo se deshace
+# desde su pestaña «Instalado». Empaquetado desde apps/app-installer/ de este repo; llega a todos con
+# «vortex actualizar», que además la pone de app por defecto para esos archivos.
+#
+#   cd packaging/vortex-app-installer && makepkg -si
+pkgname=vortex-app-installer
+pkgver=1.0
+pkgrel=1
+pkgdesc="Vortex App Installer: instala o descomprime lo que descargas, sin terminal"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# libarchive trae bsdtar (casi todos los comprimidos); xdg-utils, para abrir carpetas;
+# desktop-file-utils, para que el lanzador vea lo que instala o quita.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'libarchive' 'flatpak' 'xdg-utils'
+         'desktop-file-utils')
+optdepends=('7zip: 7z y zip cifrados'
+            'unrar: RAR cifrados'
+            'wine: abrir programas de Windows'
+            'jre-openjdk: correr archivos .jar'
+            'kitty: terminal para instaladores .run/.sh'
+            'fuse2: correr AppImages sin extraerlas'
+            'glib2: papelera fuera de la carpeta personal'
+            'zstd: archivos .zst sueltos')
+
+package() {
+    local origen="$startdir/../../apps/app-installer"
+    local share="$pkgdir/usr/share/vortex-app-installer"
+
+    install -d "$share"
+    cp -a "$origen/vortex_app_installer" "$share/"
+    # Sin restos de correrla desde el repo.
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    # Ya compilado: /usr es de solo lectura para el usuario.
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-app-installer" "$pkgdir/usr/bin/vortex-app-installer"
+    install -Dm644 "$origen/share/applications/vortex-app-installer.desktop" \
+        "$pkgdir/usr/share/applications/vortex-app-installer.desktop"
+    local t
+    for t in scalable 16x16 24x24; do
+        install -Dm644 "$origen/share/icons/hicolor/$t/apps/vortex-app-installer.svg" \
+            "$pkgdir/usr/share/icons/hicolor/$t/apps/vortex-app-installer.svg"
+    done
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

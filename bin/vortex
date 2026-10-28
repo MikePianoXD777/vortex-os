@@ -434,6 +434,7 @@ cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
   restore_al_iniciar
+  asociar_app_installer
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _
@@ -1072,11 +1073,11 @@ cmd_actualizar() {
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
-  # Los paquetes propios (shell, tienda, Miku y Vortex Studio) vienen de packaging/ de este repo: se
+  # Los paquetes propios (shell, tienda, App Installer, Miku y Vortex Studio) vienen de packaging/ de este repo: se
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     if [[ "$pkg" == vortex-studio && -z "$instalado" ]]; then
@@ -1099,6 +1100,7 @@ cmd_actualizar() {
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   done
+  asociar_app_installer
   # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
   # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
   local f respaldo cambio=0
@@ -1172,6 +1174,43 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIDAD
+}
+
+# Vortex App Installer (1.10) como app por defecto de lo que se descarga: comprimidos, ISO, AppImage,
+# .deb/.rpm, Flatpak, .exe/.msi y .jar. Una sola vez y solo donde no hay otra app elegida (o la elegida
+# ya no existe): si prefieres Ark o File Roller para los .zip, se respeta, y no vuelve a cambiarlo. Los
+# scripts y ejecutables sueltos no: se editan a menudo; la app sale en «Abrir con».
+APP_INSTALLER_MIME=(application/zip application/x-zip-compressed application/vnd.rar application/x-rar
+  application/x-rar-compressed application/x-7z-compressed application/x-tar application/x-compressed-tar
+  application/x-gtar application/x-xz-compressed-tar application/x-zstd-compressed-tar
+  application/x-bzip2-compressed-tar application/x-bzip-compressed-tar application/x-lzma-compressed-tar
+  application/x-lz4-compressed-tar application/gzip application/x-gzip application/x-xz application/x-bzip2
+  application/x-bzip application/zstd application/x-zstd application/x-cd-image application/x-iso9660-image
+  application/vnd.appimage application/x-iso9660-appimage application/x-appimage
+  application/vnd.debian.binary-package application/x-deb application/x-rpm
+  application/x-redhat-package-manager application/vnd.flatpak.ref application/vnd.flatpak
+  application/x-msdos-program application/x-ms-dos-executable application/vnd.microsoft.portable-executable
+  application/x-msi application/x-java-archive)
+
+existe_desktop() {
+  local dirs d
+  IFS=: read -ra dirs <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  for d in "${dirs[@]}"; do
+    [[ -f "$d/applications/$1" ]] && return 0
+  done
+  return 1
+}
+
+asociar_app_installer() {
+  local marca="$AVISOS_ESTADO/app-installer-asociado" m actual
+  [[ -e "$marca" ]] && return 0
+  command -v vortex-app-installer >/dev/null && command -v xdg-mime >/dev/null || return 0
+  for m in "${APP_INSTALLER_MIME[@]}"; do
+    actual="$(xdg-mime query default "$m" 2>/dev/null)" || actual=""
+    [[ -n "$actual" ]] && existe_desktop "$actual" && continue
+    xdg-mime default vortex-app-installer.desktop "$m" 2>/dev/null || true
+  done
+  mkdir -p "$AVISOS_ESTADO" && : >"$marca"
 }
 
 # Vortexine Restore (1.10): un punto cada 30 min, solo si algo cambió (vortex-restore auto). Es un
@@ -1265,7 +1304,7 @@ avisos_pendientes() {
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
   # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
-  for pkg in vortex-shell vortex-shop vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortex App Installer en tamaño chico (16 a 24 px): el mismo dibujo sin tapas ni detalles, con trazos
+     más gruesos para que no se empaste. El grande está en scalable/apps. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vx-caja" x1="16" y1="60" x2="112" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="128" height="128" rx="30" fill="#0b0d1a"/>
+  <path d="M16 64 h96 v34 a14 14 0 0 1 -14 14 h-68 a14 14 0 0 1 -14 -14 z" fill="url(#vx-caja)"/>
+  <path d="M64 14 V60 M42 42 L64 64 L86 42" fill="none" stroke="#0b0d1a" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M64 14 V60 M42 42 L64 64 L86 42" fill="none" stroke="#b4b8ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

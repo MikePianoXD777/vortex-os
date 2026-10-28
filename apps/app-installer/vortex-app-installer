@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Vortex App Installer: instala o descomprime lo que bajaste de internet, sin terminal.
+#   vortex-app-installer [ARCHIVO]
+# Corre «python -m vortex_app_installer» con el código donde esté:
+#   1. VORTEX_APP_INSTALLER_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-app-installer, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_APP_INSTALLER_DIR:-}" "$aqui" /usr/share/vortex-app-installer; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_app_installer/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortex App Installer no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_app_installer "$@"
