@@ -199,7 +199,7 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
             } 
         },
         "music": { 
-            w: 625, h: 565, comp: "media/MusicPopup.qml", 
+            w: 625, h: 565, comp: "media/MusicPopup.qml", sinEscala: true,
             pos: { 
                 "top": { anchor: "top-left", mt: 52, ml: 5 }, 
                 "bottom": { anchor: "bottom-left", mb: 52, ml: 5 }, 
@@ -290,8 +290,11 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
     let t = base[name];
     let p = t.pos[barPosition] || t.pos["top"];
 
-    let finalW = t.w === "fill" ? mw : s(t.w, scale);
-    let finalH = t.h === "fill" ? mh : s(t.h, scale);
+    // Vortex: «sinEscala» = el contenido no se encoge con general.uiScale (Scaler.s no escala), así
+    // que el marco tampoco; si no, con el 0.85 de la semilla el contenido se sale y se corta.
+    let sizeScale = t.sinEscala ? 1.0 : scale;
+    let finalW = t.w === "fill" ? mw : s(t.w, sizeScale);
+    let finalH = t.h === "fill" ? mh : s(t.h, sizeScale);
 
     let rx = 0;
     let ry = 0;
