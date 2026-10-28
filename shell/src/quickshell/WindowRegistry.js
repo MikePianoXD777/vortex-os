@@ -119,6 +119,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰌝"
         },
         {
+            // Vortex 1.10: buscaminas tryhard (buscaminas/), idea de THYRVAREN.
+            id: "buscaminas",
+            name: tr("widgets.buscaminas.name", "Tryhard Minesweeper"),
+            description: tr("widgets.buscaminas.desc", "Minesweeper with records, 3BV/s and modes to suffer: fog, against the clock, no flags"),
+            icon: "applications-games",
+            fontIcon: "\u{F0691}"
+        },
+        {
             // Vortex 1.10: mods de Minecraft de Modrinth y CurseForge a la instancia que elijas (minecraft/).
             id: "modrinth",
             name: tr("widgets.minecraft.name", "Minecraft mods"),
@@ -292,6 +300,17 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: «Widgets en HTML» (htmlwidgets/HtmlWidgetsPopup.qml), al centro.
         "htmlwidgets": {
             w: 1000, h: 680, comp: "htmlwidgets/HtmlWidgetsPopup.qml", draggable: true, sinEscala: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: el buscaminas tryhard (buscaminas/BuscaminasPopup.qml), al centro. Cabe el
+        // tablero Tryhard de 30×20 con casillas de ~30 px.
+        "buscaminas": {
+            w: 1040, h: 840, comp: "buscaminas/BuscaminasPopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

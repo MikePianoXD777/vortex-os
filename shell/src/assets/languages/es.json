@@ -1720,6 +1720,10 @@
       "name": "Temporizador de estudio",
       "desc": "Pomodoro: bloques de estudio con descansos, sin notificaciones mientras estudias",
       "short": "Estudio"
+    },
+    "buscaminas": {
+      "name": "Buscaminas tryhard",
+      "desc": "Buscaminas con récords, 3BV/s y modos para sufrir: niebla, contrarreloj, sin banderas"
     }
   },
   "cli": {
@@ -2168,5 +2172,46 @@
     "long_break_body": "Hoy llevas {n} bloques de estudio. Descansa {m} minutos: párate y toma agua.",
     "study_title": "A estudiar",
     "study_body": "{m} minutos. Páralo desde la barra o el panel cuando termines."
+  },
+  "buscaminas": {
+    "title": "Buscaminas tryhard",
+    "intro": "El primer clic siempre es seguro. Lo demás, ya es cosa tuya.",
+    "diff": {
+      "facil": "Fácil",
+      "medio": "Medio",
+      "experto": "Experto",
+      "tryhard": "Tryhard"
+    },
+    "mines_word": "minas",
+    "modifiers": "Modificadores:",
+    "mod": {
+      "sin_banderas": "Sin banderas",
+      "contrarreloj": "Contrarreloj",
+      "niebla": "Niebla",
+      "muerte_subita": "Muerte súbita"
+    },
+    "mod_desc": {
+      "sin_banderas": "Ábrelo todo sin marcar ni una sola mina",
+      "contrarreloj": "1 segundo por cada clic del 3BV (1.5 en Fácil y Medio): si se acaba, pierdes",
+      "niebla": "Los números se borran 2.5 s después de abrirlos: memorízalos",
+      "muerte_subita": "Una bandera donde no hay mina y pierdes ahí mismo"
+    },
+    "again": "Otra (R)",
+    "stat": {
+      "mines": "Minas",
+      "time": "Tiempo",
+      "left": "Te queda",
+      "clicks": "Clics",
+      "efficiency": "Eficiencia",
+      "best": "Récord",
+      "won": "Ganadas"
+    },
+    "no_flags_hint": "En este modo no hay banderas: abre todo lo demás",
+    "new_record": "¡Nuevo récord!",
+    "won": "Ganaste en %1 s",
+    "timeout": "Se acabó el tiempo. R para otra",
+    "lost": "Boom. R para otra",
+    "ready": "Dale clic donde sea para empezar",
+    "controls": "Izq: abrir · Der: bandera · Clic en número o medio: acorde · Espacio: bandera/acorde · R: otra · 1-4: dificultad"
   }
 }

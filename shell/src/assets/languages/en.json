@@ -1676,6 +1676,10 @@
       "name": "Study timer",
       "desc": "Pomodoro: study blocks with breaks, with no notifications while you study",
       "short": "Study"
+    },
+    "buscaminas": {
+      "name": "Tryhard Minesweeper",
+      "desc": "Minesweeper with records, 3BV/s and modes to suffer: fog, against the clock, no flags"
     }
   },
   "cli": {
@@ -2126,5 +2130,46 @@
     "long_break_body": "You studied {n} blocks today. Rest {m} minutes: stand up, drink water.",
     "study_title": "Back to studying",
     "study_body": "{m} minutes. Stop it from the bar or the panel when you are done."
+  },
+  "buscaminas": {
+    "title": "Tryhard Minesweeper",
+    "intro": "The first click is always safe. After that, it's on you.",
+    "diff": {
+      "facil": "Easy",
+      "medio": "Medium",
+      "experto": "Expert",
+      "tryhard": "Tryhard"
+    },
+    "mines_word": "mines",
+    "modifiers": "Modifiers:",
+    "mod": {
+      "sin_banderas": "No flags",
+      "contrarreloj": "Against the clock",
+      "niebla": "Fog",
+      "muerte_subita": "Sudden death"
+    },
+    "mod_desc": {
+      "sin_banderas": "Open everything without marking a single mine",
+      "contrarreloj": "1 second per 3BV click (1.5 on Easy and Medium): run out and you lose",
+      "niebla": "Numbers fade 2.5 s after you open them: memorize them",
+      "muerte_subita": "A flag where there is no mine loses on the spot"
+    },
+    "again": "New game (R)",
+    "stat": {
+      "mines": "Mines",
+      "time": "Time",
+      "left": "Time left",
+      "clicks": "Clicks",
+      "efficiency": "Efficiency",
+      "best": "Best",
+      "won": "Won"
+    },
+    "no_flags_hint": "No flags in this mode: open everything else",
+    "new_record": "New record!",
+    "won": "You won in %1 s",
+    "timeout": "Time's up. R for another",
+    "lost": "Boom. R for another",
+    "ready": "Click anywhere to start",
+    "controls": "Left: open · Right: flag · Click a number or middle: chord · Space: flag/chord · R: new · 1-4: difficulty"
   }
 }
