@@ -98,7 +98,7 @@ GuideTab {
         let isVid = false;
         if (p) {
             let lp = p.toLowerCase();
-            isVid = lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm");
+            isVid = /\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(lp);
         }
         let cacheDir = (typeof Caching !== "undefined" && typeof Caching.getCacheDir === "function")
             ? Caching.getCacheDir("wallpaper") : "";

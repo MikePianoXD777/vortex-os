@@ -26,7 +26,7 @@ check_status() {
 
     RANDOM_WP=""
     if [ -n "$WP_DIR" ] && [ -d "$WP_DIR" ]; then
-        RANDOM_WP="$(find "$WP_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.mov" -o -iname "*.webm" \) 2>/dev/null | shuf -n 1)"
+        RANDOM_WP="$(find "$WP_DIR" -maxdepth 1 -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" -o -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.mov" -o -iname "*.webm" -o -iname "*.m4v" -o -iname "*.avi" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.ogv" -o -iname "*.mpg" -o -iname "*.mpeg" -o -iname "*.3gp" \) 2>/dev/null | shuf -n 1)"
     fi
 
     START_QML=""

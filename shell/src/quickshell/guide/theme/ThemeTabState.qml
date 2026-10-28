@@ -155,7 +155,7 @@ GuideTab {
     property int wallpaperRevision: 0
     property bool isWallpaperVideo: {
         let lp = currentWallpaperPath.toLowerCase();
-        return lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm") || lp.indexOf("000_") !== -1;
+        return /\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(lp) || lp.indexOf("000_") !== -1;
     }
 
 
@@ -319,7 +319,7 @@ GuideTab {
             "        return subprocess.run([\"xdg-user-dir\", n], capture_output=True, text=True, timeout=3).stdout.strip()\n" +
             "    except Exception:\n" +
             "        return \"\"\n" +
-            "exts = {\".jpg\", \".jpeg\", \".png\", \".webp\", \".bmp\", \".mp4\", \".mkv\", \".mov\", \".webm\"}\n" +
+            "exts = {\".jpg\", \".jpeg\", \".png\", \".webp\", \".bmp\", \".mp4\", \".mkv\", \".mov\", \".webm\", \".m4v\", \".avi\", \".wmv\", \".flv\", \".ogv\", \".mpg\", \".mpeg\", \".3gp\"}\n" +
             "dirs = set()\n" +
             "candidates = [\n" +
             "    os.path.join(home, \"Pictures\"),\n" +

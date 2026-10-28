@@ -35,6 +35,8 @@ Uso: vortex <comando>
                                        avisa (con notificación y un botón «Actualizar») cuando hay
                                        actualizaciones del sistema, de tus apps o de Vortexine's
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
+  fondo-agregar [ARCHIVO...]           copia videos (mp4, mov, mkv, webm, avi…) o imágenes a tus fondos
+                                       y pone el primero; sin archivos, los eliges en una ventana
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
@@ -298,7 +300,7 @@ minutos_fondos() {
 fondo_al_azar() {
   local actual
   actual="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper/current_$(monitores | head -n1)" 2>/dev/null)"
-  case "${actual,,}" in *.mp4 | *.webm | *.mkv | *.mov) return 1 ;; esac
+  case "${actual,,}" in *.mp4 | *.webm | *.mkv | *.mov | *.m4v | *.avi | *.wmv | *.flv | *.ogv | *.mpg | *.mpeg | *.3gp) return 1 ;; esac
   find "$(carpeta_fondos)" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) \
     2>/dev/null | grep -vxF -- "${actual:-/}" | shuf -n1
 }
@@ -363,6 +365,47 @@ cmd_fondo() {
   for m in $(monitores); do
     shell_ipc wallpaper setWallpaper "$m" "$archivo" fade >/dev/null
   done
+}
+
+# 1.10: «Agregar» del selector de fondos (Super+W). Copia a la carpeta de fondos los videos o imágenes
+# que elijas (sin pisar uno que ya esté: «nombre (2).mp4») y pone el primero; un video se optimiza solo
+# la primera vez (scripts/wallpaper/optimizar_video.sh), así que cualquier formato que lea ffmpeg sirve.
+FONDOS_EXT="mp4 m4v mkv mov webm avi wmv flv ogv mpg mpeg 3gp jpg jpeg png webp bmp gif"
+cmd_fondo_agregar() {
+  local archivos=() dir f destino base ext n primero=""
+  if (($#)); then
+    archivos=("$@")
+  else
+    command -v zenity >/dev/null || { aviso "falta zenity (sudo pacman -S zenity)"; exit 1; }
+    local filtro="Videos e imágenes |" e
+    for e in $FONDOS_EXT; do filtro+=" *.$e *.${e^^}"; done
+    mapfile -t archivos < <(zenity --file-selection --multiple --separator=$'\n' \
+      --title="Agregar fondos (videos o imágenes)" --filename="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME")/" \
+      --file-filter="$filtro" --file-filter="Todos los archivos | *" 2>/dev/null)
+    ((${#archivos[@]})) || return 0
+  fi
+  dir="$(carpeta_fondos)"
+  mkdir -p "$dir" || { aviso "no pude crear $dir"; exit 1; }
+  for f in "${archivos[@]}"; do
+    [[ -f "$f" ]] || { aviso "no existe: $f"; continue; }
+    ext="${f##*.}"
+    [[ " $FONDOS_EXT " == *" ${ext,,} "* ]] || { aviso "no es un video ni una imagen: $f"; continue; }
+    f="$(readlink -f "$f")"
+    if [[ "${f%/*}" == "$(readlink -f "$dir")" ]]; then
+      destino="$f"
+    else
+      base="${f##*/}"
+      base="${base%.*}"
+      destino="$dir/$base.$ext"
+      n=2
+      while [[ -e "$destino" ]]; do destino="$dir/$base ($n).$ext"; ((n++)); done
+      cp -- "$f" "$destino" || { aviso "no pude copiar $f"; continue; }
+    fi
+    [[ -n "$primero" ]] || primero="$destino"
+  done
+  [[ -n "$primero" ]] || exit 1
+  cmd_fondo "$primero"
+  notificar -i preferences-desktop-wallpaper "Fondo agregado" "${primero##*/} ya es tu fondo y quedó en ${dir/#$HOME/\~}."
 }
 
 # 1.7.7: una sola vez por usuario, al entrar, un aviso de dónde están los atajos (Super+F1, la hoja de
@@ -1271,6 +1314,7 @@ case "${1:-ayuda}" in
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
+  fondo-agregar) shift; cmd_fondo_agregar "$@" ;;
   fondos-auto) shift; cmd_fondos_auto "$@" ;;
   bateria) shift; cmd_bateria "$@" ;;
   celular) shift; cmd_celular "$@" ;;

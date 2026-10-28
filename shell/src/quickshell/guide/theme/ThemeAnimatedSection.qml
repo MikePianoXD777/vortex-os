@@ -5,7 +5,7 @@ import "../../"
 import "../../reusables"
 import "../../reusables/guide"
 
-// Vortex: «Fondos animados» (videos .mp4/.webm/.mkv/.mov de la carpeta de fondos). Lo lee
+// Vortex: «Fondos animados» (videos .mp4/.mov/.mkv/.webm/.avi… de la carpeta de fondos). Lo lee
 // wallpaper/WallpaperEngine.qml desde «animatedWallpapers» en settings.json; todo viene encendido.
 SettingsBlob {
     id: section

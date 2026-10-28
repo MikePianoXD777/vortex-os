@@ -128,7 +128,7 @@ Item {
                 "import os, sys\n" +
                 "home = os.path.expanduser('~')\n" +
                 "q = sys.argv[1].strip()\n" +
-                "exts = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.mp4', '.mkv', '.mov', '.webm'}\n" +
+                "exts = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.mp4', '.mkv', '.mov', '.webm', '.m4v', '.avi', '.wmv', '.flv', '.ogv', '.mpg', '.mpeg', '.3gp'}\n" +
                 "dirs = set()\n" +
                 "base = q if os.path.isdir(q) else (os.path.dirname(q) if (os.path.isabs(q) and os.path.exists(os.path.dirname(q))) else '')\n" +
                 "search_roots = []\n" +

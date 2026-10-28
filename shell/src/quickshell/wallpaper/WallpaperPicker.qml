@@ -288,7 +288,7 @@ Item {
         let slash = clean.lastIndexOf("/");
         if (slash !== -1) clean = clean.substring(slash + 1);
         if (clean.startsWith("000_")) clean = clean.substring(4);
-        clean = clean.replace(/\.(jpg|jpeg|png|webp|gif|bmp|mp4|mkv|mov|webm)$/i, "");
+        clean = clean.replace(/\.(jpg|jpeg|png|webp|gif|bmp|mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/i, "");
         return clean;
     }
 
@@ -319,9 +319,9 @@ Item {
         let slash = s.lastIndexOf("/");
         if (slash !== -1) s = s.substring(slash + 1);
         if (s.startsWith("000_")) return true;
-        if (s.endsWith(".mp4") || s.endsWith(".mkv") || s.endsWith(".mov") || s.endsWith(".webm")) return true;
+        if (/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(s)) return true;
         let orig = window.getOriginalFileName(name).toLowerCase();
-        if (orig.endsWith(".mp4") || orig.endsWith(".mkv") || orig.endsWith(".mov") || orig.endsWith(".webm")) return true;
+        if (/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(orig)) return true;
         let base = window.getCleanBaseName(name);
         let match = window.thumbLookup[base] || window.thumbLookup[s];
         if (match && match.isVideo) return true;
@@ -506,7 +506,7 @@ Item {
 
         window.setWallpaperOnMonitors(finalPath, randomTransition);
 
-        let isVid = isVideo || window.isVideoTarget(safeFileName) || finalPath.toLowerCase().match(/\.(mp4|mkv|mov|webm)$/) !== null;
+        let isVid = isVideo || window.isVideoTarget(safeFileName) || finalPath.toLowerCase().match(/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/) !== null;
 
         if (isVid) {
             if (posterPath && posterPath !== "") {
@@ -844,7 +844,7 @@ Item {
             let sFu = String(fu);
             let clean = window.getCleanName(sFn);
             let base = window.getCleanBaseName(sFn);
-            let isVid = window.isVideoTarget(sFn) || sFn.toLowerCase().match(/\.(mp4|mkv|mov|webm)$/) !== null;
+            let isVid = window.isVideoTarget(sFn) || sFn.toLowerCase().match(/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/) !== null;
 
             let cached = newThumbLookup[sFn] || newThumbLookup[clean] || newThumbLookup[base];
             let item = cached ? cached : {
@@ -899,7 +899,7 @@ Item {
     FolderListModel {
         id: srcModel
         folder: "file://" + window.srcDir
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp", "*.mp4", "*.mkv", "*.mov", "*.webm", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP", "*.GIF", "*.BMP", "*.MP4", "*.MKV", "*.MOV", "*.WEBM"]
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp", "*.mp4", "*.mkv", "*.mov", "*.webm", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP", "*.GIF", "*.BMP", "*.MP4", "*.MKV", "*.MOV", "*.WEBM", "*.m4v", "*.M4V", "*.avi", "*.AVI", "*.wmv", "*.WMV", "*.flv", "*.FLV", "*.ogv", "*.OGV", "*.mpg", "*.MPG", "*.mpeg", "*.MPEG", "*.3gp", "*.3GP"]
         caseSensitive: true
         showDirs: false
         onCountChanged: {
@@ -1051,7 +1051,7 @@ Item {
             newColorMap[fname] = item.hex || "#808080";
             newBucketMap[fname] = item.bucket || "Monochrome";
 
-            let isVid = !!item.isVideo || window.isVideoTarget(fname) || fname.toLowerCase().match(/\.(mp4|mkv|mov|webm)$/) !== null;
+            let isVid = !!item.isVideo || window.isVideoTarget(fname) || fname.toLowerCase().match(/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/) !== null;
 
             if (isVid) {
                 item.isVideo = true;
@@ -1525,7 +1525,7 @@ Item {
     FolderListModel {
         id: searchFolderModel
         folder: window.searchDir
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp", "*.mp4", "*.mkv", "*.mov", "*.webm", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP", "*.GIF", "*.BMP", "*.MP4", "*.MKV", "*.MOV", "*.WEBM"]
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp", "*.mp4", "*.mkv", "*.mov", "*.webm", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP", "*.GIF", "*.BMP", "*.MP4", "*.MKV", "*.MOV", "*.WEBM", "*.m4v", "*.M4V", "*.avi", "*.AVI", "*.wmv", "*.WMV", "*.flv", "*.FLV", "*.ogv", "*.OGV", "*.mpg", "*.MPG", "*.mpeg", "*.MPEG", "*.3gp", "*.3GP"]
         caseSensitive: true
         showDirs: false
         sortField: FolderListModel.Name
@@ -1678,7 +1678,7 @@ Item {
             readonly property string safeFileName: fileName !== undefined ? String(fileName) : ""
             readonly property string itemFileUrl: fileUrl !== undefined ? String(fileUrl) : ""
             readonly property string itemPosterUrl: posterUrl !== undefined ? String(posterUrl) : ""
-            readonly property bool isVideo: (model.isVideo !== undefined && model.isVideo !== null) ? !!model.isVideo : (safeFileName.toLowerCase().match(/\.(mp4|mkv|mov|webm)$/) !== null || safeFileName.startsWith("000_"))
+            readonly property bool isVideo: (model.isVideo !== undefined && model.isVideo !== null) ? !!model.isVideo : (safeFileName.toLowerCase().match(/\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/) !== null || safeFileName.startsWith("000_"))
 
             readonly property bool isCurrent: ListView.isCurrentItem && !window.isScrollingBlocked
             readonly property bool isFakeSelected: window.isScrollingBlocked && index === 0
@@ -1981,6 +1981,34 @@ Item {
                             }
                         }
                     }
+                }
+            }
+
+            // Vortex 1.10: «Agregar» elige videos (mp4, mov, mkv, avi…) o imágenes de cualquier carpeta, los
+            // copia a la de fondos y pone el primero («vortex fondo-agregar», bin/vortex).
+            CanvasIconButton {
+                id: agregarFondoBtn
+                glassShadow: 0
+                size: window.s(34)
+                cornerRadius: window.s(10)
+                iconSize: window.s(12)
+                accentColor: ThemeBackend.surface0
+                bgOpacity: ThemeBackend.elementOpacity
+                textColor: ThemeBackend.subtext0
+                anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+                paintCanvas: function(ctx, canvas) {
+                    var s = window.s;
+                    ctx.strokeStyle = textColor;
+                    ctx.lineWidth = s(2);
+                    ctx.lineCap = "round";
+                    ctx.beginPath();
+                    ctx.moveTo(s(6), s(1)); ctx.lineTo(s(6), s(11));
+                    ctx.moveTo(s(1), s(6)); ctx.lineTo(s(11), s(6));
+                    ctx.stroke();
+                }
+                onClicked: {
+                    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"]);
+                    Quickshell.execDetached(["vortex", "fondo-agregar"]);
                 }
             }
 

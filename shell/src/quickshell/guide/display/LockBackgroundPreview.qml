@@ -36,7 +36,7 @@ Item {
     ImagePicker {
         id: backgroundPicker
         rootObj: preview.rootObj
-        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.svg", "*.gif", "*.mp4", "*.mkv", "*.mov", "*.webm"]
+        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.svg", "*.gif", "*.mp4", "*.mkv", "*.mov", "*.webm", "*.m4v", "*.avi", "*.wmv", "*.flv", "*.ogv", "*.mpg", "*.mpeg", "*.3gp"]
         onImageSelected: function(filePath, fileName) {
             preview.tab.setCustomBackground(filePath);
         }

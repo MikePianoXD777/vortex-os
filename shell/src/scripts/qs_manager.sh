@@ -162,7 +162,8 @@ handle_wallpaper_prep() {
         find "$SRC_DIR" -maxdepth 1 -type f \
             \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \
                -o -iname "*.gif" -o -iname "*.mp4" -o -iname "*.mkv" \
-               -o -iname "*.mov" -o -iname "*.webm" \) \
+               -o -iname "*.mov" -o -iname "*.webm" \
+               -o -iname "*.m4v" -o -iname "*.avi" -o -iname "*.wmv" -o -iname "*.flv" -o -iname "*.ogv" -o -iname "*.mpg" -o -iname "*.mpeg" -o -iname "*.3gp" \) \
             -printf "%f\n" | sort > "$SRC_LIST"
 
         comm -23 <(sed 's/^000_//' "$MANIFEST" | sort) "$SRC_LIST" | while read -r orphan; do
@@ -184,7 +185,7 @@ handle_wallpaper_prep() {
                 extension="jpg"
             fi
 
-            if [[ "${extension,,}" =~ ^(mp4|mkv|mov|webm)$ ]]; then
+            if [[ "${extension,,}" =~ ^(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$ ]]; then
                 thumb="$THUMB_DIR/000_$filename"
                 [[ -f "$THUMB_DIR/$filename" ]] && rm -f "$THUMB_DIR/$filename"
                 if [[ ! -f "$thumb" ]]; then

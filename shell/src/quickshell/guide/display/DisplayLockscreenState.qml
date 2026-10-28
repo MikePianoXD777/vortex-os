@@ -49,7 +49,7 @@ GuideTab {
 
     function isVideoPath(path) {
         let lp = String(path || "").toLowerCase();
-        return lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm");
+        return /\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(lp);
     }
 
     function setBackgroundMode(mode) {

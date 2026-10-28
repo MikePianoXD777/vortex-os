@@ -70,7 +70,7 @@ Scope {
                 readonly property string backgroundPath: customBackgroundActive ? customBackgroundPath : desktopWallpaperPath
                 readonly property bool backgroundIsVideo: {
                     let lp = win.backgroundPath.toLowerCase();
-                    return lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm");
+                    return /\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/.test(lp);
                 }
                 readonly property string videoPath: win.backgroundIsVideo ? win.backgroundPath : ""
                 readonly property string wallpaperSource: {

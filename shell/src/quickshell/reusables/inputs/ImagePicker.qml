@@ -20,7 +20,7 @@ FilePicker {
     ]
 
     property bool showCircleMask: false
-    readonly property bool selectedIsVideo: /\.(mp4|mkv|mov|webm)$/i.test(selectedFilePath)
+    readonly property bool selectedIsVideo: /\.(mp4|mkv|mov|webm|m4v|avi|wmv|flv|ogv|mpg|mpeg|3gp)$/i.test(selectedFilePath)
     signal imageSelected(string filePath, string fileName)
 
     onFileSelected: function(filePath, fileName) {

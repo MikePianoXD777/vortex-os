@@ -188,7 +188,7 @@ def run_indexing(src_dir, per_dir_cache, index_file, poster_dir):
             cached_items = {}
 
     img_exts = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-    vid_exts = {".mp4", ".mkv", ".mov", ".webm"}
+    vid_exts = {".mp4", ".mkv", ".mov", ".webm", ".m4v", ".avi", ".wmv", ".flv", ".ogv", ".mpg", ".mpeg", ".3gp"}
 
     entries_to_process = []
     seen_entry_names = set()
