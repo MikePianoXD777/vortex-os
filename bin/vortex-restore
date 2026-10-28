@@ -26,7 +26,7 @@ VORTEX="${VORTEX_BIN:-vortex}"
 PARTES=(
   "hyprland|Hyprland (ventanas, atajos, monitores)|.config/hypr .config/vortex/hypr-mio.lua .config/vortex/teclado.lua"
   "tema|Barra, tema y dock|.config/serpantinum"
-  "widgets|Widgets del escritorio|.local/state/serpantinum/widgets"
+  "widgets|Widgets del escritorio|.local/state/serpantinum/widgets .config/vortex/widgets-html"
   "terminal|Terminal|.config/kitty"
   "apariencia|Apariencia de las apps (GTK y Qt)|.config/gtk-3.0/settings.ini .config/gtk-3.0/gtk.css .config/gtk-4.0/settings.ini .config/gtk-4.0/gtk.css .config/qt5ct .config/qt6ct"
   "vortex|Ajustes de Vortexine's (avisos, Miku)|.config/vortex/actualizaciones.conf .config/vortex/miku.json .config/vortex/ventanas"

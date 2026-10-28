@@ -719,6 +719,18 @@ QtObject {
             variants: {
                 "default": { file: "faces/github/GithubFace.qml", icon: "1", label: typeof I18n !== "undefined" ? I18n.t("widgets.variants.default", "Default") : "Default" }
             }
+        },
+        // Vortex 1.10: tu widget en HTML sencillo (faces/html/). La ruta del .html va en imagePath; se
+        // crea y se edita en el lanzador → «Widgets en HTML».
+        "html": {
+            name: typeof I18n !== "undefined" ? I18n.t("widgets.types.html", "HTML") : "HTML",
+            icon: String.fromCodePoint(0xF031D),
+            defaultWidth: 320,
+            defaultHeight: 160,
+            defaultVariant: "default",
+            variants: {
+                "default": { file: "faces/html/HtmlFace.qml", icon: "1", label: typeof I18n !== "undefined" ? I18n.t("widgets.variants.default", "Default") : "Default" }
+            }
         }
     })
 

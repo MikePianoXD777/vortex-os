@@ -1564,6 +1564,7 @@
       "usage": "Usage",
       "battery": "Battery",
       "github": "Github",
+      "html": "HTML",
       "time": "Time"
     },
     "variants": {
@@ -1643,6 +1644,10 @@
       "name": "Your games",
       "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)",
       "short": "Game library"
+    },
+    "htmlwidgets": {
+      "name": "HTML widgets",
+      "desc": "Program your own desktop widgets in simple HTML, with a live preview"
     },
     "restore": {
       "name": "Vortexine Restore",
@@ -1895,6 +1900,21 @@
     "search": "Search your games…",
     "empty": "No games yet. Install them with Steam or Heroic (or a Flatpak from the Shop) and they will show up here.",
     "no_match": "No game matches your search."
+  },
+  "htmlwidgets": {
+    "title": "HTML widgets",
+    "intro": "Program your own desktop widgets in simple HTML. Save and it updates on its own.",
+    "saved": "Saved: the widget on your desktop is already updated.",
+    "created": "New widget. Edit it and press «Put it on the desktop».",
+    "placed": "Done: it's in the middle of your screen. Move it or resize it from «Edit widgets».",
+    "new": "New widget",
+    "none": "You don't have any yet: press «New widget».",
+    "preview": "How it looks",
+    "save": "Save",
+    "place": "Put it on the desktop",
+    "file": "File: {f}",
+    "empty_widget": "Create it in the launcher → «HTML widgets»",
+    "cheatsheet": "<b>What works</b><br>&lt;h1&gt;…&lt;h6&gt; titles<br>&lt;p&gt; &lt;br&gt; &lt;hr&gt;<br>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt;<br>&lt;font color=\"#f38ba8\" size=\"5\"&gt;<br>&lt;span style=\"color: red; font-size: 20px\"&gt;<br>&lt;div align=\"center\"&gt;<br>&lt;ul&gt; &lt;ol&gt; &lt;li&gt;<br>&lt;table&gt; &lt;tr&gt; &lt;td&gt;<br>&lt;img src=\"/path/image.png\" width=\"80\"&gt;<br>&lt;a href=\"https://…\"&gt; link<br><br><b>Filled in by itself</b><br>{hora} {hora12} {segundos}<br>{fecha} {fechaLarga}<br>{dia} {mes} {año}<br>{usuario} {equipo}<br><br>No JavaScript: it uses almost no memory. Ctrl+S saves."
   },
   "restore": {
     "intro": "Restore points of your desktop: if something breaks, go back to an earlier one, all of it or just one part.",

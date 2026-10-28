@@ -1605,6 +1605,7 @@
       "usage": "Uso",
       "battery": "Batería",
       "github": "Github",
+      "html": "HTML",
       "time": "Hora"
     },
     "variants": {
@@ -1687,6 +1688,10 @@
       "name": "Tus juegos",
       "desc": "Steam, Heroic y tus demás juegos, con portadas (Super+Shift+G)",
       "short": "Biblioteca de juegos"
+    },
+    "htmlwidgets": {
+      "name": "Widgets en HTML",
+      "desc": "Programa tus propios widgets del escritorio en HTML sencillo, con vista previa al instante"
     },
     "restore": {
       "name": "Vortexine Restore",
@@ -1937,6 +1942,21 @@
     "search": "Buscar un juego…",
     "empty": "Todavía no hay juegos. Instálalos con Steam o Heroic (o un Flatpak de la Tienda) y aparecerán aquí.",
     "no_match": "Ningún juego coincide con tu búsqueda."
+  },
+  "htmlwidgets": {
+    "title": "Widgets en HTML",
+    "intro": "Programa tus propios widgets del escritorio en HTML sencillo. Guardas y se actualiza solo.",
+    "saved": "Guardado: el widget de tu escritorio ya cambió.",
+    "created": "Widget nuevo. Edítalo y dale «Ponerlo en el escritorio».",
+    "placed": "Listo: quedó a la mitad de tu pantalla. Muévelo o cámbiale el tamaño desde «Editar widgets».",
+    "new": "Widget nuevo",
+    "none": "Todavía no tienes: dale «Widget nuevo».",
+    "preview": "Así se ve",
+    "save": "Guardar",
+    "place": "Ponerlo en el escritorio",
+    "file": "Archivo: {f}",
+    "empty_widget": "Créalo en el lanzador → «Widgets en HTML»",
+    "cheatsheet": "<b>Qué sirve</b><br>&lt;h1&gt;…&lt;h6&gt; títulos<br>&lt;p&gt; &lt;br&gt; &lt;hr&gt;<br>&lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt;<br>&lt;font color=\"#f38ba8\" size=\"5\"&gt;<br>&lt;span style=\"color: red; font-size: 20px\"&gt;<br>&lt;div align=\"center\"&gt;<br>&lt;ul&gt; &lt;ol&gt; &lt;li&gt;<br>&lt;table&gt; &lt;tr&gt; &lt;td&gt;<br>&lt;img src=\"/ruta/imagen.png\" width=\"80\"&gt;<br>&lt;a href=\"https://…\"&gt; enlace<br><br><b>Se llenan solos</b><br>{hora} {hora12} {segundos}<br>{fecha} {fechaLarga}<br>{dia} {mes} {año}<br>{usuario} {equipo}<br><br>Sin JavaScript: casi no gasta memoria. Ctrl+S guarda."
   },
   "restore": {
     "intro": "Puntos de tu escritorio: si algo se rompe, vuelve a uno anterior, todo o solo una parte.",

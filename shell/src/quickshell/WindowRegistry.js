@@ -111,6 +111,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰁯"
         },
         {
+            // Vortex 1.10: tus widgets del escritorio en HTML sencillo (htmlwidgets/).
+            id: "htmlwidgets",
+            name: tr("widgets.htmlwidgets.name", "HTML widgets"),
+            description: tr("widgets.htmlwidgets.desc", "Program your own desktop widgets in simple HTML, with a live preview"),
+            icon: "text-html",
+            fontIcon: "󰌝"
+        },
+        {
             // Vortex 1.8: la biblioteca de juegos (Super+Shift+G).
             id: "juegos",
             name: tr("widgets.juegos.name", "Your games"),
@@ -266,6 +274,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: metrónomo y afinador (musica/MusicaPopup.qml), al centro.
         "musica": {
             w: 680, h: 640, comp: "musica/MusicaPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: «Widgets en HTML» (htmlwidgets/HtmlWidgetsPopup.qml), al centro.
+        "htmlwidgets": {
+            w: 1000, h: 680, comp: "htmlwidgets/HtmlWidgetsPopup.qml", draggable: true, sinEscala: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },
