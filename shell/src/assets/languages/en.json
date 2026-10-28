@@ -1174,7 +1174,10 @@
     "equalizer": "Equalizer",
     "eq": {
       "apply": "Apply",
-      "saved": "Saved"
+      "saved": "Saved",
+      "freq_hint": "Click: type the frequency · wheel: nudge it · right-click: remove the band",
+      "add_band": "Add a band (up to 16)",
+      "remove_band": "Remove this band"
     },
     "audio": {
       "title": "Audio",

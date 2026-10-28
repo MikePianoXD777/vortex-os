@@ -1215,7 +1215,10 @@
     "equalizer": "Ecualizador",
     "eq": {
       "apply": "Aplicar",
-      "saved": "Guardado"
+      "saved": "Guardado",
+      "freq_hint": "Clic: escribe la frecuencia · rueda: muévela · clic derecho: quita la banda",
+      "add_band": "Agregar una banda (hasta 16)",
+      "remove_band": "Quitar esta banda"
     },
     "audio": {
       "title": "Audio",

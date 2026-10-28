@@ -6,16 +6,14 @@ import "../"
 MusicPlayerState {
     id: root
 
-    property var eqData: {
-        "b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0,
-        "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0,
+    property var eqData: ({
+        "bandas": root.bandasBase([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         "preset": "Flat", "pending": false, "balance": 0,
         "mono": false, "swap": false, "dynamics": "off"
-    }
+    })
 
     property var savedEqData: ({
-        "b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0,
-        "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0,
+        "bandas": root.bandasBase([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         "preset": "Flat", "pending": false, "balance": 0,
         "mono": false, "swap": false, "dynamics": "off"
     })
@@ -29,31 +27,122 @@ MusicPlayerState {
         onTriggered: root.audioTestRunning = false
     }
 
+    // Vortex 1.10 (idea de THYRVAREN): las bandas son una lista de {f: Hz, g: dB} que se edita desde el
+    // panel: cambiar la frecuencia de cada una y agregar o quitar (de 2 a 16). Los presets vuelven a
+    // las 10 de siempre. equalizer.sh guarda la lista con «set_bands f:g,f:g,…».
+    readonly property var frecuenciasBase: [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+    readonly property int minBandas: 2
+    readonly property int maxBandas: 16
+
+    function bandasBase(ganancias) {
+        return frecuenciasBase.map((f, i) => ({ "f": f, "g": ganancias[i] }));
+    }
+
+    function bandasDe(datos) {
+        if (datos && Array.isArray(datos.bandas) && datos.bandas.length >= minBandas) return datos.bandas;
+        // Estado de antes de la 1.10 (b1…b10), mientras equalizer.sh lo pasa a la lista
+        return bandasBase(frecuenciasBase.map((f, i) => Number(datos && datos["b" + (i + 1)]) || 0));
+    }
+
+    readonly property var eqBandas: bandasDe(eqData)
+    property string eqAyuda: ""
+
+    function textoBandas(bandas) {
+        return bandas.map(b => Math.round(b.f) + ":" + Math.round(b.g)).join(",");
+    }
+
+    function formatoFrecuencia(f) {
+        if (f < 1000) return String(Math.round(f));
+        let k = f / 1000;
+        return (k >= 10 || Math.abs(k - Math.round(k)) < 0.05 ? String(Math.round(k)) : k.toFixed(1)) + "k";
+    }
+
+    // «1.5k», «1,5 kHz», «800», «800hz» → Hz entre 20 y 20 000 (NaN si no se entiende)
+    function leerFrecuencia(texto) {
+        let m = String(texto).trim().toLowerCase().replace(",", ".").match(/^([0-9]+(?:\.[0-9]+)?)\s*(k)?(?:hz)?$/);
+        if (!m) return NaN;
+        let f = parseFloat(m[1]) * (m[2] ? 1000 : 1);
+        return Math.max(20, Math.min(20000, Math.round(f)));
+    }
+
+    function cambiarBandas(bandas) {
+        let lista = bandas.map(b => ({ "f": Math.max(20, Math.min(20000, Math.round(b.f))),
+                                       "g": Math.max(-12, Math.min(12, Math.round(b.g))) }));
+        lista.sort((a, b) => a.f - b.f);
+        let temp = Object.assign({}, root.eqData);
+        temp.bandas = lista;
+        temp.preset = "Custom";
+        temp.pending = true;
+        root.eqData = temp;
+        root.lastEqUpdate = Date.now();
+        enviarBandasTimer.restart();
+    }
+
+    // La rueda del mouse cambia la frecuencia muchas veces seguidas: se manda una sola vez al final
+    Timer {
+        id: enviarBandasTimer
+        interval: 250
+        onTriggered: {
+            root.lastEqUpdate = Date.now();
+            root.ecualizador(["set_bands", root.textoBandas(root.eqBandas)]);
+        }
+    }
+
+    function ponerGanancia(i, g) {
+        let b = eqBandas.slice();
+        b[i] = { "f": b[i].f, "g": g };
+        cambiarBandas(b);
+    }
+
+    function ponerFrecuencia(i, f) {
+        if (isNaN(f)) return;
+        let b = eqBandas.slice();
+        // Dos bandas en la misma frecuencia se suman: la movida se corre un poquito
+        while (b.some((x, j) => j !== i && Math.round(x.f) === Math.round(f))) f = f * 1.03;
+        b[i] = { "f": f, "g": b[i].g };
+        cambiarBandas(b);
+    }
+
+    // La nueva va en el hueco más grande (en octavas, contando de 20 Hz a 20 kHz), con la ganancia
+    // de sus vecinas para no cambiar cómo suena
+    function agregarBanda() {
+        let b = eqBandas;
+        if (b.length >= maxBandas) return;
+        let mejor = 0, hueco = -1;
+        for (let i = 0; i <= b.length; i++) {
+            let izq = i === 0 ? 20 : b[i - 1].f, der = i === b.length ? 20000 : b[i].f;
+            let octavas = Math.log2(der / izq) * (i === 0 || i === b.length ? 0.5 : 1);
+            if (octavas > hueco) { hueco = octavas; mejor = i; }
+        }
+        let izq = mejor === 0 ? 20 : b[mejor - 1].f, der = mejor === b.length ? 20000 : b[mejor].f;
+        let gIzq = mejor === 0 ? b[0].g : b[mejor - 1].g, gDer = mejor === b.length ? b[b.length - 1].g : b[mejor].g;
+        let nueva = b.slice();
+        nueva.splice(mejor, 0, { "f": Math.sqrt(izq * der), "g": (Number(gIzq) + Number(gDer)) / 2 });
+        cambiarBandas(nueva);
+    }
+
+    function quitarBanda(i) {
+        if (eqBandas.length <= minBandas) return;
+        let b = eqBandas.slice();
+        b.splice(i, 1);
+        cambiarBandas(b);
+    }
+
     function restoreLastSavedEqualizer() {
         if (!root.savedEqData) return;
+        enviarBandasTimer.stop();
         var wasPending = root.eqData && root.eqData.pending;
-        var needsRestore = wasPending;
-        if (!needsRestore && root.eqData) {
-            for (var i = 1; i <= 10; i++) {
-                if (root.eqData["b" + i] !== root.savedEqData["b" + i]) {
-                    needsRestore = true;
-                    break;
-                }
-            }
-        }
+        var needsRestore = wasPending ||
+            JSON.stringify(bandasDe(root.eqData)) !== JSON.stringify(bandasDe(root.savedEqData));
         var restored = Object.assign({}, root.savedEqData);
         restored.pending = false;
         root.eqData = restored;
         if (needsRestore) {
             root.lastEqUpdate = Date.now();
             if (root.savedEqData.preset && root.savedEqData.preset !== "Custom") {
-                root.execCmd(Caching.qsDir + `/media/equalizer.sh preset ${root.savedEqData.preset}`);
+                root.ecualizador(["preset", String(root.savedEqData.preset)]);
             } else {
-                for (var b = 1; b <= 10; b++) {
-                    if (root.savedEqData["b" + b] !== undefined) {
-                        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_band ${b} ${root.savedEqData["b" + b]}`);
-                    }
-                }
+                root.ecualizador(["set_bands", textoBandas(bandasDe(root.savedEqData)), "guardado"]);
             }
         }
     }
@@ -102,6 +191,20 @@ MusicPlayerState {
         `, root);
     }
 
+    // Vortex: equalizer.sh con sus argumentos en lista (execCmd pasa por «bash -c» y se rompe si la
+    // carpeta del shell tiene espacios, como cuando corre desde el repo)
+    Component {
+        id: ecualizadorProc
+        Process {
+            onExited: destroy()
+        }
+    }
+
+    function ecualizador(args) {
+        let p = ecualizadorProc.createObject(root, { "command": ["bash", Caching.qsDir + "/media/equalizer.sh"].concat(args) });
+        p.running = true;
+    }
+
     function applyPresetOptimistically(presetName) {
         var presets = {
             "Flat": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -114,10 +217,9 @@ MusicPlayerState {
             "Classic": [0, 1, 2, 2, 2, 2, 1, 2, 3, 4]
         };
         if (presets[presetName]) {
+            enviarBandasTimer.stop();
             var temp = Object.assign({}, root.eqData);
-            for (var i = 0; i < 10; i++) {
-                temp["b" + (i + 1)] = presets[presetName][i];
-            }
+            temp.bandas = root.bandasBase(presets[presetName]);
             temp.preset = presetName;
             temp.pending = false;
             root.eqData = temp;
@@ -126,7 +228,7 @@ MusicPlayerState {
             root.lastEqUpdate = Date.now();
             
             root.triggerEqLightning();
-            execCmd(Caching.qsDir + `/media/equalizer.sh preset ${presetName}`);
+            ecualizador(["preset", String(presetName)]);
         }
     }
 
@@ -139,7 +241,7 @@ MusicPlayerState {
         root.eqData = temp;
         root.savedEqData = Object.assign({}, temp);
         root.lastEqUpdate = Date.now();
-        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_balance ${temp.balance}`);
+        root.ecualizador(["set_balance", String(temp.balance)]);
     }
 
     function setAudioFlag(name, value) {
@@ -149,7 +251,7 @@ MusicPlayerState {
         root.eqData = temp;
         root.savedEqData = Object.assign({}, temp);
         root.lastEqUpdate = Date.now();
-        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_${name} ${temp[name]}`);
+        root.ecualizador(["set_" + name, String(temp[name])]);
     }
 
     function setDynamics(value) {
@@ -159,7 +261,7 @@ MusicPlayerState {
         root.eqData = temp;
         root.savedEqData = Object.assign({}, temp);
         root.lastEqUpdate = Date.now();
-        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_dynamics ${value}`);
+        root.ecualizador(["set_dynamics", String(value)]);
     }
 
     function resetAudio() {
@@ -173,16 +275,16 @@ MusicPlayerState {
         root.audioTestRunning = false;
         audioTestTimer.stop();
         root.lastEqUpdate = Date.now();
-        root.execCmd(Caching.qsDir + "/media/equalizer.sh reset_audio");
+        root.ecualizador(["reset_audio"]);
     }
 
     function toggleAudioTest() {
         if (root.audioTestRunning) {
-            root.execCmd(Caching.qsDir + "/media/equalizer.sh stop_test");
+            root.ecualizador(["stop_test"]);
             root.audioTestRunning = false;
             audioTestTimer.stop();
         } else {
-            root.execCmd(Caching.qsDir + "/media/equalizer.sh test");
+            root.ecualizador(["test"]);
             root.audioTestRunning = true;
             audioTestTimer.restart();
         }

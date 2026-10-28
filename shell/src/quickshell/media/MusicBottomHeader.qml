@@ -150,7 +150,7 @@ RowLayout {
                 root.savedEqData = Object.assign({}, temp);
                 root.lastEqUpdate = Date.now();
                 root.triggerEqLightning();
-                root.execCmd(Caching.qsDir + "/media/equalizer.sh apply");
+                root.ecualizador(["apply"]);
             }
         }
     }

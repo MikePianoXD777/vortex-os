@@ -17,10 +17,20 @@ TEST_PID_FILE="$QS_RUN_MUSIC/channel_test.pid"
 
 mkdir -p "$PRESET_DIR"
 
+# Vortex 1.10 (idea de THYRVAREN): las bandas son una lista «bandas» de {f: Hz, g: dB} que se puede
+# editar (frecuencia de cada una, agregar o quitar, de 2 a 16), en vez de 10 fijas b1…b10. Los presets
+# vuelven a las 10 de siempre; un estado viejo se pasa con sus mismas ganancias.
+FRECUENCIAS='[31,63,125,250,500,1000,2000,4000,8000,16000]'
+MIN_BANDAS=2
+MAX_BANDAS=16
+
 if [ ! -f "$STATE_FILE" ]; then
-    echo '{"b1": 0, "b2": 0, "b3": 0, "b4": 0, "b5": 0, "b6": 0, "b7": 0, "b8": 0, "b9": 0, "b10": 0, "preset": "Flat", "pending": false, "balance": 0, "mono": false, "swap": false, "dynamics": "off"}' > "$STATE_FILE"
-elif ! jq -e 'has("balance") and has("mono") and has("swap") and has("dynamics")' "$STATE_FILE" >/dev/null 2>&1; then
-    updated=$(jq -c '.balance //= 0 | .mono //= false | .swap //= false | .dynamics //= "off"' "$STATE_FILE") &&
+    jq -nc --argjson F "$FRECUENCIAS" '{"bandas": [$F[] | {f: ., g: 0}], "preset": "Flat", "pending": false, "balance": 0, "mono": false, "swap": false, "dynamics": "off"}' > "$STATE_FILE"
+elif ! jq -e 'has("bandas") and has("balance") and has("mono") and has("swap") and has("dynamics")' "$STATE_FILE" >/dev/null 2>&1; then
+    updated=$(jq -c --argjson F "$FRECUENCIAS" '
+        .balance //= 0 | .mono //= false | .swap //= false | .dynamics //= "off"
+        | .bandas //= [range(10) as $i | {f: $F[$i], g: ((.["b\($i + 1)"] // 0) | tonumber? // 0)}]
+        | del(.b1, .b2, .b3, .b4, .b5, .b6, .b7, .b8, .b9, .b10)' "$STATE_FILE") &&
         echo "$updated" > "$STATE_FILE"
 fi
 
@@ -65,44 +75,19 @@ apply_eq() {
     vals=$(cat "$STATE_FILE")
 
     python3 -c "
-import sys, json
+import sys, json, math
 
 try:
     data = json.loads(sys.argv[1])
 
-    slider_map = {
-        0: 0,
-        1: 3,
-        2: 6,
-        3: 9,
-        4: 12,
-        5: 15,
-        6: 18,
-        7: 21,
-        8: 24,
-        9: 27
-    }
-
-    freqs = [
-        32, 40, 50, 63, 80, 100, 125, 160,
-        200, 250, 315, 400, 500, 630, 800,
-        1000, 1250, 1600, 2000, 2500, 3150,
-        4000, 5000, 6300, 8000, 10000, 12500,
-        16000, 20000, 22000, 24000, 24000
-    ]
-
-    gains = [
-        float(data['b1']),
-        float(data['b2']),
-        float(data['b3']),
-        float(data['b4']),
-        float(data['b5']),
-        float(data['b6']),
-        float(data['b7']),
-        float(data['b8']),
-        float(data['b9']),
-        float(data['b10'])
-    ]
+    # Vortex 1.10: tantas bandas como haya en «bandas», cada una con su frecuencia. El ancho (Q) sale de
+    # la distancia en octavas a sus vecinas: con más bandas, cada una es más angosta.
+    bandas = sorted(
+        ({'f': max(20.0, min(20000.0, float(b['f']))), 'g': max(-12.0, min(12.0, float(b['g'])))}
+         for b in data['bandas']),
+        key=lambda b: b['f'])[:32]
+    if not bandas:
+        bandas = [{'f': 1000.0, 'g': 0.0}]
 
     mono = bool(data.get('mono', False))
     swap = bool(data.get('swap', False))
@@ -113,22 +98,20 @@ try:
         dynamics = 'off'
 
     bands = {}
-
-    for i in range(32):
-        freq = freqs[i] if i < len(freqs) else 20000.0
-        gain = 0.0
-
-        for s_idx, b_idx in slider_map.items():
-            if i == b_idx:
-                gain = gains[s_idx]
-                break
-
+    for i, b in enumerate(bandas):
+        lados = []
+        if i > 0:
+            lados.append(math.log2(b['f'] / bandas[i - 1]['f']))
+        if i < len(bandas) - 1:
+            lados.append(math.log2(bandas[i + 1]['f'] / b['f']))
+        octavas = max(0.1, min(4.0, sum(lados) / len(lados) if lados else 1.0))
+        q = math.sqrt(2 ** octavas) / (2 ** octavas - 1)
         bands[f'band{i}'] = {
-            'frequency': freq,
-            'gain': gain,
+            'frequency': round(b['f'], 1),
+            'gain': b['g'],
             'mode': 'Bell',
             'mute': False,
-            'q': 1.0,
+            'q': round(max(0.3, min(10.0, q)), 3),
             'solo': False,
             'width': 1.0,
             'slope': 'x1'
@@ -145,7 +128,7 @@ try:
                 'left': bands,
                 'right': bands,
                 'mode': 'IIR',
-                'num-bands': 32,
+                'num-bands': len(bandas),
                 'split-channels': False
         }
     }
@@ -252,46 +235,14 @@ except Exception:
     easyeffects -l "$PRESET_NAME" >/dev/null 2>&1 &
 }
 
+# Un preset vuelve a las 10 bandas de siempre: save_preset NOMBRE g1 … g10
 save_preset() {
-    balance=$(jq -r '.balance // 0' "$STATE_FILE")
-    mono=$(jq -r '.mono // false' "$STATE_FILE")
-    swap=$(jq -r '.swap // false' "$STATE_FILE")
-    dynamics=$(jq -r '.dynamics // "off"' "$STATE_FILE")
-
-    jq -n -c \
-        --arg b1 "$1" \
-        --arg b2 "$2" \
-        --arg b3 "$3" \
-        --arg b4 "$4" \
-        --arg b5 "$5" \
-        --arg b6 "$6" \
-        --arg b7 "$7" \
-        --arg b8 "$8" \
-        --arg b9 "$9" \
-        --arg b10 "${10}" \
-        --arg p "${11}" \
-        --argjson balance "$balance" \
-        --argjson mono "$mono" \
-        --argjson swap "$swap" \
-        --arg dynamics "$dynamics" \
-        '{
-            "b1": $b1,
-            "b2": $b2,
-            "b3": $b3,
-            "b4": $b4,
-            "b5": $b5,
-            "b6": $b6,
-            "b7": $b7,
-            "b8": $b8,
-            "b9": $b9,
-            "b10": $b10,
-            "preset": $p,
-            "pending": false,
-            "balance": $balance,
-            "mono": $mono,
-            "swap": $swap,
-            "dynamics": $dynamics
-        }' > "$STATE_FILE"
+    local nombre=$1
+    shift
+    updated=$(jq -c --argjson F "$FRECUENCIAS" --arg p "$nombre" --args \
+        '.bandas = [range(10) as $i | {f: $F[$i], g: ($ARGS.positional[$i] | tonumber)}]
+         | .preset = $p | .pending = false' "$@" <"$STATE_FILE") || return 1
+    echo "$updated" > "$STATE_FILE"
 }
 
 stop_test() {
@@ -367,20 +318,33 @@ case $cmd in
     # aplicar y EasyEffects está instalado; plano y sin efectos no arranca nada.
     "restaurar")
         command -v easyeffects >/dev/null 2>&1 || exit 0
-        jq -e '([.b1,.b2,.b3,.b4,.b5,.b6,.b7,.b8,.b9,.b10] | map(tonumber) | any(. != 0))
+        jq -e '(.bandas | map(.g | tonumber) | any(. != 0))
                or (.balance | tonumber) != 0 or .mono or .swap or .dynamics != "off"' \
             "$STATE_FILE" >/dev/null 2>&1 || exit 0
         apply_eq
         ;;
 
     "set_band")
-        tmp=$(cat "$STATE_FILE")
+        [[ "$arg1" =~ ^[0-9]+$ && "$arg2" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || exit 1
+        updated=$(jq -c --argjson i "$arg1" --argjson val "$arg2" '
+            if $i >= 1 and $i <= (.bandas | length)
+            then .bandas[$i - 1].g = ([-12, ([12, $val] | min)] | max) | .preset = "Custom" | .pending = true
+            else error("no existe esa banda") end' "$STATE_FILE") || exit 1
+        echo "$updated" > "$STATE_FILE"
+        ;;
 
-        updated=$(echo "$tmp" |
-            jq -c \
-                --arg val "$arg2" \
-                ".b$arg1 = \$val | .preset = \"Custom\" | .pending = true")
-
+    # Vortex 1.10: la lista entera «f:g,f:g,…» (cambiar una frecuencia, agregar o quitar bandas). Con
+    # «guardado» queda como ya aplicada (cuando el panel deshace lo que no aplicaste).
+    "set_bands")
+        [[ "$arg1" =~ ^[0-9]+([.][0-9]+)?:-?[0-9]+([.][0-9]+)?(,[0-9]+([.][0-9]+)?:-?[0-9]+([.][0-9]+)?)*$ ]] || exit 1
+        updated=$(jq -c --arg lista "$arg1" --arg guardado "$arg2" --argjson min "$MIN_BANDAS" --argjson max "$MAX_BANDAS" '
+            ($lista | split(",") | map(split(":") | {f: ([20, ([20000, (.[0] | tonumber)] | min)] | max | round),
+                                                     g: ([-12, ([12, (.[1] | tonumber)] | min)] | max)})
+                    | sort_by(.f)) as $b
+            | if ($b | length) < $min or ($b | length) > $max then error("de \($min) a \($max) bandas") else . end
+            | .bandas = $b
+            | if $guardado == "guardado" then .pending = false else .preset = "Custom" | .pending = true end' \
+            "$STATE_FILE") || exit 1
         echo "$updated" > "$STATE_FILE"
         ;;
 
@@ -445,35 +409,35 @@ case $cmd in
     "preset")
         case $arg1 in
             "Flat")
-                save_preset 0 0 0 0 0 0 0 0 0 0 "Flat"
+                save_preset Flat 0 0 0 0 0 0 0 0 0 0
                 ;;
 
             "Bass")
-                save_preset 5 7 5 2 1 0 0 0 1 2 "Bass"
+                save_preset Bass 5 7 5 2 1 0 0 0 1 2
                 ;;
 
             "Treble")
-                save_preset -2 -1 0 1 2 3 4 5 6 6 "Treble"
+                save_preset Treble -2 -1 0 1 2 3 4 5 6 6
                 ;;
 
             "Vocal")
-                save_preset -2 -1 1 3 5 5 4 2 1 0 "Vocal"
+                save_preset Vocal -2 -1 1 3 5 5 4 2 1 0
                 ;;
 
             "Pop")
-                save_preset 2 4 2 0 1 2 4 2 1 2 "Pop"
+                save_preset Pop 2 4 2 0 1 2 4 2 1 2
                 ;;
 
             "Rock")
-                save_preset 5 4 2 -1 -2 -1 2 4 5 6 "Rock"
+                save_preset Rock 5 4 2 -1 -2 -1 2 4 5 6
                 ;;
 
             "Jazz")
-                save_preset 3 3 1 1 1 1 2 1 2 3 "Jazz"
+                save_preset Jazz 3 3 1 1 1 1 2 1 2 3
                 ;;
 
             "Classic")
-                save_preset 0 1 2 2 2 2 1 2 3 4 "Classic"
+                save_preset Classic 0 1 2 2 2 2 1 2 3 4
                 ;;
         esac
 

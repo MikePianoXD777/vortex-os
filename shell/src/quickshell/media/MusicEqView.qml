@@ -32,24 +32,23 @@ Item {
                 anchors.fill: parent
                 z: 1
 
+                // Vortex 1.10: una columna por banda (de 2 a 16, ver MusicEqualizerState) y el «+» al final
                 Repeater {
-                    model: [
-                        {"idx": 1, "lbl": "31"}, {"idx": 2, "lbl": "63"}, {"idx": 3, "lbl": "125"},
-                        {"idx": 4, "lbl": "250"}, {"idx": 5, "lbl": "500"}, {"idx": 6, "lbl": "1k"},
-                        {"idx": 7, "lbl": "2k"}, {"idx": 8, "lbl": "4k"}, {"idx": 9, "lbl": "8k"},
-                        {"idx": 10, "lbl": "16k"}
-                    ]
+                    model: root.eqBandas.length
                     delegate: Item {
                         id: sliderDelegate
-                        width: eqSliderRow.width / 10
+                        width: (eqSliderRow.width - masBanda.width) / root.eqBandas.length
                         height: eqSliderRow.height
+                        readonly property var banda: root.eqBandas[index] || { "f": 1000, "g": 0 }
+
+                        HoverHandler { id: hoverBanda }
 
                         opacity: root.introEqSliders
                         transform: Translate {
                             y: root.s(25) * (1 - root.introEqSliders) + (index * root.s(7) * (1 - root.introEqSliders))
                         }
 
-                        property real dist: root.eqLightningProgress - (modelData.idx - 1)
+                        property real dist: root.eqLightningProgress - index
                         property real hitPulse: dist >= 0 && dist < 1.0 ? Math.sin((dist) * Math.PI) : 0.0
                         
                         property real trackPulse: 0.0
@@ -93,14 +92,14 @@ Item {
                                 stepSize: 1
                                 hoverEnabled: true
 
+                                Component.onCompleted: value = Number(sliderDelegate.banda.g) || 0
+
                                 Connections {
                                     target: root
                                     function onEqDataChanged() {
                                         if (!eqSlider.pressed) {
-                                            if (root.eqData && root.eqData["b" + modelData.idx] !== undefined) {
-                                                var p = Number(root.eqData["b" + modelData.idx]);
-                                                if (!isNaN(p)) eqSlider.value = p;
-                                            }
+                                            var p = Number(sliderDelegate.banda.g);
+                                            if (!isNaN(p)) eqSlider.value = p;
                                         }
                                     }
                                 }
@@ -114,16 +113,8 @@ Item {
                                 }
 
                                 onPressedChanged: {
-                                    if (!pressed) {
-                                        var temp = Object.assign({}, root.eqData);
-                                        temp["b" + modelData.idx] = Math.round(value);
-                                        temp.preset = "Custom";
-                                        temp.pending = true;
-                                        root.eqData = temp;
-                                        
-                                        root.lastEqUpdate = Date.now();
-                                        
-                                        root.execCmd(Caching.qsDir + `/media/equalizer.sh set_band ${modelData.idx} ${Math.round(value)}`);
+                                    if (!pressed && Math.round(value) !== Math.round(Number(sliderDelegate.banda.g))) {
+                                        root.ponerGanancia(index, Math.round(value));
                                     }
                                 }
 
@@ -333,23 +324,172 @@ Item {
                                     scale: (targetScale * popScale) + (sliderDelegate.hitPulse * 0.4 * (1.0 - root.eqLightningFade))
                                 }
                             }
-                            Text {
-                                text: modelData.lbl
-                                color: ThemeBackend.overlay1 || "#7f849c"
-                                font.family: ThemeBackend.fontFamily
-                                font.pixelSize: root.s(9.5)
-                                font.bold: true
-                                Layout.alignment: Qt.AlignHCenter
+                            // La frecuencia: clic para escribirla («1.5k», «800»), rueda para moverla
+                            // poquito a poquito, clic derecho para quitar la banda
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: root.s(14)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !freqInput.visible
+                                    text: root.formatoFrecuencia(sliderDelegate.banda.f)
+                                    color: freqZona.containsMouse ? root.eqAccentColor : (ThemeBackend.overlay1 || "#7f849c")
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: root.s(root.eqBandas.length > 12 ? 8.5 : 9.5)
+                                    font.bold: true
+                                    font.underline: freqZona.containsMouse
+                                }
+
+                                TextInput {
+                                    id: freqInput
+                                    anchors.centerIn: parent
+                                    width: Math.max(parent.width, root.s(34))
+                                    visible: false
+                                    horizontalAlignment: TextInput.AlignHCenter
+                                    color: root.eqAccentColor
+                                    selectionColor: Qt.alpha(root.eqAccentColor, 0.4)
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: root.s(10)
+                                    font.bold: true
+                                    maximumLength: 8
+                                    function terminar(guardar) {
+                                        if (!visible) return;
+                                        visible = false;
+                                        if (guardar) root.ponerFrecuencia(index, root.leerFrecuencia(text));
+                                    }
+                                    onAccepted: terminar(true)
+                                    onActiveFocusChanged: if (!activeFocus) terminar(true)
+                                    Keys.onEscapePressed: (event) => { terminar(false); event.accepted = true; }
+                                    Rectangle {
+                                        z: -1
+                                        anchors.fill: parent
+                                        anchors.margins: -root.s(2)
+                                        radius: root.s(4)
+                                        color: Qt.alpha(ThemeBackend.surface0 || "#313244", 0.95)
+                                        border.width: 1
+                                        border.color: root.eqAccentColor
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: freqZona
+                                    anchors.fill: parent
+                                    visible: !freqInput.visible
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    cursorShape: Qt.PointingHandCursor
+                                    onContainsMouseChanged: root.eqAyuda = containsMouse ? I18n.t("music.eq.freq_hint") : ""
+                                    onClicked: (mouse) => {
+                                        if (mouse.button === Qt.RightButton) {
+                                            root.quitarBanda(index);
+                                            return;
+                                        }
+                                        freqInput.text = root.formatoFrecuencia(sliderDelegate.banda.f);
+                                        freqInput.visible = true;
+                                        freqInput.forceActiveFocus();
+                                        freqInput.selectAll();
+                                    }
+                                    onWheel: (wheel) => {
+                                        // Un «clic» de la rueda = 1/12 de octava (el touchpad va más fino)
+                                        let paso = Math.pow(2, wheel.angleDelta.y / 120 / 12);
+                                        root.ponerFrecuencia(index, sliderDelegate.banda.f * paso);
+                                    }
+                                }
                             }
+                        }
+
+                        // Quitar la banda (aparece al pasar el mouse; siempre quedan al menos 2)
+                        Rectangle {
+                            z: 3
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.rightMargin: Math.max(0, (parent.width - root.s(16)) / 2 - root.s(14))
+                            width: root.s(15)
+                            height: width
+                            radius: width / 2
+                            visible: opacity > 0
+                            opacity: hoverBanda.hovered && root.eqBandas.length > root.minBandas && !eqSlider.pressed ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                            color: quitarZona.containsMouse ? (ThemeBackend.red || "#f38ba8") : Qt.alpha(ThemeBackend.surface1 || "#45475a", 0.95)
+                            Text {
+                                anchors.centerIn: parent
+                                text: "×"
+                                color: quitarZona.containsMouse ? (ThemeBackend.base || "#1e1e2e") : (ThemeBackend.text || "#cdd6f4")
+                                font.family: ThemeBackend.fontFamily
+                                font.pixelSize: root.s(11)
+                                font.bold: true
+                            }
+                            MouseArea {
+                                id: quitarZona
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onContainsMouseChanged: root.eqAyuda = containsMouse ? I18n.t("music.eq.remove_band") : ""
+                                onClicked: root.quitarBanda(index)
+                            }
+                        }
+                    }
+                }
+
+                // Agregar una banda (va en el hueco más grande)
+                Item {
+                    id: masBanda
+                    width: root.eqBandas.length < root.maxBandas ? root.s(30) : 0
+                    height: eqSliderRow.height
+                    visible: width > 0
+                    opacity: root.introEqSliders
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        anchors.verticalCenterOffset: -root.s(9)
+                        width: root.s(24)
+                        height: width
+                        radius: width / 2
+                        color: masZona.containsMouse ? root.eqAccentColor : Qt.alpha(ThemeBackend.surface0 || "#313244", 0.8)
+                        border.width: 1
+                        border.color: Qt.alpha(root.eqAccentColor, 0.6)
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "+"
+                            color: masZona.containsMouse ? (ThemeBackend.base || "#1e1e2e") : (ThemeBackend.text || "#cdd6f4")
+                            font.family: ThemeBackend.fontFamily
+                            font.pixelSize: root.s(16)
+                            font.bold: true
+                        }
+                        MouseArea {
+                            id: masZona
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onContainsMouseChanged: root.eqAyuda = containsMouse ? I18n.t("music.eq.add_band") : ""
+                            onClicked: root.agregarBanda()
                         }
                     }
                 }
             }
 
+            // Qué hace lo que tienes bajo el mouse
+            Text {
+                z: 4
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: -root.s(14)
+                text: root.eqAyuda
+                visible: opacity > 0
+                opacity: root.eqAyuda !== "" ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+                color: ThemeBackend.subtext0 || "#a6adc8"
+                font.family: ThemeBackend.fontFamily
+                font.pixelSize: root.s(10)
+            }
+
             ShaderEffect {
                 id: lightningCanvas
                 anchors.fill: parent
-                opacity: 1.0 - root.eqLightningFade
+                // El rayo de los presets está hecho para las 10 bandas de siempre
+                opacity: root.eqBandas.length === 10 ? 1.0 - root.eqLightningFade : 0
                 z: 0
 
                 property real animTime: 0.0
@@ -368,20 +508,20 @@ Item {
                 property color accentColor: root.eqAccentColor
 
                 property vector4d bands0: Qt.vector4d(
-                    root.eqData.b1 !== undefined ? Number(root.eqData.b1) : 0,
-                    root.eqData.b2 !== undefined ? Number(root.eqData.b2) : 0,
-                    root.eqData.b3 !== undefined ? Number(root.eqData.b3) : 0,
-                    root.eqData.b4 !== undefined ? Number(root.eqData.b4) : 0
+                    root.eqBandas.length > 0 ? Number(root.eqBandas[0].g) : 0,
+                    root.eqBandas.length > 1 ? Number(root.eqBandas[1].g) : 0,
+                    root.eqBandas.length > 2 ? Number(root.eqBandas[2].g) : 0,
+                    root.eqBandas.length > 3 ? Number(root.eqBandas[3].g) : 0
                 )
                 property vector4d bands1: Qt.vector4d(
-                    root.eqData.b5 !== undefined ? Number(root.eqData.b5) : 0,
-                    root.eqData.b6 !== undefined ? Number(root.eqData.b6) : 0,
-                    root.eqData.b7 !== undefined ? Number(root.eqData.b7) : 0,
-                    root.eqData.b8 !== undefined ? Number(root.eqData.b8) : 0
+                    root.eqBandas.length > 4 ? Number(root.eqBandas[4].g) : 0,
+                    root.eqBandas.length > 5 ? Number(root.eqBandas[5].g) : 0,
+                    root.eqBandas.length > 6 ? Number(root.eqBandas[6].g) : 0,
+                    root.eqBandas.length > 7 ? Number(root.eqBandas[7].g) : 0
                 )
                 property vector4d bands2: Qt.vector4d(
-                    root.eqData.b9 !== undefined ? Number(root.eqData.b9) : 0,
-                    root.eqData.b10 !== undefined ? Number(root.eqData.b10) : 0,
+                    root.eqBandas.length > 8 ? Number(root.eqBandas[8].g) : 0,
+                    root.eqBandas.length > 9 ? Number(root.eqBandas[9].g) : 0,
                     root.s(10),
                     root.s(30)
                 )
