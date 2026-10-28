@@ -1021,12 +1021,17 @@ cmd_actualizar() {
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
-  # Los paquetes propios (shell, tienda y Miku) vienen de packaging/ de este repo: se reconstruye
-  # el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
+  # Los paquetes propios (shell, tienda, Miku y Vortex Studio) vienen de packaging/ de este repo: se
+  # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
+  # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-miku; do
+  for pkg in vortex-shell vortex-shop vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
+    if [[ "$pkg" == vortex-studio && -z "$instalado" ]]; then
+      [[ -e "$AVISOS_ESTADO/studio-ofrecido" ]] && continue
+      mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/studio-ofrecido"
+    fi
     [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar ]] || continue
     # makepkg no corre como root ni escribe en una carpeta de root (/usr/share/vortex-os): ahí se
     # construye en una copia en tu caché.
@@ -1166,8 +1171,8 @@ avisos_pendientes() {
     local_="$(git -c safe.directory="$VORTEX_DIR" -C "$VORTEX_DIR" rev-parse HEAD 2>/dev/null)" || local_=""
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
-  # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku).
-  for pkg in vortex-shell vortex-shop vortex-miku; do
+  # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
+  for pkg in vortex-shell vortex-shop vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"

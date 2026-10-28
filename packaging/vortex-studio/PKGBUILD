@@ -2,12 +2,12 @@
 # de GitHub. Lo elige el instalador gráfico de la ISO; también sirve con «makepkg -si».
 pkgname=vortex-studio
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc='Editor de video no lineal de la Vortex Suite'
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-studio'
 license=('MIT')
-depends=('glibc' 'hicolor-icon-theme')
+depends=('glibc' 'hicolor-icon-theme' 'fontconfig' 'freetype2' 'expat')
 options=('!strip' '!debug')
 source=("https://github.com/MikePianoXD777/vortex-studio/releases/download/v${pkgver}/VortexStudio-${pkgver}-linux-x86_64.tar.gz")
 sha256sums=('af441eb4d886b1d4f287b759d85ec832dd5e7c3a27f229c7bf9fedb60563b145')
@@ -16,6 +16,9 @@ package() {
   local raiz="$srcdir/VortexStudio-${pkgver}-linux-x86_64"
   install -d "$pkgdir/opt"
   cp -a "$raiz/vortex-studio" "$pkgdir/opt/vortex-studio"
+  # La 1.0.0 trae la fontconfig 2.13 de Ubuntu 22.04, que no entiende la configuración de Arch
+  # (45 «Fontconfig error» al abrir): se usan las del sistema. Desde la 1.0.1 ya no vienen.
+  rm -f "$pkgdir"/opt/vortex-studio/_internal/{libfontconfig.so.1,libfreetype.so.6,libexpat.so.1}
   install -d "$pkgdir/usr/bin"
   ln -s /opt/vortex-studio/vortex-studio "$pkgdir/usr/bin/vortex-studio"
   sed 's|@EXEC@|/usr/bin/vortex-studio|g' "$raiz/vortex-studio.desktop" \

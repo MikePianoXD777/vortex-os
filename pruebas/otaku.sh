@@ -459,6 +459,20 @@ probar "reconstruye la tienda (otro pkgrel) e instala Miku (faltaba), no el shel
 env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar --forzar >/dev/null 2>&1
 probar "con --forzar reconstruye los tres" "[[ \"\$(grep -vc hyprctl '$T/makepkg.log')\" == 3 ]]"
 
+# Vortex Studio llega una sola vez a quien no lo tiene; si lo quitó, no vuelve; si lo tiene, se pone al día.
+mkdir -p "$T/repo/packaging/vortex-studio"
+cp "$AQUI/packaging/vortex-studio/PKGBUILD" "$T/repo/packaging/vortex-studio/PKGBUILD"
+: >"$T/makepkg.log"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1
+probar "instala Vortex Studio a quien no lo tenía" "grep -qx vortex-studio '$T/makepkg.log'"
+: >"$T/makepkg.log"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar --forzar >/dev/null 2>&1
+probar "si lo quitaste, no lo vuelve a instalar (ni con --forzar)" "! grep -qx vortex-studio '$T/makepkg.log'"
+sed -i 's/^  \*) exit 1 ;;$/  vortex-studio) echo "vortex-studio 0.1.1-1" ;;\n  *) exit 1 ;;/' "$T/bin/pacman"
+: >"$T/makepkg.log"
+env HOME="$H" PATH="$T/bin:$PATH" T="$T" VORTEX_RELEASE=/nonexistent VORTEX_BIN_DESTINO="$T/destino" "$T/repo/bin/vortex" actualizar >/dev/null 2>&1
+probar "si lo tienes en otra versión, lo pone al día" "grep -qx vortex-studio '$T/makepkg.log'"
+
 # La config de Hyprland que copió el instalador se pone al día (con respaldo); sin ella no se crea.
 mkdir -p "$T/repo/config/hypr" "$H/.config/hypr"
 cp "$AQUI/config/hypr/hyprland.lua" "$AQUI/config/hypr/atajos.lua" "$T/repo/config/hypr/"
