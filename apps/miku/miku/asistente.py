@@ -103,6 +103,7 @@ class Asistente(QObject):
     emocion = Signal(str, float)
     sonrojo = Signal(float)             # 0..1: se sonroja (le dijiste algo bonito o ella a ti)
     afecto = Signal(float, str)         # (0..100, nivel) para el medidor de cariño; -1 = sentimientos apagados
+    boda = Signal(str)                  # 2.1: «lista» (botón «Pedirle matrimonio»), «casados», «boda» (¡se casaron!) o «»
     cerrar = Signal()                   # pide a la ventana que se cierre (el panel se cierra solo)
     progreso = Signal(str, str, float)  # (título, detalle, 0..1) de la descarga de los modelos; fracción < 0 = ya no hay
     acciones = Signal(object)           # botones bajo la respuesta: [[id, texto], ...] (vacía = ninguno)
@@ -698,9 +699,16 @@ class Asistente(QObject):
         except (OSError, ValueError):
             return
         self.afecto.emit(round(e["afecto"], 1), corazon.nivel(e)[0])
+        self.boda.emit(corazon.estado_boda(e))
 
     def _sentir(self, r: dict) -> None:
         self._emitir_afecto()
+        if r.get("boda"):
+            self.boda.emit("boda")
+            if shutil.which("notify-send"):
+                subprocess.Popen(["notify-send", "-a", "Miku", "-i", "vortex-miku", "💍 ¡Miku y tú se casaron!",
+                                  "Lo anotó en su diario. Ahora se acuerda de sus aniversarios."],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if r.get("animo"):
             self._animo = corazon.expresion(r["animo"])
             self.emocion.emit(*self._animo)

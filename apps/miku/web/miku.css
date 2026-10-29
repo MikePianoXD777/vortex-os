@@ -56,6 +56,19 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; b
 #carino-num { color: var(--tenue); font-variant-numeric: tabular-nums; }
 #carino.late svg { animation: latido 0.7s ease; }
 #carino.enamorada svg { filter: drop-shadow(0 0 4px var(--corazon)); }
+/* 2.1: el botón para pedirle matrimonio (a la derecha del medidor) y la lluvia de corazones de la boda */
+#b-boda {
+  position: absolute; top: 10px; left: 0; height: 30px; padding: 0 12px; border-radius: 15px; z-index: 5;
+  border: 1px solid var(--corazon); background: var(--cristal); color: var(--texto); font: inherit; font-size: 12px;
+  cursor: pointer; animation: brillo 2.4s ease-in-out infinite;
+}
+#b-boda[hidden] { display: none; }
+#b-boda:hover { background: var(--corazon); color: #fff; }
+@keyframes brillo { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 10px 1px var(--corazon); } }
+#corazones { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 7; }
+#corazones span { position: absolute; bottom: -30px; color: var(--corazon); animation: sube-corazon linear forwards; }
+@keyframes sube-corazon { 0% { transform: translateY(0) rotate(0); opacity: 0; } 10% { opacity: 1; }
+                          100% { transform: translateY(-110vh) rotate(25deg); opacity: 0; } }
 @keyframes latido { 0% { transform: scale(1); } 25% { transform: scale(1.35); } 50% { transform: scale(0.95); } 75% { transform: scale(1.15); } 100% { transform: scale(1); } }
 #carino-cambio {
   position: absolute; top: 15px; left: 0; color: var(--corazon); font-size: 13px; font-weight: 600; opacity: 0;

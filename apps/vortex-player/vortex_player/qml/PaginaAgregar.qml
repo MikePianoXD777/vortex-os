@@ -1,5 +1,5 @@
-// Agregar música: pegar un enlace (YouTube, YouTube Music, Spotify) para bajarlo, o agregar tus archivos
-// sin pérdida. Abajo, lo que se está bajando.
+// Agregar música: buscar en YouTube Music o YouTube (2.1), pegar un enlace (YouTube, YouTube Music,
+// Spotify) para bajarlo, o agregar tus archivos sin pérdida. Abajo, lo que se está bajando.
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -17,6 +17,17 @@ Flickable {
         vp.bajar(enlace.text)
         enlace.text = ""
     }
+    // Desde el buscador de tu biblioteca («Buscar en YouTube Music») o al dar Enter aquí
+    function buscar(texto) {
+        if (texto !== undefined) campoBuscar.text = texto
+        vp.buscarEnLinea(campoBuscar.text, fuente.currentIndex === 0 ? "ytmusic" : "youtube")
+        raiz.contentY = 0
+    }
+    function tiempo(s) {
+        if (!s) return ""
+        var m = Math.floor(s / 60), x = s % 60
+        return m + ":" + (x < 10 ? "0" : "") + x
+    }
 
     ColumnLayout {
         id: columna
@@ -26,6 +37,145 @@ Flickable {
         spacing: 18
 
         Text { text: "Agregar música"; color: Tema.texto; font.pixelSize: 32; font.weight: Font.Bold }
+
+        // --- buscar (2.1) ---
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: cajaBuscar.implicitHeight + 40
+            radius: Tema.radioTarjeta
+            color: Tema.tarjeta
+            ColumnLayout {
+                id: cajaBuscar
+                anchors.fill: parent
+                anchors.margins: 20
+                spacing: 12
+                Text { text: "Buscar canciones"; color: Tema.texto; font.pixelSize: 17; font.weight: Font.DemiBold }
+                Text {
+                    Layout.fillWidth: true
+                    text: "Escribe una canción o un artista. Lo que bajes queda en tu biblioteca para armar tus playlists."
+                    color: Tema.suave
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    TextField {
+                        id: campoBuscar
+                        Layout.fillWidth: true
+                        implicitHeight: 44
+                        placeholderText: "Canción o artista"
+                        placeholderTextColor: Tema.tenue
+                        color: Tema.texto
+                        leftPadding: 42
+                        selectByMouse: true
+                        onAccepted: raiz.buscar()
+                        background: Rectangle {
+                            radius: 22
+                            color: Tema.campo
+                            border.width: 1
+                            border.color: campoBuscar.activeFocus ? Tema.azul : Tema.bordeCampo
+                            Icono { x: 14; anchors.verticalCenter: parent.verticalCenter; width: 18; height: 18; nombre: "buscar"; color: Tema.tenue }
+                        }
+                    }
+                    Selector {
+                        id: fuente
+                        Layout.preferredWidth: 170
+                        implicitHeight: 44
+                        model: ["YouTube Music", "YouTube"]
+                        onActivated: if (campoBuscar.text.trim() !== "") raiz.buscar()
+                    }
+                    Boton { text: "Buscar"; icono: "buscar"; grande: true; enabled: campoBuscar.text.trim() !== "" && !vp.buscandoEnLinea; onClicked: raiz.buscar() }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    visible: vp.buscandoEnLinea || vp.errorEnLinea !== ""
+                    text: vp.buscandoEnLinea ? "Buscando…" : vp.errorEnLinea
+                    color: vp.errorEnLinea && !vp.buscandoEnLinea ? Tema.peligro : Tema.tenue
+                    font.pixelSize: 13
+                    wrapMode: Text.WordWrap
+                }
+                Repeater {
+                    model: vp.enLinea
+                    delegate: Rectangle {
+                        id: resultado
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        implicitHeight: 60
+                        radius: 12
+                        color: zona.hovered ? Tema.campo : "transparent"
+                        HoverHandler { id: zona }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            spacing: 12
+                            Portada {
+                                Layout.preferredWidth: 46
+                                Layout.preferredHeight: 46
+                                url: resultado.modelData.portada
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: resultado.modelData.titulo
+                                    color: Tema.texto
+                                    font.pixelSize: 14
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: [resultado.modelData.artistas, resultado.modelData.album].filter(x => x).join(" · ")
+                                    color: Tema.suave
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+                            }
+                            Text {
+                                text: raiz.tiempo(resultado.modelData.duracion)
+                                color: Tema.tenue
+                                font.pixelSize: 12
+                                font.features: { "tnum": 1 }
+                            }
+                            // Ya la tienes / se está bajando / bajar (o bajar directo a una playlist)
+                            RowLayout {
+                                visible: resultado.modelData.estado !== ""
+                                spacing: 6
+                                Icono {
+                                    Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                                    nombre: resultado.modelData.estado === "biblioteca" ? "visto" : "descargar"
+                                    color: resultado.modelData.estado === "biblioteca" ? Tema.exito : Tema.azul
+                                }
+                                Text {
+                                    text: resultado.modelData.estado === "biblioteca" ? "En tu biblioteca" : "Bajando…"
+                                    color: Tema.suave
+                                    font.pixelSize: 12
+                                }
+                            }
+                            Boton {
+                                visible: resultado.modelData.estado === ""
+                                text: "Bajar"
+                                icono: "descargar"
+                                tipo: "secundario"
+                                enabled: vp.ajustes.hayYtDlp
+                                onClicked: vp.bajarResultado(resultado.index, -1)
+                            }
+                            BotonIcono {
+                                visible: resultado.modelData.estado === ""
+                                icono: "playlist"
+                                ayuda: "Bajar y agregar a una playlist"
+                                enabled: vp.ajustes.hayYtDlp
+                                onClicked: { menuPlaylist.indice = resultado.index; menuPlaylist.popup() }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // --- enlace ---
         Rectangle {
@@ -208,6 +358,27 @@ Flickable {
                     Text { text: "o arrástralos a la ventana"; color: Tema.tenue; font.pixelSize: 12; Layout.leftMargin: 6 }
                 }
             }
+        }
+    }
+
+    Menu {
+        id: menuPlaylist
+        property int indice: -1
+        title: "Bajar a la playlist"
+        Instantiator {
+            model: vp.playlists
+            delegate: MenuItem {
+                required property var modelData
+                text: modelData.nombre
+                onTriggered: vp.bajarResultado(menuPlaylist.indice, modelData.id)
+            }
+            onObjectAdded: (i, o) => menuPlaylist.insertItem(i, o)
+            onObjectRemoved: (i, o) => menuPlaylist.removeItem(o)
+        }
+        MenuSeparator {}
+        MenuItem {
+            text: "Nueva playlist…"
+            onTriggered: vp.bajarResultado(menuPlaylist.indice, vp.crearPlaylist("Nueva playlist"))
         }
     }
 

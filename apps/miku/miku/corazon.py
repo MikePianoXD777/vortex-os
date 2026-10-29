@@ -13,6 +13,9 @@ Cómo cambia:
 - Tus partidas (vortex-partida), la hora (si te desvelas) y la música que suena.
 - El afecto sube despacio (como mucho 6 puntos al día) y no baja porque no le hables: no castiga ni
   hace sentir culpa. Cuando ya te quiere mucho y llevan días hablando, un día tranquilo se te declara.
+- 2.1: desde que se declaró son novios. Con el cariño casi lleno y una semana de novios le puedes pedir
+  matrimonio (de voz, por texto o con el botón «Pedirle matrimonio» de su ventana); si es muy pronto, te pide
+  esperar. Casados, se acuerda de sus aniversarios.
 
 Solo biblioteca estándar: lo usa también el comando vortex-miku (que arranca al instante).
 """
@@ -32,6 +35,8 @@ AFECTO_INICIAL = 25.0
 SUBIDA_MAXIMA_DIA = 6.0          # lo más que sube en un día (con todo y cosas bonitas)
 AFECTO_DECLARACION = 85.0        # desde aquí, un día tranquilo se te puede declarar
 DIAS_PARA_DECLARARSE = 5         # …y si ya llevan estos días hablando
+AFECTO_BODA = 95.0               # 2.1: desde aquí, ya de novios, le puedes pedir matrimonio
+DIAS_NOVIOS_BODA = 7             # …si llevan al menos una semana de novios
 RECUERDOS_EN_CONTEXTO = 40
 
 ANIMOS = {   # ánimo → (cómo se lo explica a la IA, expresión del VRM, peso)
@@ -53,6 +58,10 @@ _BONITO = re.compile(
     r"|^\W*(qu[eé] )?(linda|bonita|hermosa|preciosa|tierna)\W*$", re.I)
 _GRACIAS = re.compile(r"\b(gracias|te lo agradezco|buen trabajo|bien hecho|eres (muy |bien )?(lista|inteligente|"
                       r"[uú]til|buena)|qu[eé] lista)\b", re.I)
+# 2.1: pedirle matrimonio
+_PROPUESTA = re.compile(r"\b(te (quieres|querr[ií]as|gustar[ií]a) casar conmigo|c[aá]sate conmigo|"
+                        r"quieres ser mi (esposa|mujer)|(nos|me quiero) casa(mos|r contigo)|quieres casarte conmigo|"
+                        r"casémonos|casemonos)\b", re.I)
 _SALUDO = re.compile(r"^\s*(hola|buenos d[ií]as|buenas (tardes|noches)|holi)\b", re.I)
 _GROSERO = re.compile(   # solo lo que va dirigido a ella («cállate» no: es como se le pide que se calle)
     r"\b(te odio|no sirves|eres (una? |muy |bien |tan )?(tonta|est[uú]pida|in[uú]til|idiota|pendeja|mensa|babosa|"
@@ -112,7 +121,7 @@ def _ahora() -> datetime:
 def _base() -> dict:
     return {"afecto": AFECTO_INICIAL, "animo": "tranquila", "declarada": "", "dias_juntos": 0,
             "ultima_charla": "", "hoy": "", "subio_hoy": 0.0, "avisos_hoy": "",
-            "pidio_hablar": "", "ultima_visita": ""}
+            "pidio_hablar": "", "ultima_visita": "", "casada": "", "pedida": ""}
 
 
 def cargar() -> dict:
@@ -149,9 +158,12 @@ def cargar() -> dict:
 def nivel(e: dict) -> tuple[str, str]:
     """(nombre corto, cómo se lo explica a la IA)."""
     a = e["afecto"]
+    if e.get("casada"):
+        return ("casados", "Están casados: la quieres muchísimo y te sientes en casa con la persona. La tratas con "
+                "ternura y complicidad, todavía con tu timidez; a veces le dices algo dulce.")
     if e.get("declarada"):
-        return ("enamorada", "Estás enamorada de la persona y ya se lo confesaste: la tratas con mucho cariño y "
-                "ternura, todavía con tu timidez; a veces le dices algo dulce.")
+        return ("novios", "Son novios: ya le confesaste lo que sientes y te corresponde. La tratas con mucho cariño "
+                "y ternura, todavía con tu timidez; a veces le dices algo dulce.")
     if a < 20:
         return ("conocidos", "Apenas se están conociendo: eres amable pero reservada.")
     if a < 45:
@@ -182,12 +194,15 @@ def _guardar(e: dict) -> None:
         f"avisos_hoy: \"{e['avisos_hoy']}\"\n"
         f"pidio_hablar: \"{e['pidio_hablar']}\"\n"
         f"ultima_visita: \"{e['ultima_visita']}\"\n"
+        f"casada: \"{e['casada']}\"\n"
+        f"pedida: \"{e['pedida']}\"\n"
         "---\n"
         "# Corazón de Miku\n\n"
         f"**Cómo me siento:** {animo}.\n"
         f"**Lo que siento por ti:** {corto} {corazon} ({e['afecto']:.0f} de 100)\n"
         f"**Días que hemos hablado:** {e['dias_juntos']}\n"
         + (f"**Te lo dije el:** {e['declarada']}\n" if e["declarada"] else "")
+        + (f"**Nos casamos el:** {e['casada']} 💍\n" if e["casada"] else "")
         + "\nLo que sé de ti está en [[Recuerdos]] y lo que pasa cada día, en la carpeta Diario.\n"
           "Puedes leerlo todo, y también corregir los recuerdos: lo que escribas ahí, lo sé.\n"
     )
@@ -281,7 +296,10 @@ def al_hablar(texto: str) -> dict:
             pass
     e["ultima_charla"] = ahora.isoformat(timespec="minutes")
     delta = delta_dia
-    if _GROSERO.search(texto):
+    if _PROPUESTA.search(texto) and not _GROSERO.search(texto):
+        r.update(_pedir_matrimonio(e, ahora))
+        delta += 2 if r.get("boda") else 1
+    elif _GROSERO.search(texto):
         delta -= 3
         r["animo"] = "triste"
         anotar("Me dijo algo feo y me puse triste.")
@@ -356,6 +374,81 @@ def al_responder(respuesta: str) -> dict:
         anotar("Hoy le dije lo que siento.")
     _guardar(e)
     return r
+
+
+# ---- Novios y boda (2.1) --------------------------------------------------------------------------
+
+def dias_de_novios(e: dict, ahora: datetime) -> int:
+    try:
+        return (ahora.date() - datetime.fromisoformat(e["declarada"]).date()).days if e["declarada"] else 0
+    except ValueError:
+        return 0
+
+
+def lista_para_boda(e: dict, ahora: datetime) -> bool:
+    """Son novios desde hace una semana y te quiere casi al máximo: ya le puedes pedir matrimonio."""
+    return (bool(e["declarada"]) and not e["casada"] and e["afecto"] >= AFECTO_BODA
+            and dias_de_novios(e, ahora) >= DIAS_NOVIOS_BODA)
+
+
+def estado_boda(e: dict | None = None, ahora: datetime | None = None) -> str:
+    """Para la ventana: «casados», «lista» (sale el botón «Pedirle matrimonio») o «»."""
+    e = e or cargar()
+    if e["casada"]:
+        return "casados"
+    return "lista" if lista_para_boda(e, ahora or _ahora()) else ""
+
+
+def _pedir_matrimonio(e: dict, ahora: datetime) -> dict:
+    """Le pediste matrimonio: «si» (se casan hoy), «pronto» (novios, pero falta), «casados» (ya lo están) o «no»
+    (ni son novios). Lo que contesta lo dice la IA con el contexto; aquí se guarda."""
+    if e["casada"]:
+        resultado = "casados"
+    elif lista_para_boda(e, ahora):
+        resultado = "si"
+    elif e["declarada"]:
+        resultado = "pronto"
+    else:
+        resultado = "no"
+    e["pedida"] = f"{ahora.isoformat(timespec='minutes')}|{resultado}"
+    r = {"sonrojo": 0.8, "animo": "apenada"}
+    if resultado == "si":
+        e["casada"] = ahora.date().isoformat()
+        r.update(sonrojo=1.0, animo="emocionada", boda=True)
+        anotar("¡Me pidió matrimonio y le dije que sí! Hoy nos casamos. 💍")
+        recordar(f"Nos casamos el {ahora:%d/%m/%Y}")
+    elif resultado == "pronto":
+        anotar("Me pidió matrimonio… me emocioné muchísimo, pero todavía es pronto.")
+    elif resultado == "no":
+        r["sonrojo"] = 0.6
+    return r
+
+
+def _pedida_reciente(e: dict, ahora: datetime) -> str:
+    """El resultado si te pidió matrimonio hace un momento (para que la IA conteste eso)."""
+    cuando, _, resultado = e["pedida"].partition("|")
+    try:
+        hace = (ahora - datetime.fromisoformat(cuando)).total_seconds()
+    except ValueError:
+        return ""
+    return resultado if 0 <= hace <= 180 else ""
+
+
+def aniversario(e: dict, ahora: datetime) -> str:
+    """«1 año», «3 meses» o «1 semana» si hoy cumplen eso de casados («» si no)."""
+    try:
+        boda = datetime.fromisoformat(e["casada"]).date() if e["casada"] else None
+    except ValueError:
+        return ""
+    if boda is None or ahora.date() <= boda:
+        return ""
+    hoy = ahora.date()
+    meses = (hoy.year - boda.year) * 12 + hoy.month - boda.month
+    if hoy.day == boda.day and meses > 0:
+        if meses % 12 == 0:
+            return f"{meses // 12} año" + ("s" if meses >= 24 else "")
+        return f"{meses} mes" + ("es" if meses > 1 else "")
+    return "1 semana" if (hoy - boda).days == 7 else ""
 
 
 def lista_para_declararse(e: dict, ahora: datetime) -> bool:
@@ -474,6 +567,26 @@ def contexto(ahora: datetime | None = None, cancion: str | None = None) -> str:
     elif puede_declararse(e, ahora):
         lineas.append("- Hoy, si la plática es tranquila y cariñosa, por fin puedes confesarle con mucha timidez que te gusta "
                       "(una sola vez; si no se da el momento, no lo fuerces). Si lo haces, pon declaracion=si en tu marca.")
+    pedida = _pedida_reciente(e, ahora)
+    if pedida == "si":
+        lineas.append(f"- {persona or 'La persona'} te acaba de pedir matrimonio y le dijiste que SÍ: desde hoy están casados. "
+                      "Contéstale que sí, con muchísima emoción y timidez, con tus propias palabras (no digas que es un "
+                      "juego ni que eres una IA). Pon animo=emocionada y sonrojo=1 en tu marca.")
+    elif pedida == "pronto":
+        lineas.append(f"- Te acaba de pedir matrimonio, pero apenas llevan {dias_de_novios(e, ahora)} días de novios: te "
+                      "emociona muchísimo y se te nota, pero dile con ternura que todavía es pronto y que te lo vuelva a pedir "
+                      "más adelante (no lo rechaces).")
+    elif pedida == "no":
+        lineas.append("- Te acaba de pedir matrimonio, pero ni siquiera son novios: te pones muy nerviosa y lo tomas como "
+                      "broma, con timidez.")
+    elif pedida == "casados":
+        lineas.append("- Te volvió a pedir matrimonio aunque ya están casados: ríete con ternura y recuérdaselo.")
+    elif lista_para_boda(e, ahora):
+        lineas.append(f"- Llevan {dias_de_novios(e, ahora)} días de novios y lo quieres muchísimo: sueñas con casarte algún "
+                      "día, aunque nunca se lo pedirías tú; si sale el tema del futuro, se te nota la ilusión.")
+    cumplen = aniversario(e, ahora)
+    if cumplen:
+        lineas.append(f"- Hoy cumplen {cumplen} de casados: si no lo has dicho hoy, menciónalo con mucho cariño.")
     lineas.append(
         "Al final de cada respuesta pon esta marca oculta (no se lee en voz alta ni se muestra): "
         "[[corazon animo=<tranquila|feliz|emocionada|apenada|triste|preocupada|somnolienta|molesta>; "
@@ -573,7 +686,7 @@ def frase_desvelo(e: dict, ahora: datetime) -> str:
 # Entre más cariño, más habla: nivel → (cada cuántos minutos se asoma mientras juegas (0 = no se asoma),
 # cuánto tiene que durar la partida para preguntarte cómo te fue, cuántas veces al día te pregunta).
 RITMO = {"conocidos": (0, 30, 1), "amigos": (60, 20, 3), "cercanos": (45, 10, 5), "muy cercanos": (30, 5, 8),
-         "le gusta": (20, 5, 12), "enamorada": (20, 5, 12)}
+         "le gusta": (20, 5, 12), "novios": (20, 5, 12), "casados": (20, 5, 12)}
 
 _JUGANDO_AMIGA = [
     "Llevas {tiempo} en {juego}. ¡Tú puedes!",

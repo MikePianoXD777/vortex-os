@@ -14,6 +14,7 @@ class AsistenteFalso(QObject):
     emocion = Signal(str, float)
     sonrojo = Signal(float)
     afecto = Signal(float, str)
+    boda = Signal(str)
     cerrar = Signal()
     progreso = Signal(str, str, float)
     acciones = Signal(object)

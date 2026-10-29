@@ -235,6 +235,73 @@ class Descargas(Temporal):
         self.assertEqual(evs[-1]["tipo"], "fin")
 
 
+def _fila_ytm(vid: str, titulo: str, segunda: str) -> dict:
+    """Una canción como la manda la búsqueda de YouTube Music."""
+    col = lambda t: {"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": x} for x in t]}}}
+    return {"musicResponsiveListItemRenderer": {
+        "playlistItemData": {"videoId": vid}, "flexColumns": [col([titulo]), col(segunda.split("|"))],
+        "thumbnail": {"musicThumbnailRenderer": {"thumbnail": {"thumbnails": [{"url": "https://x/a=w60-h60-l90"}]}}}}}
+
+
+def _fila_radio(vid: str, titulo: str, linea: str, dur: str) -> dict:
+    """Una canción como la manda la radio («A continuación») de YouTube Music."""
+    return {"playlistPanelVideoRenderer": {"videoId": vid, "title": {"runs": [{"text": titulo}]},
+                                           "longBylineText": {"runs": [{"text": linea}]},
+                                           "lengthText": {"runs": [{"text": dur}]},
+                                           "thumbnail": {"thumbnails": [{"url": "https://x/b=w60-h60"}]}}}
+
+
+class Buscar(unittest.TestCase):
+    """2.1: buscar en YouTube Music / YouTube y recomendaciones, con respuestas falsas (sin internet)."""
+
+    def test_leer_busqueda_de_ytmusic(self) -> None:
+        r = {"contents": [_fila_ytm("aaaaaaaaaaa", "Idol", "YOASOBI| • |Idol| • |3:34"),
+                          _fila_ytm("bbbbbbbbbbb", "Sin álbum", "Canción| • |Alguien| • |1:02:03")]}
+        c = descargas.leer_ytmusic(r)
+        self.assertEqual([(x["titulo"], x["artistas"], x["album"], x["duracion"]) for x in c],
+                         [("Idol", "YOASOBI", "Idol", 214), ("Sin álbum", "Alguien", "", 3723)])
+        self.assertEqual(c[0]["portada"], "https://x/a=w226-h226-l90")
+        self.assertEqual(c[0]["url"], "https://music.youtube.com/watch?v=aaaaaaaaaaa")
+
+    def test_buscar_cae_a_yt_dlp(self) -> None:
+        # YouTube Music contestó algo que no se entiende: se usa la búsqueda de yt-dlp
+        with tempfile.TemporaryDirectory() as t:
+            falso = Path(t) / "yt-dlp"
+            falso.write_text("#!/bin/sh\necho '{\"entries\": [{\"id\": \"ccccccccccc\", \"title\": \"T\", \"channel\": \"C\", \"duration\": 61}, {\"id\": \"UCcanal\"}]}'\n")
+            falso.chmod(0o755)
+            c = descargas.buscar("algo", "ytmusic", yt_dlp=str(falso), pedir=lambda u, b: {})
+            self.assertEqual([(x["id"], x["titulo"], x["artistas"], x["duracion"]) for x in c], [("ccccccccccc", "T", "C", 61)])
+            c = descargas.buscar("algo", "youtube", yt_dlp=str(falso), pedir=lambda u, b: {})
+            self.assertTrue(c[0]["url"].startswith("https://www.youtube.com/watch?v="))
+        self.assertEqual(descargas.buscar("   ", "ytmusic"), [])
+
+    def test_recomendar(self) -> None:
+        radios = {
+            "semilla0001": [_fila_radio("semilla0001", "Idol", "YOASOBI • Idol • 2023", "3:34"),
+                            _fila_radio("r1111111111", "Monster", "YOASOBI • THE BOOK 2 • 2021", "3:26"),
+                            _fila_radio("r2222222222", "Ya la tengo (Live)", "LiSA • X", "4:00"),
+                            _fila_radio("r3333333333", "Comun", "Alguien • Y", "2:00")],
+            "semilla0002": [_fila_radio("r4444444444", "Gurenge", "LiSA • LEO-NiNE • 2020", "3:58"),
+                            _fila_radio("r3333333333", "Comun", "Alguien • Y", "2:00")],
+        }
+        pedidos = []
+
+        def pedir(url: str, cuerpo: dict) -> dict:
+            pedidos.append(url.split("/")[-1].split("?")[0])
+            if "search" in url:   # la semilla sin id (un archivo tuyo) se busca primero
+                return {"x": [_fila_ytm("semilla0002", "Homura", "LiSA| • |homura| • |4:35")]}
+            return {"contents": [radios[cuerpo["videoId"]]]}
+
+        c = descargas.recomendar([{"id": "semilla0001", "titulo": "Idol", "artista": "YOASOBI"},
+                                  {"titulo": "Homura", "artista": "LiSA"}],
+                                 [{"titulo": "Ya la tengo", "artista": "LiSA"}], pedir=pedir)
+        # Intercaladas, sin la semilla, sin repetir y sin lo que ya tienes (aunque diga «(Live)»)
+        self.assertEqual([x["titulo"] for x in c], ["Monster", "Gurenge", "Comun"])
+        self.assertEqual((c[0]["artistas"], c[0]["album"], c[0]["duracion"]), ("YOASOBI", "THE BOOK 2", 206))
+        self.assertEqual(pedidos, ["search", "next", "next"])
+        self.assertEqual(descargas.recomendar([], []), [])
+
+
 class Audio(Temporal):
     def _pactl(self, bt: bool) -> str:
         sinks = [{"name": "alsa_output.pci", "description": "Audio Interno", "sample_specification": "s32le 2ch 48000Hz",

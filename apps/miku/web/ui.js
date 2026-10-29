@@ -89,7 +89,7 @@
 
   // Medidor de cariño (2.0): el corazón se llena de 0 a 100; al cambiar, late y muestra cuánto.
   const NIVELES = { conocidos: 'Conocidos', amigos: 'Amigos', cercanos: 'Cercanos', 'muy cercanos': 'Muy cercanos',
-                    'le gusta': 'Le gustas', enamorada: 'Enamorada' };
+                    'le gusta': 'Le gustas', enamorada: 'Enamorada', novios: 'Novios', casados: 'Casados 💍' };
   let afectoPrevio = null;
   miku.afecto = (valor, nivel) => {
     const c = $('carino');
@@ -99,17 +99,46 @@
     $('carino-nivel').setAttribute('y', String(21 - 16 * v / 100));      // el corazón va de y=5 a y=21
     $('carino-nombre').textContent = NIVELES[nivel] || nivel;
     $('carino-num').textContent = Math.round(v);
-    c.classList.toggle('enamorada', nivel === 'enamorada');
+    c.classList.toggle('enamorada', ['enamorada', 'novios', 'casados'].includes(nivel));
+    acomodarBoda();
     c.title = `Cariño de Miku: ${Math.round(v)} de 100. Crece despacio con cómo la tratas. Lo que siente y lo que sabe de ti está en Documentos/Miku.`;
     if (afectoPrevio !== null && Math.abs(v - afectoPrevio) >= 0.25) {
       const d = v - afectoPrevio, cambio = $('carino-cambio');
       cambio.textContent = (d > 0 ? '+' : '−') + Math.abs(d).toLocaleString('es', { maximumFractionDigits: 1 });
       cambio.classList.toggle('baja', d < 0);
-      cambio.style.left = (c.offsetLeft + c.offsetWidth + 6) + 'px';
+      const ancla = $('b-boda').hidden ? c : $('b-boda');       // 2.1: después del botón de matrimonio, si está
+      cambio.style.left = (ancla.offsetLeft + ancla.offsetWidth + 6) + 'px';
       cambio.classList.remove('sube'); void cambio.offsetWidth; cambio.classList.add('sube');
       if (d > 0) { c.classList.remove('late'); void c.offsetWidth; c.classList.add('late'); }
     }
     afectoPrevio = v;
+  };
+
+  // 2.1: «lista» → el botón «Pedirle matrimonio» (manda la pregunta como si la escribieras); «boda» → ¡se
+  // casaron!: lluvia de corazones; «casados» o «» → sin botón.
+  const acomodarBoda = () => {
+    const c = $('carino'), b = $('b-boda');
+    b.style.left = (c.hidden ? 10 : c.offsetLeft + c.offsetWidth + 8) + 'px';
+  };
+  $('b-boda').addEventListener('click', () => {
+    $('b-boda').hidden = true;
+    aPython((p) => p.enviarTexto('¿Te quieres casar conmigo?'));
+  });
+  miku.boda = (estado) => {
+    $('b-boda').hidden = estado !== 'lista';
+    acomodarBoda();
+    if (estado !== 'boda') return;
+    const caja = $('corazones');
+    for (let i = 0; i < 40; i++) {
+      const h = document.createElement('span');
+      h.textContent = i % 7 === 0 ? '💍' : '♥';
+      h.style.left = (Math.random() * 100) + '%';
+      h.style.fontSize = (12 + Math.random() * 18) + 'px';
+      h.style.animationDuration = (3 + Math.random() * 3) + 's';
+      h.style.animationDelay = (Math.random() * 1.5) + 's';
+      caja.appendChild(h);
+      setTimeout(() => h.remove(), 8000);
+    }
   };
 
   // Primera vez: descarga de la voz y el oído. fraccion < 0 = ya no hay descarga.

@@ -144,8 +144,11 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: ["canciones", "agregar", "ecualizador", "ajustes"].indexOf(ventana.pagina)
-                PaginaCanciones { onIrAAgregar: ventana.ir("agregar") }
-                PaginaAgregar {}
+                PaginaCanciones {
+                    onIrAAgregar: ventana.ir("agregar")
+                    onBuscarEnInternet: (texto) => { ventana.ir("agregar"); paginaAgregar.buscar(texto) }
+                }
+                PaginaAgregar { id: paginaAgregar }
                 PaginaEcualizador {}
                 PaginaAjustes {}
             }

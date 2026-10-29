@@ -5,7 +5,7 @@
 #
 #   cd packaging/vortex-player && makepkg -si
 pkgname=vortex-player
-pkgver=1.0
+pkgver=1.1
 pkgrel=1
 pkgdesc="Vortex Player: tu música a la máxima calidad, y la de YouTube Music y Spotify"
 arch=('any')

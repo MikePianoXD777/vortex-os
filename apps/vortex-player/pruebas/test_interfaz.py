@@ -163,6 +163,175 @@ class Interfaz(unittest.TestCase):
         self.assertNotEqual(d["titulo_tras_next"], None)
         self.assertEqual(d["errores_qml"], [])
 
+    def test_buscar_y_bajar_a_playlist(self) -> None:
+        # 2.1: buscar en YouTube Music, bajar un resultado directo a una playlist y que salga «En tu biblioteca».
+        # Sin internet: la búsqueda y la descarga son falsas, pero el archivo pasa de verdad por la biblioteca.
+        d = self.correr("""
+            import shutil, time
+            from pathlib import Path
+            from vortex_player import descargas
+            origen = Path(os.environ["VORTEX_PLAYER_MUSICA"]) / "disco" / "b.wav"
+            def buscar_falso(texto, fuente="ytmusic", n=20, **_):
+                time.sleep(0.2)
+                return [{"id": "abcdefghijk", "url": "https://music.youtube.com/watch?v=abcdefghijk", "titulo": "Idol",
+                         "artistas": "YOASOBI", "album": "Idol", "duracion": 214, "portada": ""},
+                        {"id": "zzzzzzzzzzz", "url": "https://music.youtube.com/watch?v=zzzzzzzzzzz", "titulo": "Otra",
+                         "artistas": "Nadie", "album": "", "duracion": 0, "portada": ""}]
+            def descargar_falso(url, destino, *a, **k):
+                destino = Path(os.environ["VORTEX_PLAYER_DATOS"]) / "bajadas"   # no en la música de las otras pruebas
+                yield {"tipo": "inicio", "nombre": "", "total": 1, "es_lista": False}
+                time.sleep(0.5)
+                (destino / "YOASOBI").mkdir(parents=True, exist_ok=True)
+                ruta = destino / "YOASOBI" / "Idol [abcdefghijk].wav"
+                shutil.copy(origen, ruta)
+                yield {"tipo": "archivo", "ruta": str(ruta)}
+                yield {"tipo": "fin", "bajadas": 1, "fallidas": 0}
+            descargas.buscar = buscar_falso
+            descargas.descargar = descargar_falso
+            datos = {}
+            def buscar():
+                ventana.setProperty("pagina", "agregar")
+                puente.buscarEnLinea("yoasobi idol", "ytmusic")
+                datos["buscando"] = puente.buscandoEnLinea
+            def bajar():
+                datos["resultados"] = [(c["titulo"], c["estado"]) for c in puente.enLinea]
+                datos["pid"] = puente.crearPlaylist("Anime")
+                puente.bajarResultado(0, datos["pid"])
+                datos["durante"] = puente.enLinea[0]["estado"]
+            def ver():
+                datos["despues"] = [c["estado"] for c in puente.enLinea]
+                puente.verPlaylist(datos["pid"])
+                datos["playlist"] = [c["titulo"] for c in puente.canciones]
+                datos["descarga"] = puente.descargasLista[0]["nombre"]
+            paso(1500, buscar)
+            paso(700, bajar)
+            paso(1500, ver)
+            paso(200, lambda: fin(**datos))
+        """, "buscar")
+        self.assertTrue(d["buscando"])
+        self.assertEqual(d["resultados"], [["Idol", ""], ["Otra", ""]])
+        self.assertEqual(d["durante"], "bajando")
+        self.assertEqual(d["despues"], ["biblioteca", ""])
+        self.assertEqual(len(d["playlist"]), 1)
+        self.assertEqual(d["descarga"], "Idol · YOASOBI")
+        self.assertEqual(d["errores_qml"], [])
+
+    def test_recomendaciones_de_una_playlist(self) -> None:
+        # 2.1: al abrir una playlist salen solas canciones parecidas; «Agregar» la baja y la mete a la playlist
+        d = self.correr("""
+            import shutil, time
+            from pathlib import Path
+            from vortex_player import descargas
+            origen = Path(os.environ["VORTEX_PLAYER_MUSICA"]) / "disco" / "b.wav"
+            llamadas = []
+            def recomendar_falso(semillas, tienes, n=20, **_):
+                llamadas.append([s["titulo"] for s in semillas])
+                time.sleep(0.2)
+                vuelta = len(llamadas)
+                return [{"id": f"reco{vuelta}aaaaaa"[:11], "url": "https://music.youtube.com/watch?v=x", "titulo": f"Parecida {vuelta}",
+                         "artistas": "Alguien", "album": "", "duracion": 200, "portada": ""}]
+            def descargar_falso(url, destino, *a, **k):
+                destino = Path(os.environ["VORTEX_PLAYER_DATOS"]) / "bajadas"
+                yield {"tipo": "inicio", "nombre": "", "total": 1, "es_lista": False}
+                destino.mkdir(parents=True, exist_ok=True)
+                ruta = destino / "Parecida 1 [reco1aaaaaa].wav"
+                shutil.copy(origen, ruta)
+                yield {"tipo": "archivo", "ruta": str(ruta)}
+                yield {"tipo": "fin", "bajadas": 1, "fallidas": 0}
+            descargas.recomendar = recomendar_falso
+            descargas.descargar = descargar_falso
+            datos = {}
+            def abrir():
+                pid = puente.crearPlaylist("Mía")
+                datos["pid"] = pid
+                puente.agregarAPlaylist(pid, puente.canciones[0]["ruta"])
+                puente.verPlaylist(pid)
+                datos["cargando"] = puente.cargandoRecomendaciones
+            def ver():
+                datos["recos"] = [(c["titulo"], c["estado"]) for c in puente.recomendaciones]
+                datos["para"] = puente.recomendandoPara == datos["pid"]
+                puente.agregarRecomendada(0)
+            def agregada():
+                datos["despues"] = [c["estado"] for c in puente.recomendaciones]
+                datos["en_playlist"] = len(puente.canciones)
+                puente.verPlaylist(-1)
+                puente.verPlaylist(datos["pid"])   # al volver: las mismas, sin pedir otra vez
+                datos["llamadas_al_volver"] = len(llamadas)
+                puente.recomendar(datos["pid"], True)   # «Otras»
+            def otras():
+                datos["otras"] = [c["titulo"] for c in puente.recomendaciones]
+                datos["llamadas"] = len(llamadas)
+            paso(1500, abrir)
+            paso(700, ver)
+            paso(1500, agregada)
+            paso(700, otras)
+            paso(200, lambda: fin(**datos))
+        """, "recos")
+        self.assertTrue(d["cargando"])
+        self.assertTrue(d["para"])
+        self.assertEqual(d["recos"], [["Parecida 1", ""]])
+        self.assertEqual(d["despues"], ["biblioteca"])
+        self.assertEqual(d["en_playlist"], 2)
+        self.assertEqual(d["llamadas_al_volver"], 1)
+        self.assertEqual((d["otras"], d["llamadas"]), (["Parecida 2"], 2))
+        self.assertEqual(d["errores_qml"], [])
+
+    def test_arrastrar_banda_del_ecualizador(self) -> None:
+        # 2.1: al arrastrar una barra temblaba y se soltaba (cada movimiento volvía a crear las barras)
+        d = self.correr("""
+            from PySide6.QtCore import QPointF, Qt
+            from PySide6.QtTest import QTest
+            datos = {"valores": [], "misma": True}
+            barras = []
+            def sliders():
+                encontrados, pila = [], [ventana.contentItem()]
+                while pila:
+                    o = pila.pop(0)
+                    if o.inherits("QQuickSlider") and o.isVisible() and o.property("vertical"):
+                        encontrados.append(o)
+                    pila.extend(o.childItems())
+                return encontrados
+            def ir():
+                ventana.setProperty("pagina", "ecualizador")
+            def agarrar():
+                barras[:] = sliders()
+                datos["barras"] = len(barras)
+                b = barras[3]
+                datos["id"] = id(b)
+                c = b.mapToScene(QPointF(b.width() / 2, b.height() / 2)).toPoint()
+                datos["xy"] = [c.x(), c.y()]
+                QTest.mousePress(ventana, Qt.LeftButton, Qt.NoModifier, c)
+            def mover(dy):
+                def f():
+                    x, y = datos["xy"]
+                    datos["xy"] = [x, y + dy]
+                    from PySide6.QtCore import QPoint
+                    QTest.mouseMove(ventana, QPoint(x, y + dy))
+                    actuales = sliders()
+                    datos["misma"] = datos["misma"] and len(actuales) == 10 and actuales[3] is barras[3]
+                    datos["valores"].append(barras[3].property("value"))
+                return f
+            def soltar():
+                from PySide6.QtCore import QPoint
+                QTest.mouseRelease(ventana, Qt.LeftButton, Qt.NoModifier, QPoint(*datos["xy"]))
+                datos["eq"] = puente.eq["bandas"][3]["g"]
+                datos["final"] = barras[3].property("value")
+            from PySide6.QtCore import QObject
+            paso(1500, ir)
+            paso(500, agarrar)
+            for _ in range(8):
+                paso(60, mover(-12))
+            paso(600, mover(-12))   # después de que se aplicó (400 ms) sigue en la mano
+            paso(100, soltar)
+            paso(300, lambda: fin(**datos))
+        """, "eq")
+        self.assertEqual(d["barras"], 10)
+        self.assertTrue(d["misma"], "la barra se volvió a crear mientras se arrastraba")
+        v = d["valores"]
+        self.assertTrue(all(b >= a for a, b in zip(v, v[1:])) and v[-1] > 0, v)
+        self.assertEqual(d["final"], d["eq"])
+        self.assertEqual(d["errores_qml"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

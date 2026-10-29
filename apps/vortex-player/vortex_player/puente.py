@@ -6,9 +6,12 @@ señales. La base SQLite se comparte entre hilos con un candado.
 from __future__ import annotations
 
 import hashlib
+import random
+import re
 import shutil
 import subprocess
 import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -37,11 +40,15 @@ class Puente(QObject):
     cambioSalida = Signal()
     cambioAjustes = Signal()
     cambioEscaneo = Signal()
+    cambioEnLinea = Signal()
+    cambioRecomendaciones = Signal()
     aviso = Signal(str)
     mostrarVentana = Signal()
     portadaLista = Signal(str)
     _evento = Signal(int, "QVariantMap")         # de los hilos de descarga al hilo de Qt
     _escaneado = Signal("QVariantMap")
+    _resultados = Signal(int, "QVariantList", str)   # de la búsqueda en YouTube (hilo) al hilo de Qt
+    _recomendadas = Signal(int, int, "QVariantList", str)   # (vuelta, playlist, canciones, error)
 
     def __init__(self, parent: QObject | None = None, biblioteca: Biblioteca | None = None,
                  reproductor: Reproductor | None = None):
@@ -56,15 +63,33 @@ class Puente(QObject):
         self._playlists: list[dict] = []
         self._descargas: list[dict] = []
         self._eq = ecualizador.estado()
+        self._eq_local = 0.0   # cuándo se movió una banda aquí (time.monotonic)
         self._salida: dict = {}
         self._escaneando = False
         self._portadas: dict[str, str] = {}
         self._parar_descargas = False
         self._cola_urls: list[tuple[int, str]] = []
         self._hilo_descargas: threading.Thread | None = None
+        # 2.1: buscar en YouTube Music / YouTube y bajar a la biblioteca
+        self._en_linea: list[dict] = []
+        self._buscando_linea = False
+        self._error_linea = ""
+        self._busqueda_linea = 0            # la última búsqueda: las respuestas viejas se ignoran
+        self._ids_biblioteca: set[str] = set()
+        # 2.1: recomendaciones para la playlist que estás viendo (se guardan mientras la app está abierta)
+        self._recom: list[dict] = []
+        self._recom_para = -1
+        self._recom_cargando = False
+        self._recom_error = ""
+        self._recom_vuelta = 0
+        self._recom_guardadas: dict[int, list[dict]] = {}
 
         self._evento.connect(self._en_evento)
         self._escaneado.connect(self._fin_escaneo)
+        self._resultados.connect(self._fin_busqueda_linea)
+        self._recomendadas.connect(self._fin_recomendar)
+        self.cambioDescargas.connect(self.cambioEnLinea)
+        self.cambioEnLinea.connect(self.cambioRecomendaciones)
         self.r.ponerVolumen(int(self.bib.ajustes().get("volumen", 80)))
 
         # El ecualizador es el del panel del escritorio: si cambia allá, cambia aquí
@@ -104,11 +129,15 @@ class Puente(QObject):
             else:
                 lista = self.bib.canciones(self._buscar, self._orden)
             self._playlists = self.bib.playlists()
+            # Lo bajado de YouTube lleva su id en el nombre («Título [id].opus»): así la búsqueda sabe qué ya tienes
+            self._ids_biblioteca = {m.group(1) for (r,) in self.bib.db.execute("SELECT ruta FROM canciones")
+                                    if (m := re.search(r"\[([\w-]{11})\]\.\w+$", r))}
         for c in lista:
             c["portada"] = self._portadas.get(c["ruta"], "")
         self._canciones = lista
         self.cambioCanciones.emit()
         self.cambioPlaylists.emit()
+        self.cambioEnLinea.emit()
 
     @Slot(str)
     def buscar(self, texto: str) -> None:
@@ -124,6 +153,8 @@ class Puente(QObject):
     def verPlaylist(self, pid: int) -> None:
         self._vista_playlist = pid
         self._recargar()
+        if pid >= 0:
+            self.recomendar(pid, False)
 
     @Slot(int)
     def tocar(self, i: int) -> None:
@@ -282,17 +313,122 @@ class Puente(QObject):
 
     # --- descargas ---------------------------------------------------------------------------------
 
+    # --- buscar en YouTube Music / YouTube (2.1) ------------------------------------------------------
+
+    @Slot(str, str)
+    def buscarEnLinea(self, texto: str, fuente: str) -> None:
+        self._busqueda_linea += 1
+        n = self._busqueda_linea
+        texto = texto.strip()
+        self._error_linea = ""
+        if not texto:
+            self._en_linea, self._buscando_linea = [], False
+            self.cambioEnLinea.emit()
+            return
+        self._buscando_linea = True
+        self.cambioEnLinea.emit()
+
+        def hilo() -> None:
+            try:
+                self._resultados.emit(n, descargas.buscar(texto, fuente), "")
+            except OSError as e:   # sin red, yt-dlp que falta o YouTube que no contesta
+                claro = e.args[0] if len(e.args) == 1 and isinstance(e.args[0], str) else "Sin conexión con YouTube"
+                self._resultados.emit(n, [], claro)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_busqueda_linea(self, n: int, canciones: list, error: str) -> None:
+        if n != self._busqueda_linea:
+            return
+        self._en_linea, self._error_linea, self._buscando_linea = list(canciones), error, False
+        self.cambioEnLinea.emit()
+
+    def _con_estado(self, lista: list[dict]) -> list[dict]:
+        bajando = {d.get("id") for d in self._descargas if d.get("id") and d["estado"] in ("espera", "bajando")}
+        return [{**c, "estado": "biblioteca" if c["id"] in self._ids_biblioteca
+                 else "bajando" if c["id"] in bajando else ""} for c in lista]
+
+    # --- recomendaciones para una playlist (2.1) -------------------------------------------------------
+
+    @staticmethod
+    def _id_de(ruta: str) -> str:
+        m = re.search(r"\[([\w-]{11})\]\.\w+$", ruta)
+        return m.group(1) if m else ""
+
+    @Slot(int, bool)
+    def recomendar(self, pid: int, otras: bool) -> None:
+        """Las de una playlist: las guardadas, o con «otras» unas nuevas (otras canciones de semilla)."""
+        self._recom_vuelta += 1
+        vuelta = self._recom_vuelta
+        self._recom_para, self._recom_error = pid, ""
+        if not otras and pid in self._recom_guardadas:
+            self._recom, self._recom_cargando = self._recom_guardadas[pid], False
+            self.cambioRecomendaciones.emit()
+            return
+        with self.candado:
+            de_la_playlist = self.bib.canciones_de_playlist(pid)
+            todas = self.bib.canciones()
+        if not de_la_playlist:
+            self._recom, self._recom_cargando = [], False
+            self.cambioRecomendaciones.emit()
+            return
+        # Hasta 3 de semilla, al azar: «Otras» trae algo distinto cada vez. Primero las bajadas de YouTube
+        # (ya traen su id y no hay que buscarlas)
+        con_id = [c for c in de_la_playlist if self._id_de(c["ruta"])]
+        sin_id = [c for c in de_la_playlist if not self._id_de(c["ruta"])]
+        random.shuffle(con_id)
+        random.shuffle(sin_id)
+        semillas = [{"id": self._id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]}
+                    for c in (con_id + sin_id)[:3]]
+        tienes = [{"id": self._id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]} for c in todas]
+        self._recom_cargando = True
+        if otras:
+            self._recom = []
+        self.cambioRecomendaciones.emit()
+
+        def hilo() -> None:
+            try:
+                self._recomendadas.emit(vuelta, pid, descargas.recomendar(semillas, tienes), "")
+            except OSError as e:
+                claro = e.args[0] if len(e.args) == 1 and isinstance(e.args[0], str) else "Sin conexión con YouTube"
+                self._recomendadas.emit(vuelta, pid, [], claro)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_recomendar(self, vuelta: int, pid: int, canciones: list, error: str) -> None:
+        if canciones:
+            self._recom_guardadas[pid] = list(canciones)
+        if vuelta != self._recom_vuelta:
+            return
+        self._recom, self._recom_error, self._recom_cargando = list(canciones), error, False
+        self.cambioRecomendaciones.emit()
+
+    @Slot(int)
+    def agregarRecomendada(self, i: int) -> None:
+        """La baja a tu biblioteca y la agrega a la playlist para la que se recomendó."""
+        if 0 <= i < len(self._recom) and self._recom_para >= 0:
+            c = self._recom[i]
+            self.bajar(c["url"], self._recom_para, c["id"],
+                       f"{c['titulo']} · {c['artistas']}" if c["artistas"] else c["titulo"])
+
+    @Slot(int, int)
+    def bajarResultado(self, i: int, playlist: int) -> None:
+        """Baja el resultado i a la biblioteca; con playlist ≥ 0, además lo agrega a esa playlist."""
+        if 0 <= i < len(self._en_linea):
+            c = self._en_linea[i]
+            self.bajar(c["url"], playlist, c["id"], f"{c['titulo']} · {c['artistas']}" if c["artistas"] else c["titulo"])
+
     @Slot(str)
-    def bajar(self, url: str) -> None:
+    def bajar(self, url: str, playlist: int = -1, vid: str = "", nombre: str = "") -> None:
         url = url.strip()
         t = descargas.tipo_de(url)
         if t is None:
             self.aviso.emit("Pega un enlace de YouTube, YouTube Music o Spotify")
             return
         n = len(self._descargas)
-        self._descargas.append({"url": url, "servicio": t[0], "nombre": url, "total": 0, "hechas": 0,
+        self._descargas.append({"url": url, "servicio": t[0], "nombre": nombre or url, "total": 0, "hechas": 0,
                                 "fallidas": 0, "actual": "En espera…", "porcentaje": 0.0, "estado": "espera",
-                                "avisos": [], "playlist": -1})
+                                "avisos": [], "playlist": playlist, "id": vid})
         self.cambioDescargas.emit()
         self._cola_urls.append((n, url))
         if self._hilo_descargas is None or not self._hilo_descargas.is_alive():
@@ -320,7 +456,9 @@ class Puente(QObject):
             d["estado"] = "bajando"
             d["actual"] = "Leyendo el enlace…"
         elif tipo == "inicio":
-            d["nombre"] = ev.get("nombre") or ("Canción" if not ev.get("es_lista") else "Playlist")
+            # Lo que viene de la búsqueda ya trae su nombre («Título · Artista»)
+            d["nombre"] = ev.get("nombre") or (d["nombre"] if d["nombre"] != d["url"]
+                                               else "Canción" if not ev.get("es_lista") else "Playlist")
             d["total"] = ev.get("total", 0)
             if ev.get("es_lista"):
                 with self.candado:
@@ -334,7 +472,7 @@ class Puente(QObject):
                 d["actual"] = ev["titulo"]
         elif tipo == "archivo":
             d["hechas"] += 1
-            if not d["total"] or (d["nombre"] == d["url"]):
+            if d["nombre"] in (d["url"], "Canción"):
                 d["nombre"] = Path(ev["ruta"]).stem.rsplit(" [", 1)[0]
             if d["playlist"] >= 0 and ev.get("ok"):
                 with self.candado:
@@ -378,6 +516,12 @@ class Puente(QObject):
 
     def _eq_cambio(self, *_: str) -> None:
         self._vigilar_eq()   # el script reescribe el archivo: se vuelve a vigilar
+        # 2.1: mientras mueves una banda aquí, el script escribe el archivo a medias (set_bands y luego apply)
+        # y releerlo regresaba la barra a un valor viejo. Se vuelve a leer cuando terminó de aplicar.
+        espera = self._eq_local + 2.0 - time.monotonic()
+        if espera > 0:
+            QTimer.singleShot(int(espera * 1000) + 50, self._eq_cambio)
+            return
         nuevo = ecualizador.estado()
         if nuevo != self._eq:
             self._eq = nuevo
@@ -389,6 +533,7 @@ class Puente(QObject):
         if 0 <= i < len(bandas):
             bandas[i]["g"] = round(max(-12.0, min(12.0, g)), 1)
             self._eq = {**self._eq, "bandas": bandas, "preset": "Custom"}
+            self._eq_local = time.monotonic()
             self.cambioEq.emit()
             self._aplicar_eq.start()
 
@@ -398,7 +543,13 @@ class Puente(QObject):
 
     def _aplicar_bandas(self) -> None:
         bandas = [dict(b) for b in self._eq["bandas"]]
-        threading.Thread(target=ecualizador.poner_bandas, args=(bandas,), daemon=True).start()
+
+        def aplicar() -> None:
+            ecualizador.poner_bandas(bandas)
+            # EasyEffects puede tardar más que la espera de _eq_cambio: se cuenta desde que terminó
+            self._eq_local = max(self._eq_local, time.monotonic() - 1.5)
+
+        threading.Thread(target=aplicar, daemon=True).start()
 
     @property
     def _aplicar_eq(self) -> QTimer:
@@ -475,6 +626,13 @@ class Puente(QObject):
     salida = Property("QVariantMap", lambda s: s._salida, notify=cambioSalida)
     ajustes = Property("QVariantMap", _ajustes, notify=cambioAjustes)
     escaneando = Property(bool, lambda s: s._escaneando, notify=cambioEscaneo)
+    enLinea = Property("QVariantList", lambda s: s._con_estado(s._en_linea), notify=cambioEnLinea)
+    recomendaciones = Property("QVariantList", lambda s: s._con_estado(s._recom), notify=cambioRecomendaciones)
+    recomendandoPara = Property(int, lambda s: s._recom_para, notify=cambioRecomendaciones)
+    cargandoRecomendaciones = Property(bool, lambda s: s._recom_cargando, notify=cambioRecomendaciones)
+    errorRecomendaciones = Property(str, lambda s: s._recom_error, notify=cambioRecomendaciones)
+    buscandoEnLinea = Property(bool, lambda s: s._buscando_linea, notify=cambioEnLinea)
+    errorEnLinea = Property(str, lambda s: s._error_linea, notify=cambioEnLinea)
     reproductor = Property(QObject, lambda s: s.r, constant=True)
 
 

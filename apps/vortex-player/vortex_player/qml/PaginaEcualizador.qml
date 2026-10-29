@@ -67,12 +67,15 @@ Item {
                     Item { Layout.fillHeight: true }
                     Text { text: "-12"; color: Tema.tenue; font.pixelSize: 11 }
                 }
+                // 2.1: el modelo es el número de bandas, no la lista. Con la lista, cada movimiento (que cambia
+                // vp.eq) volvía a crear todas las barras y la que arrastrabas se cambiaba bajo el mouse: daba
+                // brincos y se soltaba. Así solo se rehacen si cambia cuántas bandas hay.
                 Repeater {
-                    model: vp.eq.bandas
+                    model: vp.eq.bandas.length
                     delegate: ColumnLayout {
                         id: banda
-                        required property var modelData
                         required property int index
+                        readonly property var modelData: vp.eq.bandas[index] || { "f": 0, "g": 0 }
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         spacing: 6
@@ -89,8 +92,9 @@ Item {
                             Layout.fillHeight: true
                             orientation: Qt.Vertical
                             from: -12; to: 12; stepSize: 0.5
-                            value: banda.modelData.g
                             hoverEnabled: true
+                            // Sigue al estado (el panel del escritorio, un preset) solo mientras no la arrastras
+                            Binding on value { value: banda.modelData.g; when: !barra.pressed }
                             onMoved: vp.ponerBanda(banda.index, value)
                             background: Rectangle {
                                 x: barra.leftPadding + barra.availableWidth / 2 - width / 2

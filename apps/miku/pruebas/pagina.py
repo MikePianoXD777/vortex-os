@@ -208,6 +208,32 @@ def main() -> int:
     comprobar("con los sentimientos apagados se esconde", js("document.getElementById('carino').hidden"))
     asistente.afecto.emit(29.0, "amigos")
 
+    print("== Pedirle matrimonio (2.1)")
+    comprobar("sin estar lista, no hay botón de matrimonio", js("document.getElementById('b-boda').hidden"))
+    asistente.boda.emit("lista")
+    asistente.afecto.emit(97.0, "novios")
+    pasar(0.3)
+    comprobar("lo que subió sale después del botón, no encima",
+              js("document.getElementById('carino-cambio').offsetLeft >= document.getElementById('b-boda').offsetLeft + document.getElementById('b-boda').offsetWidth"))
+    comprobar("novios: el medidor dice «Novios»", js("document.getElementById('carino-nombre').textContent") == "Novios")
+    comprobar("lista: sale «Pedirle matrimonio» junto al medidor",
+              not js("document.getElementById('b-boda').hidden")
+              and js("document.getElementById('b-boda').offsetLeft > document.getElementById('carino').offsetLeft + 40"))
+    foto("boda-boton")
+    js("document.getElementById('b-boda').click()")
+    pasar(0.3)
+    comprobar("el botón le pregunta «¿Te quieres casar conmigo?»", ("enviar", "¿Te quieres casar conmigo?") in asistente.registro)
+    comprobar("…y se esconde", js("document.getElementById('b-boda').hidden"))
+    asistente.afecto.emit(98.0, "casados")
+    asistente.boda.emit("boda")
+    pasar(1.5)
+    comprobar("¡boda!: lluvia de corazones", js("document.querySelectorAll('#corazones span').length") >= 30)
+    comprobar("casados: «Casados 💍» y brilla", js("document.getElementById('carino-nombre').textContent") == "Casados 💍"
+              and js("document.getElementById('carino').classList.contains('enamorada')"))
+    foto("boda")
+    asistente.boda.emit("casados")
+    asistente.afecto.emit(29.0, "amigos")
+
     print("== Boca: vocales con la voz")
     # Una pista de prueba: a, i, u, e, o, cada una 0,5 s al máximo.
     pista = []

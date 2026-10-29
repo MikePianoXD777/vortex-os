@@ -7,6 +7,7 @@ import QtQuick.Layouts
 Item {
     id: raiz
     signal irAAgregar()
+    signal buscarEnInternet(string texto)
     readonly property var playlist: {
         for (var i = 0; i < vp.playlists.length; i++)
             if (vp.playlists[i].id === vp.vistaPlaylist) return vp.playlists[i]
@@ -155,6 +156,14 @@ Item {
                 }
                 Timer { id: buscarTimer; interval: 180; onTriggered: vp.buscar(busqueda.text) }
             }
+            // 2.1: lo que no tienes, se busca en YouTube Music (página «Agregar música»)
+            Boton {
+                visible: busqueda.text.trim() !== ""
+                text: "Buscar en YouTube Music"
+                icono: "descargar"
+                tipo: "fantasma"
+                onClicked: raiz.buscarEnInternet(busqueda.text)
+            }
             Item { Layout.fillWidth: true }
             Text { visible: !raiz.playlist; text: "Ordenar:"; color: Tema.tenue; font.pixelSize: 12 }
             Selector {
@@ -196,6 +205,113 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             reuseItems: true
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+            // 2.1: abajo de una playlist, canciones parecidas de YouTube Music (salen solas); «Agregar» la baja
+            // a tu biblioteca y a esta playlist
+            footer: ColumnLayout {
+                id: recomendadas
+                readonly property bool aqui: !!raiz.playlist && vp.recomendandoPara === raiz.playlist.id
+                                             && vp.canciones.length > 0 && !busqueda.text
+                visible: aqui
+                width: lista.width - 12
+                height: aqui ? implicitHeight : 0
+                spacing: 4
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 28
+                    Layout.leftMargin: 12
+                    Layout.bottomMargin: 6
+                    spacing: 10
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text { text: "Recomendadas para esta playlist"; color: Tema.texto; font.pixelSize: 18; font.weight: Font.Bold }
+                        Text {
+                            text: vp.cargandoRecomendaciones ? "Buscando canciones parecidas en YouTube Music…"
+                                : vp.errorRecomendaciones ? vp.errorRecomendaciones
+                                : "Parecidas a las que tienes aquí, de YouTube Music"
+                            color: vp.errorRecomendaciones && !vp.cargandoRecomendaciones ? Tema.peligro : Tema.tenue
+                            font.pixelSize: 12
+                        }
+                    }
+                    Boton {
+                        text: "Otras"
+                        icono: "girar"
+                        tipo: "fantasma"
+                        enabled: !vp.cargandoRecomendaciones
+                        onClicked: vp.recomendar(raiz.playlist.id, true)
+                    }
+                }
+                Repeater {
+                    model: recomendadas.aqui ? vp.recomendaciones : []
+                    delegate: Rectangle {
+                        id: reco
+                        required property var modelData
+                        required property int index
+                        Layout.fillWidth: true
+                        implicitHeight: 58
+                        radius: 8
+                        color: zonaReco.hovered ? Tema.tarjetaHover : "transparent"
+                        HoverHandler { id: zonaReco }
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 14
+                            Portada {
+                                Layout.leftMargin: 42
+                                Layout.preferredWidth: 42
+                                Layout.preferredHeight: 42
+                                url: reco.modelData.portada
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Text { Layout.fillWidth: true; text: reco.modelData.titulo; color: Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: reco.modelData.artistas; color: Tema.suave; font.pixelSize: 12; elide: Text.ElideRight }
+                            }
+                            Text {
+                                Layout.preferredWidth: lista.width * 0.24
+                                text: reco.modelData.album
+                                color: Tema.suave
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                Layout.preferredWidth: 48
+                                text: reco.modelData.duracion ? raiz.tiempo(reco.modelData.duracion) : ""
+                                color: Tema.tenue
+                                font.pixelSize: 13
+                                font.features: { "tnum": 1 }
+                                horizontalAlignment: Text.AlignRight
+                            }
+                            Item {
+                                Layout.preferredWidth: 120
+                                Layout.preferredHeight: 34
+                                Boton {
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: reco.modelData.estado === ""
+                                    text: "Agregar"
+                                    icono: "mas"
+                                    tipo: "secundario"
+                                    enabled: vp.ajustes.hayYtDlp
+                                    onClicked: vp.agregarRecomendada(reco.index)
+                                }
+                                Text {
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: reco.modelData.estado !== ""
+                                    text: reco.modelData.estado === "biblioteca" ? "✓ Agregada" : "Bajando…"
+                                    color: reco.modelData.estado === "biblioteca" ? Tema.exito : Tema.suave
+                                    font.pixelSize: 12
+                                }
+                            }
+                        }
+                    }
+                }
+                Item { Layout.preferredHeight: 20 }
+            }
 
             delegate: Rectangle {
                 id: fila
