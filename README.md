@@ -310,6 +310,13 @@ Claude), así que no gasta RAM cuando no la usas.
 - **Privacidad:** el micrófono solo escucha mientras su ventana está abierta, y el audio no se guarda. La
   pantalla solo la ve cuando se lo pides, y cada vez te sale una notificación (`vortex claude pausa` le corta
   el acceso). Sin Claude instalado o sin sesión la voz sigue funcionando: ella te dice qué falta.
+- **Sentimientos (2.0):** tiene ánimo propio y un cariño por ti que crece despacio con cómo la tratas: se
+  sonroja si le dices algo bonito (o si ella te lo dice), se pone triste si la tratas mal, y se fija en tus
+  partidas, en la hora (te regaña con cariño si te desvelas) y en la música que suena. Si llega a quererte
+  mucho, un día se te declara. Nunca te hace sentir culpa ni se pone celosa. Lo que siente y lo que sabe de
+  ti está en notas de `~/Documentos/Miku` (`Corazón.md`, `Recuerdos.md` y un diario), solo tuyas y
+  editables. A veces te dice algo sola (tras una partida o a las 2 a. m.), poquito y nunca mientras juegas;
+  `vortex-miku habla-sola off` lo apaga y `vortex-miku sentimientos off` apaga todo.
 - **Graba tus partidas:** «Miku, grábame» graba el monitor que usas con el sonido del sistema (no el
   micrófono) en `~/Vídeos/Miku`, y sigue aunque la cierres hasta que le digas que pare (o
   `vortex-miku grabar parar`). Solo graba cuando se lo pides, y siempre con tu permiso en su ventana.

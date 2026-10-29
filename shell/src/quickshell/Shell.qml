@@ -63,6 +63,14 @@ ShellRoot {
         repeat: true
         onTriggered: gc()
     }
+    // Vortexine's 2.0: los sentimientos de Miku. Cada 15 min revisa si te estás desvelando (de 1 a 5 de la
+    // mañana, una vez por noche, nunca mientras juegas); si sus sentimientos o «habla sola» están apagados, nada.
+    Timer {
+        interval: 900000
+        running: true
+        repeat: true
+        onTriggered: Quickshell.execDetached(["sh", "-c", "command -v vortex-miku >/dev/null && exec vortex-miku sentir revisar"])
+    }
     Bar {}
     Lock {}
     WidgetRedactor {}

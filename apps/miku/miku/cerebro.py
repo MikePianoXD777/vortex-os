@@ -234,6 +234,7 @@ class Cerebro:
         self.avatar = avatar
         self.al_evento = al_evento
         self.persona = leer_persona(avatar)
+        self.sentimientos = ""                          # cómo se siente ahora (corazon.contexto, lo pone el asistente)
         self.sesion: str | None = None
         self.sesiones_creadas: set[str] = set()
         self.ultimo_init: dict = {}                     # herramientas y servidores MCP que Claude dijo tener (diagnóstico)
@@ -306,7 +307,7 @@ class Cerebro:
             avisar("error", clave=clave, mensaje=mensaje)
             return
         rutas.CEREBRO_CWD.mkdir(parents=True, exist_ok=True)
-        cmd = construir_comando(self.claude, self.persona, texto, self.sesion, self.mcp, self.autorizar, self.internet)
+        cmd = construir_comando(self.claude, self.persona + self.sentimientos, texto, self.sesion, self.mcp, self.autorizar, self.internet)
         env = entorno_claude()
         if self.autorizar:
             env["VORTEX_MIKU_AUTORIZAR"] = self.autorizar        # para el hook de internet

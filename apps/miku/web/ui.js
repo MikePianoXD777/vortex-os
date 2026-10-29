@@ -16,6 +16,7 @@
     estadoActual: 'reposo',
     // Estado que lee la escena 3D en cada cuadro.
     emocionNombre: null, emocionPeso: 0,
+    sonrojoMeta: 0, sonrojoHasta: 0,   // se sonroja con esta fuerza hasta esta hora (performance.now)
     pista: null,                       // visemas en curso: {datos, hz, t0}
     mirada: { x: 0, y: 0 },
     // Cuántos ms tarda el audio en salir desde que Python manda empezar (pw-play arranca y llena su búfer).
@@ -134,6 +135,10 @@
     return a.map((v, k) => (v + (b[k] - v) * f) / 100);
   };
   miku.emocion = (nombre, peso) => { miku.emocionNombre = nombre || null; miku.emocionPeso = peso == null ? 1 : peso; };
+  miku.sonrojo = (v) => {                        // dura más cuanto más fuerte (de 4 a 10 s)
+    miku.sonrojoMeta = Math.max(0, Math.min(1, v));
+    miku.sonrojoHasta = performance.now() + 4000 + miku.sonrojoMeta * 6000;
+  };
   miku.mirar = (x, y) => { miku.mirada.x = Math.max(-1, Math.min(1, x)); miku.mirada.y = Math.max(-1, Math.min(1, y)); };
 
   // ---- Eventos ----------------------------------------------------------------------------------

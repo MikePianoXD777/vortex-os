@@ -22,7 +22,7 @@ from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signa
 from PySide6.QtNetwork import QLocalServer
 
 from . import cerebro as modulo_cerebro
-from . import cerebro_abierto, config, descargas, elevenlabs, ia, oido, rutas, voces
+from . import cerebro_abierto, config, corazon, descargas, elevenlabs, ia, oido, rutas, voces
 
 # Estados que la ventana muestra con su indicador.
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
@@ -100,6 +100,7 @@ class Asistente(QObject):
     boca = Signal(object, int)          # (pista de visemas [[aa, ih, ou, ee, oh], ...], cuadros por segundo)
     boca_fin = Signal()
     emocion = Signal(str, float)
+    sonrojo = Signal(float)             # 0..1: se sonroja (le dijiste algo bonito o ella a ti)
     cerrar = Signal()                   # pide a la ventana que se cierre (el panel se cierra solo)
     progreso = Signal(str, str, float)  # (título, detalle, 0..1) de la descarga de los modelos; fracción < 0 = ya no hay
     acciones = Signal(object)           # botones bajo la respuesta: [[id, texto], ...] (vacía = ninguno)
@@ -123,6 +124,8 @@ class Asistente(QObject):
         self.cerebro = self._crear_cerebro()
         self.divisor = modulo_cerebro.DivisorFrases()
         self._acumulado = ""
+        self._filtro = corazon.FiltroMarca()   # quita la marca [[corazon …]] antes de la voz y la pantalla
+        self._animo: tuple[str, float] | None = None   # la expresión de su ánimo (corazon.py), base de su cara
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
         self._turno = 0                  # sube cada vez que se calla a Miku; descarta el audio de un turno viejo
         self._pregunta_id = 0            # sube con cada pregunta a Claude; descarta lo que llegue de una vieja
@@ -437,7 +440,10 @@ class Asistente(QObject):
     def _reproducir(self, wav: str, seg: float, vis: list, texto: str) -> None:
         self._cambiar_estado(HABLANDO, "")
         self._reloj_seguir.stop()
-        self.emocion.emit(*emocion_de(texto))
+        emocion = emocion_de(texto)
+        if emocion == ("relaxed", 0.3) and self._animo:     # la frase no trae emoción propia: manda su ánimo
+            emocion = self._animo
+        self.emocion.emit(*emocion)
         self.boca.emit(vis, 30)
         salida_prueba = os.environ.get("VORTEX_MIKU_SALIDA")
         if salida_prueba:
@@ -581,13 +587,52 @@ class Asistente(QObject):
         self._cancelar_cerebro()
         self.divisor = modulo_cerebro.DivisorFrases()
         self._acumulado = ""
+        self._filtro = corazon.FiltroMarca()
         self._cerebro_listo = False
         self._ultimo_turno_con_error = False
         self.usuario.emit(texto)
         self.respuesta.emit("", False)
         self._cambiar_estado(PENSANDO, "Pensando...")
         self._pregunta_id += 1
-        threading.Thread(target=self.cerebro.preguntar, args=(texto, self._pregunta_id), daemon=True).start()
+        self._sentir_lo_que_dijo(texto)
+        threading.Thread(target=self._preguntar, args=(self.cerebro, texto, self._pregunta_id), daemon=True).start()
+
+    def _preguntar(self, cerebro, texto: str, pregunta_id: int) -> None:
+        """En el hilo: le cuenta a la IA cómo se siente (lee la música, por eso no va en el hilo de la ventana)."""
+        cerebro.sentimientos = ""
+        if self.cfg.get("sentimientos", True):
+            try:
+                cerebro.sentimientos = "\n\n" + corazon.contexto()
+            except (OSError, ValueError):
+                pass
+        cerebro.preguntar(texto, pregunta_id)
+
+    # ---- Sentimientos (corazon.py) ---------------------------------------------------------------
+
+    def _sentir_lo_que_dijo(self, texto: str) -> None:
+        if not self.cfg.get("sentimientos", True):
+            return
+        try:
+            r = corazon.al_hablar(texto)
+        except (OSError, ValueError):
+            return
+        self._sentir(r)
+
+    def _sentir_lo_que_respondio(self, respuesta: str) -> None:
+        if not self.cfg.get("sentimientos", True):
+            return
+        try:
+            r = corazon.al_responder(respuesta)
+        except (OSError, ValueError):
+            return
+        self._sentir(r)
+
+    def _sentir(self, r: dict) -> None:
+        if r.get("animo"):
+            self._animo = corazon.expresion(r["animo"])
+            self.emocion.emit(*self._animo)
+        if r.get("sonrojo", 0) > 0.05:
+            self.sonrojo.emit(float(r["sonrojo"]))
 
     def _cancelar_cerebro(self) -> None:
         self.cerebro.cancelar()
@@ -598,9 +643,12 @@ class Asistente(QObject):
         if self._cerrado or datos.get("etiqueta", self._pregunta_id) != self._pregunta_id:
             return
         if tipo == "texto":
-            self._acumulado += datos["delta"]
+            delta = self._filtro.alimentar(datos["delta"])
+            if not delta:
+                return
+            self._acumulado += delta
             self.respuesta.emit(elevenlabs.quitar_etiquetas(self._acumulado), False)
-            for frase in self.divisor.alimentar(datos["delta"]):
+            for frase in self.divisor.alimentar(delta):
                 self._decir(frase)
         elif tipo in ("bloque_fin", "herramienta"):
             if self._acumulado and not self._acumulado.endswith((" ", "\n")):
@@ -614,11 +662,18 @@ class Asistente(QObject):
                 else:
                     self._cambiar_estado(VIENDO, "Mirando tu pantalla...")
         elif tipo == "listo":
+            cola = self._filtro.vaciar()
+            if cola:
+                self._acumulado += cola
+                for frase in self.divisor.alimentar(cola):
+                    self._decir(frase)
             resto = self.divisor.vaciar()
             if resto:
                 self._decir(resto)
             self._cerebro_listo = True
-            self.respuesta.emit(elevenlabs.quitar_etiquetas(self._acumulado or datos.get("texto", "")), True)
+            final = datos.get("texto", "") or ""
+            self.respuesta.emit(elevenlabs.quitar_etiquetas(self._acumulado or corazon.quitar_marca(final)), True)
+            self._sentir_lo_que_respondio(self._acumulado + "\n" + (self._filtro.marca or final))
             self._revisar_fin_de_turno()
         elif tipo == "claude_listo":
             self._claude_ok = True

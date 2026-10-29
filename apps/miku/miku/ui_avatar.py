@@ -111,6 +111,7 @@ class VentanaAvatar(QWebEngineView):
         a_.boca.connect(lambda pista, hz: self.js("visemas", pista, hz))
         a_.boca_fin.connect(lambda: self.js("pararBoca"))
         a_.emocion.connect(lambda n, p: self.js("emocion", n, p))
+        a_.sonrojo.connect(lambda v: self.js("sonrojo", round(v, 2)))
         a_.progreso.connect(lambda t, d, f: self.js("progreso", t, d, round(f, 3)))
         a_.acciones.connect(lambda lista: self.js("acciones", lista))
         self._vigilante = colores.vigilante(self.poner_tema)        # el fondo cambió → cambian los colores

@@ -145,6 +145,7 @@ class CerebroAbierto:
         self.al_evento = al_evento
         self.proveedor = ia.elegido(cfg)
         self.persona = cerebro.leer_persona(avatar)
+        self.sentimientos = ""                  # cómo se siente ahora (corazon.contexto, lo pone el asistente)
         self.autorizar: str | None = None       # socket del permiso de las acciones (lo pone el asistente)
         self.internet = False                   # la búsqueda web es de Claude: aquí no hay
         self.ocupado = threading.Event()
@@ -199,7 +200,7 @@ class CerebroAbierto:
         ve_imagenes = True
         try:
             for _ in range(VUELTAS):
-                mensajes = [{"role": "system", "content": self.persona + _hoy()}] + self.historial + nuevos
+                mensajes = [{"role": "system", "content": self.persona + self.sentimientos + _hoy()}] + self.historial + nuevos
                 if not ve_imagenes:
                     mensajes = _sin_imagenes(mensajes)
                 try:

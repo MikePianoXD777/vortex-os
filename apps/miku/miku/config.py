@@ -23,6 +23,8 @@ DEFECTOS = {
     "ia_url": "",                   # con «otra»: la dirección compatible con OpenAI (…/v1)
     "ia_modelo": "",                # vacío = el modelo por defecto de esa IA; la clave va en el llavero
     "voz_natural_auto": True,       # Miku instala sola la voz natural si la PC aguanta («natural quitar» lo apaga)
+    "sentimientos": True,           # ánimo, cariño, recuerdos y sonrojo (corazon.py, en Documentos/Miku)
+    "habla_sola": True,             # a veces te dice algo sola (tras una partida, si te desvelas); nunca mientras juegas
 }
 IAS = ("claude", "local", "gemini", "openai", "otra")
 
@@ -53,6 +55,8 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg["avatar"] = _como_bool(crudo.get("avatar"), DEFECTOS["avatar"])
     cfg["seguir_escuchando"] = _como_bool(crudo.get("seguir_escuchando"), DEFECTOS["seguir_escuchando"])
     cfg["voz_natural_auto"] = _como_bool(crudo.get("voz_natural_auto"), DEFECTOS["voz_natural_auto"])
+    cfg["sentimientos"] = _como_bool(crudo.get("sentimientos"), DEFECTOS["sentimientos"])
+    cfg["habla_sola"] = _como_bool(crudo.get("habla_sola"), DEFECTOS["habla_sola"])
     # Sin «internet» en miku.json manda la casilla del instalador (la marca de vortex-miku-internet).
     cfg["internet"] = _como_bool(crudo.get("internet"), rutas.MARCA_INTERNET.is_file())
     if crudo.get("ia") in IAS:

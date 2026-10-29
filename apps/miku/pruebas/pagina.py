@@ -5,7 +5,7 @@ mueve la interfaz como lo haría el asistente y guarda imágenes en una carpeta.
     QT_QPA_PLATFORM=offscreen python3 -I pruebas/pagina.py MODELO.vrm CARPETA_SALIDA [sin-modelo]
 
 Comprueba: que el modelo cargue y dibuje cuadros; que el fondo sea transparente (alfa 0 en las esquinas,
-tanto en el WebGL como en lo que ve Qt); que la boca (vocales), la emoción, el globo, el estado y el
+tanto en el WebGL como en lo que ve Qt); que la boca (vocales), la emoción, el sonrojo, el globo, el estado y el
 crédito cambien lo que se ve; y que el puente de la página hacia Python funcione (escribir, micrófono, cerrar).
 """
 
@@ -174,6 +174,19 @@ def main() -> int:
     asistente.estado.emit("hablando", "")
     asistente.respuesta.emit("Déjame ver. Tienes la terminal y el navegador abiertos, y el editor detrás. ¿Quieres que mire algo en especial?", True)
     asistente.emocion.emit("happy", 0.35)
+
+    print("== Sonrojo (2.0)")
+    comprobar("sabe cómo sonrojarse (expresión del modelo o mejillas)", js("miku.escena.sonrojo") in ("expresion", "mejillas"),
+              str(js("miku.escena.sonrojo")))
+    antes = js("miku.captura()")
+    asistente.sonrojo.emit(1.0)
+    pasar(1.2)
+    comprobar("se sonroja al recibir la señal", (js("miku.escena.sonrojoValor") or 0) > 0.6, str(js("miku.escena.sonrojoValor")))
+    despues = js("miku.captura()")
+    (salida / "sonrojo.png").write_bytes(base64.b64decode(despues.split(",", 1)[1]))
+    comprobar("el sonrojo cambia lo que se ve", antes != despues)
+    js("miku.sonrojoHasta = 0")
+    comprobar("se le baja sola", esperar("miku.escena.sonrojoValor === 0", 25))
 
     print("== Boca: vocales con la voz")
     # Una pista de prueba: a, i, u, e, o, cada una 0,5 s al máximo.

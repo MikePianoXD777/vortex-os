@@ -23,6 +23,9 @@
                                     internet), gemini u openai (con tu clave), u otra compatible con OpenAI
   vortex-miku ia local|gemini|openai [MODELO] · ia otra URL MODELO · ia claude   la cambia
   vortex-miku ia clave              pone la clave de la IA elegida · ia bajar: baja ya la IA local (~3,3 GB)
+  vortex-miku sentimientos [on|off]  su ánimo, cuánto te quiere y lo que recuerda de ti (en Documentos/Miku);
+                                    sin nada, cómo está su corazón
+  vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas)
 
 La configuración está en ~/.config/vortex/miku.json: {"avatar": true, "voz": "<id>", "modelo": "<ruta>"}.
 Los modelos de la voz (Supertonic 3) y del oído (Whisper) no vienen en la ISO: la primera vez que se abre
@@ -52,7 +55,7 @@ def _raiz() -> Path:
 
 RAIZ = _raiz()
 sys.path.insert(0, str(RAIZ))
-from miku import config, descargas, elevenlabs, grabacion, ia, rutas, voces  # noqa: E402  (solo biblioteca estándar)
+from miku import config, corazon, descargas, elevenlabs, grabacion, ia, rutas, voces  # noqa: E402  (solo biblioteca estándar)
 
 APP = RAIZ / "miku" / "app.py"
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
@@ -199,6 +202,12 @@ def alternar() -> int:
             cerrar_todo(pid)
             return 0
         return lanzar()
+
+
+def mostrar() -> int:
+    """Abre a Miku si está cerrada; si ya está abierta, la deja (el botón «Hablar con Miku» de un aviso)."""
+    with Candado():
+        return 0 if pid_abierta() else lanzar()
 
 
 def reabrir_si_esta_abierta() -> bool:
@@ -1028,6 +1037,101 @@ def orden_momentos(args: list[str]) -> int:
     return momentos.main([str(video)])
 
 
+# ---- Sentimientos (corazon.py) -------------------------------------------------------------------
+
+_SI_NO = {"on": True, "si": True, "sí": True, "true": True, "1": True, "off": False, "no": False, "false": False, "0": False}
+
+
+def orden_sentimientos(args: list[str]) -> int:
+    if not args or args[0] == "estado":
+        print(f"sentimientos={'on' if config.cargar()['sentimientos'] else 'off'}")
+        print(corazon.resumen())
+        return 0
+    if len(args) != 1 or args[0].lower() not in _SI_NO:
+        return error("uso: vortex-miku sentimientos [on|off]", 2)
+    nuevo = _SI_NO[args[0].lower()]
+    try:
+        config.guardar({"sentimientos": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    reabrir_si_esta_abierta()
+    print(f"sentimientos={'on' if nuevo else 'off'}")
+    if not nuevo:
+        print(f"Sus notas se quedan en {corazon.carpeta()}: si los vuelves a encender, se acuerda de todo.")
+    return 0
+
+
+def orden_habla_sola(args: list[str]) -> int:
+    if not args or args[0] == "estado":
+        print(f"habla-sola={'on' if config.cargar()['habla_sola'] else 'off'}")
+        return 0
+    if len(args) != 1 or args[0].lower() not in _SI_NO:
+        return error("uso: vortex-miku habla-sola on|off", 2)
+    nuevo = _SI_NO[args[0].lower()]
+    try:
+        config.guardar({"habla_sola": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print(f"habla-sola={'on' if nuevo else 'off'}")
+    return 0
+
+
+def _decir_sola(frase: str, espera: int = 0) -> None:
+    """Un aviso de Miku con el botón «Hablar con Miku», aparte de este comando (no lo hace esperar).
+
+    Con `espera`, primero duerme esos segundos y vuelve a revisar que no estés jugando.
+    """
+    if not frase:
+        return
+    if espera:
+        subprocess.Popen([sys.executable, "-I", os.path.abspath(__file__), "sentir", "decir", frase, str(espera)],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+        return
+    if not shutil.which("notify-send"):
+        return
+    guion = ('r=$(notify-send -a Miku -i vortex-miku -t 20000 -A hablar="Hablar con Miku" "$1" "$2" 2>/dev/null); '
+             '[ "$r" = hablar ] && exec "$3" -I "$4" mostrar')
+    subprocess.Popen(["sh", "-c", guion, "sh", "Miku", frase, sys.executable, os.path.abspath(__file__)],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+
+
+def orden_sentir(args: list[str]) -> int:
+    """Lo usan el escritorio y vortex-partida (no la persona):
+      sentir partida JUEGO MINUTOS CPU GPU   terminó una partida
+      sentir revisar                         cada rato: ¿se está desvelando?
+      sentir decir FRASE [ESPERA]            el aviso en sí (tras ESPERA segundos)
+    """
+    cfg = config.cargar()
+    if not cfg["sentimientos"]:
+        return 0
+    numero = lambda s: int(s) if s.isdigit() else 0   # noqa: E731
+    try:
+        if args[:1] == ["partida"] and len(args) >= 3:
+            juego, minutos = args[1], numero(args[2])
+            cpu = numero(args[3]) if len(args) > 3 else 0
+            gpu = numero(args[4]) if len(args) > 4 else 0
+            frase = corazon.evento_partida(juego, minutos, cpu, gpu)
+            if cfg["habla_sola"]:
+                _decir_sola(frase, espera=90)      # que primero salga el resumen de la partida
+            return 0
+        if args[:1] == ["revisar"]:
+            frase = corazon.revisar() if cfg["habla_sola"] else ""
+            _decir_sola(frase)
+            return 0
+        if args[:1] == ["decir"] and len(args) >= 2:
+            espera = numero(args[2]) if len(args) > 2 else 0
+            if espera:
+                time.sleep(espera)
+            if cfg["habla_sola"] and not corazon.jugando():
+                _decir_sola(args[1])
+            return 0
+    except (OSError, ValueError) as e:
+        return error(f"no pude leer o guardar sus notas: {e}")
+    return error("uso: vortex-miku sentir partida JUEGO MINUTOS CPU GPU | sentir revisar", 2)
+
+
 def main(argv: list[str]) -> int:
     if not argv or argv[0] in ("alternar", "abrir", "toggle"):
         return alternar()
@@ -1065,6 +1169,14 @@ def main(argv: list[str]) -> int:
         return orden_momentos(args)
     if orden == "ia":
         return orden_ia(args)
+    if orden in ("sentimientos", "corazon", "corazón"):
+        return orden_sentimientos(args)
+    if orden in ("habla-sola", "habla_sola"):
+        return orden_habla_sola(args)
+    if orden == "sentir":
+        return orden_sentir(args)
+    if orden == "mostrar":
+        return mostrar()
     return error(f"no conozco «{orden}». Mira: vortex-miku ayuda", 2)
 
 

@@ -85,6 +85,7 @@ async function iniciar() {
     estado.huesos = Object.values(huesos).filter(Boolean).length;
     estado.vrm0 = vrm.meta?.metaVersion === '0';
     caja = new THREE.Box3().setFromObject(vrm.scene);
+    prepararSonrojo();
     encuadrar();
     estado.listo = true;
   }, undefined, (e) => {
@@ -110,6 +111,74 @@ async function iniciar() {
     objetivoMirada.position.set(0, miraBaseY, dist);
   }
   let miraBaseY = 1.4;
+
+  // ---- Sonrojo: la expresión del modelo si la trae; si no, dos manchas rosadas en las mejillas ----
+  let sonrojo = 0, sonrojoExpr = null, mejillas = null;
+  function prepararSonrojo() {
+    sonrojoExpr = estado.expresiones.find((n) => /blush|cheek|照れ|赤面|ぽっ/i.test(n)) || null;
+    estado.sonrojo = sonrojoExpr ? 'expresion' : 'mejillas';
+    if (sonrojoExpr) return;
+    const cabeza = vrm.humanoid.getRawBoneNode('head');
+    if (!cabeza) { estado.sonrojo = null; return; }
+    // Se mide con el modelo quieto (recién girado hacia la cámara, +Z) y se cuelga de la cabeza.
+    vrm.scene.updateMatrixWorld(true);
+    const ojoI = vrm.humanoid.getRawBoneNode('leftEye'), ojoD = vrm.humanoid.getRawBoneNode('rightEye');
+    let centro, sep;
+    if (ojoI && ojoD) {
+      const a = ojoI.getWorldPosition(new THREE.Vector3()), b = ojoD.getWorldPosition(new THREE.Vector3());
+      centro = a.clone().add(b).multiplyScalar(0.5);
+      sep = Math.max(0.04, a.distanceTo(b));
+    } else {                                                        // sin ojos: a ojo, sobre el hueso de la cabeza
+      centro = cabeza.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.06, 0.07));
+      sep = 0.064;
+    }
+    const lienzoS = document.createElement('canvas');
+    lienzoS.width = lienzoS.height = 64;
+    const g = lienzoS.getContext('2d');
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,105,135,1)');
+    grad.addColorStop(0.55, 'rgba(255,120,150,0.5)');
+    grad.addColorStop(1, 'rgba(255,130,160,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    const textura = new THREE.CanvasTexture(lienzoS);
+    textura.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: textura, transparent: true, depthWrite: false, opacity: 0, toneMapped: false });
+    const forma = new THREE.PlaneGeometry(sep * 0.85, sep * 0.45);
+    const giro = cabeza.getWorldQuaternion(new THREE.Quaternion()).invert();
+    mejillas = { material, mallas: [] };
+    // La mejilla se busca con un rayo desde la cámara: los huesos de los ojos van muy adentro de la cabeza
+    // y cada modelo es distinto. Se queda con la cara (no con el pelo que la tape: ese la sigue tapando).
+    const rayo = new THREE.Raycaster();
+    const nombre = (h) => {
+      const mat = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex ?? 0] : h.object.material;
+      return (h.object.name || '') + ' ' + (mat?.name || '');
+    };
+    for (const lado of [-1, 1]) {
+      const m = new THREE.Mesh(forma, material);
+      const p = centro.clone().add(new THREE.Vector3(lado * sep * 0.62, -sep * 0.72, 0));
+      rayo.set(p.clone().setZ(p.z + 2), new THREE.Vector3(0, 0, -1));
+      const golpes = rayo.intersectObject(vrm.scene, true).filter((h) => !/outline/i.test(nombre(h)));
+      const cara = golpes.find((h) => /face|skin|head|顔|肌/i.test(nombre(h)))
+                || golpes.find((h) => !/hair|bang|髪|前髪/i.test(nombre(h)));
+      p.z = cara ? cara.point.z + sep * 0.12 : p.z + sep * 1.8;
+      m.position.copy(cabeza.worldToLocal(p));
+      m.quaternion.copy(giro);
+      m.renderOrder = 10;
+      m.frustumCulled = false;
+      m.visible = false;
+      cabeza.add(m);
+      mejillas.mallas.push(m);
+    }
+  }
+  function ponerSonrojo(v) {
+    estado.sonrojoValor = v;
+    if (sonrojoExpr) vrm.expressionManager.setValue(sonrojoExpr, v);
+    else if (mejillas) {
+      mejillas.material.opacity = v * 0.85;
+      for (const m of mejillas.mallas) m.visible = v > 0.01;
+    }
+  }
 
   // ---- Vida: parpadeo, respiración, mirada, boca y emoción ----
   let tParpadeo = 2.5, faseParpadeo = -1;
@@ -161,6 +230,12 @@ async function iniciar() {
       em.setValue(emocionActual, clamp(emocionPeso));
     }
     if (miku.estadoActual === 'reposo' && miku.emocionNombre && !miku.pista && total < 0.02) miku.emocionPeso *= 0.985;   // se apaga sola
+
+    // Sonrojo: sube rápido y se le baja despacio cuando se acaba su tiempo.
+    const metaSonrojo = performance.now() < miku.sonrojoHasta ? miku.sonrojoMeta : 0;
+    sonrojo += (metaSonrojo - sonrojo) * (1 - Math.exp(-dt * (metaSonrojo > sonrojo ? 4 : 0.9)));   // ~0,5 s sube, ~6 s baja
+    if (sonrojo < 0.005 && metaSonrojo === 0) sonrojo = 0;
+    ponerSonrojo(clamp(sonrojo));
 
     // Postura según lo que esté haciendo.
     const meta = postura(miku.estadoActual);
@@ -222,7 +297,12 @@ async function iniciar() {
     vivir(0.016, (performance.now() - t0) / 1000); vrm.update(0.016); renderer.render(escena, camara);
     return lienzo.toDataURL('image/png');
   };
-  miku.forzar = (o) => { for (const k in o) vrm.expressionManager.setValue(k, o[k]); };
+  miku.forzar = (o) => {
+    for (const k in o) {
+      if (k === 'sonrojo') { sonrojo = o[k]; miku.sonrojoMeta = o[k]; miku.sonrojoHasta = performance.now() + 60000; }
+      else vrm.expressionManager.setValue(k, o[k]);
+    }
+  };
   miku.info = () => {
     const gl = renderer.getContext();
     const e = gl.getExtension('WEBGL_debug_renderer_info');

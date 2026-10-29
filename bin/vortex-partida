@@ -128,6 +128,9 @@ cmd_terminar() {
   command -v notify-send >/dev/null &&
     notify-send -a "Vortexine's OS" -i applications-games "${juego:-Resumen de la partida}" \
       "$(printf '%s\n' "${lineas[@]}")" >/dev/null 2>&1
+  # Miku se entera (sus sentimientos) y, si toca, al rato te dice algo; si sus sentimientos están apagados, nada.
+  command -v vortex-miku >/dev/null &&
+    (vortex-miku sentir partida "$juego" $((seg / 60)) "${cpu:-0}" "${gpu:-0}" >/dev/null 2>&1 &)
   printf '%s\n' "${juego:-Partida}" "${lineas[@]}"
 }
 
