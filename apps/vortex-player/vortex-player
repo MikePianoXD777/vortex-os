@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Vortex Player: música a la máxima calidad.
+#   vortex-player [ENLACE | ARCHIVO…]
+# Corre «python -m vortex_player» con el código donde esté:
+#   1. VORTEX_PLAYER_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-player, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_PLAYER_DIR:-}" "$aqui" /usr/share/vortex-player; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_player/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortex Player no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_player "$@"

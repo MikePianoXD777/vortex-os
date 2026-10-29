@@ -1254,7 +1254,8 @@
     "searching_lyrics": "Buscando letra...",
     "no_lyrics": "No se encontró la letra",
     "select_local_file": "Seleccionar un archivo local",
-    "lyrics": "Letra"
+    "lyrics": "Letra",
+    "open_player": "▶ Abrir Vortex Player"
   },
   "network": {
     "tabs": {

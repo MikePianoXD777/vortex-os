@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortex Player
+GenericName=Reproductor de música
+GenericName[en]=Music Player
+Comment=Tu música a la máxima calidad, y la de YouTube Music y Spotify
+Comment[en]=Your music at the highest quality, plus YouTube Music and Spotify
+Exec=vortex-player %U
+Icon=vortex-player
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+Keywords=música;musica;reproductor;hi-res;flac;ldac;youtube;spotify;playlist;music;player;
+MimeType=audio/flac;audio/x-flac;audio/wav;audio/x-wav;audio/x-aiff;audio/aiff;audio/mpeg;audio/ogg;audio/opus;audio/mp4;audio/x-m4a;audio/x-wavpack;audio/x-ape;
+StartupNotify=true
+StartupWMClass=vortex-player

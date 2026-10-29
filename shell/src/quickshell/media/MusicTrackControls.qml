@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import QtQuick.Layouts
+import Quickshell
 import "../"
 import "../reusables"
 import "../reusables/media"
@@ -86,7 +87,11 @@ ColumnLayout {
                 Layout.preferredHeight: root.s(22)
                 cornerRadius: ThemeBackend.borderRadius
                 horizontalPadding: root.s(10)
-                buttonText: I18n.t("music.via_source", { "source": root.targetPlayer ? (root.targetPlayer.identity || root.targetPlayer.desktopEntry || "Media") : I18n.t("music.offline") })
+                // Vortex 2.0: sin nada sonando, el chip abre Vortex Player (que comparte este ecualizador)
+                buttonText: root.targetPlayer
+                    ? I18n.t("music.via_source", { "source": root.targetPlayer.identity || root.targetPlayer.desktopEntry || "Media" })
+                    : I18n.t("music.open_player")
+                onClicked: if (!root.targetPlayer) Quickshell.execDetached(["vortex-player"])
                 textFontSize: root.s(11.5)
                 accentColor: ThemeBackend.surface0 || "#313244"
                 bgOpacity: ThemeBackend.elementOpacity

@@ -89,6 +89,17 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-app-installer/"{pkg,src} "$VORTEX_DIR/packaging/vortex-app-installer/"*.pkg.tar.*
 fi
+# Vortex Player (2.0): música a la máxima calidad (FLAC, YouTube Music, Spotify, LDAC).
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-player)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-player" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortex Player instalado (vortex-player)"
+  else
+    aviso "No se pudo instalar Vortex Player (packaging/vortex-player)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-player/"{pkg,src} "$VORTEX_DIR/packaging/vortex-player/"*.pkg.tar.*
+fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 

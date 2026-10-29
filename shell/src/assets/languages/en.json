@@ -1213,7 +1213,8 @@
     "searching_lyrics": "Searching lyrics...",
     "no_lyrics": "No lyrics found",
     "select_local_file": "Select a local file",
-    "lyrics": "Lyrics"
+    "lyrics": "Lyrics",
+    "open_player": "▶ Open Vortex Player"
   },
   "network": {
     "tabs": {

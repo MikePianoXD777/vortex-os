@@ -1,0 +1,39 @@
+# Vortex Player (2.0): música a la máxima calidad. Toca FLAC/WAV/ALAC a su frecuencia y bits originales,
+# baja canciones y playlists de YouTube, YouTube Music y Spotify sin recomprimirlas, comparte el
+# ecualizador con el panel de música y con audífonos LDAC pide 990 kbps. Empaquetado desde
+# apps/vortex-player/ de este repo; llega a todos con «vortex actualizar».
+#
+#   cd packaging/vortex-player && makepkg -si
+pkgname=vortex-player
+pkgver=1.0
+pkgrel=1
+pkgdesc="Vortex Player: tu música a la máxima calidad, y la de YouTube Music y Spotify"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# mpv toca; ffmpeg (ffprobe) lee la calidad y las portadas; yt-dlp baja; python-dbus y python-gobject
+# anuncian el reproductor por MPRIS (el panel de música, las teclas multimedia); libpulse trae pactl
+# (el códec Bluetooth).
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'mpv' 'ffmpeg' 'yt-dlp' 'python-dbus'
+         'python-gobject' 'libpulse' 'pipewire' 'wireplumber' 'xdg-user-dirs' 'xdg-utils' 'glib2')
+optdepends=('easyeffects: el ecualizador (el mismo del panel de música)'
+            'python-secretstorage: leer la sesión de YouTube Music Premium de Chrome/Chromium')
+
+package() {
+    local origen="$startdir/../../apps/vortex-player"
+    local share="$pkgdir/usr/share/vortex-player"
+
+    install -d "$share"
+    cp -a "$origen/vortex_player" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-player" "$pkgdir/usr/bin/vortex-player"
+    install -Dm644 "$origen/share/applications/vortex-player.desktop" \
+        "$pkgdir/usr/share/applications/vortex-player.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-player.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-player.svg"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

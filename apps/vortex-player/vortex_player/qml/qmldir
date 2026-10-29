@@ -1,0 +1,13 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+BotonIcono 1.0 BotonIcono.qml
+Etiqueta 1.0 Etiqueta.qml
+Portada 1.0 Portada.qml
+Barra 1.0 Barra.qml
+PaginaCanciones 1.0 PaginaCanciones.qml
+PaginaAgregar 1.0 PaginaAgregar.qml
+PaginaEcualizador 1.0 PaginaEcualizador.qml
+PaginaAjustes 1.0 PaginaAjustes.qml
+Selector 1.0 Selector.qml
