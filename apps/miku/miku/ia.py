@@ -13,6 +13,7 @@ como la de ElevenLabs. Nunca va en miku.json.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -69,25 +70,32 @@ def archivo_clave(proveedor: str) -> Path:
     return rutas.CONFIG_DIR / f"ia-{proveedor}.clave"
 
 
+def limpiar_clave(clave: str) -> str:
+    """Sin lo que algunas terminales meten al pegar (el «pegado entre corchetes»: ESC[200~ … ESC[201~),
+    ni espacios, saltos o caracteres invisibles: una clave nunca los lleva."""
+    clave = re.sub(r"\x1b?\[20[01]~", "", clave)
+    return "".join(c for c in clave if c.isprintable() and not c.isspace())
+
+
 def leer_clave(proveedor: str) -> str:
     if os.environ.get("VORTEX_MIKU_IA_CLAVE"):
-        return os.environ["VORTEX_MIKU_IA_CLAVE"].strip()
+        return limpiar_clave(os.environ["VORTEX_MIKU_IA_CLAVE"])
     if shutil.which("secret-tool"):
         try:
             r = subprocess.run(["secret-tool", "lookup", *_llavero(proveedor)], capture_output=True, text=True, timeout=5)
-            if r.returncode == 0 and r.stdout.strip():
-                return r.stdout.strip()
+            if r.returncode == 0 and limpiar_clave(r.stdout):
+                return limpiar_clave(r.stdout)
         except (OSError, subprocess.TimeoutExpired):
             pass
     try:
-        return archivo_clave(proveedor).read_text(encoding="utf-8").strip()
+        return limpiar_clave(archivo_clave(proveedor).read_text(encoding="utf-8"))
     except OSError:
         return ""
 
 
 def guardar_clave(proveedor: str, clave: str) -> str:
     """Guarda la clave y dice dónde quedó («llavero» o la ruta del archivo)."""
-    clave = clave.strip()
+    clave = limpiar_clave(clave)
     archivo = archivo_clave(proveedor)
     if shutil.which("secret-tool"):
         try:
@@ -284,7 +292,7 @@ def bajar_modelo(modelo: str = MODELO_LOCAL, progreso=None, cancelar=None) -> No
 
 def _explicar(p: dict, codigo: int, cuerpo: str) -> ErrorIA:
     nombre = p["nombre"]
-    if codigo in (401, 403):
+    if codigo in (401, 403) or (codigo == 400 and re.search(r"api[ _-]?key", cuerpo, re.I)):   # Gemini: 400
         return ErrorIA("clave", f"{nombre} no aceptó tu clave. Ponla otra vez en una terminal con: vortex-miku ia clave")
     if codigo == 404 and p["id"] == "local":
         return ErrorIA("modelo", f"Para pensar sin internet necesito bajar mi IA local una sola vez ({TAMANO_LOCAL}).")
