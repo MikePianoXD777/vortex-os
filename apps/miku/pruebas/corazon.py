@@ -192,6 +192,7 @@ class AsistenteMinimo(asistente.Asistente):
         QObject.__init__(self)
         self.cfg = {"sentimientos": True}
         self._cerrado, self._pregunta_id, self._animo = False, 1, None
+        self._visita, self._visita_dicha, self._pregunta_inicial, self._voz_lista = "", False, "", False
         self._filtro, self._acumulado, self.divisor = corazon.FiltroMarca(), "", modulo_cerebro.DivisorFrases()
         self.dicho, self.caras, self.rubores, self.pantalla = [], [], [], []
         self.emocion.connect(lambda n, p: self.caras.append(n))
@@ -234,6 +235,73 @@ m2.enviados = []
 m2.enviar = lambda texto, oculto=False: m2.enviados.append(texto)
 ver(not m2._declararse_si_toca() and not m2.enviados, "sin aviso previo no empieza sola")
 poner(declarada="2026-11-04")
+
+print("== Platicadora: mientras juegas y al terminar")
+poner(afecto=30.0, declarada="", ultima_visita="", avisos_hoy="")
+a_las("2026-11-12T16:00")
+ver(corazon.ritmo(corazon.cargar())[0] == 60, "de amigos se asoma cada hora")
+ver(corazon.visita_jugando("Roblox", 30, 60, 60) == "", "…no a los 30 minutos")
+f = corazon.visita_jugando("Roblox", 61, 60, 60)
+ver("Roblox" in f and "1 hora" in f, f"a la hora se asoma: «{f}»")
+a_las("2026-11-12T16:30")
+ver(corazon.visita_jugando("Roblox", 91, 60, 60) == "", "…y no otra vez a la media hora")
+a_las("2026-11-12T17:01")
+ver(corazon.visita_jugando("Roblox", 122, 60, 60) != "", "…sino a la siguiente hora")
+poner(afecto=75.0, ultima_visita="")
+ver(corazon.ritmo(corazon.cargar())[0] == 30, "con más cariño se asoma más seguido (cada 30 min)")
+ver("88 grados" in corazon.visita_jugando("Roblox", 31, 60, 88), "si la GPU se calienta, se lo dice")
+poner(afecto=30.0, avisos_hoy="")
+ver(corazon.pregunta_partida("Roblox", 10, 0, 0) == "", "de amigos no pregunta por una partida de 10 min")
+q = corazon.pregunta_partida("Roblox", 40, 70, 80)
+ver("Roblox" in q and "Pregúntame cómo me fue" in q and "GPU 80" in q, "tras 40 min le pide a la IA que te pregunte")
+corazon.pregunta_partida("Roblox", 40, 0, 0)
+corazon.pregunta_partida("Roblox", 40, 0, 0)
+ver(corazon.pregunta_partida("Roblox", 40, 0, 0) == "", "de amigos, 3 preguntas al día")
+poner(afecto=90.0, avisos_hoy="")
+ver(corazon.pregunta_partida("Roblox", 6, 0, 0) != "", "si le gustas, pregunta hasta por partidas cortas")
+
+m = AsistenteMinimo()
+m._visita, m._visita_dicha, m._voz_lista = "Llevas 1 hora en Roblox. ¡Tú puedes!", False, False
+m.escuchas = []
+m.escuchar = lambda seguimiento=False: m.escuchas.append(1)
+m._escuchar_si_toca()
+ver(not m.escuchas, "en una visita no abre el micrófono")
+m._decir_visita()
+ver(m.pantalla and m.pantalla[-1].startswith("Llevas 1 hora"), "la frase sale en su globo")
+cerrada = []
+m.cerrar.connect(lambda: cerrada.append(1))
+m._cerrar_visita()
+ver(cerrada, "y se cierra sola")
+m2 = AsistenteMinimo()
+m2._visita, m2._pregunta_inicial = "", "(Acabo de dejar de jugar Roblox. Pregúntame cómo me fue.)"
+m2.enviados = []
+m2.enviar = lambda texto, oculto=False: m2.enviados.append((texto, oculto))
+ver(m2._declararse_si_toca() and m2.enviados == [(m2._pregunta_inicial, True)], "al terminar de jugar empieza ella preguntando")
+
+APP = TMP / "app-falsa.py"
+ABIERTA = TMP / "abierta.txt"
+APP.write_text(f"import os, time\nopen({str(ABIERTA)!r}, 'a').write(os.environ.get('VORTEX_MIKU_VISITA', '') + '|' + "
+               f"os.environ.get('VORTEX_MIKU_PREGUNTA', '') + '\\n')\ntime.sleep(3)\n")
+os.environ["VORTEX_MIKU_APP"] = str(APP)
+poner(afecto=30.0, ultima_visita="", avisos_hoy="")
+AVISOS.unlink(missing_ok=True)
+a_las("2026-11-13T16:00")
+cli("sentir", "jugando", "Roblox", "65", "60", "60")
+ver(ABIERTA.exists() and "Roblox" in ABIERTA.read_text().split("|")[0], "sentir jugando la abre de visita…")
+ver(AVISOS.exists() and "Roblox" in AVISOS.read_text(), "…y deja la notificación")
+ver(cli("platicadora", "off").stdout.strip() == "platicadora=off", "platicadora off")
+ABIERTA.unlink()
+poner(ultima_visita="")
+time.sleep(3)
+cli("sentir", "jugando", "Roblox", "65", "60", "60")
+ver(not ABIERTA.exists(), "…y ya no se asoma")
+ver("platicadora=off" in cli("estado").stdout, "estado dice platicadora=off (lo lee Ajustes)")
+cli("platicadora", "on")
+cli("sentir", "preguntar", "(Pregúntame cómo me fue.)")
+ver(ABIERTA.exists() and "Pregúntame" in ABIERTA.read_text(), "sentir preguntar la abre para preguntarte")
+time.sleep(3)
+os.environ.pop("VORTEX_MIKU_APP")
+poner(declarada="2026-11-04", afecto=95.0)
 
 print("== vortex-miku")
 r = cli("sentimientos")

@@ -67,6 +67,15 @@ muestra() {
   [[ -n "$juego" ]] && poner juego "$juego"
 }
 
+miku_jugando() {
+  command -v vortex-miku >/dev/null || return 0
+  local inicio
+  inicio="$(leer inicio)"
+  [[ -n "$inicio" ]] || return 0
+  (vortex-miku sentir jugando "$(leer juego)" $((($(date +%s) - inicio) / 60)) "$(leer cpu)" "$(leer gpu)" \
+    >/dev/null 2>&1 &)
+}
+
 cmd_empezar() {
   mkdir -p "$ESTADO"
   # Dos «on» seguidos (gamemode y el gestor) son la misma partida
@@ -74,8 +83,12 @@ cmd_empezar() {
   exec 9>"$ESTADO/partida.lock"
   flock -n 9 || return 0
   (
+    local vuelta=0
     while [[ -s "$PARTIDA" ]]; do
       muestrear
+      vuelta=$((vuelta + 1))
+      # Cada minuto: Miku decide si se asoma a hablarte (vortex-miku platicadora; ella lleva la cuenta)
+      ((vuelta * PASO % 60 < PASO)) && miku_jugando
       sleep "$PASO"
     done
   ) </dev/null >/dev/null 2>&1 & # se queda con el candado (fd 9) mientras mide

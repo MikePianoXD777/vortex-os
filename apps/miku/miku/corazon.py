@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -111,7 +112,7 @@ def _ahora() -> datetime:
 def _base() -> dict:
     return {"afecto": AFECTO_INICIAL, "animo": "tranquila", "declarada": "", "dias_juntos": 0,
             "ultima_charla": "", "hoy": "", "subio_hoy": 0.0, "avisos_hoy": "",
-            "pidio_hablar": ""}
+            "pidio_hablar": "", "ultima_visita": ""}
 
 
 def cargar() -> dict:
@@ -180,6 +181,7 @@ def _guardar(e: dict) -> None:
         f"subio_hoy: {e['subio_hoy']:.1f}\n"
         f"avisos_hoy: \"{e['avisos_hoy']}\"\n"
         f"pidio_hablar: \"{e['pidio_hablar']}\"\n"
+        f"ultima_visita: \"{e['ultima_visita']}\"\n"
         "---\n"
         "# Corazón de Miku\n\n"
         f"**Cómo me siento:** {animo}.\n"
@@ -564,6 +566,72 @@ def frase_desvelo(e: dict, ahora: datetime) -> str:
     if corto in ("cercanos", "muy cercanos"):
         return f"Son las {hora}… ¿todavía despierto? Ve a dormir, mañana me cuentas qué estabas haciendo."
     return f"Son las {hora}… me preocupas cuando te desvelas. ¿Te vas a dormir pronto? Buenas noches."
+
+
+# ---- Platicadora: te acompaña mientras juegas y te pregunta cómo te fue ----------------------------
+
+# Entre más cariño, más habla: nivel → (cada cuántos minutos se asoma mientras juegas (0 = no se asoma),
+# cuánto tiene que durar la partida para preguntarte cómo te fue, cuántas veces al día te pregunta).
+RITMO = {"conocidos": (0, 30, 1), "amigos": (60, 20, 3), "cercanos": (45, 10, 5), "muy cercanos": (30, 5, 8),
+         "le gusta": (20, 5, 12), "enamorada": (20, 5, 12)}
+
+_JUGANDO_AMIGA = [
+    "Llevas {tiempo} en {juego}. ¡Tú puedes!",
+    "{tiempo} de {juego}… ¿vas ganando? Yo aquí te echo porras.",
+    "Ya van {tiempo} de {juego}. No olvides tomar agua, ¿sí?",
+    "¿Qué tal va {juego}? Llevas {tiempo}. Suerte.",
+]
+_JUGANDO_CARINO = [
+    "Llevas {tiempo} en {juego}… me gusta verte jugar. ¡Vas muy bien!",
+    "{tiempo} de {juego}. Aquí sigo contigo, échale ganas.",
+    "Oye… llevas {tiempo} jugando. ¿Me cuentas cuando ganes? Te estoy echando porras.",
+    "Ya van {tiempo} de {juego}. Toma agüita y sigue así, campeón.",
+]
+
+
+def ritmo(e: dict) -> tuple[int, int, int]:
+    return RITMO.get(nivel(e)[0], RITMO["amigos"])
+
+
+def frase_jugando(e: dict, juego: str, minutos: int, cpu: int, gpu: int) -> str:
+    juego = juego or "tu juego"
+    if gpu >= 85 or cpu >= 90:
+        pieza, t = ("la GPU", gpu) if gpu >= 85 else ("el procesador", cpu)
+        return f"Oye, {pieza} va en {t} grados… cuídala un poquito, ¿sí? Llevas {_duracion(minutos)} de {juego}."
+    frases = _JUGANDO_AMIGA if nivel(e)[0] in ("conocidos", "amigos", "cercanos") else _JUGANDO_CARINO
+    return random.choice(frases).format(tiempo=_duracion(minutos), juego=juego)
+
+
+def visita_jugando(juego: str, minutos: int, cpu: int, gpu: int, ahora: datetime | None = None) -> str:
+    """Cada rato mientras juegas (según su cariño) se asoma a decirte algo. Devuelve la frase o vacío."""
+    ahora = ahora or _ahora()
+    e = cargar()
+    cada = ritmo(e)[0]
+    if not cada or minutos < cada:
+        return ""
+    try:
+        if e["ultima_visita"] and (ahora - datetime.fromisoformat(e["ultima_visita"])).total_seconds() < cada * 60 - 30:
+            return ""
+    except ValueError:
+        pass
+    e["ultima_visita"] = ahora.isoformat(timespec="minutes")
+    _guardar(e)
+    return frase_jugando(e, juego, minutos, cpu, gpu)
+
+
+def pregunta_partida(juego: str, minutos: int, cpu: int, gpu: int) -> str:
+    """Al terminar una partida: lo que se le pide a la IA para que te pregunte cómo te fue (vacío si no toca)."""
+    e = cargar()
+    _nuevo_dia(e, _ahora())
+    _, minimo, al_dia = ritmo(e)
+    if minutos < minimo or _ya_aviso(e, "pregunta") >= al_dia:
+        return ""
+    _marcar_aviso(e, "pregunta")
+    _guardar(e)
+    temps = ", ".join(x for x in (f"CPU {cpu} °C" if cpu else "", f"GPU {gpu} °C" if gpu else "") if x)
+    return (f"(Acabo de dejar de jugar {juego or 'un juego'} después de {_duracion(minutos)}"
+            + (f"; temperaturas máximas: {temps}" if temps else "")
+            + ". Pregúntame cómo me fue, en una o dos frases, con tu forma de ser.)")
 
 
 def evento_partida(juego: str, minutos: int, cpu: int, gpu: int) -> str:

@@ -25,6 +25,8 @@
   vortex-miku ia clave              pone la clave de la IA elegida · ia bajar: baja ya la IA local (~3,3 GB)
   vortex-miku sentimientos [on|off]  su ánimo, cuánto te quiere y lo que recuerda de ti (en Documentos/Miku);
                                     sin nada, cómo está su corazón
+  vortex-miku platicadora on|off    mientras juegas se asoma a hablarte (sin abrir el micrófono) y al terminar
+                                    se abre y te pregunta cómo te fue; entre más cariño, más seguido
   vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas, o que
                                     quiere decirte algo); nunca mientras juegas o estás en una llamada
 
@@ -58,7 +60,7 @@ RAIZ = _raiz()
 sys.path.insert(0, str(RAIZ))
 from miku import config, corazon, descargas, elevenlabs, grabacion, ia, rutas, voces  # noqa: E402  (solo biblioteca estándar)
 
-APP = RAIZ / "miku" / "app.py"
+APP = Path(os.environ.get("VORTEX_MIKU_APP") or RAIZ / "miku" / "app.py")   # VORTEX_MIKU_APP: pruebas
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
 
 
@@ -159,10 +161,10 @@ def cerrar_todo(pid: int) -> None:
     shutil.rmtree(rutas.runtime() / "vortex-miku", ignore_errors=True)    # audios temporales de la voz
 
 
-def lanzar() -> int:
+def lanzar(extra: dict | None = None) -> int:
     """Abre la app, aparte de este comando: sesión propia, para poder cerrarla entera después."""
     registro = open(rutas.runtime() / "vortex-miku.log", "w")
-    env = dict(os.environ)
+    env = dict(os.environ, **(extra or {}))
     env.setdefault("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
     try:
         p = subprocess.Popen([sys.executable, "-I", str(APP)], stdin=subprocess.DEVNULL, stdout=registro, stderr=registro,
@@ -258,6 +260,7 @@ def orden_internet(args: list[str]) -> int:
 def orden_estado() -> int:
     print(f"avatar={'on' if config.cargar()['avatar'] else 'off'}")
     print(f"abierta={'si' if pid_abierta() else 'no'}")
+    print(f"platicadora={'on' if config.cargar()['platicadora'] else 'off'}")
     return 0
 
 
@@ -1062,6 +1065,51 @@ def orden_sentimientos(args: list[str]) -> int:
     return 0
 
 
+def orden_platicadora(args: list[str]) -> int:
+    if not args or args[0] == "estado":
+        print(f"platicadora={'on' if config.cargar()['platicadora'] else 'off'}")
+        return 0
+    if len(args) != 1 or args[0].lower() not in _SI_NO:
+        return error("uso: vortex-miku platicadora on|off", 2)
+    nuevo = _SI_NO[args[0].lower()]
+    try:
+        config.guardar({"platicadora": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print(f"platicadora={'on' if nuevo else 'off'}")
+    return 0
+
+
+VRAM_VISITA_GIB = 8.0   # con menos memoria de GPU, mientras juegas se asoma con la voz ligera (la natural ocupa 4-5 GB)
+
+
+def _vram_gib() -> float:
+    if not shutil.which("nvidia-smi"):
+        return 0.0
+    try:
+        r = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                           capture_output=True, text=True, timeout=10)
+        return max((float(x) / 1024 for x in r.stdout.split()), default=0.0)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return 0.0
+
+
+def _abrir_con(variable: str, texto: str) -> None:
+    """Abre a Miku para una visita o una pregunta (si ya está abierta, no la toca).
+
+    En una visita (estás jugando) con una GPU chica, habla con la voz ligera (en el procesador): la natural le
+    quitaría al juego 4-5 GB de memoria de la GPU.
+    """
+    extra = {variable: texto}
+    if variable == "VORTEX_MIKU_VISITA":
+        voz = voces.buscar(config.cargar()["voz"]) or {}
+        if voz.get("motor") == "qwen" and _vram_gib() < VRAM_VISITA_GIB:
+            extra["VORTEX_MIKU_VOZ"] = voces.VOZ_DEFECTO
+    with Candado():
+        if not pid_abierta():
+            lanzar(extra)
+
+
 def orden_habla_sola(args: list[str]) -> int:
     if not args or args[0] == "estado":
         print(f"habla-sola={'on' if config.cargar()['habla_sola'] else 'off'}")
@@ -1108,6 +1156,8 @@ def orden_sentir(args: list[str]) -> int:
       sentir partida JUEGO MINUTOS CPU GPU   terminó una partida
       sentir revisar                         cada rato: ¿se está desvelando? ¿es momento de declararse?
       sentir declarar [ESPERA]               te pide hablar para declararse, si no estás ocupado
+      sentir jugando JUEGO MINUTOS CPU GPU   cada minuto mientras juegas: ¿toca asomarse? (platicadora)
+      sentir preguntar TEXTO [ESPERA]        al terminar de jugar: se abre y te pregunta cómo te fue
       sentir decir FRASE [ESPERA]            el aviso en sí (tras ESPERA segundos)
     """
     cfg = config.cargar()
@@ -1125,8 +1175,30 @@ def orden_sentir(args: list[str]) -> int:
                 # momento: acabas de dejar de jugar (se revisa otra vez que no estés ocupado).
                 if corazon.quiere_declararse():
                     _despues(["declarar"], 90)
+                    return 0
+                pregunta = corazon.pregunta_partida(juego, minutos, cpu, gpu) if cfg["platicadora"] else ""
+                if pregunta:
+                    _despues(["preguntar", pregunta], 20)   # tras el resumen de la partida
                 else:
                     _decir_sola(frase, espera=90)
+            return 0
+        if args[:1] == ["jugando"] and len(args) >= 3:
+            if not cfg["platicadora"]:
+                return 0
+            frase = corazon.visita_jugando(args[1], numero(args[2]), numero(args[3]) if len(args) > 3 else 0,
+                                           numero(args[4]) if len(args) > 4 else 0)
+            if frase:
+                if shutil.which("notify-send"):
+                    subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "-t", "8000", "Miku", frase],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                _abrir_con("VORTEX_MIKU_VISITA", frase)
+            return 0
+        if args[:1] == ["preguntar"] and len(args) >= 2:
+            espera = numero(args[2]) if len(args) > 2 else 0
+            if espera:
+                time.sleep(espera)
+            if cfg["platicadora"] and not corazon.ocupado():
+                _abrir_con("VORTEX_MIKU_PREGUNTA", args[1])
             return 0
         if args[:1] == ["revisar"]:
             if not cfg["habla_sola"]:
@@ -1194,6 +1266,8 @@ def main(argv: list[str]) -> int:
         return orden_ia(args)
     if orden in ("sentimientos", "corazon", "corazón"):
         return orden_sentimientos(args)
+    if orden == "platicadora":
+        return orden_platicadora(args)
     if orden in ("habla-sola", "habla_sola"):
         return orden_habla_sola(args)
     if orden == "sentir":

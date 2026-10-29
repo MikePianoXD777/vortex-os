@@ -23,6 +23,8 @@ SettingsBlob {
     property bool avatarOn: true
     // true = Miku puede buscar en la web y leer páginas (cada vez con permiso); de fábrica, apagado.
     property bool internetOn: false
+    // true = Miku platica mientras juegas y te pregunta cómo te fue al terminar (2.0.1); de fábrica, encendido.
+    property bool platicadoraOn: true
     // false = no hay vortex-miku (el paquete no está instalado) o no contestó.
     property bool available: true
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
@@ -59,6 +61,10 @@ SettingsBlob {
         section.run("internet", on);
     }
 
+    function setPlaticadora(on) {
+        section.run("platicadora", on);
+    }
+
     function run(option, on) {
         if (toggleProc.running)
             return;
@@ -72,6 +78,7 @@ SettingsBlob {
         let rc = -1;
         let avatar = "";
         let internet = "";
+        let platicadora = "";
         let claude = "?";
         let ia = "claude";
         let lines = text.split("\n");
@@ -87,6 +94,8 @@ SettingsBlob {
                 internet = l.substring(9);
             else if (l.indexOf("ia=") === 0)
                 ia = l.substring(3);
+            else if (l.indexOf("platicadora=") === 0)
+                platicadora = l.substring(12);
         }
         section.ia = ia;
         section.available = (rc === 0);
@@ -98,6 +107,9 @@ SettingsBlob {
         if (rc === 0 && (internet === "on" || internet === "off"))
             section.internetOn = (internet === "on");
         internetToggle.checked = section.internetOn;
+        if (rc === 0 && (platicadora === "on" || platicadora === "off"))
+            section.platicadoraOn = (platicadora === "on");
+        platicadoraToggle.checked = section.platicadoraOn;
     }
 
     Process {
@@ -183,6 +195,31 @@ SettingsBlob {
             handleOffColor: ThemeBackend.text
             onToggled: function (on) {
                 section.setInternet(on);
+            }
+        }
+    }
+
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_platicadora"
+        icon: "󰊴"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.platicadora_title") || "Miku chats while you play"
+        description: I18n.t("guide.general.assistant.platicadora_desc") || "She pops up to talk to you while you play and asks how it went when you finish"
+        searchKeywords: "asistente miku jugar juego partida platicar hablar platicadora notificaciones game play chat"
+        visible: section.available
+
+        Toggle {
+            id: platicadoraToggle
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            enabled: !section.busy
+            checked: section.platicadoraOn
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function (on) {
+                section.setPlaticadora(on);
             }
         }
     }

@@ -255,7 +255,9 @@
         "missing": "The assistant is not installed (vortex-miku package)",
         "claude_off": "Claude is off: turn it on in the section above, or tap «Use local AI» in Miku's window so she thinks on your PC without an account",
         "internet_title": "Miku with internet",
-        "internet_desc": "She can search the web and read pages; each time she asks for your permission"
+        "internet_desc": "She can search the web and read pages; each time she asks for your permission",
+        "platicadora_title": "Miku chats while you play",
+        "platicadora_desc": "Every so often she pops up to talk to you while you play (without opening the microphone) and, when you finish, she opens and asks how it went. The fonder she is of you, the more often"
       },
       "fps": {
         "title": "FPS counter in games",

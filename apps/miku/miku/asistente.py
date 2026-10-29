@@ -30,6 +30,7 @@ REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
 
 PERMISO_SEG = 120              # cuánto espera una acción tu Autorizar antes de cancelarse sola
 CIERRE_PANEL_SEG = 20          # el panel de solo voz se cierra solo tras tanto tiempo sin que lo toquen
+VISITA_SEG = 6                 # tras asomarse mientras juegas, cuánto se queda después de hablar
 ESPERA_SEGUIMIENTO = 8.0       # tras contestar, cuánto escucha por si sigues hablando
 ESPERA_PRIMERA = 10.0          # al abrir, cuánto espera a que empieces a hablar
 
@@ -127,6 +128,12 @@ class Asistente(QObject):
         self._acumulado = ""
         self._filtro = corazon.FiltroMarca()   # quita la marca [[corazon …]] antes de la voz y la pantalla
         self._animo: tuple[str, float] | None = None   # la expresión de su ánimo (corazon.py), base de su cara
+        # Platicadora (2.0.1), las pone «vortex-miku sentir»: VISITA = se asoma mientras juegas, dice la frase sin
+        # abrir el micrófono y se cierra sola; PREGUNTA = al terminar de jugar, empieza ella preguntándote.
+        self._visita = os.environ.pop("VORTEX_MIKU_VISITA", "")
+        self._visita_dicha = False
+        self._pregunta_inicial = os.environ.pop("VORTEX_MIKU_PREGUNTA", "")
+        self._voz_forzada = os.environ.pop("VORTEX_MIKU_VOZ", "") or None   # la visita con GPU chica: la ligera
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
         self._turno = 0                  # sube cada vez que se calla a Miku; descarta el audio de un turno viejo
         self._pregunta_id = 0            # sube con cada pregunta a Claude; descarta lo que llegue de una vieja
@@ -203,11 +210,14 @@ class Asistente(QObject):
     def iniciar(self) -> None:
         """Al abrir: baja lo que falte (la primera vez), levanta la voz y se pone a escuchar enseguida."""
         self._emitir_afecto()
+        if self._visita:                 # si la voz no carga a tiempo, la frase sale igual, solo en el globo
+            QTimer.singleShot(40000, self._decir_visita)
         if descargas.pendientes():
             self._iniciar_descarga()
         else:
-            self._arrancar_voz()
-            self._natural_en_segundo_plano()
+            self._arrancar_voz(self._voz_forzada)
+            if not self._visita:         # mientras juegas no se pone a instalar la voz natural
+                self._natural_en_segundo_plano()
         threading.Thread(target=self._comprobar_claude, daemon=True).start()
 
     def _comprobar_claude(self) -> None:
@@ -306,6 +316,8 @@ class Asistente(QObject):
 
     def _escuchar_si_toca(self) -> None:
         """Se pone a escuchar si no está haciendo otra cosa ni hay un problema con Claude pendiente."""
+        if self._visita:                 # mientras juegas no abre el micrófono (oiría el juego o tu Discord)
+            return
         if self.estado_actual == REPOSO and self._cerebro_listo and not self.acciones_visibles and self._claude_ok:
             self.escuchar()
 
@@ -351,7 +363,28 @@ class Asistente(QObject):
         if not self._cerrado and self.cfg.get("ia") == "local" and (self._voz_lista or self._voz_error):
             ia.precargar(ia.elegido(self.cfg)["modelo"])
 
+    def _decir_visita(self) -> None:
+        """La frase de la visita: en el globo y con su voz (si la voz no arrancó, solo en el globo)."""
+        if self._visita_dicha or not self._visita:
+            return
+        self._visita_dicha = True
+        self.usuario.emit("")
+        self.respuesta.emit(self._visita, True)
+        self._acumulado = self._visita
+        if self._voz_lista:
+            self._decir(self._visita)
+        else:
+            self._revisar_fin_de_turno()
+
+    def _cerrar_visita(self) -> None:
+        if self._visita and not self._cerrado:      # si le escribiste mientras, ya no es visita: se queda
+            self.cerrar.emit()
+
     def _sin_voz(self, motivo: str) -> None:
+        if self._visita:
+            self._voz_error = True
+            self._decir_visita()
+            return
         self._voz_error = True
         self._precargar_ia()
         self._avisar_una_vez("voz", motivo + " Te respondo solo por texto.")
@@ -371,6 +404,9 @@ class Asistente(QObject):
                 continue
             if m.get("listo"):
                 self._voz_lista = True
+                if self._visita:
+                    self._decir_visita()
+                    continue
                 self._precargar_ia()
                 if m.get("modo") == "cpu":       # sin una GPU que sirva: ~7 s más lo que dura cada frase
                     self._avisar_una_vez("voz-lenta", "Voz natural en modo lento (en la CPU): tardo un poco en contestar.")
@@ -579,6 +615,8 @@ class Asistente(QObject):
 
         `oculto`: no la escribiste tú (la abriste porque te pidió hablar): no se muestra como tuya ni la siente.
         """
+        if not oculto:
+            self._visita = ""            # le hablaste durante una visita: se queda abierta como siempre
         texto = texto.strip()
         if not texto or self._cerrado:
             return
@@ -634,9 +672,14 @@ class Asistente(QObject):
         self._sentir(r)
 
     def _declararse_si_toca(self) -> bool:
-        """Te avisó que quería decirte algo y abriste su ventana: ella empieza a hablar (una vez por apertura)."""
-        if getattr(self, "_ya_se_declaro_aqui", False) or not self.cfg.get("sentimientos", True):
-            return False
+        """Ella empieza a hablar (una vez por apertura): te avisó que quería decirte algo y abriste su ventana,
+        o acabas de dejar de jugar y te pregunta cómo te fue. En una visita no (ahí no piensa: solo saluda)."""
+        if getattr(self, "_ya_se_declaro_aqui", False) or not self.cfg.get("sentimientos", True) or self._visita:
+            return self._visita != ""
+        if self._pregunta_inicial:
+            self._ya_se_declaro_aqui = True
+            self.enviar(self._pregunta_inicial, oculto=True)
+            return True
         try:
             if not corazon.pendiente_declararse():
                 return False
@@ -903,6 +946,10 @@ class Asistente(QObject):
             return
         if self.estado_actual != REPOSO:
             self._cambiar_estado(REPOSO, "")
+        if self._visita:
+            if self._visita_dicha:
+                QTimer.singleShot(VISITA_SEG * 1000, self._cerrar_visita)
+            return
         if self.cfg.get("seguir_escuchando") and not self._ultimo_turno_con_error and self._acumulado:
             self._reloj_seguir.start(500)             # medio segundo, para no oírse a sí misma
         else:

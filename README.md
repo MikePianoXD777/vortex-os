@@ -320,6 +320,10 @@ Claude), así que no gasta RAM cuando no la usas.
   ti está en notas de `~/Documentos/Miku` (`Corazón.md`, `Recuerdos.md` y un diario), solo tuyas y
   editables. A veces te dice algo sola (tras una partida o a las 2 a. m.), poquito y nunca mientras juegas;
   `vortex-miku habla-sola off` lo apaga y `vortex-miku sentimientos off` apaga todo.
+- **Platica mientras juegas (2.0.1):** cada rato se asoma a echarte porras (con su voz y una notificación,
+  sin abrir el micrófono) y, al terminar la partida, se abre y te pregunta cómo te fue. Entre más cariño,
+  más seguido. Con una GPU de menos de 8 GB, mientras juegas usa la voz ligera para no quitarle memoria al
+  juego. Se apaga en **Ajustes → General → Miku platica mientras juegas** (o `vortex-miku platicadora off`).
 - **Graba tus partidas:** «Miku, grábame» graba el monitor que usas con el sonido del sistema (no el
   micrófono) en `~/Vídeos/Miku`, y sigue aunque la cierres hasta que le digas que pare (o
   `vortex-miku grabar parar`). Solo graba cuando se lo pides, y siempre con tu permiso en su ventana.
