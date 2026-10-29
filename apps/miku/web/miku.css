@@ -14,6 +14,7 @@
   --relleno: #1f2552;
   --rojo: #ff9db0;
   --radio: 18px;
+  --corazon: #ff7aa2;     /* el medidor de cariño es rosa con cualquier tema */
 }
 * { box-sizing: border-box; }
 html, body {
@@ -40,6 +41,29 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; b
 }
 #barra button:hover { color: var(--texto); border-color: var(--borde-campo); }
 #barra svg, #mic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Medidor de cariño, arriba a la izquierda */
+#carino {
+  position: absolute; top: 10px; left: 10px; height: 30px; padding: 0 11px 0 8px; display: flex; align-items: center;
+  gap: 6px; border-radius: 15px; border: 1px solid var(--borde); background: var(--cristal); color: var(--texto);
+  font-size: 12px; z-index: 5; cursor: default; user-select: none; -webkit-user-select: none;
+}
+#carino[hidden] { display: none; }
+#carino svg { width: 18px; height: 18px; overflow: visible; }
+#carino .contorno { fill: none; stroke: var(--corazon); stroke-width: 1.6; stroke-linejoin: round; }
+#carino .lleno { fill: var(--corazon); }
+#carino-nivel { transition: y 0.8s ease; }
+#carino-num { color: var(--tenue); font-variant-numeric: tabular-nums; }
+#carino.late svg { animation: latido 0.7s ease; }
+#carino.enamorada svg { filter: drop-shadow(0 0 4px var(--corazon)); }
+@keyframes latido { 0% { transform: scale(1); } 25% { transform: scale(1.35); } 50% { transform: scale(0.95); } 75% { transform: scale(1.15); } 100% { transform: scale(1); } }
+#carino-cambio {
+  position: absolute; top: 15px; left: 0; color: var(--corazon); font-size: 13px; font-weight: 600; opacity: 0;
+  pointer-events: none; z-index: 6;
+}
+#carino-cambio.baja { color: var(--tenue); }
+#carino-cambio.sube { animation: cambio 1.6s ease-out; }
+@keyframes cambio { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 
 /* Globo de texto, arriba */
 #globo {

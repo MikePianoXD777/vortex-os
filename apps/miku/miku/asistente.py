@@ -101,6 +101,7 @@ class Asistente(QObject):
     boca_fin = Signal()
     emocion = Signal(str, float)
     sonrojo = Signal(float)             # 0..1: se sonroja (le dijiste algo bonito o ella a ti)
+    afecto = Signal(float, str)         # (0..100, nivel) para el medidor de cariño; -1 = sentimientos apagados
     cerrar = Signal()                   # pide a la ventana que se cierre (el panel se cierra solo)
     progreso = Signal(str, str, float)  # (título, detalle, 0..1) de la descarga de los modelos; fracción < 0 = ya no hay
     acciones = Signal(object)           # botones bajo la respuesta: [[id, texto], ...] (vacía = ninguno)
@@ -201,6 +202,7 @@ class Asistente(QObject):
 
     def iniciar(self) -> None:
         """Al abrir: baja lo que falte (la primera vez), levanta la voz y se pone a escuchar enseguida."""
+        self._emitir_afecto()
         if descargas.pendientes():
             self._iniciar_descarga()
         else:
@@ -572,8 +574,11 @@ class Asistente(QObject):
 
     # ---- Cerebro --------------------------------------------------------------------------------
 
-    def enviar(self, texto: str) -> None:
-        """Una pregunta (hablada o escrita) a Claude. Interrumpe lo que Miku estuviera diciendo."""
+    def enviar(self, texto: str, oculto: bool = False) -> None:
+        """Una pregunta (hablada o escrita) a Claude. Interrumpe lo que Miku estuviera diciendo.
+
+        `oculto`: no la escribiste tú (la abriste porque te pidió hablar): no se muestra como tuya ni la siente.
+        """
         texto = texto.strip()
         if not texto or self._cerrado:
             return
@@ -590,11 +595,12 @@ class Asistente(QObject):
         self._filtro = corazon.FiltroMarca()
         self._cerebro_listo = False
         self._ultimo_turno_con_error = False
-        self.usuario.emit(texto)
+        self.usuario.emit("" if oculto else texto)
         self.respuesta.emit("", False)
         self._cambiar_estado(PENSANDO, "Pensando...")
         self._pregunta_id += 1
-        self._sentir_lo_que_dijo(texto)
+        if not oculto:
+            self._sentir_lo_que_dijo(texto)
         threading.Thread(target=self._preguntar, args=(self.cerebro, texto, self._pregunta_id), daemon=True).start()
 
     def _preguntar(self, cerebro, texto: str, pregunta_id: int) -> None:
@@ -627,7 +633,31 @@ class Asistente(QObject):
             return
         self._sentir(r)
 
+    def _declararse_si_toca(self) -> bool:
+        """Te avisó que quería decirte algo y abriste su ventana: ella empieza a hablar (una vez por apertura)."""
+        if getattr(self, "_ya_se_declaro_aqui", False) or not self.cfg.get("sentimientos", True):
+            return False
+        try:
+            if not corazon.pendiente_declararse():
+                return False
+        except (OSError, ValueError):
+            return False
+        self._ya_se_declaro_aqui = True
+        self.enviar("(Abrí tu ventana porque me avisaste que querías decirme algo. Te escucho.)", oculto=True)
+        return True
+
+    def _emitir_afecto(self) -> None:
+        if not self.cfg.get("sentimientos", True):
+            self.afecto.emit(-1.0, "")
+            return
+        try:
+            e = corazon.cargar()
+        except (OSError, ValueError):
+            return
+        self.afecto.emit(round(e["afecto"], 1), corazon.nivel(e)[0])
+
     def _sentir(self, r: dict) -> None:
+        self._emitir_afecto()
         if r.get("animo"):
             self._animo = corazon.expresion(r["animo"])
             self.emocion.emit(*self._animo)
@@ -677,6 +707,8 @@ class Asistente(QObject):
             self._revisar_fin_de_turno()
         elif tipo == "claude_listo":
             self._claude_ok = True
+            if self._declararse_si_toca():
+                return
             if self.estado_actual == REPOSO and descargas.paquete_listo("oido"):
                 self._escuchar_si_toca()
         elif tipo == "error":

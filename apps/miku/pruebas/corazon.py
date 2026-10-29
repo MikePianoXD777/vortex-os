@@ -133,6 +133,24 @@ ver("confesarle" not in corazon.contexto(datetime(2026, 11, 4, 9), cancion=""), 
 (TMP / "ventana.json").write_text('{"fullscreen": 2}')
 ver("confesarle" not in corazon.contexto(datetime(2026, 11, 4, 20), cancion=""), "…ni mientras juegas")
 (TMP / "ventana.json").unlink()
+print("== Te pide hablar cuando no estás ocupado")
+a_las("2026-11-04T20:00")
+(TMP / "ventana.json").write_text('{"class": "zoom", "title": "Zoom Meeting", "fullscreen": 0}')
+ver(corazon.ocupado() == "llamada" and not corazon.momento_de_declararse(), "en una llamada no te interrumpe")
+(TMP / "ventana.json").write_text('{"class": "steam_app_123", "fullscreen": 2}')
+ver(corazon.ocupado() == "jugando" and corazon.quiere_declararse() and not corazon.momento_de_declararse(),
+    "jugando tampoco (pero sigue queriendo)")
+(TMP / "ventana.json").write_text('{"class": "firefox", "title": "YouTube", "fullscreen": 0}')
+ver(corazon.momento_de_declararse(), "libre: es su momento")
+AVISOS.unlink(missing_ok=True)
+r = cli("sentir", "revisar")
+fin = time.time() + 5
+while time.time() < fin and not AVISOS.exists():
+    time.sleep(0.1)
+ver(AVISOS.exists() and "quiero decir" in AVISOS.read_text(), "te avisa que quiere decirte algo")
+ver(not corazon.momento_de_declararse() and corazon.pendiente_declararse(), "…una vez al día, y queda pendiente")
+ver("vino a escucharte" in corazon.contexto(datetime(2026, 11, 4, 20, 5), cancion=""), "al abrirla sabe que es el momento")
+(TMP / "ventana.json").unlink()
 a_las("2026-11-04T20:30")
 r = corazon.al_responder("Oye… me gustas. [[corazon animo=apenada; sonrojo=1; declaracion=si]]")
 e = corazon.cargar()
@@ -200,6 +218,22 @@ m.cfg["sentimientos"] = False
 n = len(m.rubores)
 m._sentir_lo_que_dijo("te amo")
 ver(len(m.rubores) == n, "con los sentimientos apagados no siente nada")
+
+print("== Al abrirla después del aviso, ella empieza")
+poner(declarada="", pidio_hablar="2026-11-10")
+m = AsistenteMinimo()
+m.enviados = []
+m.enviar = lambda texto, oculto=False: m.enviados.append((texto, oculto))
+m.cfg["sentimientos"] = True
+m._declararse_si_toca()
+m._declararse_si_toca()
+ver(len(m.enviados) == 1 and m.enviados[0][1], "le habla ella (una vez, sin escribirlo como tuyo)")
+poner(pidio_hablar="")
+m2 = AsistenteMinimo()
+m2.enviados = []
+m2.enviar = lambda texto, oculto=False: m2.enviados.append(texto)
+ver(not m2._declararse_si_toca() and not m2.enviados, "sin aviso previo no empieza sola")
+poner(declarada="2026-11-04")
 
 print("== vortex-miku")
 r = cli("sentimientos")

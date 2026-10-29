@@ -13,6 +13,7 @@ class AsistenteFalso(QObject):
     boca_fin = Signal()
     emocion = Signal(str, float)
     sonrojo = Signal(float)
+    afecto = Signal(float, str)
     cerrar = Signal()
     progreso = Signal(str, str, float)
     acciones = Signal(object)

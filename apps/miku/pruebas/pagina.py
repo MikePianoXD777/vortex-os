@@ -188,6 +188,26 @@ def main() -> int:
     js("miku.sonrojoHasta = 0")
     comprobar("se le baja sola", esperar("miku.escena.sonrojoValor === 0", 25))
 
+    print("== Medidor de cariño (2.0)")
+    comprobar("sin datos, el medidor está escondido", js("document.getElementById('carino').hidden"))
+    asistente.afecto.emit(26.0, "amigos")
+    pasar(0.3)
+    lectura = js("document.getElementById('carino-nombre').textContent + '|' + document.getElementById('carino-num').textContent")
+    comprobar("muestra el nivel y el número", not js("document.getElementById('carino').hidden") and lectura == "Amigos|26", lectura)
+    asistente.afecto.emit(29.0, "amigos")
+    pasar(0.3)
+    comprobar("al subir, late y dice cuánto", js("document.getElementById('carino-cambio').textContent") == "+3"
+              and js("document.getElementById('carino').classList.contains('late')"))
+    foto("carino")
+    asistente.afecto.emit(88.0, "enamorada")
+    pasar(0.3)
+    comprobar("enamorada brilla", js("document.getElementById('carino').classList.contains('enamorada')"))
+    comprobar("el corazón se llena según el cariño", abs(float(js("document.getElementById('carino-nivel').getAttribute('y')")) - (21 - 16 * 0.88)) < 0.01)
+    asistente.afecto.emit(-1.0, "")
+    pasar(0.2)
+    comprobar("con los sentimientos apagados se esconde", js("document.getElementById('carino').hidden"))
+    asistente.afecto.emit(29.0, "amigos")
+
     print("== Boca: vocales con la voz")
     # Una pista de prueba: a, i, u, e, o, cada una 0,5 s al máximo.
     pista = []

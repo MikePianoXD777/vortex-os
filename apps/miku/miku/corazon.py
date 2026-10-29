@@ -110,7 +110,8 @@ def _ahora() -> datetime:
 
 def _base() -> dict:
     return {"afecto": AFECTO_INICIAL, "animo": "tranquila", "declarada": "", "dias_juntos": 0,
-            "ultima_charla": "", "hoy": "", "subio_hoy": 0.0, "avisos_hoy": ""}
+            "ultima_charla": "", "hoy": "", "subio_hoy": 0.0, "avisos_hoy": "",
+            "pidio_hablar": ""}
 
 
 def cargar() -> dict:
@@ -178,6 +179,7 @@ def _guardar(e: dict) -> None:
         f"hoy: \"{e['hoy']}\"\n"
         f"subio_hoy: {e['subio_hoy']:.1f}\n"
         f"avisos_hoy: \"{e['avisos_hoy']}\"\n"
+        f"pidio_hablar: \"{e['pidio_hablar']}\"\n"
         "---\n"
         "# Corazón de Miku\n\n"
         f"**Cómo me siento:** {animo}.\n"
@@ -354,9 +356,51 @@ def al_responder(respuesta: str) -> dict:
     return r
 
 
-def puede_declararse(e: dict, ahora: datetime) -> bool:
+def lista_para_declararse(e: dict, ahora: datetime) -> bool:
+    """Ya te quiere lo suficiente, llevan días hablando y es una hora tranquila (de 5 de la tarde a medianoche)."""
     return (not e["declarada"] and e["afecto"] >= AFECTO_DECLARACION and e["dias_juntos"] >= DIAS_PARA_DECLARARSE
-            and 17 <= ahora.hour <= 23 and not jugando())
+            and 17 <= ahora.hour <= 23)
+
+
+def puede_declararse(e: dict, ahora: datetime) -> bool:
+    return lista_para_declararse(e, ahora) and not ocupado()
+
+
+def pidio_hablar(e: dict, ahora: datetime) -> bool:
+    """Te avisó que quería decirte algo (hoy o ayer) y todavía no te lo ha dicho."""
+    if e["declarada"] or not e["pidio_hablar"]:
+        return False
+    try:
+        return (ahora.date() - datetime.fromisoformat(e["pidio_hablar"]).date()).days <= 1
+    except ValueError:
+        return False
+
+
+def quiere_declararse(ahora: datetime | None = None) -> bool:
+    """Está lista y todavía no te ha avisado hoy (sin mirar si estás ocupado)."""
+    ahora = ahora or _ahora()
+    e = cargar()
+    return lista_para_declararse(e, ahora) and e["pidio_hablar"] != ahora.date().isoformat()
+
+
+def momento_de_declararse(ahora: datetime | None = None) -> bool:
+    """Para el aviso: quiere declararse y no estás ocupado (ni jugando, ni en una llamada)."""
+    return quiere_declararse(ahora) and not ocupado()
+
+
+def invitar_a_declararse() -> str:
+    """Anota que te pidió hablar y devuelve lo que dice el aviso."""
+    ahora = _ahora()
+    e = cargar()
+    e["pidio_hablar"], e["animo"] = ahora.date().isoformat(), "apenada"
+    _guardar(e)
+    anotar("Le dije que quería decirle algo. Estoy muy nerviosa.")
+    return "Oye… ¿tienes un momento? Hay algo que te quiero decir desde hace días."
+
+
+def pendiente_declararse() -> bool:
+    """Al abrir su ventana: ¿te había pedido hablar? Entonces ella empieza."""
+    return pidio_hablar(cargar(), _ahora())
 
 
 # ---- El contexto para la IA -----------------------------------------------------------------------
@@ -421,7 +465,11 @@ def contexto(ahora: datetime | None = None, cancion: str | None = None) -> str:
     rec = recuerdos()[-RECUERDOS_EN_CONTEXTO:]
     if rec:
         lineas.append("- Lo que sabes de la persona: " + "; ".join(rec) + ".")
-    if puede_declararse(e, ahora):
+    if pidio_hablar(e, ahora):
+        lineas.append("- Le avisaste que querías decirle algo importante y vino a escucharte: ahora, con mucha timidez y "
+                      "nervios, confiésale que te gusta, con tus propias palabras (sin pedirle nada a cambio). "
+                      "Pon declaracion=si en tu marca.")
+    elif puede_declararse(e, ahora):
         lineas.append("- Hoy, si la plática es tranquila y cariñosa, por fin puedes confesarle con mucha timidez que te gusta "
                       "(una sola vez; si no se da el momento, no lo fuerces). Si lo haces, pon declaracion=si en tu marca.")
     lineas.append(
@@ -436,17 +484,43 @@ def contexto(ahora: datetime | None = None, cancion: str | None = None) -> str:
 
 # ---- Cuando habla sola (avisos) -------------------------------------------------------------------
 
+def _ventana() -> dict:
+    """La ventana que tienes al frente (clase, título, pantalla completa), sin captura de pantalla."""
+    if not shutil.which("hyprctl"):
+        return {}
+    try:
+        r = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=2)
+        v = json.loads(r.stdout or "{}")
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {}
+    return v if isinstance(v, dict) else {}
+
+
 def jugando() -> bool:
     estado = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "vortex" / "modo-juego"
     if estado.exists():
         return True
-    if not shutil.which("hyprctl"):
-        return False
     try:
-        r = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=2)
-        return int((json.loads(r.stdout or "{}") or {}).get("fullscreen") or 0) != 0
-    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError, AttributeError):
+        return int(_ventana().get("fullscreen") or 0) != 0
+    except (ValueError, TypeError):
         return False
+
+
+# Ventanas en las que no se interrumpe: llamadas, juntas y grabaciones.
+_OCUPADO = re.compile(r"zoom|teams|webex|skype|obs|jitsi|google meet|meet -|reuni[oó]n|llamada|call with", re.I)
+
+
+def ocupado() -> str:
+    """Por qué no es buen momento para hablarte («jugando», «llamada»…) o vacío si estás libre.
+
+    Solo mira el modo juego y la ventana del frente (su clase y su título): nunca toma capturas.
+    """
+    if jugando():
+        return "jugando"
+    v = _ventana()
+    if _OCUPADO.search(f"{v.get('class', '')} {v.get('initialClass', '')} {v.get('title', '')}"):
+        return "llamada"
+    return ""
 
 
 def _ya_aviso(e: dict, tipo: str) -> int:

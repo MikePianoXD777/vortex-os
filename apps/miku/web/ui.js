@@ -87,6 +87,31 @@
     for (const k in vars) r.setProperty('--' + k, vars[k]);
   };
 
+  // Medidor de cariño (2.0): el corazón se llena de 0 a 100; al cambiar, late y muestra cuánto.
+  const NIVELES = { conocidos: 'Conocidos', amigos: 'Amigos', cercanos: 'Cercanos', 'muy cercanos': 'Muy cercanos',
+                    'le gusta': 'Le gustas', enamorada: 'Enamorada' };
+  let afectoPrevio = null;
+  miku.afecto = (valor, nivel) => {
+    const c = $('carino');
+    if (valor < 0) { c.hidden = true; afectoPrevio = null; return; }
+    const v = Math.max(0, Math.min(100, valor));
+    c.hidden = false;
+    $('carino-nivel').setAttribute('y', String(21 - 16 * v / 100));      // el corazón va de y=5 a y=21
+    $('carino-nombre').textContent = NIVELES[nivel] || nivel;
+    $('carino-num').textContent = Math.round(v);
+    c.classList.toggle('enamorada', nivel === 'enamorada');
+    c.title = `Cariño de Miku: ${Math.round(v)} de 100. Crece despacio con cómo la tratas. Lo que siente y lo que sabe de ti está en Documentos/Miku.`;
+    if (afectoPrevio !== null && Math.abs(v - afectoPrevio) >= 0.25) {
+      const d = v - afectoPrevio, cambio = $('carino-cambio');
+      cambio.textContent = (d > 0 ? '+' : '−') + Math.abs(d).toLocaleString('es', { maximumFractionDigits: 1 });
+      cambio.classList.toggle('baja', d < 0);
+      cambio.style.left = (c.offsetLeft + c.offsetWidth + 6) + 'px';
+      cambio.classList.remove('sube'); void cambio.offsetWidth; cambio.classList.add('sube');
+      if (d > 0) { c.classList.remove('late'); void c.offsetWidth; c.classList.add('late'); }
+    }
+    afectoPrevio = v;
+  };
+
   // Primera vez: descarga de la voz y el oído. fraccion < 0 = ya no hay descarga.
   miku.progreso = (titulo, detalle, fraccion) => {
     const p = $('prep');
