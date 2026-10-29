@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# vortex-clips (1.10): los últimos 30 s, como ShadowPlay. gpu-screen-recorder graba siempre en segundo
-# plano con la GPU, en la RAM (no escribe nada al disco), y Alt+F10 guarda lo último en
+# vortex-clips (1.10): los últimos 30 s, como ShadowPlay. Mientras juegas, gpu-screen-recorder graba en
+# segundo plano con la GPU, en la RAM (no escribe nada al disco), y Alt+F10 guarda lo último en
 # Vídeos/Clips con el nombre del juego. Sale un aviso con «Ver» y «Abrir carpeta».
+# 2.0.2: graba solo durante el modo juego («vortex modo-juego on» lo arranca y «off» lo para): grabar
+# el escritorio todo el día ocupaba 250-400 MB de RAM desde que entrabas. Fuera de un juego, Alt+F10
+# empieza a grabar desde ese momento.
 #
 #   vortex clips guardar     guarda los últimos 30 s (Alt+F10)
 #   vortex clips estado      si está grabando y en qué monitor
 #   vortex clips apagar      deja de grabar y no vuelve a empezar solo
-#   vortex clips encender    vuelve a grabar (viene encendido)
-#   vortex clips servicio    lo que corre en segundo plano (el shell lo arranca al iniciar sesión)
+#   vortex clips encender    vuelve a grabar en los juegos (viene encendido)
+#   vortex clips servicio    lo que corre en segundo plano (lo arranca el modo juego)
+#   vortex clips detener     para el servicio hasta el siguiente juego (lo llama el modo juego al salir)
 #
 # Graba el monitor donde estás. Si cambias de monitor espera 10 s antes de seguirte (un Alt+Tab
 # rápido a Discord no borra el clip), salvo que la ventana esté en pantalla completa: ahí va directo.
@@ -19,6 +23,7 @@ PASO_MS="${VORTEX_CLIPS_PASO_MS:-2000}"
 ESPERA_MS="${VORTEX_CLIPS_ESPERA_MS:-10000}"
 RUN="${XDG_RUNTIME_DIR:-/tmp}/vortex-clips"
 APAGADO="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/clips-apagado"
+MODO_JUEGO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego"
 DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Clips"
 APP="Vortexine's OS"
 
@@ -47,6 +52,16 @@ empezar() {
   echo "$monitor" >"$RUN/monitor"
 }
 
+# El servicio de esta sesión, por su PID: «pkill -f» con su nombre también mataba a cualquier
+# proceso que lo llevara en la línea de comandos (una terminal, una prueba).
+detener_servicio() {
+  local pid
+  pid="$(cat "$RUN/servicio.pid" 2>/dev/null)"
+  [[ "$pid" =~ ^[0-9]+$ ]] && kill "$pid" 2>/dev/null
+  rm -f "$RUN/servicio.pid"
+  parar
+}
+
 parar() {
   local pid
   pid="$(grabador_pid)" && kill "$pid" 2>/dev/null
@@ -60,7 +75,8 @@ cmd_servicio() {
   # Uno solo por sesión, aunque el shell lo pida otra vez al reiniciarse
   exec 9>"$RUN/servicio.lock"
   flock -n 9 || return 0
-  trap 'parar; exit 0' TERM INT
+  echo $$ >"$RUN/servicio.pid"
+  trap 'parar; rm -f "$RUN/servicio.pid"; exit 0' TERM INT
   local monitor="" quiere esperando=0 fallos=0
   while true; do
     [[ -e "$APAGADO" ]] && { parar; return 0; }
@@ -98,7 +114,7 @@ cmd_guardar() {
       notificar -i video-x-generic "Los clips están apagados" "Para grabar los últimos 30 s: vortex clips encender"
     else
       setsid "$0" servicio >/dev/null 2>&1 </dev/null &
-      notificar -i video-x-generic "Los clips no estaban grabando" "Ya empezaron: desde ahora Alt+F10 guarda los últimos $SEGUNDOS s."
+      notificar -i video-x-generic "Los clips graban solo mientras juegas" "Ya empezaron: desde ahora Alt+F10 guarda los últimos $SEGUNDOS s."
     fi
     return 1
   fi
@@ -137,13 +153,13 @@ case "${1:-}" in
   apagar)
     mkdir -p "$(dirname "$APAGADO")"
     touch "$APAGADO"
-    parar
-    pkill -f "vortex-clips servicio" 2>/dev/null
+    detener_servicio
     echo "Clips apagados" ;;
   encender)
     rm -f "$APAGADO"
-    setsid "$0" servicio >/dev/null 2>&1 </dev/null &
-    echo "Clips encendidos: Alt+F10 guarda los últimos $SEGUNDOS s" ;;
+    [[ -e "$MODO_JUEGO" ]] && setsid "$0" servicio >/dev/null 2>&1 </dev/null &
+    echo "Clips encendidos: en los juegos, Alt+F10 guarda los últimos $SEGUNDOS s" ;;
+  detener) detener_servicio ;;
   # gpu-screen-recorder: ARCHIVO replay
   /*) [[ "${2:-}" == replay ]] && cmd_aviso "$1" ;;
   *) sed -n '2,/^set -uo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; [[ -z "${1:-}" ]] ;;

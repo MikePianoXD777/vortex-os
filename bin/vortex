@@ -66,6 +66,9 @@ EOF
 }
 
 aviso() { printf 'vortex: %s\n' "$*" >&2; }
+# 2.0.2: fondos_nuevos lo usaba sin que existiera (solo está en install/lib.sh) y, con set -e,
+# «vortex actualizar» se cortaba ahí antes de reconstruir el shell y los paquetes.
+bien() { printf 'vortex: %s\n' "$*"; }
 
 notificar() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" "$@" || true; }
 
@@ -481,6 +484,8 @@ cmd_modo_juego() {
       touch "$marca"
       # Vortex 1.10: empieza a medir la partida para el resumen del final (bin/vortex-partida)
       "$VORTEX_DIR/bin/vortex-partida" empezar 2>/dev/null || true
+      # Vortex 2.0.2: los clips (Alt+F10) graban solo mientras juegas; si ya graban, no hace nada.
+      setsid "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
     off)
@@ -496,6 +501,8 @@ cmd_modo_juego() {
         shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
       fi
       rm -f "$marca" "$marca.anterior" "$marca.fondo"
+      # Vortex 2.0.2: deja de grabar clips y suelta su RAM (250-400 MB).
+      "$VORTEX_DIR/bin/vortex-clips" detener 2>/dev/null || true
       # Vortex 1.10: el resumen de la partida (cuánto jugaste, FPS y temperaturas) en vez del aviso
       # de siempre; en una partida de menos de 2 min no hay resumen y sale el aviso normal
       "$VORTEX_DIR/bin/vortex-partida" terminar 2>/dev/null | grep -q . ||
@@ -1088,6 +1095,10 @@ cmd_actualizar() {
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
+  # 2.0.2: los clips graban solo en el modo juego; el grabador que dejó corriendo el shell de antes se
+  # para ya (no guardaba su PID: se busca su línea exacta) para soltar su RAM sin reiniciar.
+  [[ -e "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego" ]] ||
+    pkill -f '^bash .*/vortex-clips servicio$' 2>/dev/null || true
   # Los paquetes propios (shell, tienda, App Installer, Vortex Player, Miku y Vortex Studio) vienen de packaging/ de este repo: se
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
@@ -1376,12 +1387,21 @@ cmd_actualizaciones() {
       [[ -n "$sonido" && -f "$sonido" ]] && args+=(-h "string:sound-file:$sonido")
       # La espera del botón va aparte (setsid) y con tope de 6 h: hasta la 1.6.3 «revisar» se quedaba
       # esperando a que cerraras la notificación y el temporizador ya no volvía a revisar.
+      # 2.0.2: antes de avisar otra vez se suelta la espera del aviso anterior; si no, cada aviso nuevo
+      # dejaba un notify-send esperando (~9 MB) hasta 6 h. --foreground deja a timeout y notify-send en
+      # el grupo de procesos de la espera, para pararlos juntos.
+      local esperas="${XDG_RUNTIME_DIR:-/tmp}/vortex-avisos" viejo
+      mkdir -p "$esperas"
+      viejo="$(cat "$esperas/actualizaciones.pid" 2>/dev/null)" || viejo=""
+      [[ "$viejo" =~ ^[0-9]+$ ]] && grep -qa "Hay actualizaciones" "/proc/$viejo/cmdline" 2>/dev/null &&
+        { kill -- "-$viejo" 2>/dev/null || true; }
       setsid -f bash -c '
-        respuesta="$(timeout 6h notify-send "$@" 2>/dev/null)" || true
+        echo $$ >"$0"
+        respuesta="$(timeout --foreground 6h notify-send "$@" 2>/dev/null)" || true
         if [[ "$respuesta" == actualizar ]]; then
           setsid -f kitty --title "Actualizar Vortexine'"'"'s" -e bash -c \
             "vortex actualizar; echo; read -rp \"Listo. Presiona Enter para cerrar.\""
-        fi' _ "${args[@]}" "Hay actualizaciones" "$cuerpo" </dev/null >/dev/null 2>&1
+        fi' "$esperas/actualizaciones.pid" "${args[@]}" "Hay actualizaciones" "$cuerpo" </dev/null >/dev/null 2>&1
       ;;
     *) aviso "uso: vortex actualizaciones [revisar|on|off|sonido ARCHIVO]"; exit 2 ;;
   esac

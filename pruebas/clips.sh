@@ -86,7 +86,17 @@ SERVICIO=""
 probar "apagado se queda apagado" "[[ -e '$H/.config/vortex/clips-apagado' ]] && clips estado | grep -q apagado"
 probar "guardar con los clips apagados lo dice y no arranca nada" "! clips guardar && sleep 0.3 && ! pgrep -f '$T/bin/gpu-screen-recorder' >/dev/null"
 clips encender >/dev/null
-probar "encender vuelve a grabar" "hasta \"pgrep -f '$T/bin/gpu-screen-recorder' >/dev/null\""
+probar "encender fuera de un juego no graba (2.0.2)" "sleep 0.4; ! pgrep -f '$T/bin/gpu-screen-recorder' >/dev/null"
+mkdir -p "$H/.local/state/vortex" && touch "$H/.local/state/vortex/modo-juego"
+clips encender >/dev/null
+probar "encender en un juego vuelve a grabar" "hasta \"pgrep -f '$T/bin/gpu-screen-recorder' >/dev/null\""
+
+echo "== detener (al salir del modo juego, 2.0.2)"
+hasta "[[ -s '$T/run/vortex-clips/servicio.pid' ]]"
+SPID="$(cat "$T/run/vortex-clips/servicio.pid")"
+clips detener
+probar "detener para el grabador y el servicio" "hasta \"! pgrep -f '$T/bin/gpu-screen-recorder' >/dev/null\" && hasta '! kill -0 $SPID'"
+probar "detener no apaga los clips" "[[ ! -e '$H/.config/vortex/clips-apagado' ]]"
 clips apagar >/dev/null
 
 echo

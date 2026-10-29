@@ -131,7 +131,7 @@ ShellRoot {
         Quickshell.execDetached(["bash", Caching.qsDir + "/media/equalizer.sh", "restaurar"]);
         // Vortex 1.10: los recordatorios del lanzador suenan aunque nunca se abra (singletons/system/Recordar.qml).
         Recordar.iniciar();
-        // Vortex 1.10: los últimos 30 s con Alt+F10 (bin/vortex-clips); si ya corre, no hace nada.
-        Quickshell.execDetached(["vortex", "clips", "servicio"]);
+        // Vortex 2.0.2: los clips (Alt+F10) ya no se arrancan aquí: graban solo durante el modo juego
+        // (bin/vortex, cmd_modo_juego), porque grabar el escritorio todo el día ocupaba 250-400 MB.
     }
 }
