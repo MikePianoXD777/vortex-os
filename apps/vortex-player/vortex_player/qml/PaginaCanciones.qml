@@ -251,15 +251,27 @@ Item {
                         Layout.fillWidth: true
                         implicitHeight: 58
                         radius: 8
-                        color: zonaReco.hovered ? Tema.tarjetaHover : "transparent"
+                        color: zonaReco.hovered || botonAvance.mio ? Tema.tarjetaHover : "transparent"
                         HoverHandler { id: zonaReco }
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 12
                             anchors.rightMargin: 12
                             spacing: 14
+                            // 2.1.1: ▶ escucha 30 s antes de agregarla (tu música se pausa y luego sigue)
+                            Item {
+                                Layout.preferredWidth: 28
+                                Layout.fillHeight: true
+                                BotonAvance {
+                                    id: botonAvance
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.rightMargin: -6
+                                    vid: reco.modelData.id
+                                    onClicked: vp.escucharRecomendada(reco.index)
+                                }
+                            }
                             Portada {
-                                Layout.leftMargin: 42
                                 Layout.preferredWidth: 42
                                 Layout.preferredHeight: 42
                                 url: reco.modelData.portada
@@ -267,7 +279,7 @@ Item {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 2
-                                Text { Layout.fillWidth: true; text: reco.modelData.titulo; color: Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: reco.modelData.titulo; color: botonAvance.mio ? Tema.azul : Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
                                 Text { Layout.fillWidth: true; text: reco.modelData.artistas; color: Tema.suave; font.pixelSize: 12; elide: Text.ElideRight }
                             }
                             Text {

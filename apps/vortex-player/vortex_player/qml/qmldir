@@ -3,6 +3,7 @@ singleton Iconos 1.0 Iconos.qml
 Icono 1.0 Icono.qml
 Boton 1.0 Boton.qml
 BotonIcono 1.0 BotonIcono.qml
+BotonAvance 1.0 BotonAvance.qml
 Etiqueta 1.0 Etiqueta.qml
 Portada 1.0 Portada.qml
 Barra 1.0 Barra.qml

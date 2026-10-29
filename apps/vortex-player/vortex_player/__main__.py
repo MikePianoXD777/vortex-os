@@ -134,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     recibir(puente, args)
     codigo = app.exec()
     servidor.close()
+    puente.pararAvance()
     puente.r.cerrar()
     del mpris
     sys.stdout.flush()

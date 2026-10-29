@@ -104,13 +104,18 @@ Flickable {
                         Layout.fillWidth: true
                         implicitHeight: 60
                         radius: 12
-                        color: zona.hovered ? Tema.campo : "transparent"
+                        color: zona.hovered || avanceResultado.mio ? Tema.campo : "transparent"
                         HoverHandler { id: zona }
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 8
                             anchors.rightMargin: 8
                             spacing: 12
+                            BotonAvance {      // 2.1.1: escuchar 30 s antes de bajarla
+                                id: avanceResultado
+                                vid: resultado.modelData.id
+                                onClicked: vp.escucharResultado(resultado.index)
+                            }
                             Portada {
                                 Layout.preferredWidth: 46
                                 Layout.preferredHeight: 46
@@ -122,7 +127,7 @@ Flickable {
                                 Text {
                                     Layout.fillWidth: true
                                     text: resultado.modelData.titulo
-                                    color: Tema.texto
+                                    color: avanceResultado.mio ? Tema.azul : Tema.texto
                                     font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                     elide: Text.ElideRight

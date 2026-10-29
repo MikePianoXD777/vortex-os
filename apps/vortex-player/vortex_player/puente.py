@@ -18,6 +18,7 @@ from urllib.parse import quote
 from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QTimer, QUrl, Signal, Slot
 
 from . import audio, descargas, ecualizador, rutas
+from .avance import Avance
 from .biblioteca import Biblioteca
 from .reproductor import Reproductor
 
@@ -83,6 +84,13 @@ class Puente(QObject):
         self._recom_error = ""
         self._recom_vuelta = 0
         self._recom_guardadas: dict[int, list[dict]] = {}
+        # 2.1.1: escuchar 30 s de una recomendada o de un resultado antes de bajarla
+        self._avance = Avance(self)
+        self._seguir_tras_avance = False
+        self._avance.empezo.connect(self._pausar_por_avance)
+        self._avance.termino.connect(self._seguir_tras_el_avance)
+        self._avance.error.connect(self.aviso)
+        self.r.quiereSonar.connect(self._musica_quiere_sonar)
 
         self._evento.connect(self._en_evento)
         self._escaneado.connect(self._fin_escaneo)
@@ -411,6 +419,44 @@ class Puente(QObject):
             self.bajar(c["url"], self._recom_para, c["id"],
                        f"{c['titulo']} · {c['artistas']}" if c["artistas"] else c["titulo"])
 
+    # --- avance: 30 s antes de bajarla (2.1.1) -------------------------------------------------------
+
+    def _escuchar(self, c: dict) -> None:
+        if self._avance.idActual == c["id"]:
+            self._avance.parar()
+        else:
+            self._avance.tocar(c["id"], c["url"], float(c.get("duracion") or 0), self.r.volumen)
+
+    @Slot(int)
+    def escucharRecomendada(self, i: int) -> None:
+        """Toca 30 s de la recomendada i (otra vez, la para)."""
+        if 0 <= i < len(self._recom):
+            self._escuchar(self._recom[i])
+
+    @Slot(int)
+    def escucharResultado(self, i: int) -> None:
+        if 0 <= i < len(self._en_linea):
+            self._escuchar(self._en_linea[i])
+
+    @Slot()
+    def pararAvance(self) -> None:
+        self._avance.parar()
+
+    def _pausar_por_avance(self) -> None:
+        self._seguir_tras_avance = not self.r.pausado
+        self.r.pausar()
+
+    def _seguir_tras_el_avance(self) -> None:
+        if self._seguir_tras_avance:
+            self._seguir_tras_avance = False
+            self.r.seguir()
+
+    def _musica_quiere_sonar(self) -> None:
+        # Si le das play a tu música mientras suena un avance, el avance se calla
+        if self._avance.idActual:
+            self._seguir_tras_avance = False
+            self._avance.parar()
+
     @Slot(int, int)
     def bajarResultado(self, i: int, playlist: int) -> None:
         """Baja el resultado i a la biblioteca; con playlist ≥ 0, además lo agrega a esa playlist."""
@@ -634,6 +680,7 @@ class Puente(QObject):
     buscandoEnLinea = Property(bool, lambda s: s._buscando_linea, notify=cambioEnLinea)
     errorEnLinea = Property(str, lambda s: s._error_linea, notify=cambioEnLinea)
     reproductor = Property(QObject, lambda s: s.r, constant=True)
+    avance = Property(QObject, lambda s: s._avance, constant=True)
 
 
 def uri(ruta: str) -> str:

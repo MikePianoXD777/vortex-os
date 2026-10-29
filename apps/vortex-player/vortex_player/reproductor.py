@@ -25,6 +25,7 @@ class Reproductor(QObject):
     cambioEstado = Signal()
     cambioPosicion = Signal()
     cambioCola = Signal()
+    quiereSonar = Signal()      # le diste play (o tocar, siguiente…): el avance de una canción se calla (2.1.1)
     error = Signal(str)
 
     def __init__(self, parent: QObject | None = None):
@@ -168,6 +169,8 @@ class Reproductor(QObject):
         self._enviar({"command": ["loadfile", c["ruta"], "replace"]})
         self._enviar({"command": ["set_property", "pause", pausado]})
         self._pausado = pausado
+        if not pausado:
+            self.quiereSonar.emit()
         self.cambioCancion.emit()
         self.cambioEstado.emit()
         self.cambioPosicion.emit()
@@ -196,6 +199,8 @@ class Reproductor(QObject):
     def alternar(self) -> None:
         if not self.cancion:
             return
+        if self._pausado:
+            self.quiereSonar.emit()
         self._enviar({"command": ["cycle", "pause"]})
 
     @Slot()
@@ -205,6 +210,7 @@ class Reproductor(QObject):
     @Slot()
     def seguir(self) -> None:
         if self.cancion:
+            self.quiereSonar.emit()
             self._enviar({"command": ["set_property", "pause", False]})
 
     @Slot()

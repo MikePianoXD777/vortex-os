@@ -67,6 +67,12 @@ class Interfaz(unittest.TestCase):
         d = self.t / nombre
         d.mkdir(exist_ok=True)
         (d / "guion.py").write_text(_guion(cuerpo))
+        # Un equalizer.sh falso: el de verdad (el de /usr/share/serpantinum) cambia el ecualizador y el
+        # EasyEffects reales de quien corre las pruebas (el 29/10 tumbó EasyEffects y el shell de Mike)
+        eq = d / "sin-shell" / "quickshell" / "media" / "equalizer.sh"
+        eq.parent.mkdir(parents=True, exist_ok=True)
+        eq.write_text(f'#!/bin/sh\necho "$*" >>"{d}/eq.log"\n')
+        eq.chmod(0o755)
         entorno = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "VORTEX_PLAYER_AO": "null",
                    "VORTEX_PLAYER_MUSICA": str(self.t / "Música"), "VORTEX_PLAYER_DATOS": str(d / "datos"),
                    "VORTEX_PLAYER_CONFIG": str(d / "config"), "VORTEX_PLAYER_CACHE": str(d / "cache"),
@@ -274,6 +280,86 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["en_playlist"], 2)
         self.assertEqual(d["llamadas_al_volver"], 1)
         self.assertEqual((d["otras"], d["llamadas"]), (["Parecida 2"], 2))
+        self.assertEqual(d["errores_qml"], [])
+
+    def test_avance_de_una_recomendada(self) -> None:
+        # 2.1.1: ▶ en una recomendada toca 30 s (un mpv aparte): tu música se pausa y al terminar sigue
+        d = self.correr("""
+            import stat, time
+            from pathlib import Path
+            from vortex_player import descargas
+            t = Path(os.environ["VORTEX_PLAYER_DATOS"]).parent
+            log = t / "avance.log"
+            falso = t / "mpv-avance"
+            # El mpv del avance, falso: anota sus argumentos, «abre el audio» y suena 1.5 s. Con FALLA_CLIENTE,
+            # el cliente visionos falla y tiene que intentarlo otra vez sin él
+            falso.write_text("#!/bin/sh\\necho \\"$*\\" >>" + str(log) + "\\n"
+                             "case \\"$*\\" in *visionos*) [ -e " + str(t / "falla") + " ] && exit 2 ;; esac\\n"
+                             "sleep 0.3; echo 'AO: [null] 48000Hz'; sleep 1.5\\n")
+            falso.chmod(falso.stat().st_mode | stat.S_IEXEC)
+            descargas.recomendar = lambda semillas, tienes, n=20, **_: [
+                {"id": "recoaaaaaaa", "url": "https://music.youtube.com/watch?v=recoaaaaaaa", "titulo": "Parecida",
+                 "artistas": "Alguien", "album": "", "duracion": 200, "portada": ""}]
+            datos = {}
+            def abrir():
+                pid = puente.crearPlaylist("Mía")
+                puente.agregarAPlaylist(pid, puente.canciones[0]["ruta"])
+                puente.verPlaylist(pid)
+                puente.tocar(0)
+            def escuchar():
+                os.environ["VORTEX_PLAYER_MPV"] = str(falso)
+                datos["sonaba"] = not r.pausado
+                puente.escucharRecomendada(0)
+                datos["cargando"] = (puente.avance.idActual, puente.avance.sonando)
+            def sonando():
+                datos["sonando"] = (puente.avance.idActual, puente.avance.sonando)
+                datos["musica_pausada"] = r.pausado
+                datos["args"] = log.read_text()
+            def acabo():
+                datos["al_terminar"] = puente.avance.idActual
+                datos["musica_sigue"] = not r.pausado
+                puente.escucharRecomendada(0)
+            def parar():
+                puente.escucharRecomendada(0)   # otra vez: lo para
+            def parado():
+                datos["parado"] = puente.avance.idActual
+                datos["musica_sigue_2"] = not r.pausado
+                (t / "falla").touch()
+                log.write_text("")
+                puente.escucharRecomendada(0)
+            def sin_cliente():
+                datos["intentos"] = log.read_text().splitlines()
+                datos["sonando_2"] = puente.avance.sonando
+                r.seguir()                      # le das play a tu música: el avance se calla
+            def play():
+                datos["tras_play"] = puente.avance.idActual
+                datos["musica_3"] = not r.pausado
+            paso(1500, abrir)
+            paso(1500, escuchar)
+            paso(800, sonando)
+            paso(1800, acabo)
+            paso(900, parar)
+            paso(900, parado)
+            paso(1000, sin_cliente)
+            paso(1500, play)                    # mpv a veces tarda en quitar la pausa con todas las pruebas juntas
+            paso(200, lambda: fin(**datos))
+        """, "avance")
+        self.assertTrue(d["sonaba"])
+        self.assertEqual(d["cargando"], ["recoaaaaaaa", False])
+        self.assertEqual(d["sonando"], ["recoaaaaaaa", True])
+        self.assertTrue(d["musica_pausada"])
+        self.assertIn("--start=70 --end=100", d["args"])          # desde el 35 % de la canción, 30 s
+        self.assertIn("player_client=visionos", d["args"])
+        self.assertIn("watch?v=recoaaaaaaa", d["args"])
+        self.assertEqual(d["al_terminar"], "")
+        self.assertTrue(d["musica_sigue"])
+        self.assertEqual(d["parado"], "")
+        self.assertTrue(d["musica_sigue_2"])
+        self.assertEqual(len(d["intentos"]), 2)
+        self.assertNotIn("visionos", d["intentos"][1])
+        self.assertTrue(d["sonando_2"])
+        self.assertEqual(d["tras_play"], "")
+        self.assertTrue(d["musica_3"])
         self.assertEqual(d["errores_qml"], [])
 
     def test_arrastrar_banda_del_ecualizador(self) -> None:
