@@ -61,6 +61,8 @@ Uso: vortex <comando>
   miku [avatar on|off|estado]          Miku, el asistente de voz (Super+O): la abre o la cierra del todo;
                                        «avatar off» la deja solo como voz y gasta menos RAM
   java [aplicar]                       muestra o aplica a Minecraft los ajustes de Java para jugar
+  camara [instalar|quitar|abrir]       Vortexine's Camera: tus cámaras Imou en mosaico, como Imou Life en la
+                                       PC (no viene de fábrica: se instala aquí o desde Vortexine's Shop)
   ventanas [estado|mosaico|kde]        gestor de ventanas: mosaico (como qtile, de fábrica) o kde
                                        (flotantes con barra de título, como KDE o Windows). También
                                        desde Ajustes → Pantalla
@@ -847,7 +849,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1129,6 +1131,9 @@ cmd_actualizar() {
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
     [[ "$pkg" == vortex-shell ]] && { hypr_corriendo && hypr reload >/dev/null 2>&1; } || true
   done
+  # Vortexine's Camera (2.4) no viene de fábrica: se pone al día solo si la instalaste (Shop o
+  # «vortex camara instalar»); a quien no la tiene no le llega.
+  "$VORTEX_DIR/bin/vortex-camara" actualizar || aviso "no se pudo poner al día Vortexine's Camera"
   asociar_app_installer
   # La config de Hyprland de Vortex se copia a ~/.config/hypr al instalar (lo tuyo va en
   # ~/.config/vortex/hypr-mio.lua): se pone al día aquí, con respaldo de la que había.
@@ -1533,6 +1538,7 @@ case "${1:-ayuda}" in
   restore) shift; exec "$VORTEX_DIR/bin/vortex-restore" "$@" ;;
   emergencia) exec "$VORTEX_DIR/bin/vortex-restore" emergencia ;;
   mods) shift; exec "$VORTEX_DIR/bin/vortex-mods" "$@" ;;
+  camara | camera) shift; exec "$VORTEX_DIR/bin/vortex-camara" "$@" ;;
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
   reiniciar-shell) reiniciar_shell ;;

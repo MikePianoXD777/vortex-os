@@ -36,6 +36,7 @@ from vortex_shop.catalogo import App, AppDetalle, Catalogo, Categoria, RECOMENDA
 from vortex_shop.errores import AppNoEncontrada, ErrorFlatpak, FlatpakSinRed, SinRed  # noqa: E402
 from vortex_shop.ids import es_id_valido, validar_id                  # noqa: E402
 from vortex_shop.texto import html_a_texto                            # noqa: E402
+from vortex_shop import propias                                       # noqa: E402
 
 PRISM = "org.prismlauncher.PrismLauncher"
 
@@ -897,6 +898,58 @@ class TestFlatpakGi(BaseFlatpak):
         eventos, cb = self.avance()
         flatpak.actualizar(["org.mozilla.firefox"], cb)                           # nada para ella
         self.assertEqual(eventos[-1], (100, "Todo está al día"))
+
+
+class TestPropias(unittest.TestCase):
+    """Las apps de Vortexine's (Vortexine's Camera): la tienda llama a «vortex camara …». Aquí con un
+    vortex falso que deja la carpeta como el de verdad, o que falla como cuando falta algo."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.datos = os.path.join(self.dir, "datos")
+        falso = os.path.join(self.dir, "vortex")
+        with open(falso, "w", encoding="utf-8") as f:
+            f.write("#!/usr/bin/env bash\n"
+                    'echo "$*" >>"$(dirname "$0")/llamadas"\n'
+                    'd="$XDG_DATA_HOME/vortex-camera/vortex_camera"\n'
+                    'case "$2" in\n'
+                    '  instalar) [[ -e "$(dirname "$0")/fallar" ]] && { echo "vortex camara: le falta: ffmpeg" >&2; exit 2; }\n'
+                    '            mkdir -p "$d" && : >"$d/__init__.py" ;;\n'
+                    '  quitar) rm -rf "$XDG_DATA_HOME/vortex-camera" ;;\n'
+                    "esac\n")
+        os.chmod(falso, 0o755)
+        self.antes = {k: os.environ.get(k) for k in ("VORTEX_SHOP_VORTEX", "XDG_DATA_HOME")}
+        os.environ["VORTEX_SHOP_VORTEX"] = falso
+        os.environ["XDG_DATA_HOME"] = self.datos
+
+    def tearDown(self):
+        for k, v in self.antes.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        shutil.rmtree(self.dir)
+
+    def test_instalar_y_quitar(self):
+        self.assertEqual([a["id"] for a in propias.lista()], ["vortex-camera"])
+        self.assertFalse(propias.lista()[0]["instalada"])
+        self.assertTrue(propias.lista()[0]["icono"].startswith("file://"))
+        from urllib.parse import unquote, urlparse
+        self.assertTrue(os.path.isfile(unquote(urlparse(propias.lista()[0]["icono"]).path)))
+        propias.instalar("vortex-camera")
+        self.assertTrue(propias.instalada("vortex-camera"))
+        propias.quitar("vortex-camera")
+        self.assertFalse(propias.instalada("vortex-camera"))
+        with open(os.path.join(self.dir, "llamadas"), encoding="utf-8") as f:
+            self.assertEqual(f.read().split("\n")[:2], ["camara instalar", "camara quitar"])
+
+    def test_error_entendible(self):
+        open(os.path.join(self.dir, "fallar"), "w").close()
+        with self.assertRaises(propias.ErrorPropia) as e:
+            propias.instalar("vortex-camera")
+        self.assertEqual(str(e.exception), "No se pudo instalar Vortexine's Camera: le falta: ffmpeg")
+        with self.assertRaises(propias.ErrorPropia):
+            propias.instalar("otra-cosa")
 
 
 if __name__ == "__main__":

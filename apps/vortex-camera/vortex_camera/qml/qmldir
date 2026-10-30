@@ -1,0 +1,14 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+BotonIcono 1.0 BotonIcono.qml
+Campo 1.0 Campo.qml
+Entrada 1.0 Entrada.qml
+Selector 1.0 Selector.qml
+MenuVortex 1.0 MenuVortex.qml
+OpcionMenu 1.0 OpcionMenu.qml
+Celda 1.0 Celda.qml
+VistaGrande 1.0 VistaGrande.qml
+PaginaGrabaciones 1.0 PaginaGrabaciones.qml
+DialogoCamara 1.0 DialogoCamara.qml

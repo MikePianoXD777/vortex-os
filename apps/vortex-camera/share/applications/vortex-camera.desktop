@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine's Camera
+GenericName=Cámaras de seguridad
+GenericName[en]=Security cameras
+Comment=Mira tus cámaras Imou en mosaico, graba y revisa lo de la microSD
+Comment[en]=Watch your Imou cameras in a grid, record and play back the microSD
+Exec=vortex-camera
+Icon=vortex-camera
+Terminal=false
+Categories=AudioVideo;Video;Security;
+Keywords=camara;cámaras;seguridad;vigilancia;imou;dahua;cctv;rtsp;mosaico;grabar;camera;security;surveillance;
+StartupNotify=true
+StartupWMClass=vortex-camera

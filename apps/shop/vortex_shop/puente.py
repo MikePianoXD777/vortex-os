@@ -21,6 +21,8 @@ from typing import Any, Callable
 from PySide6.QtCore import (Property, QObject, QRunnable, QThreadPool, QTimer,
                             Signal, Slot)
 
+from . import propias
+
 # Lo que flatpak instala pero no es una app (runtimes, temas, extensiones): la tienda no lo muestra.
 _PREFIJOS_NO_APP = ("org.freedesktop.Platform", "org.freedesktop.Sdk", "org.gnome.Platform",
                     "org.gnome.Sdk", "org.kde.Platform", "org.kde.Sdk", "org.gtk.Gtk3theme",
@@ -143,6 +145,7 @@ class Puente(QObject):
     categoriaCambio = Signal()
     busquedaCambio = Signal()
     detalleCambio = Signal()
+    propiasCambio = Signal()     # las apps de Vortexine's (Vortexine's Camera…): si están y qué se hace
     aviso = Signal(str)          # mensaje en español para el aviso que se cierra
     mostrarVentana = Signal()    # otra instancia pidió traer esta ventana al frente
 
@@ -158,6 +161,7 @@ class Puente(QObject):
             "categoriaHayMas": False, "categoriaCargandoMas": False,
             "busquedaTexto": "", "busquedaApps": [], "busquedaEstado": "listo",
             "detalle": {}, "detalleEstado": "cargando",
+            "propias": propias.lista(), "propiasEstados": {},
         }
         self._info: dict[str, dict] = {}          # fichas conocidas (id → dict), para listas locales
         self._ids_instaladas: list[str] = []
@@ -206,6 +210,8 @@ class Puente(QObject):
     busquedaEstado = Property(str, lambda s: s._v["busquedaEstado"], notify=busquedaCambio)
     detalle = Property("QVariant", lambda s: s._v["detalle"], notify=detalleCambio)
     detalleEstado = Property(str, lambda s: s._v["detalleEstado"], notify=detalleCambio)
+    propias = Property("QVariant", lambda s: s._v["propias"], notify=propiasCambio)
+    propiasEstados = Property("QVariant", lambda s: s._v["propiasEstados"], notify=propiasCambio)
 
     def _poner(self, senal: Signal, **valores: Any) -> None:
         self._v.update(valores)
@@ -240,6 +246,8 @@ class Puente(QObject):
             return "sinred", "Sin conexión a internet. Revisa tu red y vuelve a intentarlo."
         if isinstance(e, self._motor.errores.ErrorFlatpak):
             return "error", str(e) or "No se pudo completar la operación."
+        if isinstance(e, propias.ErrorPropia):
+            return "error", str(e)
         traceback.print_exception(type(e), e, e.__traceback__, file=sys.stderr)
         return "error", "Algo salió mal. Vuelve a intentarlo en un momento."
 
@@ -427,6 +435,51 @@ class Puente(QObject):
     def _refrescar_apps_locales(self) -> None:
         self._refrescar_instaladas()
         self._refrescar_actualizaciones()
+        self._poner(self.propiasCambio, propias=propias.lista())
+
+    # --- Apps de Vortexine's (no son de Flathub: las instala «vortex <app> instalar») ---
+
+    def _estado_propia(self, app_id: str, fase: str | None) -> None:
+        estados = dict(self._v["propiasEstados"])
+        if fase:
+            estados[app_id] = fase
+        else:
+            estados.pop(app_id, None)
+        self._poner(self.propiasCambio, propiasEstados=estados)
+
+    def _accion_propia(self, app_id: str, fase: str, funcion: Callable[[str], None]) -> None:
+        if app_id in self._v["propiasEstados"]:
+            return
+        self._estado_propia(app_id, fase)
+
+        def listo(_: Any) -> None:
+            self._estado_propia(app_id, None)
+            self._poner(self.propiasCambio, propias=propias.lista())
+            nombre = propias.app(app_id)["nombre"]
+            self.aviso.emit(f"{nombre} quedó instalada: ábrela desde aquí o desde el lanzador." if fase == "instalando"
+                            else f"{nombre} se quitó.")
+
+        def fallo(e: BaseException) -> None:
+            self._estado_propia(app_id, None)
+            self._avisar_error(e)
+
+        self._lanzar(lambda: funcion(app_id), listo, fallo, cola=True)
+
+    @Slot(str)
+    def instalarPropia(self, app_id: str) -> None:
+        self._accion_propia(app_id, "instalando", propias.instalar)
+
+    @Slot(str)
+    def quitarPropia(self, app_id: str) -> None:
+        self._accion_propia(app_id, "quitando", propias.quitar)
+
+    @Slot(str)
+    def abrirPropia(self, app_id: str) -> None:
+        if app_id in self._v["propiasEstados"]:
+            return
+        self._estado_propia(app_id, "abriendo")
+        QTimer.singleShot(4000, lambda: self._estado_propia(app_id, None) if self._v["propiasEstados"].get(app_id) == "abriendo" else None)
+        self._lanzar(lambda: propias.abrir(app_id), None, lambda e: (self._estado_propia(app_id, None), self._avisar_error(e)))
 
     def _refrescar_instaladas(self) -> None:
         fl = self._motor.flatpak

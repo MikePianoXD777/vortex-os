@@ -1,4 +1,5 @@
-// Inicio: bienvenida, «Recomendadas para Vortexine's» (fila que se desplaza) y «Populares» (cuadrícula).
+// Inicio: bienvenida, «Recomendadas para Vortexine's» (fila que se desplaza), «Apps de Vortexine's»
+// (las nuestras que no vienen de fábrica) y «Populares» (cuadrícula).
 import QtQuick
 import QtQuick.Layouts
 
@@ -107,6 +108,23 @@ Pagina {
                 desliz.stop()
                 desliz.to = Math.max(0, Math.min(contentWidth - width, contentX + sentido * (width * 0.8)))
                 desliz.start()
+            }
+        }
+    }
+
+    // Las apps propias no dependen de Flathub: se ven aunque no haya internet.
+    Seccion {
+        Layout.fillWidth: true
+        visible: tienda.propias.length > 0
+        etiqueta: "Hecho en Vortexine's"
+        titulo: "Apps de Vortexine's"
+        subtitulo: "No vienen de fábrica: instálalas solo si las necesitas"
+        Repeater {
+            model: tienda.propias
+            TarjetaPropia {
+                required property var modelData
+                Layout.fillWidth: true
+                app: modelData
             }
         }
     }

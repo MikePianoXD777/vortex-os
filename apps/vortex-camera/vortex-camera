@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Vortexine's Camera: tus cámaras de seguridad (Imou/Dahua) en mosaico.
+#   vortex-camera
+# Corre «python -m vortex_camera» con el código donde esté:
+#   1. VORTEX_CAMERA_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo (el repo, o ~/.local/share/vortex-camera, donde la deja
+#      «vortex camara instalar»).
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_CAMERA_DIR:-}" "$aqui"; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_camera/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine's Camera no está instalada del todo: instálala con «vortex camara instalar»." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_camera "$@"

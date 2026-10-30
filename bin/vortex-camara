@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# vortex-camara (2.4): instala, quita o abre Vortexine's Camera, la app de cámaras de seguridad (Imou y
+# Dahua) en mosaico. No viene de fábrica: se instala solo si la quieres, desde Vortexine's Shop o aquí,
+# para tu usuario y sin contraseña (todo lo que usa ya viene en Vortexine's OS: PySide6, Qt Multimedia
+# con FFmpeg y ffmpeg).
+#
+#   vortex camara                 si está instalada y qué versión
+#   vortex camara instalar        la instala (o la pone al día) en ~/.local/share/vortex-camera
+#   vortex camara quitar          la quita; tus cámaras (~/.config/vortex-camera) se quedan
+#   vortex camara abrir           la abre
+#   vortex camara actualizar      la pone al día solo si ya estaba (lo llama «vortex actualizar»)
+set -euo pipefail
+
+VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+VORTEX_RELEASE="${VORTEX_RELEASE:-/etc/vortex-release}"
+if [[ ! -d "$VORTEX_DIR/apps/vortex-camera" && -r "$VORTEX_RELEASE" ]]; then
+  repo="$(sed -n 's/^VORTEX_REPO="\(.*\)"$/\1/p' "$VORTEX_RELEASE")"
+  [[ -d "$repo/apps/vortex-camera" ]] && VORTEX_DIR="$repo"
+  unset repo
+fi
+ORIGEN="$VORTEX_DIR/apps/vortex-camera"
+DATOS="${XDG_DATA_HOME:-$HOME/.local/share}"
+DESTINO="$DATOS/vortex-camera"
+BIN="$HOME/.local/bin/vortex-camera"
+DESKTOP="$DATOS/applications/vortex-camera.desktop"
+ICONO="$DATOS/icons/hicolor/scalable/apps/vortex-camera.svg"
+
+aviso() { printf 'vortex camara: %s\n' "$*" >&2; }
+
+version_de() { sed -n 's/^VERSION = "\(.*\)"$/\1/p' "$1/vortex_camera/__init__.py" 2>/dev/null; }
+instalada() { [[ -f "$DESTINO/vortex_camera/__init__.py" ]]; }
+
+faltantes() {
+  local falta=()
+  command -v python3 >/dev/null || falta+=(python)
+  python3 -c 'import PySide6.QtMultimedia, PySide6.QtQuickControls2' 2>/dev/null || falta+=(pyside6 qt6-multimedia-ffmpeg)
+  command -v ffmpeg >/dev/null || falta+=(ffmpeg)
+  printf '%s\n' "${falta[@]}"
+}
+
+instalar() {
+  [[ -f "$ORIGEN/vortex_camera/__init__.py" ]] || { aviso "no encuentro el código en $ORIGEN"; exit 1; }
+  local falta
+  falta="$(faltantes)"
+  if [[ -n "$falta" ]]; then
+    aviso "le falta: $(tr '\n' ' ' <<<"$falta")— instálalo con: sudo pacman -S --needed $(tr '\n' ' ' <<<"$falta")"
+    exit 2
+  fi
+  # Se copia a una carpeta nueva y se cambia de golpe: si algo falla, la que tenías sigue sirviendo.
+  local nueva="$DESTINO.nueva"
+  rm -rf "$nueva"
+  mkdir -p "$nueva" "$(dirname "$BIN")" "$(dirname "$DESKTOP")" "$(dirname "$ICONO")"
+  cp -a "$ORIGEN/vortex_camera" "$ORIGEN/vortex-camera" "$nueva/"
+  find "$nueva" -name '__pycache__' -type d -prune -exec rm -rf {} +
+  rm -rf "$DESTINO" && mv "$nueva" "$DESTINO"
+  ln -sfn "$DESTINO/vortex-camera" "$BIN"
+  sed "s|^Exec=vortex-camera|Exec=$DESTINO/vortex-camera|" \
+    "$ORIGEN/share/applications/vortex-camera.desktop" >"$DESKTOP"
+  # Sin update-desktop-database ni gtk-update-icon-cache: el lanzador vigila la carpeta, y una caché de
+  # íconos en tu carpeta haría que no se vieran los que se agreguen después.
+  install -m644 "$ORIGEN/share/icons/hicolor/scalable/apps/vortex-camera.svg" "$ICONO"
+}
+
+quitar() {
+  pkill -f "python3 -m vortex_camera" 2>/dev/null || true
+  rm -rf "$DESTINO" "$DESTINO.nueva" "$DESKTOP" "$ICONO"
+  if [[ -L "$BIN" ]]; then rm -f "$BIN"; fi
+}
+
+case "${1:-estado}" in
+  estado)
+    if instalada; then echo "Vortexine's Camera $(version_de "$DESTINO") instalada"; else echo "Vortexine's Camera no está instalada"; exit 1; fi
+    ;;
+  instalar)
+    instalar
+    echo "Vortexine's Camera $(version_de "$DESTINO") instalada: búscala en el lanzador o ábrela con «vortex camara abrir»."
+    ;;
+  actualizar)
+    instalada || exit 0
+    [[ "$(version_de "$DESTINO")" == "$(version_de "$ORIGEN")" ]] && diff -rq -x __pycache__ "$ORIGEN/vortex_camera" "$DESTINO/vortex_camera" >/dev/null 2>&1 && exit 0
+    instalar
+    echo "Vortexine's Camera al día ($(version_de "$DESTINO"))"
+    ;;
+  quitar)
+    quitar
+    echo "Vortexine's Camera quitada (tus cámaras se quedan en ${XDG_CONFIG_HOME:-$HOME/.config}/vortex-camera)."
+    ;;
+  abrir)
+    instalada || { aviso "no está instalada: «vortex camara instalar»"; exit 1; }
+    exec "$DESTINO/vortex-camera"
+    ;;
+  -h | --help | ayuda) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) aviso "no conozco «$1»"; sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
