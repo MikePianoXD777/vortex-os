@@ -34,6 +34,9 @@ Uso: vortex <comando>
   actualizaciones [revisar|on|off|sonido ARCHIVO]
                                        avisa (con notificación y un botón «Actualizar») cuando hay
                                        actualizaciones del sistema, de tus apps o de Vortexine's
+  sonidos [lista|agregar ENLACE|ARCHIVO [NOMBRE]|quitar NOMBRE]
+                                       sonidos de notificación: un botón de myinstants.com, un enlace a un
+                                       mp3/wav/ogg o un archivo; se eligen en Ajustes → Notificaciones
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   fondo-agregar [ARCHIVO...]           copia videos (mp4, mov, mkv, webm, avi…) o imágenes a tus fondos
                                        y pone el primero; sin archivos, los eliges en una ventana
@@ -1337,6 +1340,99 @@ avisos_pendientes() {
   done
 }
 
+# Sonidos de notificación (2.2): los tuyos van a la carpeta que lee Ajustes → Notificaciones del shell
+# (QS_STATE_DIR/sounds/notifications). «agregar» acepta la página de un botón de myinstants.com (saca el
+# mp3 de su og:audio y el nombre de su og:title), un enlace directo a un audio o un archivo de tu PC.
+# Imprime la ruta del sonido nuevo (la última línea), para que el shell lo elija y lo toque.
+SONIDOS_EXT='wav|ogg|oga|mp3|flac|opus|m4a|aac'
+SONIDOS_MAX=$((10 * 1024 * 1024))        # 10 MB: un sonido de notificación dura segundos
+
+sonidos_dir() { printf '%s/sounds/notifications' "${QS_STATE_DIR:-$HOME/.local/state/serpantinum}"; }
+
+# Un nombre de archivo seguro y corto: sin «/», sin el «.mp3», sin espacios de más
+sonidos_nombre() {
+  local n="$1"
+  n="${n//\//-}"
+  n="$(printf '%s' "$n" | tr -d '\000-\037' | sed -E 's/^[. ]+//; s/[[:space:]]+/ /g; s/ +$//')"
+  printf '%s' "${n:0:60}"
+}
+
+# El audio es audio (ffprobe), si está; si no, basta la extensión
+sonidos_es_audio() {
+  command -v ffprobe >/dev/null 2>&1 || return 0
+  ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 "$1" 2>/dev/null | grep -q audio
+}
+
+cmd_sonidos() {
+  local dir orden="${1:-lista}"
+  dir="$(sonidos_dir)"
+  case "$orden" in
+    lista)
+      [[ -d "$dir" ]] || return 0
+      find "$dir" -maxdepth 1 -type f -regextype posix-extended -iregex ".*\.($SONIDOS_EXT)$" -printf '%f\n' | sort -f
+      ;;
+    quitar)
+      local nombre="${2:-}" f borrados=0
+      [[ -n "$nombre" && "$nombre" != */* ]] || { aviso "uso: vortex sonidos quitar NOMBRE"; return 2; }
+      for f in "$dir/$nombre" "$dir/$nombre".*; do
+        [[ -f "$f" && "$f" =~ \.($SONIDOS_EXT)$ ]] || continue
+        rm -f -- "$f" && borrados=$((borrados + 1))
+      done
+      ((borrados)) || { aviso "no tienes un sonido llamado «$nombre»"; return 1; }
+      bien "quité «$nombre»"
+      ;;
+    agregar)
+      local origen="${2:-}" nombre="${3:-}" url="" ext tmp pagina titulo
+      [[ -n "$origen" ]] || { aviso "uso: vortex sonidos agregar ENLACE|ARCHIVO [NOMBRE]"; return 2; }
+      origen="${origen#file://}"
+      mkdir -p "$dir"
+      tmp="$(mktemp "${TMPDIR:-/tmp}/vortex-sonido.XXXXXX")"
+      if [[ -f "$origen" ]]; then
+        ext="${origen##*.}"
+        [[ "${ext,,}" =~ ^($SONIDOS_EXT)$ ]] || { rm -f "$tmp"; aviso "ese archivo no es un sonido (usa mp3, wav, ogg, flac, opus o m4a)"; return 1; }
+        (( $(stat -c %s "$origen") <= SONIDOS_MAX )) || { rm -f "$tmp"; aviso "ese sonido pesa más de 10 MB"; return 1; }
+        cp -- "$origen" "$tmp"
+        [[ -n "$nombre" ]] || nombre="$(basename -- "${origen%.*}")"
+      elif [[ "$origen" =~ ^https?:// ]]; then
+        # La página de un botón (myinstants.com/es/instant/…), no el enlace directo a su mp3
+        if [[ "$origen" =~ ^https?://([a-z]+\.)?myinstants\.com/ && ! "${origen%%[?#]*}" =~ \.($SONIDOS_EXT)$ ]]; then
+          pagina="$(curl -fsL --max-time 20 -A 'Mozilla/5.0' -- "$origen" 2>/dev/null | tr -d '\000')" ||
+            { rm -f "$tmp"; aviso "no pude abrir esa página de myinstants (¿sin internet?)"; return 1; }
+          url="$(printf '%s' "$pagina" | grep -oE 'og:audio" content="[^"]+' | head -1 | sed 's/.*content="//')" || true
+          # Sin og:audio: el primer botón, pero solo en la página de uno (en el índice hay muchos)
+          [[ -n "$url" || "$origen" != */instant/* ]] ||
+            url="$(printf '%s' "$pagina" | grep -oE "/media/sounds/[^\"' ]+\.($SONIDOS_EXT)" | head -1)" || true
+          [[ -n "$url" ]] || { rm -f "$tmp"; aviso "en esa página no hay un sonido: copia el enlace de un botón (myinstants.com/…/instant/…)"; return 1; }
+          [[ "$url" == /* ]] && url="https://www.myinstants.com$url"
+          titulo="$(printf '%s' "$pagina" | grep -oE 'og:title" content="[^"]+' | head -1 | sed 's/.*content="//; s/ - [^-]*$//')" || true
+          [[ -n "$nombre" ]] || nombre="$(printf '%s' "$titulo" | sed 's/&amp;/\&/g; s/&#39;/'"'"'/g; s/&quot;/"/g')"
+        else
+          url="$origen"
+        fi
+        curl -fsL --max-time 60 --max-filesize "$SONIDOS_MAX" -A 'Mozilla/5.0' -o "$tmp" -- "$url" 2>/dev/null ||
+          { rm -f "$tmp"; aviso "no pude bajar el sonido (¿el enlace está bien, o pesa más de 10 MB?)"; return 1; }
+        ext="${url%%[?#]*}"; ext="${ext##*.}"; ext="${ext,,}"
+        [[ "$ext" =~ ^($SONIDOS_EXT)$ ]] || ext="mp3"
+        [[ -n "$nombre" ]] || { nombre="${url%%[?#]*}"; nombre="${nombre##*/}"; nombre="${nombre%.*}"; }
+      else
+        rm -f "$tmp"; aviso "no encuentro «$origen»: pega un enlace (myinstants.com o un .mp3/.wav) o la ruta de un archivo"; return 1
+      fi
+      if ! sonidos_es_audio "$tmp"; then
+        rm -f "$tmp"; aviso "eso no es un sonido"; return 1
+      fi
+      nombre="$(sonidos_nombre "$nombre")"
+      [[ -n "$nombre" ]] || nombre="sonido-$(date +%s)"
+      local destino="$dir/$nombre.${ext,,}" n=2
+      while [[ -e "$destino" ]]; do destino="$dir/$nombre ($n).${ext,,}"; n=$((n + 1)); done
+      mv -f -- "$tmp" "$destino"
+      chmod 644 "$destino"
+      bien "agregué «$(basename -- "${destino%.*}")»; elígelo en Ajustes → Notificaciones"
+      printf '%s\n' "$destino"
+      ;;
+    *) aviso "uso: vortex sonidos [lista|agregar ENLACE|ARCHIVO [NOMBRE]|quitar NOMBRE]"; return 2 ;;
+  esac
+}
+
 cmd_actualizaciones() {
   local orden="${1:-revisar}"
   case "$orden" in
@@ -1443,6 +1539,7 @@ case "${1:-ayuda}" in
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
+  sonidos) shift; cmd_sonidos "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
   fondo-agregar) shift; cmd_fondo_agregar "$@" ;;
   fondos-auto) shift; cmd_fondos_auto "$@" ;;

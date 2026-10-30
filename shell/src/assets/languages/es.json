@@ -99,6 +99,19 @@
         "title": "Efecto de sonido",
         "desc": "Selecciona el sonido para alertas entrantes"
       },
+      "sound_link": {
+        "title": "Agregar desde un enlace",
+        "desc": "Un botón de myinstants.com o un enlace a un mp3, wav u ogg",
+        "add": "Agregar",
+        "busy": "Bajando…",
+        "added": "Agregué «%1»",
+        "failed": "No pude agregar ese sonido"
+      },
+      "sound_mine": {
+        "desc": "Tuyo",
+        "in_use": "Es el que suena",
+        "use": "Usar"
+      },
       "empty_graphic": {
         "title": "Animación de centro vacío",
         "desc": "Mostrar el gráfico del gato durmiendo en el centro de notificaciones cuando esté vacío"
