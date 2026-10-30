@@ -8,6 +8,6 @@ El motor no depende de Qt (sistema.py, servicios.py); la interfaz (QML) vive en 
 puente.py, modelo.py y qml/.
 """
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 NOMBRE = "Vortexine Task Manager"
 APP_ID = "vortex-task-manager"

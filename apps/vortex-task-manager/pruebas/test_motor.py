@@ -110,6 +110,7 @@ class ProcesosReales(unittest.TestCase):
             self.assertIsNone(sistema.suspender([hijo.pid], False))
             self.assertIsNone(sistema.prioridad([hijo.pid], "baja"))
             self.assertEqual(sistema.prioridad_de(hijo.pid), "baja")
+            self.assertIsNone(sistema.suspender([hijo.pid], True))     # en pausa también termina
             self.assertIsNone(sistema.terminar([hijo.pid]))
             self.assertEqual(hijo.wait(5), -15)
         finally:

@@ -324,7 +324,11 @@ def senal(pids: list[int], sig: int) -> str | None:
 
 
 def terminar(pids: list[int], forzar: bool = False) -> str | None:
-    return senal(pids, signal.SIGKILL if forzar else signal.SIGTERM)
+    error = senal(pids, signal.SIGKILL if forzar else signal.SIGTERM)
+    if not forzar and not error:
+        # Un proceso en pausa (SIGSTOP) no atiende SIGTERM hasta que lo reanudan: se reanuda para que termine.
+        senal(pids, signal.SIGCONT)
+    return error
 
 
 def suspender(pids: list[int], si: bool) -> str | None:

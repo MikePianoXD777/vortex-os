@@ -380,6 +380,7 @@ Item {
                             onClicked: (ev) => {
                                 if (fila.esSeccion) { tm.alternarSeccion(fila.f.seccion); return }
                                 pagina.seleccion = fila.f.clave
+                                lista.forceActiveFocus()   // quita el foco del buscador: así Supr finaliza
                                 if (ev.button === Qt.RightButton) menu.abrir(fila.f.clave)
                             }
                             onDoubleClicked: if (!fila.esSeccion && (fila.f.n || 0) > 1) tm.alternarGrupo(fila.f.clave)
