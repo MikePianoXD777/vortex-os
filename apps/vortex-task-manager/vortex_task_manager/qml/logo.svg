@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortexine Task Manager: un pulso (la gráfica de rendimiento) que sale de un remolino (el vórtice de
+     Vortexine's), en los colores de Vortexine's OS. Dibujo original de este proyecto. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="tm-pulso" x1="16" y1="24" x2="112" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+    <linearGradient id="tm-borde" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0.25"/>
+    </linearGradient>
+    <linearGradient id="tm-area" x1="0" y1="50" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#9ec5ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#tm-borde)" stroke-width="1.5"/>
+  <path d="M64 24a40 40 0 1 1-36 22.5" fill="none" stroke="url(#tm-pulso)" stroke-width="5" stroke-linecap="round" opacity="0.45"/>
+  <path d="M26 72h16l8-20 12 36 9-26 6 10h25V100H26z" fill="url(#tm-area)"/>
+  <path d="M26 72h16l8-20 12 36 9-26 6 10h25" fill="none" stroke="url(#tm-pulso)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

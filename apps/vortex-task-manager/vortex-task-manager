@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Vortexine Task Manager: el administrador de tareas de Vortexine's OS (Ctrl+Shift+Esc).
+#   vortex-task-manager
+# Corre «python -m vortex_task_manager» con el código donde esté:
+#   1. VORTEX_TASK_MANAGER_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-task-manager, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_TASK_MANAGER_DIR:-}" "$aqui" /usr/share/vortex-task-manager; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_task_manager/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine Task Manager no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_task_manager "$@"

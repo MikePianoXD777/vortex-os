@@ -1102,11 +1102,11 @@ cmd_actualizar() {
   # para ya (no guardaba su PID: se busca su línea exacta) para soltar su RAM sin reiniciar.
   [[ -e "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego" ]] ||
     pkill -f '^bash .*/vortex-clips servicio$' 2>/dev/null || true
-  # Los paquetes propios (shell, tienda, App Installer, Vortex Player, Miku y Vortex Studio) vienen de packaging/ de este repo: se
+  # Los paquetes propios (shell, tienda, App Installer, Vortex Player, Task Manager, Miku y Vortex Studio) vienen de packaging/ de este repo: se
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     if [[ "$pkg" == vortex-studio && -z "$instalado" ]]; then
@@ -1333,7 +1333,7 @@ avisos_pendientes() {
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
   # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"

@@ -1,0 +1,40 @@
+# Vortexine Task Manager (2.3): el administrador de tareas de Vortexine's OS, como el de Windows
+# (Ctrl+Shift+Esc). Apps con todo lo que usan, segundo plano y sistema; gráficas de CPU, memoria, discos,
+# red y tarjeta de video; y los servicios de systemd. Empaquetado desde apps/vortex-task-manager/ de este
+# repo; llega a todos con «vortex actualizar».
+#
+#   cd packaging/vortex-task-manager && makepkg -si
+pkgname=vortex-task-manager
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Vortexine Task Manager: qué usa tu PC, cerrar lo trabado y el rendimiento en vivo"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# psutil lee procesos, discos y red; systemd (systemctl) los servicios; polkit (pkexec) pide permiso para
+# los procesos del sistema; procps-ng trae renice; hyprland (hyprctl) dice qué ventana es de qué proceso.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'python-psutil' 'systemd' 'polkit' 'procps-ng'
+         'util-linux' 'xdg-utils' 'glib2')
+optdepends=('hyprland: agrupar los procesos por ventana (Apps)'
+            'nvidia-utils: la gráfica de la tarjeta NVIDIA (nvidia-smi)'
+            'pciutils: el nombre de las tarjetas AMD e Intel (lspci)'
+            'wireless_tools: el nombre de tu red Wi-Fi (iwgetid)')
+
+package() {
+    local origen="$startdir/../../apps/vortex-task-manager"
+    local share="$pkgdir/usr/share/vortex-task-manager"
+
+    install -d "$share"
+    cp -a "$origen/vortex_task_manager" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-task-manager" "$pkgdir/usr/bin/vortex-task-manager"
+    install -Dm644 "$origen/share/applications/vortex-task-manager.desktop" \
+        "$pkgdir/usr/share/applications/vortex-task-manager.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-task-manager.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-task-manager.svg"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

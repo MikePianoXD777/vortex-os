@@ -174,7 +174,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+S | escritorio especial (cajón de ventanas escondidas) |
 | Super+Alt+S o Ctrl+Super+Shift+↑ / Ctrl+Super+Shift+↓ | mandar la ventana al especial / sacarla |
 | Super+M / Super+D / Super+R | especial de música (Spotify) / chat (Discord) / tareas (Todoist): abre la app si hace falta |
-| Ctrl+Shift+Esc | monitor del sistema (btop en un especial) |
+| Ctrl+Shift+Esc | Vortexine Task Manager (procesos, rendimiento y servicios, en un especial) |
 
 **Ventanas**
 

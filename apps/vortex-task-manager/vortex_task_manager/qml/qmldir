@@ -1,0 +1,15 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+singleton Fmt 1.0 Fmt.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+BotonIcono 1.0 BotonIcono.qml
+Selector 1.0 Selector.qml
+Interruptor 1.0 Interruptor.qml
+Grafica 1.0 Grafica.qml
+Campo 1.0 Campo.qml
+MenuVortex 1.0 MenuVortex.qml
+OpcionMenu 1.0 OpcionMenu.qml
+PaginaProcesos 1.0 PaginaProcesos.qml
+PaginaRendimiento 1.0 PaginaRendimiento.qml
+PaginaServicios 1.0 PaginaServicios.qml

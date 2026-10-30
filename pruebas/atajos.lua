@@ -333,11 +333,13 @@ ok("con Spotify ya ahí no mueve ni lanza", pulsar("SUPER + M") == "focus({works
 estado.especial = { name = "special:music" }
 ok("estando abierto lo esconde", pulsar("SUPER + M") == "workspace.toggle_special(music)")
 estado.especial, estado.ventanas = nil, {}
-ok("Ctrl+Shift+Esc lanza btop en kitty", pulsar("CTRL + SHIFT + Escape"):find("'kitty' '--class' 'btop' '--title' 'btop' 'btop'", 1, true))
+ok("Ctrl+Shift+Esc lanza Vortexine Task Manager", pulsar("CTRL + SHIFT + Escape"):find("'vortex-task-manager'", 1, true))
 estado.especial, estado.ventanas = nil, {}
 ok("Super+R lanza todoist", pulsar("SUPER + R"):find("'todoist'", 1, true))
-estado.ventanas = { { class = "btop", title = "btop", workspace = { name = "special:sysmon" } } }
-ok("con btop ya abierto no lanza otro", not pulsar("CTRL + SHIFT + Escape"):find("exec_cmd", 1, true))
+estado.ventanas = { { class = "vortex-task-manager", title = "Vortexine Task Manager", workspace = { name = "special:sysmon" } } }
+ok("con el Task Manager ya abierto no lanza otro", not pulsar("CTRL + SHIFT + Escape"):find("exec_cmd", 1, true))
+estado.ventanas = { { class = "vortex-task-manager", title = "Vortexine Task Manager", workspace = { name = "3" } } }
+ok("…y si está en otro escritorio lo trae", pulsar("CTRL + SHIFT + Escape"):find("window.move", 1, true))
 
 print("== Ventanas")
 estado.activa = { size = { x = 1000, y = 500 }, floating = false, address = "0xabc" }

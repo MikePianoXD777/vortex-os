@@ -100,6 +100,17 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-player/"{pkg,src} "$VORTEX_DIR/packaging/vortex-player/"*.pkg.tar.*
 fi
+# Vortexine Task Manager (2.3): el administrador de tareas (Ctrl+Shift+Esc).
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-task-manager)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-task-manager" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortexine Task Manager instalado (vortex-task-manager)"
+  else
+    aviso "No se pudo instalar Vortexine Task Manager (packaging/vortex-task-manager)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-task-manager/"{pkg,src} "$VORTEX_DIR/packaging/vortex-task-manager/"*.pkg.tar.*
+fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 

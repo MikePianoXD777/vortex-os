@@ -201,10 +201,12 @@ local especiales = {
         feishin = { match = { { class = "feishin" } }, move = true },
     },
     sysmon = {
-        btop = {
-            match = { { class = "btop", title = "btop", workspace = { name = "special:sysmon" } } },
-            -- Caelestia usaba foot; en Vortex la terminal es kitty.
-            command = { "kitty", "--class", "btop", "--title", "btop", "btop" },
+        -- Vortexine's 2.3: Ctrl+Shift+Esc abre Vortexine Task Manager, como en Windows (antes, btop en
+        -- kitty). Si ya estaba abierto en otro escritorio, se trae aquí.
+        taskmanager = {
+            match = { { class = "vortex-task-manager" } },
+            command = { "vortex-task-manager" },
+            move = true,
         },
     },
     todo = {

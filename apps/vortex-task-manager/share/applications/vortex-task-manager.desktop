@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine Task Manager
+GenericName=Administrador de tareas
+GenericName[en]=Task Manager
+Comment=Mira qué usa tu PC, cierra lo que se trabó y revisa el rendimiento
+Comment[en]=See what your PC is using, end frozen apps and check performance
+Exec=vortex-task-manager
+Icon=vortex-task-manager
+Terminal=false
+Categories=System;Monitor;
+Keywords=administrador;tareas;procesos;rendimiento;cpu;memoria;ram;gpu;disco;servicios;cerrar;task;manager;process;monitor;
+StartupNotify=true
+StartupWMClass=vortex-task-manager
