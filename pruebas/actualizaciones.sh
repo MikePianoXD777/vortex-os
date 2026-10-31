@@ -29,6 +29,15 @@ echo "\$*" >>"$T/systemctl.log"
 [[ ! -e "$T/systemctl-falla" ]]
 FALSO
 chmod +x "$T/bin/systemctl"
+# notify-send falso desde el principio: «primer-inicio» manda el aviso de atajos 2 s después, en segundo
+# plano, y sin esto llegaba a tu escritorio (o se colaba entre los avisos de actualizaciones).
+cat >"$T/bin/notify-send" <<FALSO
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$T/notify.log"
+FALSO
+# pacman falso: que el aviso no dependa de qué paquetes de Vortexine's tengas instalados.
+printf '#!/usr/bin/env bash\nexit 1\n' >"$T/bin/pacman"
+chmod +x "$T/bin/systemctl" "$T/bin/notify-send" "$T/bin/pacman"
 
 # Ya hay fondo: «primer-inicio» no espera al shell.
 mkdir -p "$T/cache/serpantinum/wallpaper"
@@ -103,28 +112,26 @@ cat >"$T/bin/git" <<FALSO
 if [[ "\$1" == ls-remote ]]; then cat "$T/remoto" 2>/dev/null; exit 0; fi
 exec /usr/bin/git "\$@"
 FALSO
-cat >"$T/bin/notify-send" <<FALSO
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >>"$T/notify.log"
-FALSO
 chmod +x "$T/bin/"*
 llamadas() { if [[ -f "$T/$1" ]]; then wc -l <"$T/$1"; else echo 0; fi; }
-esperar_aviso() { for _ in $(seq 20); do [[ "$(llamadas notify.log)" -ge "$1" ]] && return; sleep .1; done; }
+# Solo cuentan los avisos de actualizaciones (el de atajos puede llegar en cualquier momento).
+avisos() { grep 'Hay actualizaciones' "$T/notify.log" 2>/dev/null; }
+esperar_aviso() { for _ in $(seq 20); do [[ "$(avisos | wc -l)" -ge "$1" ]] && return; sleep .1; done; }
 printf '%s\trefs/heads/main\n' "$(git -C "$AQUI" rev-parse HEAD)" >"$T/remoto"
 vortex actualizaciones revisar
 esperar_aviso 1
 probar "pregunta al sistema la primera vez" '[[ "$(llamadas checkupdates.log)" == 1 ]]'
-probar "avisa de los paquetes del sistema" "grep -q '1 paquetes del sistema' '$T/notify.log'"
-probar "con el sonido de Vortex (no el de las notificaciones)" "grep -q 'sound-file:$AQUI/config/sonidos/actualizacion.wav' '$T/notify.log'"
+probar "avisa de los paquetes del sistema" "avisos | grep -q '1 paquetes del sistema'"
+probar "con el sonido de Vortex (no el de las notificaciones)" "avisos | grep -q 'sound-file:$AQUI/config/sonidos/actualizacion.wav'"
 probar "el sonido existe" "[[ -s '$AQUI/config/sonidos/actualizacion.wav' ]]"
 printf 'cafe\trefs/heads/main\n' >"$T/remoto"
 vortex actualizaciones revisar
 esperar_aviso 2
-probar "a los 10 min ve la versión nueva de Vortexine's" "tail -1 '$T/notify.log' | grep -q 'versión nueva'"
+probar "a los 10 min ve la versión nueva de Vortexine's" "avisos | tail -1 | grep -q 'versión nueva'"
 probar "…sin volver a bajar las listas del sistema" '[[ "$(llamadas checkupdates.log)" == 1 ]]'
 vortex actualizaciones revisar
 sleep .5
-probar "lo mismo no se avisa dos veces" '[[ "$(llamadas notify.log)" == 2 ]]'
+probar "lo mismo no se avisa dos veces" '[[ "$(avisos | wc -l)" == 2 ]]'
 touch -d '7 hours ago' "$T/casa/.local/state/vortex/actualizaciones-sistema"
 vortex actualizaciones revisar
 probar "pasadas 6 h, pregunta al sistema otra vez" '[[ "$(llamadas checkupdates.log)" == 2 ]]'
@@ -134,7 +141,7 @@ printf 'SONIDO=%q\n' "$T/mio.ogg" >"$T/casa/.config/vortex/actualizaciones.conf"
 printf 'beef\trefs/heads/main\n' >"$T/remoto"
 vortex actualizaciones revisar
 esperar_aviso 3
-probar "el sonido que elegiste manda" "tail -1 '$T/notify.log' | grep -q 'sound-file:$T/mio.ogg'"
+probar "el sonido que elegiste manda" "avisos | tail -1 | grep -q 'sound-file:$T/mio.ogg'"
 
 if ((FALLOS)); then
   echo "$FALLOS pruebas fallaron"
