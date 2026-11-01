@@ -44,7 +44,7 @@ jobs:
       - name: El tag coincide con la versión del código
         if: env.TAG != ''
         run: |
-          $version = python -c "import re,pathlib; print(re.search(r'VERSION = \"([^\"]+)\"', pathlib.Path('vortex_player/__init__.py').read_text(encoding='utf-8')).group(1))"
+          $version = python -c "import vortex_player; print(vortex_player.VERSION)"
           $tag = $env:TAG -replace '^vortex-player-v', ''
           Write-Host "código: $version · tag: $tag"
           if ($version -ne $tag) { throw "El tag $env:TAG no corresponde a la versión $version del código." }
@@ -92,7 +92,7 @@ jobs:
 
       - name: Instalador y portátil
         run: |
-          $version = python -c "import re,pathlib; print(re.search(r'VERSION = \"([^\"]+)\"', pathlib.Path('vortex_player/__init__.py').read_text(encoding='utf-8')).group(1))"
+          $version = python -c "import vortex_player; print(vortex_player.VERSION)"
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           & $iscc "/DAppVersion=$version" "empaquetado\windows\vortex-player.iss"
