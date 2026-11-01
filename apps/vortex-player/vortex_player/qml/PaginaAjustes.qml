@@ -280,6 +280,56 @@ Flickable {
             }
         }
 
+        // 1.5: el despertador: suena tu música a una hora, subiendo el volumen poco a poco
+        Tarjeta {
+            id: despertador
+            objectName: "despertador"
+            titulo: "Despertador"
+            readonly property var d: vp.ajustes.despertador || ({})
+            readonly property string hora: d.hora || "07:00"
+            readonly property var listas: [{ id: -1, nombre: "Tu mezcla del día" }].concat(
+                vp.playlists.filter(p => p.id > 0).map(p => ({ id: p.id, nombre: p.nombre })))
+            function dos(n) { return (n < 10 ? "0" : "") + n }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Explicacion {
+                    text: "A esa hora suena tu música y el volumen sube poco a poco durante un minuto. La computadora tiene que estar prendida con Vortex Player abierto (puede estar minimizado)."
+                }
+                Switch {
+                    checked: !!despertador.d.activo
+                    onToggled: vp.ponerDespertador({ activo: checked, hora: despertador.hora })
+                }
+            }
+            RowLayout {
+                spacing: 10
+                enabled: !!despertador.d.activo
+                opacity: enabled ? 1 : 0.5
+                Icono { width: 20; height: 20; nombre: "despertador"; color: Tema.suave }
+                Selector {
+                    Layout.preferredWidth: 88
+                    model: Array.from({ length: 24 }, (_, i) => despertador.dos(i))
+                    currentIndex: parseInt(despertador.hora.split(":")[0], 10)
+                    onActivated: (i) => vp.ponerDespertador({ hora: model[i] + ":" + despertador.hora.split(":")[1] })
+                }
+                Text { text: ":"; color: Tema.texto; font.pixelSize: 16 }
+                Selector {
+                    Layout.preferredWidth: 88
+                    model: Array.from({ length: 12 }, (_, i) => despertador.dos(i * 5))
+                    currentIndex: Math.round(parseInt(despertador.hora.split(":")[1], 10) / 5)
+                    onActivated: (i) => vp.ponerDespertador({ hora: despertador.hora.split(":")[0] + ":" + model[i] })
+                }
+                Selector {
+                    Layout.preferredWidth: 240
+                    model: despertador.listas
+                    textRole: "nombre"
+                    currentIndex: Math.max(0, despertador.listas.findIndex(p => p.id === (despertador.d.playlist === undefined ? -1 : despertador.d.playlist)))
+                    onActivated: (i) => vp.ponerDespertador({ playlist: despertador.listas[i].id })
+                }
+                Boton { text: "Probar"; icono: "play"; tipo: "fantasma"; onClicked: vp.despertar(despertador.d.playlist === undefined ? -1 : despertador.d.playlist) }
+            }
+        }
+
         Tarjeta {
             titulo: "YouTube Music Premium"
             Explicacion { text: "Sin Premium se baja en Opus a ~160 kbps. Con Premium (también el familiar), AAC a 256 kbps: entra a music.youtube.com con tu cuenta en tu navegador y elígelo aquí. Vortex Player usa esa sesión solo para bajar." }

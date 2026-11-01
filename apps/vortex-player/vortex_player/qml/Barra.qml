@@ -178,6 +178,15 @@ Rectangle {
                             radius: 2
                             color: tiempoBarra.hovered || tiempoBarra.pressed ? Tema.azul : Tema.texto
                         }
+                        Rectangle {   // 1.5: el tramo que se repite al practicar
+                            visible: rep.abA >= 0
+                            x: rep.abA / tiempoBarra.to * parent.width
+                            y: -2
+                            width: Math.max(3, ((rep.abB >= 0 ? rep.abB : rep.posicion) - rep.abA) / tiempoBarra.to * parent.width)
+                            height: parent.height + 4
+                            radius: 3
+                            color: Qt.rgba(Tema.violeta.r, Tema.violeta.g, Tema.violeta.b, 0.55)
+                        }
                     }
                     handle: Rectangle {
                         x: tiempoBarra.leftPadding + tiempoBarra.visualPosition * (tiempoBarra.availableWidth - width)
@@ -199,6 +208,45 @@ Rectangle {
             Item { Layout.fillWidth: true }
             BotonIcono { icono: "letra"; tam: 32; activo: raiz.letraAbierta; ayuda: "Letra (Ctrl+Y)"; enabled: !!rep.cancion.ruta; onClicked: raiz.alternarLetra() }
             BotonIcono { icono: "cola"; tam: 32; activo: raiz.colaAbierta; ayuda: "A continuación (Ctrl+Q)"; onClicked: raiz.alternarCola() }
+            BotonIcono {   // 1.5: practicar una canción: más lenta sin cambiar el tono y repetir de A a B
+                id: botonPracticar
+                objectName: "practicar"
+                readonly property bool usando: rep.velocidad !== 1 || rep.abA >= 0
+                icono: "practicar"; tam: 32; activo: usando; enabled: !!rep.cancion.ruta
+                ayuda: "Practicar: " + Math.round(rep.velocidad * 100) + " %"
+                       + (rep.abB >= 0 ? " · repite " + raiz.tiempo(rep.abA) + "–" + raiz.tiempo(rep.abB)
+                          : rep.abA >= 0 ? " · inicio en " + raiz.tiempo(rep.abA) : "")
+                onClicked: menuPracticar.popup(botonPracticar, 0, -menuPracticar.implicitHeight - 6)
+                Text {
+                    visible: rep.velocidad !== 1
+                    text: Math.round(rep.velocidad * 100)
+                    color: Tema.azul
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                }
+                Menu {
+                    id: menuPracticar
+                    MenuItem { enabled: false; text: "Velocidad (el tono no cambia)" }
+                    Repeater {
+                        model: [0.5, 0.75, 0.9, 1]
+                        MenuItem {
+                            required property real modelData
+                            text: (modelData === 1 ? "Normal" : Math.round(modelData * 100) + " %") + (rep.velocidad === modelData ? "  ✓" : "")
+                            onTriggered: rep.ponerVelocidad(modelData)
+                        }
+                    }
+                    MenuSeparator {}
+                    MenuItem {
+                        text: rep.abA < 0 ? "Repetir un pedazo: marcar el inicio aquí (" + raiz.tiempo(rep.posicion) + ")"
+                            : rep.abB < 0 ? "Marcar el final aquí (" + raiz.tiempo(rep.posicion) + ")"
+                            : "Dejar de repetir " + raiz.tiempo(rep.abA) + "–" + raiz.tiempo(rep.abB)
+                        onTriggered: rep.marcarAB()
+                    }
+                    MenuItem { visible: rep.abA >= 0 && rep.abB < 0; height: visible ? implicitHeight : 0; text: "Cancelar"; onTriggered: rep.quitarAB() }
+                }
+            }
             BotonIcono {   // 2.4: temporizador para dormir
                 id: botonDormir
                 icono: "luna"; tam: 32; activo: rep.dormirActivo

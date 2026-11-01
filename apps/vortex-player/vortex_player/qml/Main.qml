@@ -6,6 +6,7 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: ventana
+    onActiveChanged: if (active) vp.revisarOtroAparato()   // 1.5: ¿sonaba algo en el cel?
     width: 1240
     height: 800
     minimumWidth: 940
@@ -200,6 +201,39 @@ ApplicationWindow {
                     anchors.fill: parent; mostrado: ventana.pagina === "cola"; desde: 1.04
                     PaginaCola { anchors.fill: parent; onCerrar: ventana.alternar("cola") }
                 }
+            }
+        }
+
+        // 1.5: «¿Seguir aquí?»: lo que dejaste sonando en el cel
+        Rectangle {
+            id: seguir
+            objectName: "seguir"
+            visible: !!vp.seguir.id
+            Layout.fillWidth: true
+            implicitHeight: visible ? 56 : 0
+            color: Qt.rgba(Tema.violeta.r, Tema.violeta.g, Tema.violeta.b, 0.22)
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 12
+                spacing: 12
+                Rectangle {
+                    Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                    radius: 6
+                    color: Tema.tarjeta
+                    clip: true
+                    Image { anchors.fill: parent; source: vp.seguir.portada || ""; fillMode: Image.PreserveAspectCrop; asynchronous: true }
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "En " + (vp.seguir.nombre || "tu cel") + " sonaba «" + (vp.seguir.titulo || "") + "»"
+                          + (vp.seguir.artista ? " de " + vp.seguir.artista : "") + " · " + (vp.seguir.hace || "")
+                    color: Tema.texto
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                }
+                Boton { text: "Seguir aquí"; icono: "play"; onClicked: vp.seguirAqui() }
+                BotonIcono { icono: "cerrar"; tam: 30; ayuda: "Cerrar"; onClicked: vp.descartarSeguir() }
             }
         }
 

@@ -222,8 +222,9 @@ def cerrar_sesion() -> None:
 # --- Drive (solo la carpeta oculta de la app) -------------------------------------------------------------
 
 class Drive:
-    def __init__(self, token_acceso: str):
+    def __init__(self, token_acceso: str, archivo: str = ARCHIVO):
         self.token = token_acceso
+        self.archivo = archivo   # 1.5: «sonando.json» lleva lo que suena, para seguir en el otro aparato
 
     def _pedir(self, metodo: str, url: str, cuerpo: bytes | None = None, tipo: str = "") -> bytes:
         cab = {"Authorization": f"Bearer {self.token}"}
@@ -238,7 +239,7 @@ class Drive:
         return datos
 
     def buscar(self) -> str | None:
-        q = urllib.parse.quote(f"name = '{ARCHIVO}'")
+        q = urllib.parse.quote(f"name = '{self.archivo}'")
         r = json.loads(self._pedir("GET", f"{API}/files?spaces=appDataFolder&q={q}&fields=files(id)&orderBy=modifiedTime+desc"))
         archivos = r.get("files") or []
         return archivos[0]["id"] if archivos else None
@@ -248,7 +249,7 @@ class Drive:
 
     def crear(self, texto: str) -> str:
         frontera = "vortex" + secrets.token_hex(8)
-        datos = json.dumps({"name": ARCHIVO, "parents": ["appDataFolder"]})
+        datos = json.dumps({"name": self.archivo, "parents": ["appDataFolder"]})
         cuerpo = (f"--{frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{datos}\r\n"
                   f"--{frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{texto}\r\n--{frontera}--\r\n").encode()
         r = self._pedir("POST", f"{SUBIR}/files?uploadType=multipart&fields=id", cuerpo, f"multipart/related; boundary={frontera}")

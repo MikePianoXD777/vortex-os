@@ -550,5 +550,69 @@ class Novedades14(Temporal):
         self.assertEqual(b.resumen(hasta, hasta + 1)["escuchas"], 0)
         b.cerrar()
 
+
+class Novedades15(Temporal):
+    """1.5: tu mezcla del día, lo nuevo de tus artistas y la radio con datos móviles."""
+
+    def test_mas_escuchadas_y_artistas(self) -> None:
+        b = biblioteca.Biblioteca(self.t / "b.db")
+        for ruta, titulo, artista in (("/m/a.opus", "A", "Ado"), ("/m/b.opus", "B", "YOASOBI - Topic"), ("/m/c.opus", "C", "Ado")):
+            b.db.execute("INSERT INTO canciones (ruta, titulo, artista, album, duracion, agregada) VALUES (?,?,?,?,?,?)",
+                         (ruta, titulo, artista, "", 200, 0))
+        b.db.commit()
+        self.assertEqual(b.artistas_mas_escuchados(0), ["Ado", "YOASOBI"])   # sin escuchas: lo que más tienes
+        ahora = 1_800_000_000
+        for ruta, titulo, artista, veces in (("/m/b.opus", "B", "YOASOBI - Topic", 3), ("/m/a.opus", "A", "Ado", 1),
+                                             ("/m/borrada.opus", "X", "Nadie", 5)):
+            for _ in range(veces):
+                b.anotar_escucha({"ruta": ruta, "titulo": titulo, "artista": artista}, 60, cuando=ahora)
+        self.assertEqual([c["titulo"] for c in b.mas_escuchadas(ahora - 10)], ["B", "A"])   # la borrada no
+        self.assertEqual(b.mas_escuchadas(ahora + 10), [])
+        self.assertEqual(b.artistas_mas_escuchados(ahora - 10, 2), ["Nadie", "YOASOBI"])
+        b.cerrar()
+
+    def test_lanzamientos_de_youtube_music(self) -> None:
+        def item(bid, titulo, sub):
+            return {"musicTwoRowItemRenderer": {
+                "title": {"runs": [{"text": titulo}]}, "subtitle": {"runs": [{"text": sub}]},
+                "navigationEndpoint": {"browseEndpoint": {"browseId": bid}},
+                "thumbnailRenderer": {"musicThumbnailRenderer": {"thumbnail": {"thumbnails": [
+                    {"url": "https://lh3.googleusercontent.com/x=w120-h120-l90"}]}}}}}
+        pedidos = []
+
+        def pedir(url, cuerpo):
+            pedidos.append(cuerpo.get("browseId") or cuerpo.get("query"))
+            if "search" in url:
+                return {"contents": [{"musicResponsiveListItemRenderer": {
+                    "navigationEndpoint": {"browseEndpoint": {"browseId": "UCado"}}}}]}
+            if cuerpo["browseId"] == "UCado":
+                return {"contents": [{"musicCarouselShelfRenderer": {"contents": [
+                    item("MPREb_viejo", "Kyougen", "Álbum • 2022"), item("MPREb_nuevo", "Hello", "Single • 2026"),
+                    item("MPREb_ep", "Ep", "EP • 2025"), item("VLPLotra", "Una playlist", "Playlist")]}}]}
+            return {"playlistId": "OLAK5uy_abc", "contents": [{"musicResponsiveListItemRenderer": {
+                "playlistItemData": {"videoId": "aaaaaaaaaaa"},
+                "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Hello"}]}}}]}}]}
+
+        self.assertEqual(descargas.artista_id("Ado", pedir), "UCado")
+        l = descargas.lanzamientos("UCado", "Ado", pedir)
+        self.assertEqual([(x["id"], x["tipo"], x["anio"]) for x in l],
+                         [("MPREb_nuevo", "Single", 2026), ("MPREb_ep", "EP", 2025), ("MPREb_viejo", "Álbum", 2022)])
+        self.assertTrue(l[0]["portada"].endswith("=w320-h320-l90"))
+        self.assertEqual(descargas.canciones_de_lanzamiento("MPREb_nuevo", pedir),
+                         ("OLAK5uy_abc", [{"id": "aaaaaaaaaaa", "titulo": "Hello"}]))
+
+    def test_radio_con_datos_moviles(self) -> None:
+        from vortex_player.puente import Puente
+        todas = [{"ruta": f"/m/{i}", "artista": a} for i, a in enumerate(["Ado", "Otro", "Ado - Topic", "Más", "Ado"])]
+        r = Puente._radio_local([{"artista": "Ado"}], {"/m/0"}, todas, n=3)
+        self.assertEqual(sorted(c["ruta"] for c in r[:2]), ["/m/2", "/m/4"])   # primero las del mismo artista
+        self.assertEqual(len(r), 3)
+        self.assertNotIn("/m/0", [c["ruta"] for c in r])                        # sin las que ya están en la cola
+        os.environ["VORTEX_PLAYER_MEDIDA"] = "1"
+        try:
+            self.assertTrue(Puente._con_datos_medidos())
+        finally:
+            del os.environ["VORTEX_PLAYER_MEDIDA"]
+
 if __name__ == "__main__":
     unittest.main()

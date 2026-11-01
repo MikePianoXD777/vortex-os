@@ -179,6 +179,68 @@ Flickable {
                         }
                     }
                 }
+                // 1.5: «Lo nuevo de tus artistas»: los álbumes y singles de este año de los que más escuchas
+                ColumnLayout {
+                    id: novedades
+                    objectName: "novedades"
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    Layout.bottomMargin: 10
+                    visible: paraTi.visible && vp.novedades.length > 0
+                    spacing: 8
+                    Text { text: "Lo nuevo de tus artistas"; color: Tema.texto; font.pixelSize: 20; font.weight: Font.Bold }
+                    Flickable {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 222
+                        contentWidth: filaNovedades.width
+                        flickableDirection: Flickable.HorizontalFlick
+                        clip: true
+                        ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+                        Row {
+                            id: filaNovedades
+                            spacing: 12
+                            Repeater {
+                                model: novedades.visible ? vp.novedades : []
+                                delegate: Rectangle {
+                                    id: lanz
+                                    required property var modelData
+                                    width: 160; height: 214
+                                    radius: 10
+                                    color: zonaLanz.hovered ? Tema.realceFuerte : Tema.realce
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    HoverHandler { id: zonaLanz }
+                                    Column {
+                                        x: 10; y: 10
+                                        width: parent.width - 20
+                                        spacing: 6
+                                        Item {
+                                            width: parent.width; height: width
+                                            Portada { anchors.fill: parent; url: lanz.modelData.portada }
+                                            BotonIcono {
+                                                visible: zonaLanz.hovered
+                                                anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 6
+                                                icono: "play"; relleno: true; acento: true; tam: 40; ayuda: "Escucharlo sin bajarlo"
+                                                onClicked: vp.lanzamiento(lanz.modelData.id, "tocar")
+                                            }
+                                            BotonIcono {
+                                                visible: zonaLanz.hovered && vp.ajustes.hayYtDlp
+                                                anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6
+                                                icono: "descargar"; tam: 34; ayuda: "Bajarlo a tu biblioteca"
+                                                onClicked: vp.lanzamiento(lanz.modelData.id, "bajar")
+                                            }
+                                        }
+                                        Text { width: parent.width; text: lanz.modelData.titulo; color: Tema.texto; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                        Text {
+                                            width: parent.width
+                                            text: [lanz.modelData.tipo, lanz.modelData.anio || "", lanz.modelData.artista].filter(x => x).join(" · ")
+                                            color: Tema.suave; font.pixelSize: 12; elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 // 2.4: sin búsqueda, «Para ti»: parecidas a lo último que escuchaste (sin lo que ya tienes)
                 ColumnLayout {
                     id: paraTi

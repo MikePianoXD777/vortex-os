@@ -116,6 +116,25 @@ class Biblioteca:
                          c.get("artista", ""), float(segundos)))
         self.db.commit()
 
+    def mas_escuchadas(self, desde: float, n: int = 15) -> list[dict]:
+        """1.5: tus canciones (las que siguen en tu biblioteca) que más sonaron desde `desde`."""
+        filas = self.db.execute(
+            "SELECT e.ruta, COUNT(*) AS veces FROM escuchas e JOIN canciones c ON c.ruta = e.ruta "
+            "WHERE e.cuando >= ? GROUP BY e.ruta ORDER BY veces DESC, MAX(e.cuando) DESC LIMIT ?", (desde, n)).fetchall()
+        return [c for f in filas if (c := self.cancion(f["ruta"]))]
+
+    def artistas_mas_escuchados(self, desde: float, n: int = 5) -> list[str]:
+        """1.5: tus artistas de los últimos días; sin escuchas, los que más tienes en tu biblioteca."""
+        cuenta: dict[str, list] = {}
+        filas = self.db.execute("SELECT artista FROM escuchas WHERE cuando >= ?", (desde,)).fetchall()
+        if not filas:
+            filas = self.db.execute("SELECT artista FROM canciones").fetchall()
+        for f in filas:
+            a = letras.limpiar_artista(f["artista"] or "")
+            if a:
+                cuenta.setdefault(a.lower(), [a, 0])[1] += 1
+        return [a for a, _ in sorted(cuenta.values(), key=lambda x: -x[1])[:n]]
+
     def resumen(self, desde: float, hasta: float, n: int = 5) -> dict:
         """Lo que escuchaste entre `desde` y `hasta`: minutos, cuántas, cuántos días y lo más escuchado."""
         filas = self.db.execute("SELECT * FROM escuchas WHERE cuando >= ? AND cuando < ?", (desde, hasta)).fetchall()

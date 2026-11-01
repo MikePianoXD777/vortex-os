@@ -595,5 +595,97 @@ class Interfaz(unittest.TestCase):
         self.assertEqual((d["pasada"], d["aviso"], d["aviso_despues"]), (1, True, False))
         self.assertEqual(d["errores_qml"], [])
 
+    def test_novedades_15(self) -> None:
+        # 1.5: tu mezcla del día, seguir lo del cel, lo nuevo de tus artistas, la radio con datos móviles,
+        # iniciar radio, compartir y el despertador (sin red: las respuestas de internet se dan a mano)
+        d = self.correr("""
+            import os, time
+            from PySide6.QtGui import QGuiApplication
+            datos = {}
+            def mezcla():
+                rutas = [c["ruta"] for c in puente.canciones]
+                puente._fin_mezcla({"fecha": time.strftime("%Y-%m-%d"), "tuyas": rutas[:2], "nuevas": [
+                    {"id": "aaaaaaaaaaa", "url": "https://music.youtube.com/watch?v=aaaaaaaaaaa", "titulo": "Nueva",
+                     "artistas": "Alguien", "duracion": 30, "portada": ""}]})
+                m = puente.mezcla
+                datos["mezcla"] = [m["cuantas"], m["nuevas"], m["hoy"]]
+                datos["guardada"] = len(puente._leer_json("mezcla.json")["canciones"])
+                puente.tocarMezcla()
+                datos["origen"] = r.origen
+                datos["cola"] = len(r.cola)
+            def seguir():
+                puente._nube["correo"] = "alguien@ejemplo.com"
+                uno = next(c for c in puente.canciones if c["titulo"] == "Uno")
+                puente._fin_otro_aparato({"aparato": "cel-1", "nombre": "tu cel", "id": "bbbbbbbbbbb", "titulo": "Del cel",
+                                          "artista": "X", "posicion": 42.0, "cuando": time.time() * 1000 - 60000})
+                datos["ofrece"] = puente.seguir.get("titulo")
+                puente.descartarSeguir()
+                puente._fin_otro_aparato({"aparato": puente._aparato(), "id": "ccccccccccc", "cuando": time.time() * 1000})
+                datos["propio"] = puente.seguir.get("titulo")      # lo que subió esta PC no se ofrece
+                puente._fin_otro_aparato({"aparato": "cel-1", "id": "bbbbbbbbbbb", "cuando": time.time() * 1000 - 120000})
+                datos["visto"] = puente.seguir.get("id")           # una más vieja que la descartada tampoco
+                puente._nube["correo"] = ""
+            def novedades():
+                puente._fin_novedades([{"id": "MPREb_1", "titulo": "Hello", "artista": "Ado", "tipo": "Single",
+                                        "anio": 2026, "portada": ""}], {"Ado": "UCado"})
+                datos["novedades"] = [x["titulo"] for x in puente.novedades]
+                datos["vistos"] = puente._leer_json("novedades.json")["vistos"]
+                ventana.setProperty("pagina", "agregar")
+            def radio_datos():
+                os.environ["VORTEX_PLAYER_MEDIDA"] = "1"
+                uno = next(c for c in puente.canciones if c["titulo"] == "Uno")
+                puente.iniciarRadio(uno)
+                datos["radio"] = [r.origen, len(r.cola), all(not c.get("radio") for c in r.cola)]
+                del os.environ["VORTEX_PLAYER_MEDIDA"]
+                puente.compartir({"ruta": "/m/Idol [ZRtdQ81jPUQ].opus", "titulo": "Idol", "artista": "YOASOBI"}, "copiar")
+                datos["enlace"] = QGuiApplication.clipboard().text()
+            def despertador():
+                puente.ponerDespertador({"activo": True, "hora": time.strftime("%H:%M")})
+                datos["despertador"] = puente.ajustes["despertador"]
+                puente._revisar_despertador()
+                datos["desperto"] = [r.origen, r.pausado, puente._despertado == time.strftime("%Y-%m-%d")]
+                puente._revisar_despertador()   # una vez al día
+                ventana.setProperty("pagina", "ajustes")
+            paso(2500, mezcla)
+            paso(800, seguir)
+            paso(500, novedades)
+            paso(800, radio_datos)
+            paso(800, despertador)
+            def practicar():
+                puente.tocar(0)
+                r.ponerVelocidad(0.75)
+                r.buscar(1.0)
+            def marcar():
+                datos["filtros"] = [r._filtros(), r.velocidad]
+                r.marcarAB()
+            def marcar_b():
+                r.marcarAB()
+                datos["ab"] = [r.abA >= 0, r.abB > r.abA]
+            def repite():
+                datos["dentro"] = r.abA - 0.3 <= r.posicion <= r.abB + 0.6
+                r.siguiente()
+                datos["ab_otra"] = [r.abA, r.abB]
+                r.ponerVelocidad(1)
+                datos["filtros_normal"] = r._filtros()
+            paso(800, practicar)
+            paso(1200, marcar)
+            paso(1500, marcar_b)
+            paso(2500, repite)
+            paso(1500, lambda: fin(**datos))
+        """, "novedades15")
+        self.assertEqual(d["mezcla"], [3, 1, True])
+        self.assertEqual((d["guardada"], d["origen"], d["cola"]), (3, "Tu mezcla del día", 3))
+        self.assertEqual((d["ofrece"], d["propio"], d["visto"]), ("Del cel", None, None))
+        self.assertEqual((d["novedades"], d["vistos"]), (["Hello"], ["MPREb_1"]))
+        self.assertEqual(d["radio"], ["Radio de Uno", 3, True])
+        self.assertIn("music.youtube.com/watch?v=ZRtdQ81jPUQ", d["enlace"])
+        self.assertTrue(d["despertador"]["activo"])
+        self.assertEqual(d["desperto"], ["Despertador", False, True])
+        self.assertEqual(d["filtros"], ["scaletempo2", 0.75])
+        self.assertEqual(d["ab"], [True, True])
+        self.assertTrue(d["dentro"])
+        self.assertEqual((d["ab_otra"], d["filtros_normal"]), ([-1.0, -1.0], ""))
+        self.assertEqual(d["errores_qml"], [])
+
 if __name__ == "__main__":
     unittest.main()

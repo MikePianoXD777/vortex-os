@@ -43,6 +43,7 @@ class Reproductor(QObject):
     cambioCola = Signal()
     quiereSonar = Signal()      # le diste play (o tocar, siguiente…): el avance de una canción se calla (2.1.1)
     cambioDormir = Signal()
+    cambioPractica = Signal()               # 1.5: «Practicar una canción»: la velocidad y el tramo de A a B
     error = Signal(str)
     seAcaba = Signal()                      # 1.4: suena la última de la cola (o ya terminó): pide radio
     escuchada = Signal("QVariantMap", float)   # 1.4: (canción, segundos que de verdad sonó)
@@ -62,6 +63,8 @@ class Reproductor(QObject):
         self._despues = 0               # 2.4: cuántas «tocar después» van detrás de la actual
         self._fundido = 0.0             # 2.4: segundos de crossfade (0 = sin)
         self._eq = ""                   # 2.5: el ecualizador dentro de mpv (Windows), como `af`
+        self._velocidad = 1.0           # 1.5: para practicar, más lenta sin cambiar el tono
+        self._ab = [-1.0, -1.0]         # 1.5: el tramo que se repite (-1 = sin marcar)
         self._cola_fundido: list[QProcess] = []
         self._final = False             # 1.4: la cola se acabó y quedó parada en la última
         self._sonando: dict = {}        # 1.4: la canción a la que se le cuentan los segundos
@@ -122,8 +125,8 @@ class Reproductor(QObject):
     def _conectado(self) -> None:
         for pid, nombre in OBSERVAR.items():
             self._enviar({"command": ["observe_property", pid, nombre]})
-        if self._eq:
-            self._enviar({"command": ["set_property", "af", self._eq]})
+        if self._filtros():
+            self._enviar({"command": ["set_property", "af", self._filtros()]})
         for linea in self._pendientes:
             self._socket.write(linea)
         self._pendientes.clear()
@@ -241,6 +244,8 @@ class Reproductor(QObject):
         if c.get("ruta") != self._sonando.get("ruta"):
             self._sin_cliente = False
         self._cerrar_escucha()
+        if any(x >= 0 for x in self._ab):   # el tramo de A a B es de la canción que se practicaba
+            self.quitarAB()
         self._sonando = c
         self._final = False
         self._posicion = desde
@@ -250,7 +255,7 @@ class Reproductor(QObject):
         if desde > 0:
             opciones["start"] = f"{desde:.2f}"
         if entra > 0:
-            opciones["af"] = ",".join(x for x in (self._eq, f"lavfi=[afade=t=in:d={entra:.1f}]") if x)
+            opciones["af"] = ",".join(x for x in (self._filtros(), f"lavfi=[afade=t=in:d={entra:.1f}]") if x)
         if es_stream(c["ruta"]) and not self._sin_cliente:
             opciones["ytdl-raw-options"] = CLIENTE
         if opciones:
@@ -270,6 +275,11 @@ class Reproductor(QObject):
 
     # --- para la interfaz y MPRIS ----------------------------------------------------------------
 
+    def tocar_desde(self, canciones: list, inicio: int, segundo: float) -> None:
+        """1.5: como `tocar`, pero desde ese segundo (para seguir lo que sonaba en el otro aparato)."""
+        self._desde = max(0.0, float(segundo))
+        self.tocar(canciones, inicio)
+
     @Slot("QVariantList", int)
     def tocar(self, canciones: list, inicio: int = 0) -> None:
         """Toca la lista desde la canción `inicio` (con aleatorio, esa primero y luego las demás revueltas)."""
@@ -287,7 +297,8 @@ class Reproductor(QObject):
         else:
             self._i = inicio
         self.cambioCola.emit()
-        self._cargar()
+        desde, self._desde = getattr(self, "_desde", 0.0), 0.0
+        self._cargar(desde=desde)
 
     # --- 2.4: seguir donde te quedaste ----------------------------------------------------------------
 
@@ -508,7 +519,46 @@ class Reproductor(QObject):
         if filtro == self._eq:
             return
         self._eq = filtro
-        self._enviar({"command": ["set_property", "af", filtro]})
+        self._enviar({"command": ["set_property", "af", self._filtros()]})
+
+    # --- 1.5: practicar una canción -----------------------------------------------------------------
+
+    def _filtros(self) -> str:
+        """El ecualizador y, si va más lenta o más rápida, scaletempo2 (el tono no cambia)."""
+        return ",".join(x for x in (self._eq, "scaletempo2" if self._velocidad != 1 else "") if x)
+
+    @Slot(float)
+    def ponerVelocidad(self, v: float) -> None:
+        v = round(max(0.25, min(2.0, float(v))), 2)
+        if v == self._velocidad:
+            return
+        self._velocidad = v
+        self._enviar({"command": ["set_property", "af", self._filtros()]})
+        self._enviar({"command": ["set_property", "speed", v]})
+        self.cambioPractica.emit()
+
+    @Slot()
+    def marcarAB(self) -> None:
+        """La 1.ª vez marca A, la 2.ª B (y se repite de A a B), la 3.ª lo quita."""
+        a, b = self._ab
+        if a < 0:
+            self._ab = [round(self._posicion, 2), -1.0]
+            self._enviar({"command": ["set_property", "ab-loop-a", self._ab[0]]})
+        elif b < 0 and self._posicion > a + 0.5:
+            self._ab = [a, round(self._posicion, 2)]
+            self._enviar({"command": ["set_property", "ab-loop-b", self._ab[1]]})
+            self.buscar(a)
+        else:
+            self.quitarAB()
+            return
+        self.cambioPractica.emit()
+
+    @Slot()
+    def quitarAB(self) -> None:
+        self._ab = [-1.0, -1.0]
+        self._enviar({"command": ["set_property", "ab-loop-a", "no"]})
+        self._enviar({"command": ["set_property", "ab-loop-b", "no"]})
+        self.cambioPractica.emit()
 
     def ponerFundido(self, segundos: float) -> None:
         self._fundido = max(0.0, min(12.0, float(segundos)))
@@ -522,7 +572,7 @@ class Reproductor(QObject):
     def _revisar_fundido(self) -> None:
         """A `_fundido` segundos del final: la que se va sigue en otro mpv apagándose y la siguiente entra."""
         n = self._fundido
-        if (n <= 0 or self._pausado or self._repetir == "una" or self._dormir_al_final or self._duracion < n * 3
+        if (n <= 0 or self._pausado or self._repetir == "una" or self._velocidad != 1 or self._ab[1] >= 0 or self._dormir_al_final or self._duracion < n * 3
                 or time.monotonic() - self._cargada < 2 or self._duracion - self._posicion > n):
             return
         k = self._siguiente_indice()
@@ -572,5 +622,8 @@ class Reproductor(QObject):
     dormirTexto = Property(str, _dormir_texto, notify=cambioDormir)
     dormirActivo = Property(bool, lambda s: bool(s._dormir_hasta or s._dormir_al_final), notify=cambioDormir)
     fundido = Property(float, lambda s: s._fundido, notify=cambioEstado)
+    velocidad = Property(float, lambda s: s._velocidad, notify=cambioPractica)
+    abA = Property(float, lambda s: s._ab[0], notify=cambioPractica)
+    abB = Property(float, lambda s: s._ab[1], notify=cambioPractica)
     indice = Property(int, lambda s: s._i, notify=cambioCola)
     origen = Property(str, lambda s: s._origen, notify=cambioCola)

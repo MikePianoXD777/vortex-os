@@ -167,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     servidor.close()
     puente.pararAvance()
     puente._guardar_sesion()   # 2.4: el segundo exacto donde te quedaste
+    puente.al_salir()          # 1.5: y en la nube, para seguir en el otro aparato
     puente.r.cerrar()
     del mpris
     sys.stdout.flush()

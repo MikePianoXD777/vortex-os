@@ -56,7 +56,20 @@ Window {
                 Layout.fillWidth: true
                 spacing: 2
                 Text { Layout.fillWidth: true; text: rep.cancion.titulo || "Nada sonando"; color: "white"; font.pixelSize: 15; font.weight: Font.Bold; elide: Text.ElideRight }
-                Text { Layout.fillWidth: true; text: rep.cancion.artista || ""; color: Qt.rgba(1, 1, 1, 0.75); font.pixelSize: 12; elide: Text.ElideRight }
+                Text {   // 1.5: la línea de la letra que va sonando (si la letra va con tiempos); si no, el artista
+                    readonly property string linea: {
+                        const l = vp.letra
+                        if (!l.sincronizada || l.ruta !== rep.cancion.ruta) return ""
+                        const i = vp.lineaActual(rep.posicion)
+                        return i >= 0 && l.lineas[i] ? (l.lineas[i].texto || "♪") : ""
+                    }
+                    Layout.fillWidth: true
+                    text: linea || rep.cancion.artista || ""
+                    color: linea ? "white" : Qt.rgba(1, 1, 1, 0.75)
+                    font.pixelSize: 12
+                    font.weight: linea ? Font.DemiBold : Font.Normal
+                    elide: Text.ElideRight
+                }
                 RowLayout {
                     spacing: 2
                     Layout.topMargin: 2

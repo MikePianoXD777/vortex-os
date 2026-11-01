@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QTimer, QUrl, Signal, Slot
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtGui import QColor, QGuiApplication, QImage
 
 from . import audio, cuenta_google, descargas, ecualizador, letras, plataforma, rutas, sincronia
 from .avance import Avance
@@ -65,6 +65,14 @@ class Puente(QObject):
     _letras_avance = Signal("QVariantMap")                  # del hilo de las letras sin internet
     _radio_lista = Signal(int, "QVariantList", str)        # 1.4: del hilo de la radio sin fin
     cambioResumen = Signal()
+    _enlace_listo = Signal(str, str, str)                  # 1.5: (qué hacer, enlace, texto) del hilo de compartir
+    cambioMezcla = Signal()
+    _mezcla_lista = Signal("QVariantMap")
+    cambioSeguir = Signal()
+    _otro_aparato = Signal("QVariantMap")
+    cambioNovedades = Signal()
+    _novedades_listas = Signal("QVariantList", "QVariantMap")
+    _lanzamiento_listo = Signal(str, str, str, "QVariantList")   # (qué hacer, id, playlist OLAK, canciones)
 
     def __init__(self, parent: QObject | None = None, biblioteca: Biblioteca | None = None,
                  reproductor: Reproductor | None = None):
@@ -184,6 +192,43 @@ class Puente(QObject):
         self._reloj_resumen = QTimer(self, interval=60 * 60 * 1000)   # por si la semana cambia con la app abierta
         self._reloj_resumen.timeout.connect(self.cambioResumen)
         self._reloj_resumen.start()
+        self._enlace_listo.connect(self._fin_enlace)
+
+        # 1.5: tu mezcla del día, seguir en el otro aparato, lo nuevo de tus artistas, la radio con datos
+        # móviles y el despertador
+        self._mezcla = self._leer_json("mezcla.json")
+        self._mezcla_armando = False
+        self._mezcla_lista.connect(self._fin_mezcla)
+        self._seguir: dict = {}
+        self._sonando_subido = 0          # cuándo subió esta PC lo que suena (ms)
+        self._sonando_ultimo: tuple = ()
+        self._revisado_otro = 0.0
+        self._otro_aparato.connect(self._fin_otro_aparato)
+        self.r.cambioEstado.connect(lambda: self.r.pausado and self._espera_sonando.start())
+        self._espera_sonando = QTimer(self, singleShot=True, interval=2500)
+        self._espera_sonando.timeout.connect(self._subir_sonando)
+        self._reloj_sonando = QTimer(self, interval=60 * 1000)
+        self._reloj_sonando.timeout.connect(lambda: self.r.pausado or self._subir_sonando())
+        self._reloj_sonando.start()
+        self._reloj_otro = QTimer(self, interval=5 * 60 * 1000)
+        self._reloj_otro.timeout.connect(self.revisarOtroAparato)
+        self._reloj_otro.start()
+        self._novedades = self._leer_json("novedades.json")
+        self._novedades_listas.connect(self._fin_novedades)
+        self._lanzamiento_listo.connect(self._fin_lanzamiento)
+        self._aviso_datos = False
+        try:
+            from PySide6.QtNetwork import QNetworkInformation
+            QNetworkInformation.loadDefaultBackend()
+        except Exception:  # noqa: BLE001 (sin backend: se toma como red normal)
+            pass
+        self._despertado = ""             # el día que ya sonó el despertador
+        self._reloj_despertador = QTimer(self, interval=20 * 1000)
+        self._reloj_despertador.timeout.connect(self._revisar_despertador)
+        self._reloj_despertador.start()
+        QTimer.singleShot(4000, self.revisarOtroAparato)
+        QTimer.singleShot(8000, self.armarMezcla)
+        QTimer.singleShot(15000, self.revisarNovedades)
 
         self._preparar_audio()
         self._recargar()
@@ -1046,8 +1091,13 @@ class Puente(QObject):
     def _pedir_radio(self) -> None:
         """Suena la última de la cola: se piden 10 parecidas a ella y a las dos de antes."""
         cola, i = self.r.cola, self.r.indice
-        if (not self.bib.ajustes().get("radio", True) or not cola or i + 1 < len(cola) or self.r.repetir != "no"
-                or self._radio_para == cola[-1]["ruta"] or os.environ.get("VORTEX_PLAYER_SIN_RED")):
+        # 1.5: la que pediste con «Iniciar radio» sigue aunque la radio sin fin esté apagada
+        a_mano = self.r.origen.startswith("Radio de ")
+        if (not (a_mano or self.bib.ajustes().get("radio", True)) or not cola or i + 1 < len(cola) or self.r.repetir != "no"
+                or self._radio_para == cola[-1]["ruta"]):
+            return
+        medida = self._con_datos_medidos()
+        if os.environ.get("VORTEX_PLAYER_SIN_RED") and not medida:
             return
         semillas = [{"id": c.get("id") or id_de(c["ruta"]), "titulo": c.get("titulo", ""), "artista": c.get("artista", "")}
                     for c in reversed(cola[max(0, i - 2):i + 1])]
@@ -1055,6 +1105,12 @@ class Puente(QObject):
             todas = self.bib.canciones()
         tienes = [{"id": c.get("id") or id_de(c["ruta"]), "titulo": c.get("titulo", ""), "artista": c.get("artista", "")}
                   for c in todas + cola]
+        if medida:   # 1.5: con datos móviles la radio sigue con tu música (no gasta tu plan)
+            self.r.agregarRadio(self._radio_local(semillas, {c["ruta"] for c in cola}, todas))
+            if not self._aviso_datos:
+                self._aviso_datos = True
+                self.aviso.emit("Con datos móviles, la radio sigue con tu música")
+            return
         self._radio_vuelta += 1
         vuelta, self._radio_para = self._radio_vuelta, cola[-1]["ruta"]
 
@@ -1071,7 +1127,8 @@ class Puente(QObject):
             return
         cola, para = self.r.cola, self._radio_para
         self._radio_para = ""
-        if not cola or cola[-1]["ruta"] != para or not self.bib.ajustes().get("radio", True):
+        if not cola or cola[-1]["ruta"] != para or not (self.r.origen.startswith("Radio de ")
+                                                         or self.bib.ajustes().get("radio", True)):
             return
         if error or not canciones:
             if self.r.cancion and self.r.indice + 1 >= len(self.r.cola) and self.r.pausado:
@@ -1106,6 +1163,393 @@ class Puente(QObject):
     def resumenVisto(self) -> None:
         Biblioteca.guardar_ajuste("resumen_visto", biblioteca.semana(0)[0])
         self.cambioResumen.emit()
+
+    # --- 1.5: la radio con datos móviles ---------------------------------------------------------------------
+
+    @staticmethod
+    def _con_datos_medidos() -> bool:
+        """¿La conexión se cobra por lo que gastas (datos del cel, «conexión de uso medido» en Windows)?"""
+        if os.environ.get("VORTEX_PLAYER_MEDIDA") is not None:   # pruebas
+            return os.environ["VORTEX_PLAYER_MEDIDA"] == "1"
+        try:
+            from PySide6.QtNetwork import QNetworkInformation
+            i = QNetworkInformation.instance()
+            return bool(i and i.supports(QNetworkInformation.Feature.Metered) and i.isMetered())
+        except Exception:  # noqa: BLE001
+            return False
+
+    @staticmethod
+    def _radio_local(semillas: list[dict], en_cola: set[str], todas: list[dict], n: int = 10) -> list[dict]:
+        """Diez de tu biblioteca: primero de los mismos artistas, luego al azar."""
+        artistas = {letras.limpiar_artista(s.get("artista", "")).lower() for s in semillas} - {""}
+        libres = [c for c in todas if c["ruta"] not in en_cola]
+        random.shuffle(libres)
+        mismas = [c for c in libres if letras.limpiar_artista(c.get("artista", "")).lower() in artistas]
+        return (mismas + [c for c in libres if c not in mismas])[:n]
+
+    # --- 1.5: tu mezcla del día -------------------------------------------------------------------------
+
+    @staticmethod
+    def _leer_json(nombre: str) -> dict:
+        try:
+            d = json.loads((rutas.config() / nombre).read_text())
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    @staticmethod
+    def _guardar_json(nombre: str, d: dict) -> None:
+        try:
+            rutas.config().mkdir(parents=True, exist_ok=True)
+            tmp = rutas.config() / (nombre + ".tmp")
+            tmp.write_text(json.dumps(d, ensure_ascii=False))
+            tmp.replace(rutas.config() / nombre)
+        except OSError:
+            pass
+
+    @Slot()
+    def armarMezcla(self, forzar: bool = False) -> None:
+        """Una vez al día: lo que más escuchas (30 días) revuelto con 15 parecidas que no tienes."""
+        hoy = time.strftime("%Y-%m-%d")
+        if self._mezcla_armando or (not forzar and self._mezcla.get("fecha") == hoy) or os.environ.get("VORTEX_PLAYER_SIN_RED"):
+            return
+        with self.candado:
+            tuyas = self.bib.mas_escuchadas(time.time() - 30 * 86400, 15)
+            todas = self.bib.canciones()
+        if len(tuyas) < 15:
+            resto = [c for c in todas if c["ruta"] not in {t["ruta"] for t in tuyas}]
+            tuyas += random.sample(resto, min(15 - len(tuyas), len(resto)))
+        if not tuyas:
+            return
+        semillas = [{"id": id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]}
+                    for c in random.sample(tuyas[:10], min(4, len(tuyas[:10])))]
+        tienes = [{"id": id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]} for c in todas]
+        self._mezcla_armando = True
+
+        def hilo() -> None:
+            try:
+                nuevas = descargas.recomendar(semillas, tienes, 15)
+            except OSError:
+                nuevas = []
+            self._mezcla_lista.emit({"fecha": hoy, "tuyas": [c["ruta"] for c in tuyas], "nuevas": nuevas})
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_mezcla(self, r: dict) -> None:
+        self._mezcla_armando = False
+        if not r.get("nuevas"):
+            return   # sin internet: se intenta la próxima vez que abras la app
+        tuyas = list(r["tuyas"])
+        random.shuffle(tuyas)
+        nuevas = [self._de_la_radio(c) for c in r["nuevas"]]
+        canciones = []
+        for k in range(max(len(tuyas), len(nuevas))):   # una tuya, una nueva…
+            if k < len(tuyas):
+                canciones.append({"ruta": tuyas[k]})
+            if k < len(nuevas):
+                canciones.append(nuevas[k])
+        self._mezcla = {"fecha": r["fecha"], "canciones": canciones}
+        self._guardar_json("mezcla.json", self._mezcla)
+        self.cambioMezcla.emit()
+
+    def _de_la_radio(self, c: dict) -> dict:
+        """Una de YouTube Music (de `descargas.buscar`/`radio`) como canción de la cola, que suena sin bajarla."""
+        self._portadas[c["url"]] = c.get("portada", "")
+        return {"ruta": c["url"], "id": c["id"], "titulo": c["titulo"], "artista": c.get("artistas", ""),
+                "album": c.get("album", ""), "duracion": float(c.get("duracion") or 0), "portada": c.get("portada", ""),
+                "radio": True}
+
+    def _canciones_mezcla(self) -> list[dict]:
+        salida = []
+        for c in self._mezcla.get("canciones") or []:
+            if c.get("radio"):
+                self._portadas.setdefault(c["ruta"], c.get("portada", ""))
+                salida.append(c)
+            elif (t := self.bib.cancion(c["ruta"])):
+                salida.append(t)
+        return salida
+
+    def _estado_mezcla(self) -> dict:
+        lista = self._canciones_mezcla() if self._mezcla.get("canciones") else []
+        return {"fecha": self._mezcla.get("fecha", ""), "cuantas": len(lista), "hoy": self._mezcla.get("fecha") == time.strftime("%Y-%m-%d"),
+                "nuevas": sum(1 for c in lista if c.get("radio")), "portadas": [c["ruta"] for c in lista[:4]],
+                "armando": self._mezcla_armando}
+
+    @Slot()
+    def tocarMezcla(self) -> None:
+        lista = self._canciones_mezcla()
+        if lista:
+            self.r.ponerOrigen("Tu mezcla del día")
+            self.r.tocar(lista, 0)
+
+    # --- 1.5: seguir en el otro aparato (lo que suena va a la nube) ----------------------------------------
+
+    def _aparato(self) -> str:
+        a = self.bib.ajustes().get("aparato")
+        if not a:
+            import uuid
+            a = "pc-" + uuid.uuid4().hex[:12]
+            Biblioteca.guardar_ajuste("aparato", a)
+        return a
+
+    def _subir_sonando(self, esperar: float = 0) -> None:
+        """Lo que suena y en qué segundo, para que el cel ofrezca seguir ahí. Solo las que tienen id de YouTube."""
+        c = self.r.cancion
+        vid = c.get("id") or id_de(c.get("ruta", ""))
+        if not self._nube["correo"] or not vid or os.environ.get("VORTEX_PLAYER_SIN_RED"):
+            return
+        clave = (vid, int(self.r.posicion) // 10, self.r.pausado)
+        if clave == self._sonando_ultimo:
+            return
+        self._sonando_ultimo = clave
+        self._sonando_subido = int(time.time() * 1000)
+        portada = c.get("portada") or self._portadas.get(c.get("ruta", ""), "")
+        datos = {"aparato": self._aparato(), "nombre": "tu PC", "id": vid, "titulo": c.get("titulo", ""),
+                 "artista": c.get("artista", ""), "album": c.get("album", ""), "duracion": float(c.get("duracion") or 0),
+                 "portada": portada if portada.startswith("http") else "", "posicion": round(self.r.posicion, 1),
+                 "cuando": self._sonando_subido}
+
+        def hilo() -> None:
+            try:
+                d = cuenta_google.Drive(cuenta_google.token(), "sonando.json")
+                fid = d.buscar()
+                texto = json.dumps(datos, ensure_ascii=False)
+                d.escribir(fid, texto) if fid else d.crear(texto)
+            except Exception:  # noqa: BLE001 (sin internet: ya se subirá la próxima)
+                pass
+
+        h = threading.Thread(target=hilo, daemon=True)
+        h.start()
+        if esperar:
+            h.join(esperar)
+
+    def al_salir(self) -> None:
+        if self.r.posicion > 3:
+            self._sonando_ultimo = ()
+            self._subir_sonando(esperar=4)
+
+    @Slot()
+    def revisarOtroAparato(self) -> None:
+        """Al abrir la app, al volver a la ventana y cada 5 min: ¿sonaba algo en el cel?"""
+        if (not self._nube["correo"] or time.monotonic() - self._revisado_otro < 45
+                or os.environ.get("VORTEX_PLAYER_SIN_RED")):
+            return
+        self._revisado_otro = time.monotonic()
+
+        def hilo() -> None:
+            try:
+                d = cuenta_google.Drive(cuenta_google.token(), "sonando.json")
+                fid = d.buscar()
+                self._otro_aparato.emit(json.loads(d.leer(fid)) if fid else {})
+            except Exception:  # noqa: BLE001
+                pass
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_otro_aparato(self, d: dict) -> None:
+        ahora = time.time() * 1000
+        if (not d.get("id") or d.get("aparato") == self._aparato() or ahora - d.get("cuando", 0) > 12 * 3600 * 1000
+                or d.get("cuando", 0) <= max(self._sonando_subido, float(self.bib.ajustes().get("seguir_visto", 0)))):
+            return
+        c = self.r.cancion
+        if (c.get("id") or id_de(c.get("ruta", ""))) == d["id"] and abs(self.r.posicion - d.get("posicion", 0)) < 30:
+            return
+        self._seguir = d
+        self.cambioSeguir.emit()
+
+    @Slot()
+    def seguirAqui(self) -> None:
+        d, self._seguir = self._seguir, {}
+        self.cambioSeguir.emit()
+        if not d:
+            return
+        Biblioteca.guardar_ajuste("seguir_visto", d.get("cuando", 0))
+        with self.candado:
+            ruta = self.bib.rutas_por_id().get(d["id"])
+            c = self.bib.cancion(ruta) if ruta else None
+        if not c:   # no la tienes aquí: suena de YouTube Music, como las de la radio
+            c = self._de_la_radio({"url": f"https://music.youtube.com/watch?v={d['id']}", "id": d["id"],
+                                   "titulo": d.get("titulo", ""), "artistas": d.get("artista", ""),
+                                   "album": d.get("album", ""), "duracion": d.get("duracion", 0), "portada": d.get("portada", "")})
+        self.r.ponerOrigen("Desde " + d.get("nombre", "tu cel"))
+        self.r.tocar_desde([c], 0, float(d.get("posicion", 0)))
+
+    @Slot()
+    def descartarSeguir(self) -> None:
+        if self._seguir:
+            Biblioteca.guardar_ajuste("seguir_visto", self._seguir.get("cuando", 0))
+        self._seguir = {}
+        self.cambioSeguir.emit()
+
+    def _estado_seguir(self) -> dict:
+        d = self._seguir
+        if not d:
+            return {}
+        minutos = int((time.time() * 1000 - d.get("cuando", 0)) / 60000)
+        return {**d, "hace": "hace un momento" if minutos < 1 else f"hace {minutos} min" if minutos < 60 else f"hace {minutos // 60} h"}
+
+    # --- 1.5: lo nuevo de tus artistas -------------------------------------------------------------------
+
+    @Slot()
+    def revisarNovedades(self, forzar: bool = False) -> None:
+        """Una vez al día: los álbumes y singles de este año de tus 5 artistas más escuchados."""
+        hoy = time.strftime("%Y-%m-%d")
+        if (not forzar and self._novedades.get("fecha") == hoy) or os.environ.get("VORTEX_PLAYER_SIN_RED"):
+            return
+        with self.candado:
+            artistas = self.bib.artistas_mas_escuchados(time.time() - 60 * 86400, 5)
+            claves = {descargas._clave(c["titulo"], c["artista"]) for c in self.bib.canciones()}
+        ids = dict(self._novedades.get("ids") or {})
+        anio = time.localtime().tm_year
+        desde_anio = anio - 1 if time.localtime().tm_mon <= 2 else anio
+
+        def hilo() -> None:
+            lista = []
+            for a in artistas:
+                try:
+                    canal = ids.get(a) or descargas.artista_id(a)
+                    if not canal:
+                        continue
+                    ids[a] = canal
+                    for x in descargas.lanzamientos(canal, a)[:8]:
+                        if x["anio"] >= desde_anio and descargas._clave(x["titulo"], a) not in claves:
+                            lista.append(x)
+                except OSError:
+                    return   # sin internet: mañana
+            lista.sort(key=lambda x: -x["anio"])
+            self._novedades_listas.emit(lista[:12], ids)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_novedades(self, lista: list, ids: dict) -> None:
+        vistos = set(self._novedades.get("vistos") or [])
+        nuevas = [x for x in lista if x["id"] not in vistos]
+        self._novedades = {"fecha": time.strftime("%Y-%m-%d"), "lista": list(lista), "ids": dict(ids),
+                           "vistos": sorted(vistos | {x["id"] for x in lista})}
+        self._guardar_json("novedades.json", self._novedades)
+        self.cambioNovedades.emit()
+        if nuevas:
+            x = nuevas[0]
+            texto = (f"Nuevo de {x['artista']}: «{x['titulo']}»" if len(nuevas) == 1
+                     else f"{len(nuevas)} lanzamientos nuevos de tus artistas, como «{x['titulo']}» de {x['artista']}")
+            self.aviso.emit(texto)
+            if not plataforma.WINDOWS and shutil.which("notify-send"):
+                subprocess.Popen(["notify-send", "-a", "Vortex Player", "-i", "vortex-player", "Lo nuevo de tus artistas", texto],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    @Slot(str, str)
+    def lanzamiento(self, album: str, como: str) -> None:
+        """«tocar»: suena entero sin bajarlo; «bajar»: se baja entero a tu biblioteca."""
+        def hilo() -> None:
+            try:
+                lista, canciones = descargas.canciones_de_lanzamiento(album)
+            except OSError:
+                lista, canciones = "", []
+            self._lanzamiento_listo.emit(como, album, lista, canciones)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_lanzamiento(self, como: str, album: str, lista: str, canciones: list) -> None:
+        x = next((x for x in self._novedades.get("lista") or [] if x["id"] == album), {})
+        if not canciones:
+            self.aviso.emit("Sin conexión con YouTube Music")
+            return
+        if como == "bajar":
+            url = (f"https://music.youtube.com/playlist?list={lista}" if lista and len(canciones) > 1
+                   else f"https://music.youtube.com/watch?v={canciones[0]['id']}")
+            self.bajar(url, -1, "" if len(canciones) > 1 else canciones[0]["id"], f"{x.get('titulo', '')} · {x.get('artista', '')}")
+            return
+        cola = [self._de_la_radio({"url": f"https://music.youtube.com/watch?v={c['id']}", "id": c["id"], "titulo": c["titulo"],
+                                   "artistas": x.get("artista", ""), "album": x.get("titulo", ""), "portada": x.get("portada", "")})
+                for c in canciones]
+        self.r.ponerOrigen(x.get("titulo") or "Lo nuevo de tus artistas")
+        self.r.tocar(cola, 0)
+
+    # --- 1.5: el despertador (con la app abierta) -----------------------------------------------------------
+
+    @Slot("QVariantMap")
+    def ponerDespertador(self, d: dict) -> None:
+        """{"activo", "hora": "07:00", "playlist": -1 (tu mezcla del día) o el id de una}"""
+        actual = dict(self.bib.ajustes().get("despertador") or {})
+        actual.update({k: d[k] for k in ("activo", "hora", "playlist") if k in d})
+        Biblioteca.guardar_ajuste("despertador", actual)
+        self.cambioAjustes.emit()
+
+    def _revisar_despertador(self) -> None:
+        d = self.bib.ajustes().get("despertador") or {}
+        hoy = time.strftime("%Y-%m-%d")
+        if not d.get("activo") or d.get("hora") != time.strftime("%H:%M") or self._despertado == hoy:
+            return
+        self._despertado = hoy
+        self.despertar(int(d.get("playlist", -1)))
+
+    @Slot(int)
+    def despertar(self, playlist: int = -1) -> None:
+        """Suena tu mezcla del día (o esa playlist) subiendo el volumen poco a poco durante un minuto."""
+        lista = self._canciones_mezcla() if playlist < 0 else self.bib.canciones_de_playlist(playlist)
+        if not lista:
+            with self.candado:
+                lista = self.bib.canciones()
+            random.shuffle(lista)
+        if not lista:
+            return
+        meta = max(30, self.r._volumen)
+        self.r.ponerVolumen(5)
+        self.r.ponerOrigen("Despertador")
+        self.r.tocar(lista, 0)
+        self.mostrarVentana.emit()
+        pasos = [0]
+
+        def subir() -> None:
+            pasos[0] += 1
+            self.r.ponerVolumen(5 + round((meta - 5) * pasos[0] / 30))
+            if pasos[0] < 30:
+                QTimer.singleShot(2000, subir)
+
+        QTimer.singleShot(2000, subir)
+
+    # --- 1.5: «Iniciar radio» y compartir ------------------------------------------------------------------
+
+    @Slot("QVariantMap")
+    def iniciarRadio(self, c: dict) -> None:
+        """Toca esta canción y detrás, sin fin, parecidas a ella (como «Ir a la radio» de Spotify)."""
+        if not c or not c.get("ruta"):
+            return
+        self.r.tocar([c], 0)
+        self.r.ponerOrigen("Radio de " + (c.get("titulo") or Path(c["ruta"]).stem))
+        self._radio_para = ""
+        self._pedir_radio()
+        self.aviso.emit("Radio de «" + (c.get("titulo") or "esta canción") + "»")
+
+    @Slot("QVariantMap", str)
+    def compartir(self, c: dict, como: str) -> None:
+        """«copiar» el enlace de YouTube Music o mandarlo por «whatsapp». Las tuyas sin id se buscan primero."""
+        if not c or not c.get("ruta"):
+            return
+        titulo, artista = c.get("titulo") or Path(c["ruta"]).stem, c.get("artista") or ""
+        texto = f"{titulo} · {artista}" if artista else titulo
+        vid = c.get("id") or id_de(c["ruta"])
+        if vid:
+            self._fin_enlace(como, f"https://music.youtube.com/watch?v={vid}", texto)
+            return
+
+        def hilo() -> None:
+            try:
+                r = descargas.buscar(f"{artista} {titulo}", "ytmusic", 1)
+            except OSError:
+                r = []
+            self._enlace_listo.emit(como, r[0]["url"] if r else "", texto)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_enlace(self, como: str, url: str, texto: str) -> None:
+        if not url:
+            self.aviso.emit("No encontré esta canción en YouTube Music")
+        elif como == "whatsapp":
+            plataforma.abrir("https://wa.me/?text=" + quote(f"{texto} {url}"))
+        else:
+            QGuiApplication.clipboard().setText(url)
+            self.aviso.emit("Enlace copiado")
 
     @Slot(str)
     def bajarDeLaRadio(self, ruta: str) -> None:
@@ -1235,6 +1679,9 @@ class Puente(QObject):
     meGusta = Property("QStringList", lambda s: s._me_gusta, notify=cambioPlaylists)
     letrasGuardadas = Property("QVariantMap", lambda s: s._letras_estado, notify=cambioLetras)
     resumen = Property("QVariantMap", _estado_resumen, notify=cambioResumen)
+    mezcla = Property("QVariantMap", _estado_mezcla, notify=cambioMezcla)
+    seguir = Property("QVariantMap", _estado_seguir, notify=cambioSeguir)
+    novedades = Property("QVariantList", lambda s: s._novedades.get("lista") or [], notify=cambioNovedades)
     bajandoRadio = Property("QStringList", lambda s: s._bajando_radio, notify=cambioDescargas)
 
 

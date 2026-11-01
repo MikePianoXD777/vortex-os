@@ -246,6 +246,67 @@ def radio(video_id: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> li
     return [c for c in leer_radio(r) if c["id"] != video_id]
 
 
+# --- 1.5: lo nuevo de tus artistas ------------------------------------------------------------------------
+
+def _texto(x: dict | None) -> str:
+    return "".join(r.get("text", "") for r in ((x or {}).get("runs") or []))
+
+
+def artista_id(nombre: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> str:
+    """El id del canal del artista en YouTube Music («UC…»), o "" si no lo encuentra."""
+    try:
+        r = pedir("https://music.youtube.com/youtubei/v1/search?prettyPrint=false",
+                  {"context": {"client": YTM_CLIENTE}, "query": nombre, "params": "EgWKAQIgAWoKEAkQBRAKEAMQBA%3D%3D"})
+    except ValueError:
+        return ""
+    for it in _todos(r, "musicResponsiveListItemRenderer"):
+        bid = (it.get("navigationEndpoint") or {}).get("browseEndpoint", {}).get("browseId", "")
+        if bid.startswith("UC"):
+            return bid
+    return ""
+
+
+def lanzamientos(canal: str, artista: str = "", pedir: Callable[[str, dict], dict] = _pedir_json) -> list[dict]:
+    """Los álbumes, singles y EP de un artista, los más nuevos primero: [{id, titulo, artista, tipo, anio, portada}]."""
+    try:
+        r = pedir("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false",
+                  {"context": {"client": YTM_CLIENTE}, "browseId": canal})
+    except ValueError:
+        return []
+    salida = []
+    for estante in _todos(r, "musicCarouselShelfRenderer"):
+        for x in estante.get("contents") or []:
+            it = x.get("musicTwoRowItemRenderer") or {}
+            bid = (it.get("navigationEndpoint") or {}).get("browseEndpoint", {}).get("browseId", "")
+            if not bid.startswith("MPREb"):
+                continue
+            sub = _texto(it.get("subtitle"))
+            anio = re.search(r"\b(19|20)\d\d\b", sub)
+            fotos = (((it.get("thumbnailRenderer") or {}).get("musicThumbnailRenderer") or {}).get("thumbnail") or {}).get("thumbnails") or []
+            salida.append({"id": bid, "titulo": _texto(it.get("title")), "artista": artista,
+                           "tipo": "Álbum" if not re.search(r"Single|Sencillo|EP", sub) else ("EP" if "EP" in sub else "Single"),
+                           "anio": int(anio.group(0)) if anio else 0,
+                           "portada": re.sub(r"=w\d+-h\d+", "=w320-h320", fotos[-1]["url"]) if fotos else ""})
+    return sorted(salida, key=lambda c: -c["anio"])   # estable: dentro del año, como los ordena YouTube Music
+
+
+def canciones_de_lanzamiento(album: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> tuple[str, list[dict]]:
+    """(id de su playlist «OLAK…» para bajarlo entero, [{id, titulo}]) de un álbum o single («MPREb…»)."""
+    try:
+        r = pedir("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false",
+                  {"context": {"client": YTM_CLIENTE}, "browseId": album})
+    except ValueError:
+        return "", []
+    lista = re.search(r'"playlistId":\s*"(OLAK[\w-]+)"', json.dumps(r))
+    canciones = []
+    for it in _todos(r, "musicResponsiveListItemRenderer"):
+        vid = (it.get("playlistItemData") or {}).get("videoId")
+        columnas = it.get("flexColumns") or []
+        if vid and columnas:
+            canciones.append({"id": vid, "titulo": _texto(columnas[0].get("musicResponsiveListItemFlexColumnRenderer", {}).get("text"))})
+    return (lista.group(1) if lista else ""), canciones
+
+
 def letra_youtube(video_id: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> str | None:
     """La letra que muestra YouTube Music (pestaña «Letra», de Musixmatch), sin tiempos. None si no tiene."""
     try:

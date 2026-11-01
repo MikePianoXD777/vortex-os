@@ -209,6 +209,43 @@ Item {
             }
         }
 
+        // 1.5: «Tu mezcla del día»: lo que más escuchas revuelto con parecidas que no tienes (cambia cada día)
+        Rectangle {
+            id: mezcla
+            objectName: "mezcla"
+            visible: !raiz.playlist && vp.mezcla.cuantas > 0
+            Layout.fillWidth: true
+            Layout.leftMargin: 28
+            Layout.rightMargin: 28
+            Layout.bottomMargin: 14
+            implicitHeight: 92
+            radius: Tema.radioTarjeta
+            color: zonaMezcla.containsMouse ? Tema.realceFuerte : Tema.realce
+            Behavior on color { ColorAnimation { duration: 120 } }
+            MouseArea { id: zonaMezcla; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: vp.tocarMezcla() }
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 16
+                Mosaico { Layout.preferredWidth: 68; Layout.preferredHeight: 68; rutas: vp.mezcla.portadas || [] }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 3
+                    Text { text: "Tu mezcla del día"; color: Tema.texto; font.pixelSize: 17; font.weight: Font.Bold }
+                    Text {
+                        Layout.fillWidth: true
+                        text: vp.mezcla.cuantas + " canciones · lo que más escuchas"
+                              + (vp.mezcla.nuevas ? " y " + vp.mezcla.nuevas + " parecidas que no tienes" : "")
+                              + (vp.mezcla.hoy ? "" : " · se renueva al conectarte")
+                        color: Tema.suave
+                        font.pixelSize: 13
+                        elide: Text.ElideRight
+                    }
+                }
+                BotonIcono { icono: "play"; relleno: true; acento: true; tam: 46; ayuda: "Tocar tu mezcla del día"; onClicked: vp.tocarMezcla() }
+            }
+        }
+
         // --- búsqueda y orden ---
         RowLayout {
             Layout.fillWidth: true
@@ -568,6 +605,7 @@ Item {
             text: vp.meGusta.indexOf(menu.cancion.ruta || "") >= 0 ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
             onTriggered: vp.alternarMeGusta(menu.cancion.ruta)
         }
+        MenuItem { text: "Iniciar radio"; onTriggered: vp.iniciarRadio(menu.cancion) }   // 1.5
         MenuItem { text: "Tocar después"; onTriggered: vp.tocarDespues(menu.cancion) }
         MenuItem { text: "Agregar a la cola"; onTriggered: vp.agregarACola(menu.cancion) }
         MenuSeparator {}
@@ -595,6 +633,11 @@ Item {
             height: visible ? implicitHeight : 0
             text: "Quitar de esta playlist"
             onTriggered: vp.quitarDePlaylist(raiz.playlist.id, menu.cancion.ruta)
+        }
+        Menu {   // 1.5: el enlace de YouTube Music, para mandárselo a alguien
+            title: "Compartir"
+            MenuItem { text: "Copiar el enlace"; onTriggered: vp.compartir(menu.cancion, "copiar") }
+            MenuItem { text: "Mandar por WhatsApp"; onTriggered: vp.compartir(menu.cancion, "whatsapp") }
         }
         MenuItem { text: "Abrir su carpeta"; onTriggered: vp.abrirCarpeta(menu.cancion.ruta) }
         MenuSeparator {}
