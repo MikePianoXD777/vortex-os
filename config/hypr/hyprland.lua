@@ -182,6 +182,17 @@ hl.window_rule({
     size = "760 720",
 })
 
+-- Mini reproductor de Vortex Player (2.4, Ctrl+M): flotando, en todos los escritorios y abajo a la derecha,
+-- encima de todo. Se reconoce por su título (es otra ventana de la misma app).
+hl.window_rule({
+    name = "vortex-player-mini",
+    match = { title = "^Vortex Player · Mini$" },
+    float = true,
+    pin = true,
+    opacity = "1.0 override",
+    move = "monitor_w-window_w-20 monitor_h-window_h-20",
+})
+
 -- Gestor de ventanas (1.7.5, Ajustes → Pantalla o «vortex ventanas mosaico|kde»). De fábrica, mosaico
 -- (como qtile). En «kde», para quien viene de KDE o Windows: cada ventana se abre flotante y encimada, se
 -- arrastra de su barra de título (minimizar, maximizar y cerrar), se pega a las orillas y a las otras

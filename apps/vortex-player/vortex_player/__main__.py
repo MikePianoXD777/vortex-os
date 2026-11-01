@@ -135,6 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     codigo = app.exec()
     servidor.close()
     puente.pararAvance()
+    puente._guardar_sesion()   # 2.4: el segundo exacto donde te quedaste
     puente.r.cerrar()
     del mpris
     sys.stdout.flush()

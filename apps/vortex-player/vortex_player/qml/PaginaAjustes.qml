@@ -43,6 +43,50 @@ Flickable {
 
         Text { text: "Ajustes"; color: Tema.texto; font.pixelSize: 32; font.weight: Font.Bold }
 
+        // 2.4: las mismas canciones y playlists en el teléfono (por tu cuenta de Google)
+        Tarjeta {
+            titulo: "Tu música en el teléfono"
+            function hace(t) {
+                const min = Math.floor((Date.now() / 1000 - t) / 60)
+                return min < 1 ? "hace un momento" : min < 60 ? "hace " + min + " min" : "hace " + Math.floor(min / 60) + " h"
+            }
+            Explicacion {
+                text: vp.nube.correo
+                    ? "Tus canciones y playlists son las mismas aquí y en Vortex Player de tu teléfono (cuenta " + vp.nube.correo + "). Lo que bajes en uno aparece en el otro, y lo que borres desde Vortex Player se borra en los dos."
+                    : "Inicia sesión con tu cuenta de Google y tendrás las mismas canciones y playlists en Vortex Player de tu teléfono; cada uno baja solo lo que le falte. Se guardan en una carpeta oculta de tu Google Drive que solo ve Vortex Player."
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: text !== ""
+                text: vp.nube.error ? vp.nube.error
+                    : vp.nube.trabajando || vp.nube.texto ? vp.nube.texto
+                    : vp.nube.correo && vp.nube.ultima ? "Sincronizado " + parent.parent.hace(vp.nube.ultima) : ""
+                color: vp.nube.error ? Tema.peligro : Tema.azul
+                font.pixelSize: 13
+                wrapMode: Text.WordWrap
+            }
+            RowLayout {
+                spacing: 10
+                Boton {
+                    visible: !vp.nube.correo
+                    text: vp.nube.trabajando ? "Esperando al navegador…" : "Iniciar sesión con Google"
+                    icono: "enlace"
+                    enabled: vp.nube.configurada && !vp.nube.trabajando
+                    onClicked: vp.iniciarSesionGoogle()
+                }
+                Boton {
+                    visible: !!vp.nube.correo
+                    text: vp.nube.trabajando ? "Sincronizando…" : "Sincronizar ahora"
+                    icono: "girar"
+                    tipo: "secundario"
+                    enabled: !vp.nube.trabajando
+                    onClicked: vp.sincronizar()
+                }
+                Boton { visible: !!vp.nube.correo; text: "Cerrar sesión"; tipo: "fantasma"; onClicked: vp.cerrarSesionGoogle() }
+            }
+            Explicacion { visible: !vp.nube.configurada; text: "Esta versión todavía no está registrada con Google: llega en una actualización." }
+        }
+
         Tarjeta {
             titulo: "Audio"
             RowLayout {
@@ -102,6 +146,38 @@ Flickable {
             }
         }
 
+        // 2.4: crossfade y las letras guardadas para verlas sin internet
+        Tarjeta {
+            titulo: "Reproducción"
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Explicacion { text: "Crossfade: la canción que termina se va apagando mientras la siguiente entra." }
+                Selector {
+                    Layout.preferredWidth: 190
+                    readonly property var segundos: [0, 3, 5, 8, 12]
+                    model: ["Sin crossfade", "3 segundos", "5 segundos", "8 segundos", "12 segundos"]
+                    currentIndex: Math.max(0, segundos.indexOf(vp.ajustes.fundido === undefined ? 5 : vp.ajustes.fundido))
+                    onActivated: (i) => vp.ponerFundido(segundos[i])
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Explicacion {
+                    text: "Letras sin internet: " + (vp.letrasGuardadas.total
+                        ? vp.letrasGuardadas.con + " de " + vp.letrasGuardadas.total + " canciones ya buscadas"
+                          + (vp.letrasGuardadas.trabajando ? " · buscando las demás…" : "")
+                        : "se buscan solas para toda tu música") + ". Se guardan en tu computadora."
+                }
+                Boton {
+                    text: "Buscar las que faltan"; icono: "girar"; tipo: "fantasma"
+                    enabled: !vp.letrasGuardadas.trabajando
+                    onClicked: vp.bajarLetras()
+                }
+            }
+        }
+
         Tarjeta {
             titulo: "YouTube Music Premium"
             Explicacion { text: "Sin Premium se baja en Opus a ~160 kbps. Con Premium (también el familiar), AAC a 256 kbps: entra a music.youtube.com con tu cuenta en tu navegador y elígelo aquí. Vortex Player usa esa sesión solo para bajar." }
@@ -144,7 +220,7 @@ Flickable {
 
         Text {
             Layout.fillWidth: true
-            text: "Vortex Player 1.0 · para uso personal. Lo que bajas de YouTube es para escucharlo tú."
+            text: "Vortex Player 1.2 · para uso personal. Lo que bajas de YouTube es para escucharlo tú."
             color: Tema.tenue
             font.pixelSize: 12
         }

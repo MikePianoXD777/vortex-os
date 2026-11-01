@@ -3,11 +3,24 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Effects
 
 Rectangle {
     id: raiz
     color: Tema.barra
     implicitHeight: 92
+    property bool letraAbierta: false
+    property bool colaAbierta: false
+    property bool miniAbierto: false
+    signal alternarLetra()
+    signal alternarCola()
+    signal alternarMini()
+
+    // 2.4: al cambiar de canción, la portada y el título entran deslizándose con desenfoque
+    Connections {
+        target: rep
+        function onCambioCancion() { cambioCancion.restart() }
+    }
 
     function tiempo(s) {
         s = Math.max(0, Math.floor(s || 0))
@@ -34,9 +47,20 @@ Rectangle {
 
         // --- la canción ---
         RowLayout {
+            id: laCancion
             Layout.preferredWidth: parent.width * 0.3
             Layout.maximumWidth: parent.width * 0.3
             spacing: 12
+            property real desenfoque: 0
+            layer.enabled: cambioCancion.running
+            layer.effect: MultiEffect { blurEnabled: true; blurMax: 24; blur: laCancion.desenfoque }
+            transform: Translate { id: corrimiento }
+            ParallelAnimation {
+                id: cambioCancion
+                NumberAnimation { target: laCancion; property: "opacity"; from: 0; to: 1; duration: 380; easing.type: Easing.OutCubic }
+                NumberAnimation { target: corrimiento; property: "x"; from: 18; to: 0; duration: 420; easing.type: Easing.OutCubic }
+                NumberAnimation { target: laCancion; property: "desenfoque"; from: 1; to: 0; duration: 380; easing.type: Easing.OutCubic }
+            }
             Portada {
                 Layout.preferredWidth: 60
                 Layout.preferredHeight: 60
@@ -64,6 +88,21 @@ Rectangle {
                 Etiqueta {
                     texto: rep.cancion.etiqueta || ""
                     nivel: rep.cancion.nivel || "comprimida"
+                }
+            }
+            BotonIcono {   // 2.4: ❤️ como en Spotify, junto a la canción
+                id: corazon
+                readonly property bool gusta: vp.meGusta.indexOf(rep.cancion.ruta || "") >= 0
+                visible: !!rep.cancion.ruta
+                tam: 32
+                icono: gusta ? "corazonLleno" : "corazon"
+                activo: gusta
+                ayuda: gusta ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
+                onClicked: { vp.alternarMeGusta(rep.cancion.ruta); latido.restart() }
+                SequentialAnimation {
+                    id: latido
+                    NumberAnimation { target: corazon; property: "scale"; to: 1.3; duration: 120; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: corazon; property: "scale"; to: 1; duration: 260; easing.type: Easing.OutBack; easing.overshoot: 3 }
                 }
             }
         }
@@ -151,6 +190,34 @@ Rectangle {
             Layout.maximumWidth: parent.width * 0.3
             spacing: 8
             Item { Layout.fillWidth: true }
+            BotonIcono { icono: "letra"; tam: 32; activo: raiz.letraAbierta; ayuda: "Letra (Ctrl+Y)"; enabled: !!rep.cancion.ruta; onClicked: raiz.alternarLetra() }
+            BotonIcono { icono: "cola"; tam: 32; activo: raiz.colaAbierta; ayuda: "A continuación (Ctrl+Q)"; onClicked: raiz.alternarCola() }
+            BotonIcono {   // 2.4: temporizador para dormir
+                id: botonDormir
+                icono: "luna"; tam: 32; activo: rep.dormirActivo
+                ayuda: rep.dormirActivo ? "Se pausa en " + rep.dormirTexto : "Temporizador para dormir"
+                onClicked: menuDormir.popup(botonDormir, 0, -menuDormir.implicitHeight - 6)
+                Text {
+                    visible: rep.dormirActivo && rep.dormirTexto.indexOf(":") > 0
+                    text: rep.dormirTexto.split(":")[0]
+                    color: Tema.azul
+                    font.pixelSize: 9
+                    font.weight: Font.Bold
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                }
+                Menu {
+                    id: menuDormir
+                    MenuItem { enabled: false; text: rep.dormirActivo ? "Se pausa en " + rep.dormirTexto : "Pausar la música en…" }
+                    Repeater {
+                        model: [5, 15, 30, 45, 60, 90]
+                        MenuItem { required property int modelData; text: modelData + " minutos"; onTriggered: rep.dormir(modelData) }
+                    }
+                    MenuItem { text: "Al terminar la canción"; onTriggered: rep.dormir(-1) }
+                    MenuItem { visible: rep.dormirActivo; height: visible ? implicitHeight : 0; text: "Apagar el temporizador"; onTriggered: rep.dormir(0) }
+                }
+            }
+            BotonIcono { icono: "mini"; tam: 32; activo: raiz.miniAbierto; ayuda: "Mini reproductor (Ctrl+M)"; onClicked: raiz.alternarMini() }
             Rectangle {
                 id: chip
                 visible: raiz.textoSalida() !== ""

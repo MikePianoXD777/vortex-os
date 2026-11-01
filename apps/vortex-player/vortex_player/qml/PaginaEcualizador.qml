@@ -32,17 +32,17 @@ Item {
         Flow {
             Layout.fillWidth: true
             spacing: 8
+            // 2.4: los perfiles (los mismos 19 del teléfono) sobre tus bandas
             Repeater {
-                model: vp.presets
+                model: vp.perfiles
                 delegate: Boton {
                     required property string modelData
-                    text: ({ "Flat": "Plano", "Bass": "Graves", "Treble": "Agudos", "Vocal": "Voces", "Pop": "Pop",
-                             "Rock": "Rock", "Jazz": "Jazz", "Classic": "Clásica" })[modelData] || modelData
-                    tipo: vp.eq.preset === modelData ? "primario" : "secundario"
-                    onClicked: vp.ponerPreset(modelData)
+                    text: modelData
+                    tipo: vp.perfilEq === modelData ? "primario" : "secundario"
+                    onClicked: vp.ponerPerfil(modelData)
                 }
             }
-            Boton { visible: vp.eq.preset === "Custom"; text: "Personalizado"; tipo: "primario"; enabled: false }
+            Boton { visible: vp.perfilEq === "Personalizado"; text: "Personalizado"; tipo: "primario"; enabled: false }
         }
 
         Rectangle {

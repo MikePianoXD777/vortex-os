@@ -21,7 +21,7 @@ AQUI = Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI.parent))
 REPO = AQUI.parent.parent.parent
 
-from vortex_player import audio, biblioteca, calidad, descargas, ecualizador  # noqa: E402
+from vortex_player import audio, biblioteca, calidad, descargas, ecualizador, letras  # noqa: E402
 
 HAY_FFMPEG = shutil.which("ffmpeg") and shutil.which("ffprobe")
 
@@ -376,6 +376,121 @@ class Ecualizador(Temporal):
         self.assertEqual(ecualizador.estado()["preset"], "Rock")
         self.assertEqual(len(ecualizador.estado()["bandas"]), 10)
         self.assertFalse(ecualizador.poner_preset("Inventado"))
+
+
+class Perfiles(unittest.TestCase):
+    def test_perfiles_en_tus_bandas(self) -> None:
+        diez = [{"f": f, "g": 0.0} for f in ecualizador.FRECUENCIAS]
+        self.assertGreaterEqual(len(ecualizador.PERFILES), 15)
+        for nombre, valores in ecualizador.PERFILES.items():
+            self.assertEqual(len(valores), 10, nombre)
+            self.assertEqual([b["g"] for b in ecualizador.bandas_de_perfil(nombre, diez)], [float(v) for v in valores])
+            self.assertEqual(ecualizador.perfil_de(ecualizador.bandas_de_perfil(nombre, diez)), nombre)
+        # en bandas que no coinciden se interpola en escala logarítmica (a la mitad entre 62 y 125 Hz)
+        self.assertAlmostEqual(ecualizador.db_en(ecualizador.PERFILES["Graves"], (62 * 125) ** 0.5), 5.5, places=1)
+        self.assertEqual(ecualizador.db_en(ecualizador.PERFILES["Agudos"], 20000), 7)
+        tres = ecualizador.bandas_de_perfil("Rock", [{"f": 60, "g": 0}, {"f": 1000, "g": 0}, {"f": 12000, "g": 0}])
+        self.assertEqual(ecualizador.perfil_de(tres), "Rock")
+        self.assertEqual(ecualizador.perfil_de([{"f": 60, "g": 1}, {"f": 1000, "g": 9}]), "Personalizado")
+
+
+class Letras(Temporal):
+    LRC = "[00:01.00] Uno\n[00:02.50][00:06.00] Coro\n[00:04.2] Dos\n"
+
+    def test_limpiar_y_leer(self) -> None:
+        self.assertEqual(letras.limpiar("YOASOBI - アイドル (Official Music Video)", "YOASOBI"), "アイドル")
+        self.assertEqual(letras.limpiar("Blinding Lights (Official Audio) ft. Nadie", "The Weeknd"), "Blinding Lights")
+        self.assertEqual(letras.limpiar_artista("Ado, Vaundy & otros"), "Ado")
+        self.assertEqual(letras.limpiar_artista("Aimer - Topic"), "Aimer")
+        lineas = letras.leer_lrc(self.LRC)
+        self.assertEqual([(l["ms"], l["texto"]) for l in lineas],
+                         [(1000, "Uno"), (2500, "Coro"), (4200, "Dos"), (6000, "Coro")])
+        self.assertEqual([letras.actual(lineas, ms) for ms in (0, 800, 2400, 5000, 9000)], [-1, 0, 1, 2, 3])
+
+    def test_elegir(self) -> None:
+        r = [{"duration": 300, "syncedLyrics": "[00:01.00] lejos"},
+             {"duration": 201, "plainLyrics": "plana"},
+             {"duration": 199, "syncedLyrics": self.LRC}]
+        self.assertEqual(letras.elegir(r, 200)["duration"], 199)       # la que dura lo mismo y viene sincronizada
+        self.assertEqual(letras.elegir(r[:2], 200)["duration"], 201)   # si no, la plana
+        self.assertIsNone(letras.elegir(r[:1], 200))
+        self.assertTrue(letras.de_json(r[2])["sincronizada"])
+
+    def test_de_guarda_y_respaldo(self) -> None:
+        pedidos: list[str] = []
+        respuesta: dict = {"r": {"duration": 200, "syncedLyrics": self.LRC}}
+
+        def pedir(url: str):
+            pedidos.append(url)
+            r = respuesta["r"]
+            if isinstance(r, Exception):
+                raise r
+            return r if "/get?" in url else ([r] if r else [])
+
+        viejo = letras.pedir
+        letras.pedir = pedir
+        try:
+            d = self.t / "letras"
+            l = letras.de(d, "Canción (Official Video)", "Alguien", 200)
+            self.assertTrue(l["sincronizada"])
+            self.assertIn("track_name=Canci%C3%B3n", pedidos[0])
+            n = len(pedidos)
+            self.assertEqual(letras.de(d, "Canción (Official Video)", "Alguien", 200), l)   # la segunda, sin internet
+            self.assertEqual(len(pedidos), n)
+            # sin LRCLIB: la de YouTube Music (sin tiempos)
+            respuesta["r"] = None
+            l = letras.de(d, "Otra", "Alguien", 180, "vid123", lambda v: "línea 1\nlínea 2" if v == "vid123" else None)
+            self.assertEqual((l["sincronizada"], [x["texto"] for x in l["lineas"]]), (False, ["línea 1", "línea 2"]))
+            # no hay en ningún lado: se anota y no se vuelve a buscar
+            self.assertIsNone(letras.de(d, "Nada", "Nadie", 100))
+            n = len(pedidos)
+            self.assertIsNone(letras.de(d, "Nada", "Nadie", 100))
+            self.assertEqual(len(pedidos), n)
+            # sin internet: OSError y no se anota «nada»
+            respuesta["r"] = OSError("sin red")
+            with self.assertRaises(OSError):
+                letras.de(d, "Sin red", "Nadie", 100)
+            respuesta["r"] = {"duration": 100, "plainLyrics": "ya hay"}
+            self.assertEqual(letras.de(d, "Sin red", "Nadie", 100)["lineas"][0]["texto"], "ya hay")
+        finally:
+            letras.pedir = viejo
+
+
+class Novedades26(Temporal):
+    @unittest.skipUnless(HAY_FFMPEG, "falta ffmpeg")
+    def test_me_gusta_y_titulos_limpios(self) -> None:
+        m = self.t / "Música"
+        a = tono(m / "uno.flac", titulo="Uno", artista="Banda")
+        b = tono(m / "Vortex Player" / "YOASOBI - アイドル (Official Music Video) [ZRtdQ81jPUQ].opus", "-c:a", "libopus",
+                 titulo="YOASOBI - アイドル (Official Music Video)", artista="YOASOBI - Topic")
+        bib = biblioteca.Biblioteca()
+        bib.escanear()
+        self.assertEqual(sorted((c["titulo"], c["artista"]) for c in bib.canciones()), [("Uno", "Banda"), ("アイドル", "YOASOBI")])
+        self.assertEqual(bib.id_me_gusta(), -1)
+        otra = bib.crear_playlist("Otra")
+        self.assertTrue(bib.alternar_me_gusta(str(a)))
+        self.assertTrue(bib.alternar_me_gusta(str(b)))
+        self.assertEqual(bib.me_gusta(), [str(b), str(a)])   # la última, hasta arriba
+        self.assertEqual([(p["nombre"], p["meGusta"]) for p in bib.playlists()], [("Tus me gusta", True), ("Otra", False)])
+        self.assertFalse(bib.alternar_me_gusta(str(a)))
+        self.assertEqual(bib.me_gusta(), [str(b)])
+        # en la nube va con el mismo id que en el teléfono
+        self.assertIn(biblioteca.ME_GUSTA, bib.estado_nube().playlists)
+        self.assertNotEqual(otra, bib.id_me_gusta())
+
+    def test_titulos_y_recomendadas_sin_repetir(self) -> None:
+        t = letras.titulo_limpio
+        self.assertEqual(t("YOASOBI「アイドル」Official Music Video", "YOASOBI"), "アイドル")
+        self.assertEqual(t("Kick Back - Official Video", "米津玄師"), "Kick Back")
+        self.assertEqual(t("Bad Apple!! feat.nomico", "Alstroemeria Records"), "Bad Apple!!")
+        self.assertEqual(t("Song Name | Lyric Video", "X"), "Song Name")
+        self.assertEqual(t("Video", "X"), "Video")   # no se queda vacío
+        self.assertEqual(letras.artista_limpio("AdoVEVO"), "Ado")
+        self.assertEqual(letras.artista_limpio("Ado, Vaundy"), "Ado, Vaundy")
+        # la misma canción subida como video y como canción de YouTube Music ya no se recomienda dos veces
+        self.assertEqual(descargas._clave("YOASOBI - アイドル (Official Music Video)", "YOASOBI - Topic"),
+                         descargas._clave("アイドル", "YOASOBI"))
+        self.assertTrue(letras.guardada(self.t, "x", "y", 1) is False)
 
 
 if __name__ == "__main__":

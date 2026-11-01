@@ -179,6 +179,79 @@ Flickable {
                         }
                     }
                 }
+                // 2.4: sin búsqueda, «Para ti»: parecidas a lo último que escuchaste (sin lo que ya tienes)
+                ColumnLayout {
+                    id: paraTi
+                    Layout.fillWidth: true
+                    Layout.topMargin: 8
+                    visible: vp.enLinea.length === 0 && !vp.buscandoEnLinea
+                    spacing: 4
+                    onVisibleChanged: if (visible) vp.recomendarParaTi(false)
+                    Component.onCompleted: if (visible) vp.recomendarParaTi(false)
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Text { text: "Para ti"; color: Tema.texto; font.pixelSize: 20; font.weight: Font.Bold }
+                            Text {
+                                Layout.fillWidth: true
+                                text: vp.cargandoParaTi ? "Buscando canciones parecidas a lo último que escuchaste…"
+                                    : vp.errorParaTi ? vp.errorParaTi
+                                    : vp.paraTiDe.length ? "Porque escuchaste " + vp.paraTiDe.join(", ") : "Según lo último que escuchaste"
+                                color: vp.errorParaTi && !vp.cargandoParaTi ? Tema.peligro : Tema.tenue
+                                font.pixelSize: 12
+                                elide: Text.ElideRight
+                            }
+                        }
+                        Boton { text: "Otras"; icono: "girar"; tipo: "fantasma"; enabled: !vp.cargandoParaTi; onClicked: vp.recomendarParaTi(true) }
+                    }
+                    Repeater {
+                        model: paraTi.visible ? vp.paraTi : []
+                        delegate: Rectangle {
+                            id: sugerida
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: 60
+                            radius: 12
+                            color: zonaSug.hovered || avanceSug.mio ? Tema.campo : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            HoverHandler { id: zonaSug }
+                            // cada una entra un poco después de la anterior
+                            opacity: 0
+                            NumberAnimation on opacity { from: 0; to: 1; duration: 300; running: true; easing.type: Easing.OutCubic }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                spacing: 12
+                                BotonAvance { id: avanceSug; vid: sugerida.modelData.id; onClicked: vp.escucharParaTi(sugerida.index) }
+                                Portada { Layout.preferredWidth: 46; Layout.preferredHeight: 46; url: sugerida.modelData.portada }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text { Layout.fillWidth: true; text: sugerida.modelData.titulo; color: avanceSug.mio ? Tema.azul : Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                    Text { Layout.fillWidth: true; text: [sugerida.modelData.artistas, sugerida.modelData.album].filter(x => x).join(" · "); color: Tema.suave; font.pixelSize: 12; elide: Text.ElideRight }
+                                }
+                                Text { text: raiz.tiempo(sugerida.modelData.duracion); color: Tema.tenue; font.pixelSize: 12; font.features: { "tnum": 1 } }
+                                Text {
+                                    visible: sugerida.modelData.estado !== ""
+                                    text: sugerida.modelData.estado === "biblioteca" ? "✓ En tu biblioteca" : "Bajando…"
+                                    color: sugerida.modelData.estado === "biblioteca" ? Tema.exito : Tema.suave
+                                    font.pixelSize: 12
+                                }
+                                Boton {
+                                    visible: sugerida.modelData.estado === ""
+                                    text: "Bajar"; icono: "descargar"; tipo: "secundario"
+                                    enabled: vp.ajustes.hayYtDlp
+                                    onClicked: vp.bajarParaTi(sugerida.index)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

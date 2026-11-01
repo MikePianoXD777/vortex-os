@@ -14,6 +14,16 @@ Item {
         return null
     }
     property bool renombrando: false
+    // 2.4: el encabezado toma el color de la portada (de la playlist o de la primera canción), como Spotify
+    property string colorPortada: ""
+    readonly property string rutaColor: raiz.playlist && raiz.playlist.portadas && raiz.playlist.portadas.length
+        ? raiz.playlist.portadas[0] : vp.canciones.length ? vp.canciones[0].ruta : ""
+    onRutaColorChanged: colorPortada = rutaColor ? vp.colorDe(rutaColor) : ""
+    Connections {
+        target: vp
+        function onPortadaLista(r) { if (r === raiz.rutaColor) raiz.colorPortada = vp.colorDe(r) }
+    }
+    readonly property bool sonandoAqui: !rep.pausado && rep.origen === (raiz.playlist ? raiz.playlist.nombre : "Tu biblioteca")
 
     function tiempo(s) {
         s = Math.max(0, Math.round(s || 0))
@@ -41,18 +51,28 @@ Item {
         // --- encabezado ---
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: 190
+            implicitHeight: 210
+            readonly property color tono: raiz.colorPortada ? raiz.colorPortada : Qt.rgba(Tema.azul.r, Tema.azul.g, Tema.azul.b, 0.22)
             gradient: Gradient {
-                GradientStop { position: 0; color: Qt.rgba(Tema.azul.r, Tema.azul.g, Tema.azul.b, 0.22) }
+                GradientStop { position: 0; color: parent.tono; Behavior on color { ColorAnimation { duration: 500 } } }
                 GradientStop { position: 1; color: "transparent" }
             }
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 28
                 spacing: 22
+                Mosaico {   // 2.4: la portada de la playlist: sus primeras 4 canciones
+                    visible: !!raiz.playlist
+                    Layout.preferredWidth: 154
+                    Layout.preferredHeight: 154
+                    radio: 6
+                    rutas: raiz.playlist ? raiz.playlist.portadas || [] : []
+                    meGusta: !!raiz.playlist && !!raiz.playlist.meGusta
+                }
                 Rectangle {
-                    Layout.preferredWidth: 134
-                    Layout.preferredHeight: 134
+                    visible: !raiz.playlist
+                    Layout.preferredWidth: 154
+                    Layout.preferredHeight: 154
                     radius: 14
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
@@ -115,15 +135,24 @@ Item {
                     RowLayout {
                         Layout.topMargin: 8
                         spacing: 10
-                        Boton { text: "Reproducir"; icono: "play"; enabled: vp.canciones.length > 0; onClicked: { if (rep.aleatorio) rep.alternarAleatorio(); vp.tocar(0) } }
+                        BotonIcono {   // 2.4: el botón redondo de Spotify (del color de acento)
+                            relleno: true; acento: true; tam: 52
+                            icono: raiz.sonandoAqui ? "pausa" : "play"
+                            ayuda: raiz.sonandoAqui ? "Pausa" : "Reproducir"
+                            enabled: vp.canciones.length > 0
+                            onClicked: {
+                                if (rep.origen === (raiz.playlist ? raiz.playlist.nombre : "Tu biblioteca") && rep.cancion.ruta) rep.alternar()
+                                else { if (rep.aleatorio) rep.alternarAleatorio(); vp.tocar(0) }
+                            }
+                        }
                         Boton { text: "Aleatorio"; icono: "aleatorio"; tipo: "secundario"; enabled: vp.canciones.length > 0; onClicked: vp.tocarAleatorio() }
                         Boton {
-                            visible: !!raiz.playlist
+                            visible: !!raiz.playlist && !raiz.playlist.meGusta
                             text: "Renombrar"; icono: "editar"; tipo: "fantasma"
                             onClicked: { raiz.renombrando = true; campoNombre.text = raiz.playlist.nombre; campoNombre.forceActiveFocus(); campoNombre.selectAll() }
                         }
                         Boton {
-                            visible: !!raiz.playlist
+                            visible: !!raiz.playlist && !raiz.playlist.meGusta
                             text: "Borrar playlist"; icono: "papelera"; tipo: "peligro"
                             onClicked: confirmarBorrar.open()
                         }
@@ -408,6 +437,15 @@ Item {
                             }
                         }
                     }
+                    BotonIcono {   // 2.4: ❤️ al pasar el mouse, o siempre si ya te gusta
+                        readonly property bool gusta: vp.meGusta.indexOf(fila.modelData.ruta) >= 0
+                        opacity: gusta || zona.containsMouse || hovered ? 1 : 0
+                        tam: 30
+                        icono: gusta ? "corazonLleno" : "corazon"
+                        activo: gusta
+                        ayuda: gusta ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
+                        onClicked: vp.alternarMeGusta(fila.modelData.ruta)
+                    }
                     Text {
                         Layout.preferredWidth: lista.width * 0.24
                         text: fila.modelData.album || ""
@@ -477,6 +515,14 @@ Item {
     Menu {
         id: menu
         property var cancion: ({})
+        // 2.4: ❤️ y la cola «A continuación»
+        MenuItem {
+            text: vp.meGusta.indexOf(menu.cancion.ruta || "") >= 0 ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
+            onTriggered: vp.alternarMeGusta(menu.cancion.ruta)
+        }
+        MenuItem { text: "Tocar después"; onTriggered: vp.tocarDespues(menu.cancion) }
+        MenuItem { text: "Agregar a la cola"; onTriggered: vp.agregarACola(menu.cancion) }
+        MenuSeparator {}
         Menu {
             id: submenu
             title: "Agregar a la playlist"

@@ -37,7 +37,14 @@ QtObject {
         "girar": "M20 12a8 8 0 1 1-2.3-5.7",
         "pregunta": "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01",
         "mas_puntos": "M5 12h.01M12 12h.01M19 12h.01",
-        "editar": "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"
+        "editar": "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4",
+        "letra": "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM19 11a7 7 0 0 1-14 0M12 18v3M9 21h6",
+        "atras": "M15 5l-7 7 7 7",
+        "corazon": "M12 20.3l-1.2-1.1C6.2 15.1 3 12.2 3 8.6 3 5.8 5.2 3.6 8 3.6c1.6 0 3.1.7 4 1.9.9-1.2 2.4-1.9 4-1.9 2.8 0 5 2.2 5 5 0 3.6-3.2 6.5-7.8 10.6z",
+        "corazonLleno": "M12 20.3l-1.2-1.1C6.2 15.1 3 12.2 3 8.6 3 5.8 5.2 3.6 8 3.6c1.6 0 3.1.7 4 1.9.9-1.2 2.4-1.9 4-1.9 2.8 0 5 2.2 5 5 0 3.6-3.2 6.5-7.8 10.6z",
+        "cola": "M3 6h13M3 11h13M3 16h8M16 14.5l5 3-5 3z",
+        "luna": "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z",
+        "mini": "M3 5h18v14H3zM12 12h6v4h-6z"
     })
 
     function _hex(c) {
@@ -47,7 +54,7 @@ QtObject {
 
     function uri(nombre, color, trazo) {
         var d = trazos[nombre] || trazos["pregunta"]
-        var relleno = (nombre === "play" || nombre === "siguiente" || nombre === "anterior") ? _hex(color) : "none"
+        var relleno = (nombre === "play" || nombre === "siguiente" || nombre === "anterior" || nombre === "corazonLleno") ? _hex(color) : "none"
         var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="' + relleno + '" stroke="' + _hex(color)
                 + '" stroke-width="' + (trazo || 2) + '" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>'
         return "data:image/svg+xml;utf8," + encodeURIComponent(svg)

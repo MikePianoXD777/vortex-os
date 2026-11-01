@@ -23,6 +23,8 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Iterator
 
+from . import letras
+
 AGENTE = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 MARCA = "VORTEX"
 
@@ -244,10 +246,32 @@ def radio(video_id: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> li
     return [c for c in leer_radio(r) if c["id"] != video_id]
 
 
+def letra_youtube(video_id: str, pedir: Callable[[str, dict], dict] = _pedir_json) -> str | None:
+    """La letra que muestra YouTube Music (pestaña «Letra», de Musixmatch), sin tiempos. None si no tiene."""
+    try:
+        n = pedir("https://music.youtube.com/youtubei/v1/next?prettyPrint=false",
+                  {"context": {"client": YTM_CLIENTE}, "videoId": video_id, "isAudioOnly": True})
+        ids = [(t.get("endpoint") or {}).get("browseEndpoint", {}).get("browseId", "") for t in _todos(n, "tabRenderer")]
+        bid = next((i for i in ids if i.startswith("MPLY")), "")
+        if not bid:
+            return None
+        b = pedir("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false",
+                  {"context": {"client": YTM_CLIENTE}, "browseId": bid})
+    except ValueError:
+        return None
+    for d in _todos(b, "musicDescriptionShelfRenderer"):
+        texto = "".join(r.get("text", "") for r in ((d.get("description") or {}).get("runs") or []))
+        if texto.strip():
+            return texto
+    return None
+
+
 def _clave(titulo: str, artista: str) -> str:
-    """Para reconocer la misma canción aunque venga de otro lado: «idol (from oshi no ko)» ≈ «idol»."""
-    t = re.sub(r"[\(\[].*?[\)\]]|\s-\s.*$", "", titulo.lower())
-    return re.sub(r"\W+", "", t) + "|" + re.sub(r"\W+", "", artista.lower().split(",")[0])
+    """Para reconocer la misma canción aunque venga de otro lado: «idol (from oshi no ko)» ≈ «idol», y
+    (2.4) «YOASOBI - アイドル (Official Music Video)» de «YOASOBI - Topic» ≈ «アイドル» de «YOASOBI»."""
+    t = re.sub(r"[\(\[].*?[\)\]]|\s-\s.*$", "", letras.titulo_limpio(titulo, artista).lower())
+    a = letras.limpiar_artista(artista).lower()
+    return re.sub(r"\W+", "", t) + "|" + re.sub(r"\W+", "", a)
 
 
 def recomendar(semillas: list[dict], tienes: list[dict], n: int = 20,

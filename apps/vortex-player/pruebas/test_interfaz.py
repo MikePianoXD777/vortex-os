@@ -77,7 +77,8 @@ class Interfaz(unittest.TestCase):
                    "VORTEX_PLAYER_MUSICA": str(self.t / "Música"), "VORTEX_PLAYER_DATOS": str(d / "datos"),
                    "VORTEX_PLAYER_CONFIG": str(d / "config"), "VORTEX_PLAYER_CACHE": str(d / "cache"),
                    "XDG_CONFIG_HOME": str(d / "xdg"), "XDG_RUNTIME_DIR": str(d),
-                   "VORTEX_PLAYER_EQ": str(d / "eq.json"), "SERPANTINUM_DIR": str(d / "sin-shell")}
+                   "VORTEX_PLAYER_EQ": str(d / "eq.json"), "SERPANTINUM_DIR": str(d / "sin-shell"),
+                   "VORTEX_PLAYER_SIN_RED": "1"}
         r = subprocess.run(["dbus-run-session", "--", sys.executable, str(d / "guion.py")], env=entorno,
                            capture_output=True, text=True, timeout=90)
         linea = next((x for x in r.stdout.splitlines() if x.startswith("RESULTADO ")), None)
@@ -276,7 +277,7 @@ class Interfaz(unittest.TestCase):
         self.assertTrue(d["cargando"])
         self.assertTrue(d["para"])
         self.assertEqual(d["recos"], [["Parecida 1", ""]])
-        self.assertEqual(d["despues"], ["biblioteca"])
+        self.assertEqual(d["despues"], [])   # 2.4: al bajarla se quita de las recomendadas (ya la tienes)
         self.assertEqual(d["en_playlist"], 2)
         self.assertEqual(d["llamadas_al_volver"], 1)
         self.assertEqual((d["otras"], d["llamadas"]), (["Parecida 2"], 2))
@@ -418,6 +419,124 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["final"], d["eq"])
         self.assertEqual(d["errores_qml"], [])
 
+
+    def test_letra_perfil_y_seguir_donde_te_quedaste(self) -> None:
+        # 2.4: la letra sincronizada (de la caché, sin internet), un perfil del ecualizador, y al cerrar y
+        # volver a abrir sigue en la misma canción, en pausa y en el mismo segundo
+        d = self.correr("""
+            from vortex_player import letras, rutas
+            datos = {}
+            def empezar():
+                i = next(k for k, c in enumerate(puente.canciones) if c["titulo"] == "Dos")
+                c = puente.canciones[i]
+                f = letras._archivo(rutas.cache() / "letras", c["titulo"], c.get("artista") or "", int(c.get("duracion") or 0))
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(json.dumps({"lineas": letras.leer_lrc("[00:01.00] uno\\n[00:05.00] cinco\\n[00:20.00] veinte"),
+                                         "sincronizada": True, "cuando": 9e12}))
+                puente.tocar(i)
+            def letra():
+                ventana.setProperty("pagina", "letra")
+                r.buscar(6)
+            def medir():
+                l = puente.letra
+                datos["letra"] = [x["texto"] for x in l["lineas"]]
+                datos["sincronizada"] = l["sincronizada"]
+                datos["linea"] = puente.lineaActual(r.posicion)
+                puente.ponerPerfil("Rock")
+            def cerrar():
+                datos["perfil"] = puente.perfilEq
+                r.buscar(12)
+            def guardar():
+                puente._guardar_sesion()
+                fin(**datos)
+            paso(2500, empezar)
+            paso(1500, letra)
+            paso(800, medir)
+            paso(600, cerrar)
+            paso(800, guardar)
+        """, "sesion")
+        self.assertEqual((d["letra"], d["sincronizada"], d["linea"]), (["uno", "cinco", "veinte"], True, 1))
+        self.assertEqual(d["perfil"], "Rock")
+        self.assertTrue((self.t / "sesion" / "eq.log").read_text().strip())   # el perfil llegó al ecualizador
+        self.assertEqual(d["errores_qml"], [])
+        d = self.correr("""
+            datos = {}
+            def medir():
+                datos["sonando"] = r.cancion.get("titulo")
+                datos["pausado"] = r.pausado
+                datos["posicion"] = r.posicion
+                datos["origen"] = r.origen
+                datos["cola"] = len(r.sesion()["rutas"])
+                fin(**datos)
+            paso(2500, medir)
+        """, "sesion")
+        self.assertEqual((d["sonando"], d["pausado"], d["origen"], d["cola"]), ("Dos", True, "Tu biblioteca", 3))
+        self.assertAlmostEqual(d["posicion"], 12, delta=1.5)
+        self.assertEqual(d["errores_qml"], [])
+
+    def test_me_gusta_cola_dormir_y_crossfade(self) -> None:
+        # 2.4: ❤️ (playlist «Tus me gusta», primero en la lista), la cola «A continuación», el temporizador,
+        # el crossfade (la que termina sigue en otro mpv) y el mini reproductor
+        d = self.correr("""
+            from PySide6.QtCore import QObject
+            datos = {}
+            def titulos():
+                return [c["titulo"] for c in r.cola[r.indice:]]
+            def empezar():
+                puente.ordenar("titulo")   # Dos, Tres, Uno
+                rutas = {c["titulo"]: c for c in puente.canciones}
+                puente.alternarMeGusta(rutas["Uno"]["ruta"])
+                puente.alternarMeGusta(rutas["Tres"]["ruta"])
+                datos["playlists"] = [(p["nombre"], p["meGusta"], p["canciones"]) for p in puente.playlists]
+                datos["me_gusta"] = [rutas[t]["ruta"] in puente.meGusta for t in ("Uno", "Dos", "Tres")]
+                puente.alternarMeGusta(rutas["Tres"]["ruta"])
+                datos["quitada"] = rutas["Tres"]["ruta"] in puente.meGusta
+                puente.tocar(0)   # Dos (y la cola: Tres, Uno)
+                puente.tocarDespues(rutas["Uno"])
+                puente.tocarDespues(rutas["Tres"])
+                puente.agregarACola(rutas["Dos"])
+                datos["cola"] = titulos()
+                r.quitarDeColaEn(r.indice + 2)
+                datos["sin_una"] = titulos()
+                ventana.setProperty("pagina", "cola")
+                mini = ventana.findChild(QObject, "mini")
+                datos["hay_mini"] = mini is not None
+                if mini:
+                    mini.setProperty("visible", True)
+            def saltar():
+                r.saltarA(r.indice + 1)
+                datos["salto"] = r.cancion.get("titulo")
+                r.dormir(-1)
+                datos["dormir"] = [r.dormirActivo, r.dormirTexto]
+                r.dormir(0)
+                r.dormir(30)
+                datos["dormir30"] = r.dormirTexto
+                r.dormir(0)
+                r.ponerFundido(3)
+                datos["antes"] = r.cancion.get("titulo")
+            def adelantar():
+                r.buscar(r.duracion - 4)
+            def fundido():
+                datos["despues"] = r.cancion.get("titulo")
+                datos["sonando_la_que_sale"] = len(r._cola_fundido)
+                datos["pausado"] = r.pausado
+                fin(**datos)
+            paso(2500, empezar)
+            paso(1500, saltar)
+            paso(1000, adelantar)
+            paso(2500, fundido)
+        """, "megusta")
+        self.assertEqual(d["playlists"][0], ["Tus me gusta", True, 2])
+        self.assertEqual((d["me_gusta"], d["quitada"]), ([True, False, True], False))
+        self.assertEqual(d["cola"], ["Dos", "Uno", "Tres", "Tres", "Uno", "Dos"])
+        self.assertEqual(d["sin_una"], ["Dos", "Uno", "Tres", "Uno", "Dos"])
+        self.assertTrue(d["hay_mini"])
+        self.assertEqual(d["salto"], "Uno")
+        self.assertEqual(d["dormir"], [True, "Al terminar la canción"])
+        self.assertIn(d["dormir30"], ("30:00", "29:59"))
+        self.assertEqual((d["antes"], d["despues"], d["pausado"]), ("Uno", "Tres", False))
+        self.assertEqual(d["sonando_la_que_sale"], 1)
+        self.assertEqual(d["errores_qml"], [])
 
 if __name__ == "__main__":
     unittest.main()

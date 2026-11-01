@@ -14,11 +14,20 @@ ApplicationWindow {
     title: rep.cancion.titulo ? rep.cancion.titulo + (rep.cancion.artista ? " · " + rep.cancion.artista : "") : "Vortex Player"
     color: Tema.fondo
 
-    property string pagina: "canciones"   // canciones | agregar | ecualizador | ajustes
+    property string pagina: "canciones"   // canciones | agregar | ecualizador | ajustes | letra | cola
+    property string paginaAntes: "canciones"
 
     function ir(p, playlist) {
         pagina = p
         if (p === "canciones") vp.verPlaylist(playlist === undefined ? -1 : playlist)
+    }
+
+    // 2.4: la letra ocupa la página (como en Spotify); otra vez el botón, regresa a donde estabas
+    function alternarLetra() { alternar("letra") }
+    // 2.4: la cola «A continuación» igual: ocupa la página y otra vez el botón regresa
+    function alternar(p) {
+        if (pagina === p) pagina = paginaAntes
+        else { if (pagina !== "letra" && pagina !== "cola") paginaAntes = pagina; pagina = p }
     }
 
     Connections {
@@ -36,6 +45,12 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Left"; onActivated: rep.anterior() }
     Shortcut { sequence: "Ctrl+L"; onActivated: ventana.ir("agregar") }
     Shortcut { sequences: [StandardKey.Paste]; enabled: !(activeFocusItem instanceof TextInput); onActivated: ventana.ir("agregar") }
+    Shortcut { sequence: "Ctrl+Y"; onActivated: ventana.alternarLetra() }
+    Shortcut { sequence: "Ctrl+Q"; onActivated: ventana.alternar("cola") }
+    Shortcut { sequence: "Ctrl+M"; onActivated: mini.alternar() }
+
+    // 2.4: el mini reproductor, una ventanita encima de todo (Ctrl+M)
+    MiniReproductor { id: mini; objectName: "mini"; principal: ventana }
 
     component Navegar: Rectangle {
         id: nav
@@ -116,14 +131,34 @@ ApplicationWindow {
                         spacing: 2
                         model: vp.playlists
                         boundsBehavior: Flickable.StopAtBounds
-                        delegate: Navegar {
+                        // 2.4: como «Tu biblioteca» de Spotify: el mosaico de sus primeras 4 canciones
+                        delegate: Rectangle {
+                            id: filaPl
                             required property var modelData
+                            readonly property bool elegido: ventana.pagina === "canciones" && vp.vistaPlaylist === modelData.id
                             width: ListView.view.width
-                            texto: modelData.nombre
-                            icono: modelData.url ? "enlace" : "playlist"
-                            contador: modelData.canciones
-                            elegido: ventana.pagina === "canciones" && vp.vistaPlaylist === modelData.id
-                            onPulsado: ventana.ir("canciones", modelData.id)
+                            implicitHeight: 56
+                            radius: 8
+                            color: elegido ? Tema.barraSel : zonaPl.containsMouse ? Tema.barraHover : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 6
+                                anchors.rightMargin: 10
+                                spacing: 10
+                                Mosaico { Layout.preferredWidth: 44; Layout.preferredHeight: 44; rutas: filaPl.modelData.portadas || []; radio: 5; meGusta: !!filaPl.modelData.meGusta }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text { Layout.fillWidth: true; text: filaPl.modelData.nombre; color: rep.origen === filaPl.modelData.nombre ? Tema.azul : Tema.texto; font.pixelSize: 14; font.weight: Font.Medium; elide: Text.ElideRight }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: (filaPl.modelData.url ? "Importada" : "Playlist") + " · " + filaPl.modelData.canciones + (filaPl.modelData.canciones === 1 ? " canción" : " canciones")
+                                        color: Tema.tenue; font.pixelSize: 12; elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                            MouseArea { id: zonaPl; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: ventana.ir("canciones", filaPl.modelData.id) }
                         }
                         Text {
                             visible: parent.count === 0
@@ -139,22 +174,43 @@ ApplicationWindow {
                 }
             }
 
-            // --- página ---
-            StackLayout {
+            // --- página (2.4: cada una entra con desenfoque de movimiento) ---
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                currentIndex: ["canciones", "agregar", "ecualizador", "ajustes"].indexOf(ventana.pagina)
-                PaginaCanciones {
-                    onIrAAgregar: ventana.ir("agregar")
-                    onBuscarEnInternet: (texto) => { ventana.ir("agregar"); paginaAgregar.buscar(texto) }
+                clip: true
+                Entrar {
+                    anchors.fill: parent; mostrado: ventana.pagina === "canciones"
+                    PaginaCanciones {
+                        id: paginaCanciones
+                        anchors.fill: parent
+                        onIrAAgregar: ventana.ir("agregar")
+                        onBuscarEnInternet: (texto) => { ventana.ir("agregar"); paginaAgregar.buscar(texto) }
+                    }
                 }
-                PaginaAgregar { id: paginaAgregar }
-                PaginaEcualizador {}
-                PaginaAjustes {}
+                Entrar { anchors.fill: parent; mostrado: ventana.pagina === "agregar"; PaginaAgregar { id: paginaAgregar; anchors.fill: parent } }
+                Entrar { anchors.fill: parent; mostrado: ventana.pagina === "ecualizador"; PaginaEcualizador { anchors.fill: parent } }
+                Entrar { anchors.fill: parent; mostrado: ventana.pagina === "ajustes"; PaginaAjustes { anchors.fill: parent } }
+                Entrar {
+                    anchors.fill: parent; mostrado: ventana.pagina === "letra"; desde: 1.04
+                    PaginaLetra { anchors.fill: parent; onCerrar: ventana.alternarLetra() }
+                }
+                Entrar {
+                    anchors.fill: parent; mostrado: ventana.pagina === "cola"; desde: 1.04
+                    PaginaCola { anchors.fill: parent; onCerrar: ventana.alternar("cola") }
+                }
             }
         }
 
-        Barra { Layout.fillWidth: true }
+        Barra {
+            Layout.fillWidth: true
+            letraAbierta: ventana.pagina === "letra"
+            colaAbierta: ventana.pagina === "cola"
+            miniAbierto: mini.visible
+            onAlternarLetra: ventana.alternarLetra()
+            onAlternarCola: ventana.alternar("cola")
+            onAlternarMini: mini.alternar()
+        }
     }
 
     // Arrastrar archivos, carpetas o un enlace a la ventana

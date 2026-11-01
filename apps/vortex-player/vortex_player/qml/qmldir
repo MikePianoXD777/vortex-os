@@ -12,3 +12,8 @@ PaginaAgregar 1.0 PaginaAgregar.qml
 PaginaEcualizador 1.0 PaginaEcualizador.qml
 PaginaAjustes 1.0 PaginaAjustes.qml
 Selector 1.0 Selector.qml
+Mosaico 1.0 Mosaico.qml
+Entrar 1.0 Entrar.qml
+PaginaLetra 1.0 PaginaLetra.qml
+PaginaCola 1.0 PaginaCola.qml
+MiniReproductor 1.0 MiniReproductor.qml

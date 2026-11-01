@@ -77,3 +77,61 @@ def poner_bandas(bandas: list[dict]) -> bool:
 
 def poner_preset(nombre: str) -> bool:
     return nombre in PRESETS and correr("preset", nombre)
+
+
+# --- 2.4: perfiles (los mismos que en el teléfono, Ecualizador.kt) -----------------------------------------
+# dB sobre FRECUENCIAS; se pasan a las bandas que tengas (2 a 16) interpolando en escala logarítmica.
+
+PERFILES: dict[str, list[float]] = {
+    "Plano": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "Graves": [6, 6, 5, 3, 1, 0, 0, 0, 0, 0],
+    "Graves al máximo": [9, 8, 6, 3, 0, -1, 0, 0, 0, 0],
+    "Menos graves": [-6, -5, -4, -2, 0, 0, 0, 0, 0, 0],
+    "Agudos": [0, 0, 0, 0, 0, 1, 3, 5, 6, 7],
+    "Voz": [-2, -2, -1, 1, 3, 4, 4, 3, 1, 0],
+    "Pop": [-1, 1, 3, 4, 3, 0, -1, -1, 1, 2],
+    "Rock": [5, 4, 3, 1, -1, -1, 1, 3, 4, 5],
+    "Metal": [4, 4, 2, 0, -2, 0, 2, 4, 5, 4],
+    "Electrónica": [6, 5, 2, 0, -2, 1, 0, 2, 4, 5],
+    "Hip hop": [6, 5, 3, 2, -1, -1, 1, 0, 2, 3],
+    "Reggaetón": [7, 6, 3, 0, -1, 0, 1, 2, 2, 2],
+    "J-pop y anime": [2, 2, 1, 0, 1, 2, 3, 4, 4, 3],
+    "Clásica": [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+    "Jazz": [3, 2, 1, 2, -2, -2, 0, 1, 3, 4],
+    "Piano": [2, 1, 0, 2, 3, 1, 3, 4, 3, 2],
+    "Acústica": [4, 3, 2, 1, 1, 1, 2, 3, 3, 2],
+    "Lo-fi": [3, 3, 2, 1, 0, -1, -2, -3, -4, -5],
+    "Volumen bajo": [6, 5, 3, 0, -1, 0, 0, 2, 4, 5],
+}
+
+
+def db_en(perfil: list[float], hz: float) -> float:
+    """Los dB del perfil en `hz`, interpolando entre sus frecuencias en escala logarítmica."""
+    import math
+    x = math.log(max(1.0, hz))
+    f = [math.log(v) for v in FRECUENCIAS]
+    if x <= f[0]:
+        return perfil[0]
+    if x >= f[-1]:
+        return perfil[-1]
+    i = max(k for k, v in enumerate(f) if v <= x)
+    t = (x - f[i]) / (f[i + 1] - f[i])
+    return perfil[i] + (perfil[i + 1] - perfil[i]) * t
+
+
+def bandas_de_perfil(nombre: str, bandas: list[dict]) -> list[dict]:
+    """Tus bandas (las mismas frecuencias) con las ganancias del perfil, redondeadas a 0,1 dB."""
+    p = PERFILES[nombre]
+    return [{"f": b["f"], "g": round(db_en(p, b["f"]), 1)} for b in bandas]
+
+
+def perfil_de(bandas: list[dict]) -> str:
+    """El perfil que coincide con tus bandas, o «Personalizado»."""
+    for nombre in PERFILES:
+        if all(abs(b["g"] - g["g"]) < 0.15 for b, g in zip(bandas, bandas_de_perfil(nombre, bandas))):
+            return nombre
+    return "Personalizado"
+
+
+def poner_perfil(nombre: str, bandas: list[dict]) -> bool:
+    return nombre in PERFILES and poner_bandas(bandas_de_perfil(nombre, bandas))

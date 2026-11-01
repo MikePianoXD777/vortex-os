@@ -6,6 +6,7 @@ señales. La base SQLite se comparte entre hilos con un candado.
 from __future__ import annotations
 
 import hashlib
+import json
 import random
 import re
 import shutil
@@ -16,10 +17,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QColor, QImage
 
-from . import audio, descargas, ecualizador, rutas
+from . import audio, cuenta_google, descargas, ecualizador, letras, rutas, sincronia
 from .avance import Avance
-from .biblioteca import Biblioteca
+from .biblioteca import Biblioteca, id_de
 from .reproductor import Reproductor
 
 NOMBRES_PORTADA = ("cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "Cover.jpg", "Folder.jpg", "AlbumArt.jpg")
@@ -50,6 +52,15 @@ class Puente(QObject):
     _escaneado = Signal("QVariantMap")
     _resultados = Signal(int, "QVariantList", str)   # de la búsqueda en YouTube (hilo) al hilo de Qt
     _recomendadas = Signal(int, int, "QVariantList", str)   # (vuelta, playlist, canciones, error)
+    cambioNube = Signal()
+    _nube_fin = Signal("QVariantMap")                       # del hilo de la nube al hilo de Qt
+    _quitar_de_cola = Signal(str)
+    cambioLetra = Signal()
+    _letra_lista = Signal(int, "QVariantMap")               # del hilo de las letras al hilo de Qt
+    cambioParaTi = Signal()
+    _para_ti_listo = Signal(int, "QVariantList", "QStringList", str)
+    cambioLetras = Signal()
+    _letras_avance = Signal("QVariantMap")                  # del hilo de las letras sin internet
 
     def __init__(self, parent: QObject | None = None, biblioteca: Biblioteca | None = None,
                  reproductor: Reproductor | None = None):
@@ -92,6 +103,21 @@ class Puente(QObject):
         self._avance.error.connect(self.aviso)
         self.r.quiereSonar.connect(self._musica_quiere_sonar)
 
+        # 2.4: tu biblioteca en la nube (Google Drive), la misma que en el teléfono
+        s = cuenta_google.sesion()
+        self._nube = {"correo": s.get("correo", ""), "nombre": s.get("nombre", ""), "trabajando": False,
+                      "texto": "", "ultima": 0.0, "error": ""}
+        self._nube_pendientes: set[str] = set()   # ids que mandó bajar la sincronización
+        self._nube_fallidas: set[str] = set()     # no se reintentan hasta volver a abrir la app
+        self._nube_otra_vez = False
+        self._reloj_nube = QTimer(self, interval=10 * 60 * 1000)
+        self._reloj_nube.timeout.connect(self.sincronizar)
+        self._reloj_nube.start()
+        self._espera_nube = QTimer(self, singleShot=True, interval=15000)   # un rato después de cambiar algo
+        self._espera_nube.timeout.connect(self.sincronizar)
+        self._nube_fin.connect(self._fin_nube)
+        self._quitar_de_cola.connect(self.r.quitarDeCola)
+
         self._evento.connect(self._en_evento)
         self._escaneado.connect(self._fin_escaneo)
         self._resultados.connect(self._fin_busqueda_linea)
@@ -112,8 +138,37 @@ class Puente(QObject):
         self._reloj_salida.start()
         self.actualizarSalida()
 
+        # 2.4: seguir donde te quedaste, la letra de lo que suena y «Para ti» (de lo último que escuchaste)
+        self._sesion = self._leer_sesion()
+        self._restaurada = False
+        self._letra: dict = {"ruta": "", "lineas": [], "sincronizada": False, "buscando": False}
+        self._letra_vuelta = 0
+        self._para_ti: list[dict] = []
+        self._para_ti_de: list[str] = []
+        self._para_ti_cargando = False
+        self._para_ti_error = ""
+        self._para_ti_vuelta = 0
+        self._colores: dict[str, str] = {}
+        self._letra_lista.connect(self._fin_letra)
+        self._para_ti_listo.connect(self._fin_para_ti)
+        self.r.cambioCancion.connect(self._cambio_cancion)
+        self.r.cambioEstado.connect(self._guardar_sesion)
+        self._reloj_sesion = QTimer(self, interval=5000)
+        self._reloj_sesion.timeout.connect(lambda: self.r.pausado or self._guardar_sesion())
+        self._reloj_sesion.start()
+        self.cambioDescargas.connect(self.cambioParaTi)
+
+        # 2.4: ❤️, crossfade y las letras de toda tu música guardadas para verlas sin internet
+        self._me_gusta: list[str] = []
+        self.r.ponerFundido(float(self.bib.ajustes().get("fundido", 5)))
+        self._letras_estado = {"con": 0, "total": 0, "trabajando": False}
+        self._letras_avance.connect(self._en_letras)
+        self._espera_letras = QTimer(self, singleShot=True, interval=20000)
+        self._espera_letras.timeout.connect(self.bajarLetras)
+
         self._preparar_audio()
         self._recargar()
+        QTimer.singleShot(0, self._restaurar)
         QTimer.singleShot(0, self.escanear)
 
     # --- arranque ---------------------------------------------------------------------------------
@@ -137,6 +192,9 @@ class Puente(QObject):
             else:
                 lista = self.bib.canciones(self._buscar, self._orden)
             self._playlists = self.bib.playlists()
+            for p in self._playlists:   # 2.4: el mosaico de la portada
+                p["portadas"] = self.bib.primeras_de_playlist(p["id"])
+            self._me_gusta = self.bib.me_gusta()
             # Lo bajado de YouTube lleva su id en el nombre («Título [id].opus»): así la búsqueda sabe qué ya tienes
             self._ids_biblioteca = {m.group(1) for (r,) in self.bib.db.execute("SELECT ruta FROM canciones")
                                     if (m := re.search(r"\[([\w-]{11})\]\.\w+$", r))}
@@ -164,14 +222,20 @@ class Puente(QObject):
         if pid >= 0:
             self.recomendar(pid, False)
 
+    def _origen(self) -> str:
+        p = next((p for p in self._playlists if p["id"] == self._vista_playlist), None)
+        return p["nombre"] if p else "Tu biblioteca"
+
     @Slot(int)
     def tocar(self, i: int) -> None:
+        self.r.ponerOrigen(self._origen())
         self.r.tocar(self._canciones, i)
 
     @Slot()
     def tocarAleatorio(self) -> None:
         if not self._canciones:
             return
+        self.r.ponerOrigen(self._origen())
         if not self.r.aleatorio:
             self.r.alternarAleatorio()
         import random
@@ -182,6 +246,7 @@ class Puente(QObject):
         with self.candado:
             pid = self.bib.crear_playlist(nombre)
         self._recargar()
+        self._cambio_local()
         return pid
 
     @Slot(int, str)
@@ -189,6 +254,7 @@ class Puente(QObject):
         with self.candado:
             self.bib.renombrar_playlist(pid, nombre)
         self._recargar()
+        self._cambio_local()
 
     @Slot(int)
     def borrarPlaylist(self, pid: int) -> None:
@@ -197,12 +263,14 @@ class Puente(QObject):
         if self._vista_playlist == pid:
             self._vista_playlist = -1
         self._recargar()
+        self._cambio_local()
 
     @Slot(int, str)
     def agregarAPlaylist(self, pid: int, ruta: str) -> None:
         with self.candado:
             self.bib.agregar_a_playlist(pid, ruta)
         self._recargar()
+        self._cambio_local()
         self.aviso.emit("Agregada a la playlist")
 
     @Slot(int, str)
@@ -210,20 +278,28 @@ class Puente(QObject):
         with self.candado:
             self.bib.quitar_de_playlist(pid, ruta)
         self._recargar()
+        self._cambio_local()
 
     @Slot(str)
     def quitarDeBiblioteca(self, ruta: str) -> None:
         """La quita de la biblioteca y, si la bajó Vortex Player, también borra el archivo (a la papelera)."""
         c = self.bib.cancion(ruta)
         if c and c.get("origen") == "youtube":
-            subprocess.run(["gio", "trash", ruta], capture_output=True)
-            jpg = Path(ruta).with_suffix(".jpg")
-            if jpg.exists():
-                subprocess.run(["gio", "trash", str(jpg)], capture_output=True)
+            self._a_la_papelera(ruta)
+            with self.candado:
+                self.bib.anotar_cancion_borrada(id_de(ruta))   # también se quita de la nube y del teléfono
         with self.candado:
             self.bib.quitar(ruta)
         self.r.quitarDeCola(ruta)
         self._recargar()
+        self._cambio_local()
+
+    @staticmethod
+    def _a_la_papelera(ruta: str) -> None:
+        subprocess.run(["gio", "trash", ruta], capture_output=True)
+        jpg = Path(ruta).with_suffix(".jpg")
+        if jpg.exists():
+            subprocess.run(["gio", "trash", str(jpg)], capture_output=True)
 
     @Slot(str)
     def abrirCarpeta(self, ruta: str) -> None:
@@ -248,8 +324,11 @@ class Puente(QObject):
         self._escaneando = False
         self.cambioEscaneo.emit()
         self._recargar()
+        if not self._nube["ultima"]:
+            self.sincronizar()
         if r.get("nuevas") and r.get("total", 0) > r["nuevas"]:
             self.aviso.emit(f"{r['nuevas']} canciones nuevas en tu biblioteca")
+        QTimer.singleShot(3000, self.bajarLetras)
 
     @Slot(str)
     def agregarCarpeta(self, url: str) -> None:
@@ -353,8 +432,13 @@ class Puente(QObject):
 
     def _con_estado(self, lista: list[dict]) -> list[dict]:
         bajando = {d.get("id") for d in self._descargas if d.get("id") and d["estado"] in ("espera", "bajando")}
-        return [{**c, "estado": "biblioteca" if c["id"] in self._ids_biblioteca
+        return [{**c, "titulo": letras.titulo_limpio(c.get("titulo", ""), c.get("artistas", "")),
+                 "estado": "biblioteca" if c["id"] in self._ids_biblioteca
                  else "bajando" if c["id"] in bajando else ""} for c in lista]
+
+    def _sin_las_tuyas(self, lista: list[dict]) -> list[dict]:
+        """2.4: las recomendadas no repiten lo que ya tienes: al bajarla, se quita de la lista."""
+        return [c for c in self._con_estado(lista) if c["estado"] != "biblioteca"]
 
     # --- recomendaciones para una playlist (2.1) -------------------------------------------------------
 
@@ -389,6 +473,8 @@ class Puente(QObject):
         semillas = [{"id": self._id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]}
                     for c in (con_id + sin_id)[:3]]
         tienes = [{"id": self._id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]} for c in todas]
+        if otras:   # 2.4: «Otras» no repite las que ya te había enseñado
+            tienes += [{"id": c["id"], "titulo": c["titulo"], "artista": c["artistas"]} for c in self._recom_guardadas.get(pid, [])]
         self._recom_cargando = True
         if otras:
             self._recom = []
@@ -414,8 +500,9 @@ class Puente(QObject):
     @Slot(int)
     def agregarRecomendada(self, i: int) -> None:
         """La baja a tu biblioteca y la agrega a la playlist para la que se recomendó."""
-        if 0 <= i < len(self._recom) and self._recom_para >= 0:
-            c = self._recom[i]
+        lista = self._sin_las_tuyas(self._recom)
+        if 0 <= i < len(lista) and self._recom_para >= 0:
+            c = lista[i]
             self.bajar(c["url"], self._recom_para, c["id"],
                        f"{c['titulo']} · {c['artistas']}" if c["artistas"] else c["titulo"])
 
@@ -430,8 +517,9 @@ class Puente(QObject):
     @Slot(int)
     def escucharRecomendada(self, i: int) -> None:
         """Toca 30 s de la recomendada i (otra vez, la para)."""
-        if 0 <= i < len(self._recom):
-            self._escuchar(self._recom[i])
+        lista = self._sin_las_tuyas(self._recom)
+        if 0 <= i < len(lista):
+            self._escuchar(lista[i])
 
     @Slot(int)
     def escucharResultado(self, i: int) -> None:
@@ -531,6 +619,11 @@ class Puente(QObject):
                 d["actual"] = ev.get("texto", "")
         elif tipo == "fin":
             d["fallidas"] = ev.get("fallidas", 0)
+            if d.get("id") in self._nube_pendientes:
+                self._nube_pendientes.discard(d["id"])
+                if not d["hechas"]:
+                    self._nube_fallidas.add(d["id"])
+            self._cambio_local()   # lo nuevo sube a la nube y entra a sus playlists
             if d["estado"] != "error":
                 d["estado"] = "lista"
                 d["actual"] = (f"{ev.get('bajadas', 0)} bajadas" +
@@ -538,6 +631,7 @@ class Puente(QObject):
             d["porcentaje"] = 100.0
             if d["estado"] == "lista":
                 self.aviso.emit(f"Listo: {d['nombre']}")
+            self._espera_letras.start()   # 2.4: su letra, para verla sin internet
         self.cambioDescargas.emit()
 
     @Slot()
@@ -551,6 +645,105 @@ class Puente(QObject):
             return
         self._descargas = []
         self.cambioDescargas.emit()
+
+    # --- la nube: tu biblioteca en Google Drive, la misma que en el teléfono (2.4) -------------------------
+
+    def _cambio_local(self) -> None:
+        if self._nube["correo"]:
+            self._espera_nube.start()
+
+    def _poner_nube(self, **cambios) -> None:
+        self._nube = {**self._nube, **cambios}
+        self.cambioNube.emit()
+
+    @Slot()
+    def iniciarSesionGoogle(self) -> None:
+        if self._nube["trabajando"]:
+            return
+        self._poner_nube(trabajando=True, texto="Elige tu cuenta en el navegador…", error="")
+
+        def abrir(url: str) -> None:
+            subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        def hilo() -> None:
+            try:
+                d = cuenta_google.iniciar_sesion(abrir)
+                self._nube_fin.emit({"sesion": True, "correo": d["correo"], "nombre": d["nombre"]})
+            except Exception as e:  # noqa: BLE001 (cualquier falla se le dice a la persona)
+                self._nube_fin.emit({"sesion": True, "error": str(e)})
+        threading.Thread(target=hilo, daemon=True).start()
+
+    @Slot()
+    def cerrarSesionGoogle(self) -> None:
+        threading.Thread(target=cuenta_google.cerrar_sesion, daemon=True).start()
+        self._poner_nube(correo="", nombre="", texto="", ultima=0.0, error="")
+        self.aviso.emit("Sesión cerrada. Tus canciones se quedan en esta PC.")
+
+    @Slot()
+    def sincronizar(self) -> None:
+        if not self._nube["correo"]:
+            return
+        if self._nube["trabajando"]:
+            self._nube_otra_vez = True
+            return
+        self._poner_nube(trabajando=True, texto="Sincronizando con la nube…", error="")
+
+        def borrar(vid: str, ruta: str) -> None:   # la borraste en el teléfono (ya se tiene el candado)
+            self._a_la_papelera(ruta)
+            self.bib.quitar(ruta)
+            self._quitar_de_cola.emit(ruta)
+
+        def hilo() -> None:
+            try:
+                for intento in range(2):
+                    try:
+                        _, plan = sincronia.sincronizar(self.bib, cuenta_google.Drive(cuenta_google.token()),
+                                                        borrar, self.candado)
+                        break
+                    except cuenta_google.SinPermiso:
+                        cuenta_google.olvidar_token()
+                        if intento:
+                            raise
+                bajar = [{"id": vid, "nombre": " · ".join(x for x in (c.get("titulo"), c.get("artista")) if x) or vid}
+                         for vid, c in plan.bajar]
+                self._nube_fin.emit({"ok": True, "bajar": bajar, "borradas": len(plan.borrar)})
+            except cuenta_google.SinPermiso as e:
+                self._nube_fin.emit({"ok": False, "error": str(e), "salir": True})
+            except Exception as e:  # noqa: BLE001
+                self._nube_fin.emit({"ok": False, "error": f"No se pudo sincronizar: {e}"})
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_nube(self, r: dict) -> None:
+        if r.get("sesion"):   # terminó «Iniciar sesión»
+            if r.get("error"):
+                self._poner_nube(trabajando=False, texto="", error=r["error"])
+                return
+            self._poner_nube(trabajando=False, correo=r["correo"], nombre=r["nombre"])
+            self.aviso.emit(f"Listo: tu música se sincroniza con {r['correo']}")
+            self.sincronizar()
+            return
+        if not r.get("ok"):
+            self._poner_nube(trabajando=False, texto="", error=r.get("error", ""))
+            if r.get("salir"):
+                cuenta_google.cerrar_sesion()
+                self._poner_nube(correo="", nombre="")
+            return
+        en_cola = {d.get("id") for d in self._descargas if d.get("id") and d["estado"] in ("espera", "bajando")}
+        nuevas = [c for c in r["bajar"] if c["id"] not in en_cola and c["id"] not in self._nube_fallidas]
+        for c in nuevas:
+            self._nube_pendientes.add(c["id"])
+            self.bajar(f"https://music.youtube.com/watch?v={c['id']}", -1, c["id"], c["nombre"])
+        texto = (f"Bajando {len(nuevas)} canciones de tu otro dispositivo" if nuevas
+                 else f"No se pudieron bajar {len(self._nube_fallidas)}; se reintentan al volver a abrir" if self._nube_fallidas
+                 else "")
+        self._poner_nube(trabajando=False, ultima=time.time(), texto=texto, error="")
+        self._recargar()
+        if self._nube_otra_vez:
+            self._nube_otra_vez = False
+            self._espera_nube.start()
+
+    def _estado_nube(self) -> dict:
+        return {**self._nube, "configurada": cuenta_google.configurada()}
 
     # --- ecualizador -------------------------------------------------------------------------------
 
@@ -654,6 +847,244 @@ class Puente(QObject):
             self.aviso.emit("No pude reiniciar el audio")
         QTimer.singleShot(2500, self.actualizarSalida)
 
+    # --- 2.4: seguir donde te quedaste ---------------------------------------------------------------
+
+    def _archivo_sesion(self) -> Path:
+        return rutas.config() / "sesion.json"
+
+    def _leer_sesion(self) -> dict:
+        try:
+            d = json.loads(self._archivo_sesion().read_text())
+            return d if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _guardar_sesion(self) -> None:
+        if not self._restaurada:
+            return
+        if self.r.cancion.get("ruta"):
+            self._sesion["cola"] = self.r.sesion()
+        try:
+            self._archivo_sesion().parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._archivo_sesion().with_suffix(".tmp")
+            tmp.write_text(json.dumps(self._sesion, ensure_ascii=False))
+            tmp.replace(self._archivo_sesion())
+        except OSError:
+            pass
+
+    def _restaurar(self) -> None:
+        """Al abrir: la última canción, en pausa, en el segundo donde ibas, con su cola."""
+        s = self._sesion.get("cola") or {}
+        if not self.r.cancion.get("ruta") and s.get("rutas"):
+            with self.candado:
+                cola = [c for r in s["rutas"] if (c := self.bib.cancion(r))]
+            self.r.restaurar(cola, s)
+        self._restaurada = True
+        self._cambio_cancion()
+
+    def _anotar_escuchada(self, c: dict) -> None:
+        """Las últimas 25 que escuchaste (sin repetir), para «Para ti»."""
+        nueva = {"id": id_de(c["ruta"]), "titulo": c.get("titulo", ""), "artista": c.get("artista", "")}
+        h = [x for x in self._sesion.get("historial", []) if (x.get("titulo"), x.get("artista")) != (nueva["titulo"], nueva["artista"])]
+        self._sesion["historial"] = ([nueva] + h)[:25]
+
+    def _cambio_cancion(self) -> None:
+        c = self.r.cancion
+        ruta = c.get("ruta", "")
+        if ruta == self._letra["ruta"] or not self._restaurada:
+            return
+        if ruta and self.r.sesion()["posicion"] < 1:   # lo restaurado no cuenta como «escuchada» otra vez
+            self._anotar_escuchada(c)
+        self._guardar_sesion()
+        self._buscar_letra(c)
+
+    # --- 2.4: la letra -----------------------------------------------------------------------------
+
+    def _buscar_letra(self, c: dict) -> None:
+        self._letra_vuelta += 1
+        vuelta = self._letra_vuelta
+        ruta = c.get("ruta", "")
+        self._letra = {"ruta": ruta, "lineas": [], "sincronizada": False, "buscando": bool(ruta)}
+        self.cambioLetra.emit()
+        if not ruta:
+            return
+        titulo, artista, dur = c.get("titulo") or Path(ruta).stem, c.get("artista") or "", int(c.get("duracion") or 0)
+
+        def hilo() -> None:
+            try:
+                l = letras.de(rutas.cache() / "letras", titulo, artista, dur, id_de(ruta), descargas.letra_youtube)
+                self._letra_lista.emit(vuelta, l or {})
+            except OSError:
+                self._letra_lista.emit(vuelta, {"error": "Sin conexión: no pude buscar la letra"})
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_letra(self, vuelta: int, l: dict) -> None:
+        if vuelta != self._letra_vuelta:
+            return
+        self._letra = {"ruta": self._letra["ruta"], "lineas": l.get("lineas", []), "sincronizada": bool(l.get("sincronizada")),
+                       "buscando": False, "error": l.get("error", "")}
+        self.cambioLetra.emit()
+
+    @Slot(float, result=int)
+    def lineaActual(self, segundos: float) -> int:
+        return letras.actual(self._letra["lineas"], segundos * 1000) if self._letra["sincronizada"] else -1
+
+    # --- 2.4: «Para ti» en Agregar música ----------------------------------------------------------
+
+    @Slot(bool)
+    def recomendarParaTi(self, otras: bool) -> None:
+        h = self._sesion.get("historial", [])
+        semillas = (random.sample(h[:10], len(h[:10])) if otras else h)[:3]
+        with self.candado:
+            todas = self.bib.canciones()
+        if not semillas:
+            semillas = [{"id": id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]} for c in random.sample(todas, min(3, len(todas)))]
+        if not semillas:
+            return
+        de = [x["titulo"] for x in semillas]
+        if not otras and self._para_ti and de == self._para_ti_de:
+            return
+        self._para_ti_vuelta += 1
+        vuelta = self._para_ti_vuelta
+        tienes = [{"id": id_de(c["ruta"]), "titulo": c["titulo"], "artista": c["artista"]} for c in todas]
+        if otras:
+            tienes += [{"id": c["id"], "titulo": c["titulo"], "artista": c["artistas"]} for c in self._para_ti]
+        self._para_ti_cargando, self._para_ti_error = True, ""
+        self.cambioParaTi.emit()
+
+        def hilo() -> None:
+            try:
+                self._para_ti_listo.emit(vuelta, descargas.recomendar(semillas, tienes, 25), de, "")
+            except OSError as e:
+                claro = e.args[0] if len(e.args) == 1 and isinstance(e.args[0], str) else "Sin conexión con YouTube"
+                self._para_ti_listo.emit(vuelta, [], de, claro)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_para_ti(self, vuelta: int, canciones: list, de: list, error: str) -> None:
+        if vuelta != self._para_ti_vuelta:
+            return
+        if canciones or not self._para_ti:
+            self._para_ti, self._para_ti_de = list(canciones), list(de)
+        self._para_ti_error, self._para_ti_cargando = error, False
+        self.cambioParaTi.emit()
+
+    @Slot(int)
+    def bajarParaTi(self, i: int) -> None:
+        lista = self._sin_las_tuyas(self._para_ti)
+        if 0 <= i < len(lista):
+            c = lista[i]
+            self.bajar(c["url"], -1, c["id"], f"{c['titulo']} · {c['artistas']}" if c["artistas"] else c["titulo"])
+
+    @Slot(int)
+    def escucharParaTi(self, i: int) -> None:
+        lista = self._sin_las_tuyas(self._para_ti)
+        if 0 <= i < len(lista):
+            self._escuchar(lista[i])
+
+    # --- 2.4: ❤️ «Tus me gusta», la cola y el crossfade ------------------------------------------------
+
+    @Slot(str)
+    def alternarMeGusta(self, ruta: str) -> None:
+        if not ruta:
+            return
+        with self.candado:
+            gusta = self.bib.alternar_me_gusta(ruta)
+        self._recargar()
+        self._cambio_local()
+        self.aviso.emit("Agregada a Tus me gusta" if gusta else "Quitada de Tus me gusta")
+
+    @Slot("QVariantMap")
+    def tocarDespues(self, c: dict) -> None:
+        self.r.tocarDespues(c)
+        self.aviso.emit("Suena después de esta")
+
+    @Slot("QVariantMap")
+    def agregarACola(self, c: dict) -> None:
+        self.r.agregarACola(c)
+        self.aviso.emit("Agregada a la cola")
+
+    @Slot(int)
+    def ponerFundido(self, segundos: int) -> None:
+        Biblioteca.guardar_ajuste("fundido", int(segundos))
+        self.r.ponerFundido(float(segundos))
+        self.cambioAjustes.emit()
+
+    # --- 2.4: las letras de toda tu música, para verlas sin internet -------------------------------------
+
+    @Slot()
+    def bajarLetras(self) -> None:
+        """Busca (despacito, en un hilo) la letra de cada canción que todavía no tiene; se reanuda sola."""
+        if self._letras_estado["trabajando"]:
+            return
+        carpeta = rutas.cache() / "letras"
+        with self.candado:
+            todas = self.bib.canciones()
+        self._letras_estado = {**self._letras_estado, "trabajando": True}
+
+        def hilo() -> None:
+            con = 0
+            faltan = []
+            for c in todas:
+                args = (c["titulo"] or Path(c["ruta"]).stem, c["artista"] or "", int(c.get("duracion") or 0))
+                if letras.guardada(carpeta, *args):
+                    con += 1
+                else:
+                    faltan.append((args, id_de(c["ruta"])))
+            self._letras_avance.emit({"con": con, "total": len(todas), "trabajando": bool(faltan)})
+            for args, vid in faltan:
+                try:
+                    letras.de(carpeta, *args, vid, descargas.letra_youtube)
+                except OSError:
+                    break   # sin internet (o LRCLIB caído): otro día
+                con += 1
+                self._letras_avance.emit({"con": con, "total": len(todas), "trabajando": True})
+                time.sleep(1.5)   # sin prisa: LRCLIB es gratis y de una persona
+            self._letras_avance.emit({"con": con, "total": len(todas), "trabajando": False})
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _en_letras(self, e: dict) -> None:
+        self._letras_estado = e
+        self.cambioLetras.emit()
+
+    # --- 2.4: el color de una portada (el degradado de la playlist y de la letra, como Spotify) ---------
+
+    @Slot(str, result=str)
+    def colorDe(self, ruta: str) -> str:
+        """El promedio de los pixeles con más color de la portada, oscurecido para que se lea el texto."""
+        if ruta in self._colores:
+            return self._colores[ruta]
+        url = self.portada_de(ruta)
+        if not url:
+            return ""
+        img = QImage(QUrl(url).toLocalFile())
+        if img.isNull():
+            return ""
+        img = img.scaled(24, 24)
+        r = g = b = peso = 0.0
+        for x in range(img.width()):
+            for y in range(img.height()):
+                c = img.pixelColor(x, y)
+                w = 0.05 + c.hsvSaturationF() ** 2 * c.valueF()
+                r, g, b, peso = r + c.redF() * w, g + c.greenF() * w, b + c.blueF() * w, peso + w
+        c = QColor.fromRgbF(r / peso, g / peso, b / peso)
+        h, sat, v = c.hsvHueF(), min(0.75, c.hsvSaturationF() * 1.2), min(0.45, max(0.28, c.valueF()))
+        self._colores[ruta] = QColor.fromHsvF(max(0.0, h), sat, v).name()
+        return self._colores[ruta]
+
+    @Slot(str)
+    def ponerPerfil(self, nombre: str) -> None:
+        """2.4: un perfil del ecualizador (los mismos que en el teléfono) sobre tus bandas."""
+        if nombre not in ecualizador.PERFILES:
+            return
+        bandas = ecualizador.bandas_de_perfil(nombre, self._eq["bandas"])
+        self._eq = {**self._eq, "bandas": bandas, "preset": "Custom"}
+        self._eq_local = time.monotonic()
+        self.cambioEq.emit()
+        self._aplicar_bandas()
+
     # --- propiedades para QML --------------------------------------------------------------------
 
     def _ajustes(self) -> dict:
@@ -673,14 +1104,24 @@ class Puente(QObject):
     ajustes = Property("QVariantMap", _ajustes, notify=cambioAjustes)
     escaneando = Property(bool, lambda s: s._escaneando, notify=cambioEscaneo)
     enLinea = Property("QVariantList", lambda s: s._con_estado(s._en_linea), notify=cambioEnLinea)
-    recomendaciones = Property("QVariantList", lambda s: s._con_estado(s._recom), notify=cambioRecomendaciones)
+    recomendaciones = Property("QVariantList", lambda s: s._sin_las_tuyas(s._recom), notify=cambioRecomendaciones)
     recomendandoPara = Property(int, lambda s: s._recom_para, notify=cambioRecomendaciones)
     cargandoRecomendaciones = Property(bool, lambda s: s._recom_cargando, notify=cambioRecomendaciones)
     errorRecomendaciones = Property(str, lambda s: s._recom_error, notify=cambioRecomendaciones)
     buscandoEnLinea = Property(bool, lambda s: s._buscando_linea, notify=cambioEnLinea)
     errorEnLinea = Property(str, lambda s: s._error_linea, notify=cambioEnLinea)
+    nube = Property("QVariantMap", _estado_nube, notify=cambioNube)
     reproductor = Property(QObject, lambda s: s.r, constant=True)
+    letra = Property("QVariantMap", lambda s: s._letra, notify=cambioLetra)
+    paraTi = Property("QVariantList", lambda s: s._sin_las_tuyas(s._para_ti), notify=cambioParaTi)
+    paraTiDe = Property("QStringList", lambda s: s._para_ti_de, notify=cambioParaTi)
+    cargandoParaTi = Property(bool, lambda s: s._para_ti_cargando, notify=cambioParaTi)
+    errorParaTi = Property(str, lambda s: s._para_ti_error, notify=cambioParaTi)
+    perfiles = Property("QStringList", lambda s: list(ecualizador.PERFILES), constant=True)
+    perfilEq = Property(str, lambda s: ecualizador.perfil_de(s._eq["bandas"]), notify=cambioEq)
     avance = Property(QObject, lambda s: s._avance, constant=True)
+    meGusta = Property("QStringList", lambda s: s._me_gusta, notify=cambioPlaylists)
+    letrasGuardadas = Property("QVariantMap", lambda s: s._letras_estado, notify=cambioLetras)
 
 
 def uri(ruta: str) -> str:
