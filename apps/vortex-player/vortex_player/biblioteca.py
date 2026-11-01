@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS playlist_canciones (
     PRIMARY KEY (playlist, pos)
 );
 CREATE TABLE IF NOT EXISTS borradas (tipo TEXT, clave TEXT, cuando REAL, PRIMARY KEY (tipo, clave));
+CREATE TABLE IF NOT EXISTS escuchas (cuando REAL, ruta TEXT, titulo TEXT, artista TEXT, segundos REAL);
+CREATE INDEX IF NOT EXISTS escuchas_cuando ON escuchas (cuando);
 """
 
 # 2.4: «Tus me gusta» es una playlist con este id fijo en la nube, el mismo en la PC y en el teléfono
@@ -42,10 +44,12 @@ NOMBRE_ME_GUSTA = "Tus me gusta"
 
 # Lo bajado de YouTube lleva su id en el nombre: «Título [id].opus»
 ID_EN_RUTA = re.compile(r"\[([\w-]{11})\]\.\w+$")
+# 1.4: las de la radio suenan desde YouTube Music: «https://music.youtube.com/watch?v=id»
+ID_EN_URL = re.compile(r"^https?://.*[?&]v=([\w-]{11})")
 
 
 def id_de(ruta: str) -> str:
-    m = ID_EN_RUTA.search(ruta)
+    m = ID_EN_RUTA.search(ruta) or ID_EN_URL.search(ruta)
     return m.group(1) if m else ""
 
 
@@ -58,7 +62,16 @@ AJUSTES_BASE = {
     "volumen": 80,
     "ldac_hq": True,            # pedir LDAC a 990 kbps cuando hay audífonos que lo soportan
     "fundido": 5,               # 2.4: segundos de crossfade entre canciones (0 = sin)
+    "radio": True,              # 1.4: al acabarse la cola siguen canciones parecidas (radio sin fin)
 }
+
+
+def semana(atras: int = 0, ahora: float | None = None) -> tuple[float, float]:
+    """1.4: de lunes a lunes (a la medianoche de aquí): 0 = esta semana, 1 = la pasada."""
+    import datetime as dt
+    hoy = dt.datetime.fromtimestamp(ahora or time.time()).replace(hour=0, minute=0, second=0, microsecond=0)
+    lunes = hoy - dt.timedelta(days=hoy.weekday() + 7 * atras)
+    return lunes.timestamp(), (lunes + dt.timedelta(days=7)).timestamp()
 
 
 def origen_de(ruta: str, extra: dict | None = None) -> str:
@@ -94,6 +107,41 @@ class Biblioteca:
 
     def cerrar(self) -> None:
         self.db.close()
+
+    # --- 1.4: «Tu resumen» (lo que escuchaste cada semana) ---------------------------------------------
+
+    def anotar_escucha(self, c: dict, segundos: float, cuando: float | None = None) -> None:
+        self.db.execute("INSERT INTO escuchas VALUES (?, ?, ?, ?, ?)",
+                        (cuando or time.time(), c.get("ruta", ""), c.get("titulo") or Path(c.get("ruta", "")).stem,
+                         c.get("artista", ""), float(segundos)))
+        self.db.commit()
+
+    def resumen(self, desde: float, hasta: float, n: int = 5) -> dict:
+        """Lo que escuchaste entre `desde` y `hasta`: minutos, cuántas, cuántos días y lo más escuchado."""
+        filas = self.db.execute("SELECT * FROM escuchas WHERE cuando >= ? AND cuando < ?", (desde, hasta)).fetchall()
+        canciones: dict[tuple, dict] = {}
+        artistas: dict[str, dict] = {}
+        dias = set()
+        for f in filas:
+            dias.add(time.strftime("%Y-%m-%d", time.localtime(f["cuando"])))
+            nombre = letras.limpiar_artista(f["artista"] or "")   # «YOASOBI - Topic» es «YOASOBI»
+            k = (f["titulo"].lower(), nombre.lower())
+            c = canciones.setdefault(k, {"titulo": f["titulo"], "artista": nombre or f["artista"] or "", "ruta": f["ruta"],
+                                         "veces": 0, "minutos": 0.0})
+            c["veces"] += 1
+            c["minutos"] += f["segundos"] / 60
+            if nombre:
+                a = artistas.setdefault(nombre.lower(), {"artista": nombre, "veces": 0, "minutos": 0.0, "ruta": f["ruta"]})
+                a["veces"] += 1
+                a["minutos"] += f["segundos"] / 60
+        orden = lambda x: (-x["veces"], -x["minutos"])
+        top = sorted(canciones.values(), key=orden)[:n]
+        top_a = sorted(artistas.values(), key=orden)[:n]
+        for x in top + top_a:
+            x["minutos"] = round(x["minutos"])
+        return {"desde": desde, "hasta": hasta, "minutos": round(sum(f["segundos"] for f in filas) / 60),
+                "escuchas": len(filas), "distintas": len(canciones), "dias": len(dias),
+                "canciones": top, "artistas": top_a}
 
     # --- ajustes ---------------------------------------------------------------------------------
 

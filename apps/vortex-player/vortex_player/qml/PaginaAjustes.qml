@@ -43,6 +43,99 @@ Flickable {
 
         Text { text: "Ajustes"; color: Tema.texto; font.pixelSize: 32; font.weight: Font.Bold }
 
+        // 1.4: «Tu resumen»: lo que escuchaste esta semana o la pasada, siempre aquí arriba
+        Tarjeta {
+            id: tarjetaResumen
+            titulo: "Tu resumen"
+            property int cual: vp.resumen.aviso ? 1 : 0   // 0 = esta semana, 1 = la pasada
+            readonly property var r: (cual ? vp.resumen.pasada : vp.resumen.semana) || ({})
+            function fecha(t) { return t ? new Date(t * 1000).toLocaleDateString(Qt.locale(), "d MMM") : "" }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Explicacion {
+                    text: tarjetaResumen.r.desde
+                        ? "Del lunes " + tarjetaResumen.fecha(tarjetaResumen.r.desde) + " al domingo "
+                          + tarjetaResumen.fecha(tarjetaResumen.r.hasta - 1) + ". Cuenta lo que escuchas en esta computadora (30 s o más de cada canción)."
+                        : ""
+                }
+                Selector {
+                    Layout.preferredWidth: 190
+                    model: ["Esta semana", "La semana pasada"]
+                    currentIndex: tarjetaResumen.cual
+                    onActivated: (i) => tarjetaResumen.cual = i
+                }
+            }
+            RowLayout {   // los números grandes, como el Wrapped de Spotify
+                visible: (tarjetaResumen.r.escuchas || 0) > 0
+                Layout.fillWidth: true
+                spacing: 28
+                Repeater {
+                    model: [{ n: Tema.minutos(tarjetaResumen.r.minutos), t: "escuchando" },
+                            { n: String(tarjetaResumen.r.distintas || 0), t: (tarjetaResumen.r.distintas === 1 ? "canción distinta" : "canciones distintas") },
+                            { n: String(tarjetaResumen.r.dias || 0) + " de 7", t: "días con música" }]
+                    ColumnLayout {
+                        required property var modelData
+                        spacing: 0
+                        Text { text: modelData.n; color: Tema.azul; font.pixelSize: 28; font.weight: Font.Bold }
+                        Text { text: modelData.t; color: Tema.tenue; font.pixelSize: 12 }
+                    }
+                }
+            }
+            RowLayout {
+                visible: (tarjetaResumen.r.escuchas || 0) > 0
+                Layout.fillWidth: true
+                Layout.topMargin: 6
+                spacing: 28
+                ColumnLayout {   // las que más sonaron
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 8
+                    Text { text: "Lo que más escuchaste"; color: Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold }
+                    Repeater {
+                        model: tarjetaResumen.r.canciones || []
+                        RowLayout {
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: 12
+                            Text { Layout.preferredWidth: 16; text: index + 1; color: Tema.tenue; font.pixelSize: 13; horizontalAlignment: Text.AlignRight }
+                            Portada { Layout.preferredWidth: 40; Layout.preferredHeight: 40; ruta: modelData.ruta || "" }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+                                Text { Layout.fillWidth: true; text: modelData.titulo; color: Tema.texto; font.pixelSize: 13; font.weight: Font.Medium; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: modelData.artista || "Artista desconocido"; color: Tema.tenue; font.pixelSize: 12; elide: Text.ElideRight }
+                            }
+                            Text { text: modelData.veces + (modelData.veces === 1 ? " vez" : " veces"); color: Tema.tenue; font.pixelSize: 12 }
+                        }
+                    }
+                }
+                ColumnLayout {   // tus artistas
+                    Layout.preferredWidth: 230
+                    Layout.alignment: Qt.AlignTop
+                    spacing: 8
+                    Text { text: "Tus artistas"; color: Tema.texto; font.pixelSize: 14; font.weight: Font.DemiBold }
+                    Repeater {
+                        model: tarjetaResumen.r.artistas || []
+                        RowLayout {
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: 10
+                            Text { Layout.preferredWidth: 16; text: index + 1; color: Tema.tenue; font.pixelSize: 13; horizontalAlignment: Text.AlignRight }
+                            Text { Layout.fillWidth: true; text: modelData.artista; color: Tema.texto; font.pixelSize: 13; elide: Text.ElideRight }
+                            Text { text: Tema.minutos(modelData.minutos); color: Tema.tenue; font.pixelSize: 12 }
+                        }
+                    }
+                }
+            }
+            Explicacion {
+                visible: !(tarjetaResumen.r.escuchas > 0)
+                text: tarjetaResumen.cual ? "La semana pasada no escuchaste nada aquí." : "Todavía no hay nada esta semana: pon música y aquí irá apareciendo."
+            }
+        }
+
         // 2.4: las mismas canciones y playlists en el teléfono (por tu cuenta de Google)
         Tarjeta {
             titulo: "Tu música en el teléfono"
@@ -146,9 +239,18 @@ Flickable {
             }
         }
 
-        // 2.4: crossfade y las letras guardadas para verlas sin internet
+        // 2.4: crossfade y las letras guardadas para verlas sin internet (1.4: y la radio sin fin)
         Tarjeta {
             titulo: "Reproducción"
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
+                Explicacion { text: "Radio sin fin: cuando se acaba lo que pusiste, siguen canciones parecidas de YouTube Music, sin bajarlas (si una te gusta, bájala con el botón de la barra)." }
+                Switch {
+                    checked: vp.ajustes.radio !== false
+                    onToggled: vp.ponerRadio(checked)
+                }
+            }
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 12

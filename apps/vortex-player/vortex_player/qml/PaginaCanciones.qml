@@ -7,6 +7,7 @@ import QtQuick.Layouts
 Item {
     id: raiz
     signal irAAgregar()
+    signal verResumen()
     signal buscarEnInternet(string texto)
     readonly property var playlist: {
         for (var i = 0; i < vp.playlists.length; i++)
@@ -158,6 +159,53 @@ Item {
                         }
                     }
                 }
+            }
+        }
+
+        // 1.4: el aviso de «Tu resumen» de la semana pasada, una vez por semana (siempre está en Ajustes)
+        Rectangle {
+            id: avisoResumen
+            readonly property var pasada: vp.resumen.pasada || ({})
+            readonly property var mejor: pasada.canciones && pasada.canciones.length ? pasada.canciones[0] : null
+            visible: !raiz.playlist && !!vp.resumen.aviso
+            Layout.fillWidth: true
+            Layout.leftMargin: 28
+            Layout.rightMargin: 28
+            Layout.bottomMargin: 14
+            implicitHeight: filaResumen.implicitHeight + 28
+            radius: Tema.radioTarjeta
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0; color: Qt.rgba(Tema.azul.r, Tema.azul.g, Tema.azul.b, 0.30) }
+                GradientStop { position: 1; color: Qt.rgba(Tema.violeta.r, Tema.violeta.g, Tema.violeta.b, 0.16) }
+            }
+            RowLayout {
+                id: filaResumen
+                anchors.fill: parent
+                anchors.margins: 14
+                anchors.leftMargin: 18
+                spacing: 14
+                Portada {
+                    visible: !!avisoResumen.mejor
+                    Layout.preferredWidth: 52; Layout.preferredHeight: 52
+                    ruta: avisoResumen.mejor ? avisoResumen.mejor.ruta : ""
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 3
+                    Text { text: "Tu semana en música"; color: Tema.texto; font.pixelSize: 15; font.weight: Font.Bold }
+                    Text {
+                        Layout.fillWidth: true
+                        text: Tema.minutos(avisoResumen.pasada.minutos) + " escuchando"
+                              + (avisoResumen.mejor ? " · la que más sonó: «" + avisoResumen.mejor.titulo + "»"
+                                 + (avisoResumen.mejor.artista ? " de " + avisoResumen.mejor.artista : "") : "")
+                        color: Tema.suave
+                        font.pixelSize: 13
+                        elide: Text.ElideRight
+                    }
+                }
+                Boton { text: "Ver tu resumen"; icono: "resumen"; onClicked: { vp.resumenVisto(); raiz.verResumen() } }
+                BotonIcono { icono: "cerrar"; tam: 30; ayuda: "Cerrar"; onClicked: vp.resumenVisto() }
             }
         }
 

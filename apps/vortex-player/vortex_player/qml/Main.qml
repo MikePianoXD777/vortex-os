@@ -185,6 +185,7 @@ ApplicationWindow {
                         id: paginaCanciones
                         anchors.fill: parent
                         onIrAAgregar: ventana.ir("agregar")
+                        onVerResumen: ventana.ir("ajustes")
                         onBuscarEnInternet: (texto) => { ventana.ir("agregar"); paginaAgregar.buscar(texto) }
                     }
                 }

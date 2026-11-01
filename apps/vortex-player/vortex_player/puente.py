@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import random
 import re
 import shutil
@@ -21,6 +22,7 @@ from PySide6.QtGui import QColor, QImage
 
 from . import audio, cuenta_google, descargas, ecualizador, letras, plataforma, rutas, sincronia
 from .avance import Avance
+from . import biblioteca
 from .biblioteca import Biblioteca, id_de
 from .reproductor import Reproductor
 
@@ -61,6 +63,8 @@ class Puente(QObject):
     _para_ti_listo = Signal(int, "QVariantList", "QStringList", str)
     cambioLetras = Signal()
     _letras_avance = Signal("QVariantMap")                  # del hilo de las letras sin internet
+    _radio_lista = Signal(int, "QVariantList", str)        # 1.4: del hilo de la radio sin fin
+    cambioResumen = Signal()
 
     def __init__(self, parent: QObject | None = None, biblioteca: Biblioteca | None = None,
                  reproductor: Reproductor | None = None):
@@ -167,6 +171,19 @@ class Puente(QObject):
         self._letras_avance.connect(self._en_letras)
         self._espera_letras = QTimer(self, singleShot=True, interval=20000)
         self._espera_letras.timeout.connect(self.bajarLetras)
+
+        # 1.4: la radio sin fin (al acabarse la cola siguen parecidas, sin bajarlas)
+        self._radio_vuelta = 0
+        self._bajando_radio: list[str] = []   # las de la radio que mandaste bajar
+        self._radio_para = ""   # la última de la cola cuando se pidió (si cambia la cola, la respuesta no sirve)
+        self._radio_lista.connect(self._fin_radio)
+        self.r.seAcaba.connect(self._pedir_radio)
+        # 1.4: «Tu resumen»: cada canción que de verdad escuchaste (30 s o más) cuenta
+        self._resumen: dict = {}
+        self.r.escuchada.connect(self._anotar_escucha)
+        self._reloj_resumen = QTimer(self, interval=60 * 60 * 1000)   # por si la semana cambia con la app abierta
+        self._reloj_resumen.timeout.connect(self.cambioResumen)
+        self._reloj_resumen.start()
 
         self._preparar_audio()
         self._recargar()
@@ -1017,6 +1034,89 @@ class Puente(QObject):
         self.r.agregarACola(c)
         self.aviso.emit("Agregada a la cola")
 
+    # --- 1.4: la radio sin fin ---------------------------------------------------------------------------
+
+    @Slot(bool)
+    def ponerRadio(self, activar: bool) -> None:
+        Biblioteca.guardar_ajuste("radio", bool(activar))
+        self.cambioAjustes.emit()
+        if activar:
+            self._pedir_radio()
+
+    def _pedir_radio(self) -> None:
+        """Suena la última de la cola: se piden 10 parecidas a ella y a las dos de antes."""
+        cola, i = self.r.cola, self.r.indice
+        if (not self.bib.ajustes().get("radio", True) or not cola or i + 1 < len(cola) or self.r.repetir != "no"
+                or self._radio_para == cola[-1]["ruta"] or os.environ.get("VORTEX_PLAYER_SIN_RED")):
+            return
+        semillas = [{"id": c.get("id") or id_de(c["ruta"]), "titulo": c.get("titulo", ""), "artista": c.get("artista", "")}
+                    for c in reversed(cola[max(0, i - 2):i + 1])]
+        with self.candado:
+            todas = self.bib.canciones()
+        tienes = [{"id": c.get("id") or id_de(c["ruta"]), "titulo": c.get("titulo", ""), "artista": c.get("artista", "")}
+                  for c in todas + cola]
+        self._radio_vuelta += 1
+        vuelta, self._radio_para = self._radio_vuelta, cola[-1]["ruta"]
+
+        def hilo() -> None:
+            try:
+                self._radio_lista.emit(vuelta, descargas.recomendar(semillas, tienes, 10), "")
+            except OSError:
+                self._radio_lista.emit(vuelta, [], "Sin conexión: la radio no pudo seguir")
+
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _fin_radio(self, vuelta: int, canciones: list, error: str) -> None:
+        if vuelta != self._radio_vuelta:
+            return
+        cola, para = self.r.cola, self._radio_para
+        self._radio_para = ""
+        if not cola or cola[-1]["ruta"] != para or not self.bib.ajustes().get("radio", True):
+            return
+        if error or not canciones:
+            if self.r.cancion and self.r.indice + 1 >= len(self.r.cola) and self.r.pausado:
+                self.aviso.emit(error or "La radio no encontró más canciones")
+            return
+        lista = []
+        for c in canciones:
+            self._portadas[c["url"]] = c.get("portada", "")
+            lista.append({"ruta": c["url"], "id": c["id"], "titulo": c["titulo"], "artista": c.get("artistas", ""),
+                          "album": c.get("album", ""), "duracion": float(c.get("duracion") or 0), "radio": True})
+        self.r.agregarRadio(lista)
+
+    # --- 1.4: «Tu resumen» de la semana ------------------------------------------------------------------
+
+    def _anotar_escucha(self, c: dict, segundos: float) -> None:
+        with self.candado:
+            self.bib.anotar_escucha(c, segundos)
+        self._resumen = {}
+        self.cambioResumen.emit()
+
+    def _estado_resumen(self) -> dict:
+        esta = biblioteca.semana(0)
+        if self._resumen.get("semana", {}).get("desde") != esta[0]:   # cambió la semana: se vuelve a sacar
+            with self.candado:
+                pasada = self.bib.resumen(*biblioteca.semana(1))
+                self._resumen = {"semana": self.bib.resumen(*esta), "pasada": pasada}
+        visto = float(self.bib.ajustes().get("resumen_visto", 0))
+        # el aviso sale una vez por semana, el lunes que abres la app, si la pasada escuchaste algo
+        return {**self._resumen, "aviso": self._resumen["pasada"]["escuchas"] > 0 and visto < esta[0]}
+
+    @Slot()
+    def resumenVisto(self) -> None:
+        Biblioteca.guardar_ajuste("resumen_visto", biblioteca.semana(0)[0])
+        self.cambioResumen.emit()
+
+    @Slot(str)
+    def bajarDeLaRadio(self, ruta: str) -> None:
+        """La de la radio que suena (o una de la cola), a tu biblioteca."""
+        c = next((x for x in self.r.cola if x.get("ruta") == ruta and x.get("radio")), None)
+        if not c or ruta in self._bajando_radio:
+            return
+        self._bajando_radio.append(ruta)
+        self.bajar(ruta, -1, c.get("id", ""), f"{c['titulo']} · {c['artista']}" if c.get("artista") else c["titulo"])
+        self.aviso.emit("Bajando a tu biblioteca")
+
     @Slot(int)
     def ponerFundido(self, segundos: int) -> None:
         Biblioteca.guardar_ajuste("fundido", int(segundos))
@@ -1134,6 +1234,8 @@ class Puente(QObject):
     avance = Property(QObject, lambda s: s._avance, constant=True)
     meGusta = Property("QStringList", lambda s: s._me_gusta, notify=cambioPlaylists)
     letrasGuardadas = Property("QVariantMap", lambda s: s._letras_estado, notify=cambioLetras)
+    resumen = Property("QVariantMap", _estado_resumen, notify=cambioResumen)
+    bajandoRadio = Property("QStringList", lambda s: s._bajando_radio, notify=cambioDescargas)
 
 
 def uri(ruta: str) -> str:

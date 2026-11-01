@@ -8,6 +8,9 @@ y el repetir los lleva Vortex Player; mpv solo toca la canción de turno.
 crossfade: los últimos segundos de una canción suenan en otro mpv que se va apagando (afade) mientras la
 siguiente entra subiendo, en el mpv principal.
 
+1.4: la radio sin fin (al acabarse la cola avisa con `seAcaba` y el puente le agrega parecidas de YouTube
+Music, que suenan sin bajarlas) y cuánto escuchaste de cada canción (`escuchada`) para «Tu resumen».
+
 Para pruebas: VORTEX_PLAYER_AO=null no saca sonido y VORTEX_PLAYER_MPV cambia el mpv que se usa.
 """
 from __future__ import annotations
@@ -25,6 +28,12 @@ from PySide6.QtNetwork import QLocalSocket
 from . import plataforma
 
 OBSERVAR = {1: "time-pos", 2: "duration", 3: "pause", 4: "idle-active"}
+CLIENTE = "extractor-args=youtube:player_client=visionos"   # el mismo que el avance (avance.CLIENTE)
+
+
+def es_stream(ruta: str) -> bool:
+    """1.4: una canción de la radio, que suena de YouTube sin estar en tu biblioteca."""
+    return ruta.startswith(("http://", "https://"))
 
 
 class Reproductor(QObject):
@@ -35,6 +44,8 @@ class Reproductor(QObject):
     quiereSonar = Signal()      # le diste play (o tocar, siguiente…): el avance de una canción se calla (2.1.1)
     cambioDormir = Signal()
     error = Signal(str)
+    seAcaba = Signal()                      # 1.4: suena la última de la cola (o ya terminó): pide radio
+    escuchada = Signal("QVariantMap", float)   # 1.4: (canción, segundos que de verdad sonó)
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
@@ -52,6 +63,10 @@ class Reproductor(QObject):
         self._fundido = 0.0             # 2.4: segundos de crossfade (0 = sin)
         self._eq = ""                   # 2.5: el ecualizador dentro de mpv (Windows), como `af`
         self._cola_fundido: list[QProcess] = []
+        self._final = False             # 1.4: la cola se acabó y quedó parada en la última
+        self._sonando: dict = {}        # 1.4: la canción a la que se le cuentan los segundos
+        self._escuchado = 0.0
+        self._sin_cliente = False       # 1.4: la de YouTube ya falló con el cliente visionos
         self._cargada = 0.0             # cuándo se cargó la canción (time.monotonic)
         self._dormir_hasta = 0.0        # 2.4: temporizador (time.monotonic); 0 = apagado
         self._dormir_al_final = False
@@ -85,6 +100,7 @@ class Reproductor(QObject):
                               f"--ao={ao}", "--volume-max=100", f"--volume={self._volumen}",
                               "--replaygain=no", "--audio-pitch-correction=no", "--gapless-audio=weak",
                               "--audio-client-name=Vortex Player", "--pause=yes",
+                              "--ytdl-format=bestaudio",   # 1.4: la radio suena de YouTube sin bajarla
                               f"--input-ipc-server={self._ipc}"])
         self._intentos = 0
         self._reintento.start()
@@ -122,6 +138,7 @@ class Reproductor(QObject):
 
     def cerrar(self) -> None:
         self._cerrando = True
+        self._cerrar_escucha()
         self._parar_fundido()
         self._enviar({"command": ["quit"]})
         self._socket.flush()
@@ -154,12 +171,20 @@ class Reproductor(QObject):
                 if ev.get("reason") == "eof":
                     self._termino_cancion()
                 elif ev.get("reason") == "error":
-                    self.error.emit("No se pudo tocar: " + Path(self.cancion.get("ruta", "")).name)
+                    c = self.cancion
+                    if es_stream(c.get("ruta", "")) and not self._sin_cliente:   # como el avance: otra vez sin cliente
+                        self._sin_cliente = True
+                        self._cargar()
+                        continue
+                    self.error.emit("No se pudo tocar: " + (c.get("titulo") or Path(c.get("ruta", "")).name))
                     QTimer.singleShot(300, self._termino_cancion)
 
     def _propiedad(self, nombre: str, valor) -> None:
         if nombre == "time-pos":
-            self._posicion = float(valor or 0)
+            nueva = float(valor or 0)
+            if not self._pausado and 0 < nueva - self._posicion < 3:   # lo que sí sonó (no los saltos)
+                self._escuchado += nueva - self._posicion
+            self._posicion = nueva
             self.cambioPosicion.emit()
             self._revisar_fundido()
         elif nombre == "duration":
@@ -195,13 +220,29 @@ class Reproductor(QObject):
         else:
             self._pausado = True
             self._posicion = 0.0
+            self._final = True
+            self._cerrar_escucha()
             self.cambioEstado.emit()
+            self.seAcaba.emit()
+
+    def _cerrar_escucha(self) -> None:
+        """1.4: cuenta como escuchada si sonó 30 s (o la mitad, si es más corta)."""
+        c, s = self._sonando, self._escuchado
+        self._sonando, self._escuchado = {}, 0.0
+        dur = float(c.get("duracion") or 0) or self._duracion
+        if c and s >= min(30.0, dur * 0.5 if dur > 0 else 30.0):
+            self.escuchada.emit(dict(c), round(s, 1))
 
     def _cargar(self, pausado: bool = False, desde: float = 0.0, entra: float = 0.0) -> None:
         """`entra`: segundos en que sube desde el silencio (la que entra con crossfade)."""
-        c = self.cancion
+        c = self._cancion()
         if not c:
             return
+        if c.get("ruta") != self._sonando.get("ruta"):
+            self._sin_cliente = False
+        self._cerrar_escucha()
+        self._sonando = c
+        self._final = False
         self._posicion = desde
         self._duracion = float(c.get("duracion") or 0)
         self._cargada = time.monotonic()
@@ -210,6 +251,8 @@ class Reproductor(QObject):
             opciones["start"] = f"{desde:.2f}"
         if entra > 0:
             opciones["af"] = ",".join(x for x in (self._eq, f"lavfi=[afade=t=in:d={entra:.1f}]") if x)
+        if es_stream(c["ruta"]) and not self._sin_cliente:
+            opciones["ytdl-raw-options"] = CLIENTE
         if opciones:
             self._enviar({"command": ["loadfile", c["ruta"], "replace", -1, opciones]})
         else:
@@ -222,6 +265,8 @@ class Reproductor(QObject):
         self.cambioCola.emit()   # la cola «A continuación» empieza en otro lado
         self.cambioEstado.emit()
         self.cambioPosicion.emit()
+        if self._repetir == "no" and self._i + 1 >= len(self._orden):
+            self.seAcaba.emit()
 
     # --- para la interfaz y MPRIS ----------------------------------------------------------------
 
@@ -386,6 +431,20 @@ class Reproductor(QObject):
         self._orden.append(len(self._cola) - 1)
         self.cambioCola.emit()
 
+    @Slot("QVariantList")
+    def agregarRadio(self, canciones: list) -> None:
+        """1.4: la radio sin fin: al final de la cola; si ya se había acabado, sigue sonando con la primera."""
+        nuevas = [dict(c) for c in canciones if c and c.get("ruta")]
+        if not nuevas or not self._orden:
+            return
+        for c in nuevas:
+            self._cola.append(c)
+            self._orden.append(len(self._cola) - 1)
+        self.cambioCola.emit()
+        if self._final:
+            self._i += 1
+            self._cargar()
+
     @Slot(int)
     def saltarA(self, k: int) -> None:
         """Toca la canción k de la cola (k: su lugar en `cola`)."""
@@ -470,6 +529,8 @@ class Reproductor(QObject):
         c = self.cancion
         if k < 0 or not c:
             return
+        if es_stream(c["ruta"]) or es_stream(self._cola[self._orden[k]]["ruta"]):
+            return   # 1.4: la de YouTube tarda en abrir: se pasa sin crossfade
         desde, resto = self._posicion, max(0.5, self._duracion - self._posicion)
         mpv = os.environ.get("VORTEX_PLAYER_MPV", "mpv")
         ao = plataforma.salida_audio()

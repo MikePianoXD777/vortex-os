@@ -521,5 +521,34 @@ class EcualizadorEnMpv(Temporal):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
+
+class Novedades14(Temporal):
+    """1.4: la radio sin fin y «Tu resumen»."""
+
+    def test_semana_e_id_de_la_radio(self) -> None:
+        import datetime as dt
+        jueves = dt.datetime(2026, 10, 29, 15, 30).timestamp()
+        desde, hasta = biblioteca.semana(0, jueves)
+        self.assertEqual(dt.datetime.fromtimestamp(desde), dt.datetime(2026, 10, 26))
+        self.assertEqual(dt.datetime.fromtimestamp(hasta), dt.datetime(2026, 11, 2))
+        self.assertEqual(dt.datetime.fromtimestamp(biblioteca.semana(1, jueves)[0]), dt.datetime(2026, 10, 19))
+        self.assertEqual(biblioteca.id_de("https://music.youtube.com/watch?v=ZRtdQ81jPUQ"), "ZRtdQ81jPUQ")
+        self.assertEqual(biblioteca.id_de("/m/Idol [ZRtdQ81jPUQ].opus"), "ZRtdQ81jPUQ")
+        self.assertEqual(biblioteca.id_de("/m/otra.flac"), "")
+
+    def test_resumen(self) -> None:
+        b = biblioteca.Biblioteca(self.t / "b.db")
+        desde, hasta = biblioteca.semana(0)
+        for titulo, artista, seg, dia in (("Idol", "YOASOBI - Topic", 200, 0), ("Idol", "YOASOBI", 100, 1),
+                                          ("Racing", "Ado, Otro", 60, 1), ("Fuera", "Nadie", 999, 8)):
+            b.anotar_escucha({"ruta": f"/m/{titulo}.opus", "titulo": titulo, "artista": artista}, seg,
+                             cuando=desde + dia * 86400 + 60)
+        r = b.resumen(desde, hasta)
+        self.assertEqual((r["escuchas"], r["minutos"], r["distintas"], r["dias"]), (3, 6, 2, 2))
+        self.assertEqual([(c["titulo"], c["veces"]) for c in r["canciones"]], [("Idol", 2), ("Racing", 1)])
+        self.assertEqual([(a["artista"], a["minutos"]) for a in r["artistas"]], [("YOASOBI", 5), ("Ado", 1)])
+        self.assertEqual(b.resumen(hasta, hasta + 1)["escuchas"], 0)
+        b.cerrar()
+
 if __name__ == "__main__":
     unittest.main()

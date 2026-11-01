@@ -86,14 +86,21 @@ Rectangle {
                     elide: Text.ElideRight
                 }
                 Etiqueta {
-                    texto: rep.cancion.etiqueta || ""
+                    texto: rep.cancion.radio ? "Radio" : (rep.cancion.etiqueta || "")   // 1.4: suena de YouTube Music
                     nivel: rep.cancion.nivel || "comprimida"
                 }
+            }
+            BotonIcono {   // 1.4: la de la radio todavía no es tuya: se baja (y luego ya le puedes dar ❤️)
+                visible: !!rep.cancion.radio
+                tam: 32
+                icono: vp.bajandoRadio.indexOf(rep.cancion.ruta || "") >= 0 ? "visto" : "descargar"
+                ayuda: "Bajar a tu biblioteca"
+                onClicked: vp.bajarDeLaRadio(rep.cancion.ruta)
             }
             BotonIcono {   // 2.4: ❤️ como en Spotify, junto a la canción
                 id: corazon
                 readonly property bool gusta: vp.meGusta.indexOf(rep.cancion.ruta || "") >= 0
-                visible: !!rep.cancion.ruta
+                visible: !!rep.cancion.ruta && !rep.cancion.radio
                 tam: 32
                 icono: gusta ? "corazonLleno" : "corazon"
                 activo: gusta

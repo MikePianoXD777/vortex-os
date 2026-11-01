@@ -1,5 +1,6 @@
 // 2.4: la cola, como «A continuación» de Spotify: lo que suena y lo que viene. Clic en una salta ahí y la X
 // la quita de la cola. Se llena con «Tocar después» y «Agregar a la cola» (clic derecho en una canción).
+// 1.4: al final, las de la radio sin fin (parecidas a lo que escuchabas, suenan sin bajarlas).
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -99,13 +100,27 @@ Rectangle {
             }
             Repeater {
                 model: raiz.siguientes.slice(0, 300)   // con miles, las primeras 300 bastan para ver qué viene
-                Fila {
+                ColumnLayout {
                     required property var modelData
                     required property int index
-                    cancion: modelData
-                    numero: index + 1
-                    onTocar: rep.saltarA(rep.indice + 1 + index)
-                    onQuitar: rep.quitarDeColaEn(rep.indice + 1 + index)
+                    Layout.fillWidth: true
+                    spacing: 4
+                    RowLayout {   // 1.4: donde empieza la radio
+                        visible: !!modelData.radio && (index === 0 || !raiz.siguientes[index - 1].radio)
+                        Layout.fillWidth: true
+                        Layout.topMargin: index === 0 ? 0 : 20
+                        Layout.bottomMargin: 4
+                        spacing: 8
+                        Icono { Layout.preferredWidth: 16; Layout.preferredHeight: 16; nombre: "radio"; color: Tema.azul }
+                        Text { text: "Radio"; color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold }
+                        Text { Layout.fillWidth: true; text: "· parecidas a lo que escuchabas, suenan sin bajarlas"; color: Tema.tenue; font.pixelSize: 13; elide: Text.ElideRight }
+                    }
+                    Fila {
+                        cancion: modelData
+                        numero: index + 1
+                        onTocar: rep.saltarA(rep.indice + 1 + index)
+                        onQuitar: rep.quitarDeColaEn(rep.indice + 1 + index)
+                    }
                 }
             }
 
@@ -118,7 +133,8 @@ Rectangle {
                 Text { Layout.alignment: Qt.AlignHCenter; text: "No viene nada después"; color: Tema.texto; font.pixelSize: 18; font.weight: Font.DemiBold }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Clic derecho en una canción → «Tocar después» o «Agregar a la cola»."
+                    text: vp.ajustes.radio === false ? "Clic derecho en una canción → «Tocar después» o «Agregar a la cola»."
+                        : "Al acabarse, la radio sigue con canciones parecidas."
                     color: Tema.tenue
                     font.pixelSize: 13
                 }

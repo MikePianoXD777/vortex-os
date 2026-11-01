@@ -60,8 +60,16 @@ Window {
                 RowLayout {
                     spacing: 2
                     Layout.topMargin: 2
+                    BotonIcono {   // 1.4: la de la radio se baja
+                        visible: !!rep.cancion.radio
+                        tam: 30
+                        icono: vp.bajandoRadio.indexOf(rep.cancion.ruta || "") >= 0 ? "visto" : "descargar"
+                        ayuda: "Bajar a tu biblioteca"
+                        onClicked: vp.bajarDeLaRadio(rep.cancion.ruta)
+                    }
                     BotonIcono {
                         readonly property bool gusta: vp.meGusta.indexOf(rep.cancion.ruta || "") >= 0
+                        visible: !rep.cancion.radio
                         tam: 30; enabled: !!rep.cancion.ruta
                         icono: gusta ? "corazonLleno" : "corazon"; activo: gusta
                         ayuda: gusta ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"

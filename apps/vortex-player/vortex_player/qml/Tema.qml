@@ -68,4 +68,10 @@ QtObject {
     readonly property int radioGrande: 28
     readonly property int radioCampo: 18
     readonly property int anchoLateral: 244
+
+    // 1.4: «3 h 20 min» (para «Tu resumen»)
+    function minutos(m) {
+        m = Math.max(0, Math.round(m || 0))
+        return m < 60 ? m + " min" : Math.floor(m / 60) + " h" + (m % 60 ? " " + m % 60 + " min" : "")
+    }
 }

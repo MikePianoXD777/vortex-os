@@ -538,5 +538,62 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["sonando_la_que_sale"], 1)
         self.assertEqual(d["errores_qml"], [])
 
+    def test_radio_sin_fin_y_tu_resumen(self) -> None:
+        # 1.4: al acabarse la cola siguen las de la radio (aquí, sin red, se le da la respuesta a mano) y
+        # cada canción que sonó 30 s o más cuenta para «Tu resumen» (la tarjeta de Ajustes y el aviso)
+        d = self.correr("""
+            import time
+            from vortex_player import biblioteca
+            datos = {"se_acaba": 0}
+            r.seAcaba.connect(lambda: datos.__setitem__("se_acaba", datos["se_acaba"] + 1))
+            def empezar():
+                puente.ordenar("titulo")   # Dos, Tres, Uno
+                puente.tocar(2)            # Uno: la última
+                datos["pidio"] = datos["se_acaba"]
+            def adelantar():
+                r.buscar(r.duracion - 1)
+            def radio():
+                datos["final"] = [r._final, r.pausado]
+                uno = puente.canciones[0]["ruta"]
+                puente._radio_vuelta, puente._radio_para = 7, r.cola[-1]["ruta"]
+                puente._fin_radio(7, [{"id": "aaaaaaaaaaa", "url": uno, "titulo": "Radio uno", "artistas": "Alguien",
+                                       "album": "", "duracion": 30, "portada": ""}], "")
+                datos["sonando"] = [r.cancion.get("titulo"), bool(r.cancion.get("radio")), r.pausado]
+                ventana.setProperty("pagina", "cola")
+                # una respuesta vieja (la cola ya cambió) no se agrega
+                puente._radio_vuelta, puente._radio_para = 8, "otra"
+                puente._fin_radio(8, [{"id": "bbbbbbbbbbb", "url": uno, "titulo": "Vieja", "artistas": "",
+                                       "duracion": 30}], "")
+                datos["cola"] = [c["titulo"] for c in r.cola]
+            def contar():
+                datos["escuchado"] = r._escuchado
+                r.escuchada.emit({"ruta": "x", "titulo": "Idol", "artista": "YOASOBI - Topic", "duracion": 200}, 120.0)
+                r.escuchada.emit({"ruta": "x", "titulo": "Idol", "artista": "YOASOBI", "duracion": 200}, 60.0)
+                antes = biblioteca.semana(1)[0] + 3600
+                puente.bib.anotar_escucha({"ruta": "y", "titulo": "Vieja", "artista": "Otro"}, 90, cuando=antes)
+                puente._resumen = {}
+                s = puente.resumen
+                datos["semana"] = [s["semana"]["escuchas"], s["semana"]["minutos"], s["semana"]["artistas"][0]["artista"],
+                                   s["semana"]["canciones"][0]["veces"]]
+                datos["pasada"] = s["pasada"]["escuchas"]
+                datos["aviso"] = s["aviso"]
+                puente.resumenVisto()
+                datos["aviso_despues"] = puente.resumen["aviso"]
+                ventana.setProperty("pagina", "ajustes")
+            paso(2500, empezar)
+            paso(800, adelantar)
+            paso(2500, radio)
+            paso(3000, contar)
+            paso(800, lambda: fin(**datos))
+        """, "radio")
+        self.assertGreaterEqual(d["pidio"], 1)
+        self.assertEqual(d["final"], [True, True])
+        self.assertEqual(d["sonando"], ["Radio uno", True, False])
+        self.assertEqual(d["cola"], ["Dos", "Tres", "Uno", "Radio uno"])
+        self.assertGreater(d["escuchado"], 1.5)
+        self.assertEqual(d["semana"], [2, 3, "YOASOBI", 2])
+        self.assertEqual((d["pasada"], d["aviso"], d["aviso_despues"]), (1, True, False))
+        self.assertEqual(d["errores_qml"], [])
+
 if __name__ == "__main__":
     unittest.main()
