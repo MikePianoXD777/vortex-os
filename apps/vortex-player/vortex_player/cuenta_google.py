@@ -27,7 +27,7 @@ from . import rutas
 # (2.4.0): se lee de ~/.config/vortex-player/cliente-google.json o de VORTEX_PLAYER_GOOGLE_SECRETO; sin él,
 # Ajustes dice que esta versión todavía no está registrada con Google.
 CLIENTE_ID = "986706412005-cn9dc33hf03a6ock3f7mdm1j15a4mndt.apps.googleusercontent.com"
-SECRETO_AL_REVES = ""
+SECRETO_AL_REVES = "rVPV39OdxANwk3mpxOAg3GG35wGN-XPSCOG"
 
 ALCANCE = "https://www.googleapis.com/auth/drive.appdata"
 AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
