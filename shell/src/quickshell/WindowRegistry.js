@@ -69,6 +69,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰔛"
         },
         {
+            // Vortex 2.5: tus tareas (el singleton Tareas; las de hoy y mañana salen en la barra).
+            id: "tareas",
+            name: tr("widgets.tareas.name", "Tasks"),
+            description: tr("widgets.tareas.desc", "Your homework and to-dos with a date, from your Obsidian; reminds you a day before"),
+            icon: "view-task",
+            fontIcon: "󰄲"
+        },
+        {
             // Vortex (1.7.7): la hoja de atajos (Super+F1), para buscarla en el lanzador.
             id: "keybinds",
             name: tr("widgets.keybinds.name", "Keyboard shortcuts"),
@@ -85,7 +93,17 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰏊"
         },
         {
-            // Vortex 1.10: metrónomo y afinador (musica/musica.py). La descripción lleva las palabras
+            // Vortex 2.5: tus tareas (tareas/TareasPopup.qml), al centro.
+        "tareas": {
+            w: 540, h: 680, comp: "tareas/TareasPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 1.10: metrónomo y afinador (musica/musica.py). La descripción lleva las palabras
             // con las que se buscaría: tempo, compás, afinar, guitarra, solfeo.
             id: "musica",
             name: tr("widgets.musica.name", "Metronome and tuner"),

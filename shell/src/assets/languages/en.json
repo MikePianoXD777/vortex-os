@@ -1700,6 +1700,11 @@
     "notas": {
       "name": "Quick note",
       "desc": "Jot something down on the fly; it saves itself (Super+Alt+N)"
+    },
+    "tareas": {
+      "name": "Tasks",
+      "desc": "Your homework and to-dos with a date, from your Obsidian; reminds you a day before",
+      "short": "Tasks"
     }
   },
   "cli": {
@@ -2214,5 +2219,23 @@
     "where": "Saved in Documents",
     "copy": "Copy all",
     "open": "Open in editor"
+  },
+  "tareas": {
+    "title": "Tasks",
+    "subtitle": "The ones for today and tomorrow show up in the bar, and I remind you a day before.",
+    "new": "New task… (Enter to add)",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "day_after": "Day after",
+    "next_week": "In a week",
+    "no_date": "No date",
+    "yesterday": "Yesterday",
+    "overdue": "Overdue",
+    "bar_one": "1 task",
+    "bar": "{n} tasks",
+    "empty": "Nothing pending. Write one above, or put 📅 2026-11-03 on any task in your notes.",
+    "saved_obsidian": "Saved in your Obsidian (Tareas.md)",
+    "saved_file": "Saved in Documents/Tareas.md",
+    "open": "Open"
   }
 }

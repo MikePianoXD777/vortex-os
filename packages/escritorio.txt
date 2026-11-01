@@ -22,3 +22,7 @@ zenity                 # elegir archivos para mandar al celular
 pacman-contrib         # paccache: «Algo no funciona → Disco» limpia la caché de pacman (1.9)
 easyeffects            # el ecualizador del panel de música (sin él las barras no cambian el sonido)
 gpu-screen-recorder    # los últimos 30 s con Alt+F10 (vortex-clips, 1.10)
+yt-dlp                 # bajar con copiar el enlace (vortex-enlace, 2.5)
+ffmpeg                 # junta video y audio, y saca el mp3
+deno                   # YouTube lo pide para yt-dlp
+imagemagick            # fotos de la tarea a PDF (vortex-pdf, 2.5)

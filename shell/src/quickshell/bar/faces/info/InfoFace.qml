@@ -28,7 +28,8 @@ Item {
     readonly property string recCacheDir: Caching.cacheDir ? Caching.getCacheDir("recording") : ""
 
     // Vortex 1.10: primero el temporizador de estudio (Estudio), con clic abre su panel.
-    readonly property var timerEntries: Estudio.barra.concat(TimerState.entries)
+    // Vortex 2.5: luego las tareas de hoy y mañana (Tareas), con clic abre las suyas.
+    readonly property var timerEntries: Estudio.barra.concat(Tareas.barra, TimerState.entries)
     readonly property bool isTimerActive: timerEntries.length > 0
     readonly property color greenColor: (typeof ThemeBackend !== "undefined" && ThemeBackend.green !== undefined) ? ThemeBackend.green : Qt.rgba(166/255, 227/255, 161/255, 1.0)
 
@@ -232,9 +233,10 @@ Item {
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -6
-                                enabled: timerItem.modelData.estudio === true
+                                enabled: timerItem.modelData.estudio === true || timerItem.modelData.tareas === true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: Quickshell.execDetached(["bash", Caching.serpantinumDir + "/scripts/qs_manager.sh", "toggle", "estudio"])
+                                onClicked: Quickshell.execDetached(["bash", Caching.serpantinumDir + "/scripts/qs_manager.sh", "toggle",
+                                    timerItem.modelData.tareas === true ? "tareas" : "estudio"])
                             }
                         }
                     }

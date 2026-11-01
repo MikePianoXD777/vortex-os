@@ -849,7 +849,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1061,6 +1061,8 @@ PAQUETES_NUEVOS=(
   pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
   easyeffects # 1.10: sin él el ecualizador del panel de música no hace nada
   gpu-screen-recorder # 1.10: vortex-clips (los últimos 30 s con Alt+F10)
+  yt-dlp ffmpeg deno # 2.5: vortex-enlace (bajar con copiar el enlace; deno lo pide YouTube)
+  imagemagick # 2.5: vortex-pdf (fotos de la tarea a PDF)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1157,8 +1159,11 @@ cmd_actualizar() {
   # ahora, para no esperar al próximo inicio de sesión. Cada uno tiene su candado: si ya corre, sale.
   if hypr_corriendo; then
     command -v vortex-usb >/dev/null && setsid -f vortex-usb </dev/null >/dev/null 2>&1
+    command -v vortex-enlace >/dev/null && setsid -f vortex-enlace </dev/null >/dev/null 2>&1
     setsid -f vortex fondos-auto correr </dev/null >/dev/null 2>&1
   fi
+  # 2.5: «Hacer PDF» en el clic derecho de Thunar (bin/vortex-pdf), también para quien ya tenía Vortex.
+  command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
   # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
   # config) se ve de inmediato y no hasta el próximo inicio de sesión.
   reiniciar_shell

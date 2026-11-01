@@ -51,6 +51,7 @@ singleton CurrentFocus 1.0 singletons/system/CurrentFocus.qml
 singleton DateTime 1.0 singletons/system/DateTime.qml
 singleton Estudio 1.0 singletons/system/Estudio.qml
 singleton Recordar 1.0 singletons/system/Recordar.qml
+singleton Tareas 1.0 singletons/system/Tareas.qml
 singleton FirstLaunch 1.0 singletons/system/FirstLaunch.qml
 singleton I18n 1.0 singletons/system/I18n.qml
 singleton MangoState 1.0 singletons/system/MangoState.qml

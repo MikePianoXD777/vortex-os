@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""vortex-pdf (Vortex 2.5): fotos de la tarea a PDF. Seleccionas las fotos en Thunar → clic derecho →
+«Hacer PDF»: cada foto se endereza, se recorta a la hoja (si se ve la mesa alrededor), se le quitan las
+sombras con el fondo en blanco, y todas quedan en un PDF junto a las fotos, en el orden de sus nombres.
+
+  vortex-pdf FOTO...        hace el PDF y avisa con «Abrir» (en la terminal solo dice dónde quedó)
+  vortex-pdf accion         pone «Hacer PDF» en el clic derecho de Thunar (si no está); lo corren
+                            Hyprland al entrar y vortex actualizar
+"""
+from __future__ import annotations
+
+import datetime as dt
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+HOME = Path.home()
+UCA = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "Thunar/uca.xml"
+ID_ACCION = "vortex-pdf"
+ACCION = f"""<action>
+	<icon>application-pdf</icon>
+	<name>Hacer PDF</name>
+	<submenu></submenu>
+	<unique-id>{ID_ACCION}</unique-id>
+	<command>vortex-pdf %F</command>
+	<description>Junta las fotos en un PDF, enderezadas y con el fondo blanco (Vortexine's)</description>
+	<range></range>
+	<patterns>*.jpg;*.jpeg;*.png;*.webp;*.heic;*.JPG;*.JPEG;*.PNG;*.WEBP;*.HEIC</patterns>
+	<image-files/>
+</action>
+"""
+LADO = 2339          # A4 a 200 ppp: el lado largo de cada página
+PPP = 200
+
+
+def accion() -> None:
+    """Agrega la acción a uca.xml sin tocar las que ya tengas."""
+    try:
+        xml = UCA.read_text()
+    except OSError:
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n<actions>\n</actions>\n'
+    if f"<unique-id>{ID_ACCION}</unique-id>" in xml:
+        return
+    if "</actions>" not in xml:
+        return   # no es un uca.xml que entendamos: mejor no tocarlo
+    i = xml.rindex("</actions>")
+    UCA.parent.mkdir(parents=True, exist_ok=True)
+    UCA.write_text(xml[:i] + ACCION + xml[i:])
+
+
+def magick(*args: str) -> str:
+    r = subprocess.run(["magick", *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip() or "magick falló")
+    return r.stdout.strip()
+
+
+def caja(mascara: Path) -> tuple[int, int, int, int] | None:
+    """La caja (w, h, x, y) de lo blanco de la máscara."""
+    m = re.fullmatch(r"(\d+)x(\d+)\+(-?\d+)\+(-?\d+)",
+                     magick(str(mascara), "-bordercolor", "black", "-border", "1", "-format", "%@", "info:"))
+    if not m:
+        return None
+    w, h, x, y = (int(v) for v in m.groups())
+    return w, h, max(0, x - 1), max(0, y - 1)
+
+
+def hoja(foto: Path, salida: Path) -> None:
+    """Una foto → una página: derecha, recortada a la hoja, sin sombras y con el fondo blanco."""
+    base, mascara = salida.with_suffix(".png"), salida.with_suffix(".mascara.png")
+    magick(str(foto) + "[0]", "-auto-orient", "-resize", f"{LADO}x{LADO}>", "+repage", str(base))
+    ancho, alto = map(int, magick(str(base), "-format", "%w %h", "info:").split())
+    # La hoja es lo claro y grande: umbral de Otsu sobre la foto borrosa, sin manchitas
+    magick(str(base), "-colorspace", "gray", "-blur", "0x6", "-auto-threshold", "otsu",
+           "-morphology", "Open", "Disk:8", str(mascara))
+    c = caja(mascara)
+    # Si la hoja llena la foto (o no se distingue de la mesa), no se recorta
+    con_mesa = c is not None and 0.25 <= (c[0] * c[1]) / (ancho * alto) <= 0.97
+    # Se endereza por las líneas del texto; la máscara gira igual, así su caja es la de la hoja ya derecha
+    angulo = magick(str(base), "-deskew", "40%", "-format", "%[deskew:angle]", "info:") or "0"
+    magick(str(base), "-background", "white", "-rotate", angulo, "+repage", str(base))
+    recorte = []
+    if con_mesa:
+        magick(str(mascara), "-background", "black", "-rotate", angulo, "+repage", "-threshold", "50%", str(mascara))
+        c = caja(mascara)
+        if c:
+            recorte = ["-crop", f"{c[0]}x{c[1]}+{c[2]}+{c[3]}", "+repage"]
+            # Una hoja ya derecha llena su caja; si no (un óvalo de luz, una sombra), mejor no recortar
+            if float(magick(str(mascara), *recorte, "-format", "%[fx:mean]", "info:")) < 0.9:
+                recorte = []
+    magick(str(base), *recorte,
+           # quitar sombras: dividir entre una copia muy borrosa deja el papel en blanco parejo
+           "(", "+clone", "-blur", "0x20", ")", "-compose", "Divide_Src", "-composite",
+           "-level", "12%,94%", "-quality", "85", str(salida))
+    base.unlink(missing_ok=True)
+    mascara.unlink(missing_ok=True)
+
+
+def nombre_pdf(fotos: list[Path]) -> Path:
+    carpeta = fotos[0].parent
+    if len(fotos) == 1:
+        base = fotos[0].stem
+    else:
+        base = "Tarea " + dt.datetime.now().strftime("%Y-%m-%d %H.%M")
+    destino = carpeta / f"{base}.pdf"
+    n = 2
+    while destino.exists():
+        destino = carpeta / f"{base} ({n}).pdf"
+        n += 1
+    return destino
+
+
+def aviso(titulo: str, cuerpo: str, abrir: str = "") -> None:
+    if not shutil.which("notify-send"):
+        return
+    cmd = ["notify-send", "-a", "Vortexine's OS", "-i", "application-pdf"]
+    if abrir:
+        cmd += ["-A", "abrir=Abrir", "-A", "carpeta=Ver en la carpeta"]
+    r = subprocess.run(cmd + [titulo, cuerpo], capture_output=True, text=True)
+    eleccion = r.stdout.strip()
+    if abrir and eleccion in ("abrir", "carpeta"):
+        destino = abrir if eleccion == "abrir" else str(Path(abrir).parent)
+        subprocess.Popen(["xdg-open", destino], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def hacer(rutas: list[str]) -> None:
+    fotos = sorted((Path(r) for r in rutas if Path(r).is_file()), key=lambda p: p.name.lower())
+    if not fotos:
+        sys.exit("vortex-pdf: no hay fotos")
+    if not shutil.which("magick"):
+        aviso("No se pudo hacer el PDF", "Falta ImageMagick: corre «vortex actualizar».")
+        sys.exit(1)
+    destino = nombre_pdf(fotos)
+    with tempfile.TemporaryDirectory(prefix="vortex-pdf-") as tmp:
+        paginas = []
+        for i, foto in enumerate(fotos):
+            pagina = Path(tmp) / f"{i:03d}.jpg"
+            try:
+                hoja(foto, pagina)
+            except RuntimeError:
+                aviso("No se pudo hacer el PDF", f"«{foto.name}» no es una imagen que se pueda leer.")
+                sys.exit(1)
+            paginas.append(str(pagina))
+        if os.environ.get("VORTEX_PDF_PAGINAS"):   # las pruebas revisan cada página
+            for p in paginas:
+                shutil.copy(p, os.environ["VORTEX_PDF_PAGINAS"])
+        magick(*paginas, "-units", "PixelsPerInch", "-density", str(PPP), "-compress", "jpeg", "-quality", "85",
+               str(destino))
+    print(destino)
+    paginas_txt = "1 página" if len(fotos) == 1 else f"{len(fotos)} páginas"
+    aviso("Listo: " + destino.name, f"{paginas_txt}, junto a tus fotos.", abrir=str(destino))
+
+
+def main(args: list[str]) -> None:
+    if not args or args[0] in ("-h", "--help"):
+        sys.exit(__doc__)
+    if args[0] == "accion" and len(args) == 1:
+        accion()
+    else:
+        hacer(args)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

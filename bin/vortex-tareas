@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""vortex-tareas (Vortex 2.5): tus tareas en la barra. Lee las tareas con fecha de tu bóveda de Obsidian
+(la que tengas abierta) y las de `Tareas.md`; la barra cuenta las de hoy y mañana, el panel las lista
+(clic en la cuenta, o lanzador → «Tareas») y avisa un día antes. Sin Obsidian, usa ~/Documentos/Tareas.md.
+
+Las fechas se escriben como en el plugin Tasks de Obsidian (`- [ ] Maqueta de ciencias 📅 2026-11-03`),
+o `due:: 2026-11-03`, o a la mexicana: `(3/11)`, «para el 3/11». Al marcarla hecha queda `- [x] … ✅ fecha`.
+
+  vortex-tareas listar             JSON para el panel: {boveda, archivo, tareas: [...]}
+  vortex-tareas agregar TEXTO [AAAA-MM-DD]
+  vortex-tareas hecha ARCHIVO LINEA TEXTO   (TEXTO es la línea tal cual; si cambió, no toca nada)
+  vortex-tareas abrir              abre Tareas.md en Obsidian (o en el editor), creándola si falta
+  vortex-tareas avisar             avisa (una vez) de las de mañana después de las 5 pm y de las de hoy
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+ESTADO = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "vortex"
+CONFIGS_OBSIDIAN = [
+    Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "obsidian/obsidian.json",
+    HOME / ".var/app/md.obsidian.Obsidian/config/obsidian/obsidian.json",   # Flatpak
+]
+TAREA = re.compile(r"^(\s*[-*+] \[)( )(\] )(.*)$")
+FECHAS = [
+    re.compile(r"\s*📅\s*(\d{4})-(\d{2})-(\d{2})"),
+    re.compile(r"\s*\[?due::\s*(\d{4})-(\d{2})-(\d{2})\]?"),
+]
+# «(3/11)» o «para el 3/11»: entre paréntesis o con «para»/«entrega», para no confundir «1/2 taza» con una fecha
+FECHA_CORTA = re.compile(r"\s*(?:\(|\b(?:para el|para|entrega(?: el)?)\s+)(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b\)?", re.I)
+SALTAR = {".obsidian", ".trash", ".git", "node_modules"}
+
+
+def ahora() -> dt.datetime:
+    """La hora de ahora; VORTEX_TAREAS_AHORA (AAAA-MM-DDTHH:MM) la fija para las pruebas."""
+    fija = os.environ.get("VORTEX_TAREAS_AHORA")
+    return dt.datetime.fromisoformat(fija) if fija else dt.datetime.now()
+
+
+def boveda() -> Path | None:
+    """La bóveda abierta en Obsidian (o la más reciente). VORTEX_TAREAS_BOVEDA manda (pruebas)."""
+    if os.environ.get("VORTEX_TAREAS_BOVEDA"):
+        return Path(os.environ["VORTEX_TAREAS_BOVEDA"])
+    for c in CONFIGS_OBSIDIAN:
+        try:
+            vaults = json.loads(c.read_text()).get("vaults") or {}
+        except (OSError, ValueError):
+            continue
+        orden = sorted(vaults.values(), key=lambda v: (not v.get("open"), -v.get("ts", 0)))
+        for v in orden:
+            if v.get("path") and Path(v["path"]).is_dir():
+                return Path(v["path"])
+    return None
+
+
+def archivo_tareas() -> Path:
+    b = boveda()
+    return (b if b else HOME / "Documentos") / "Tareas.md"
+
+
+def fecha_de(texto: str, hoy: dt.date) -> tuple[str, dt.date | None]:
+    """(texto sin la fecha, fecha). «(3/11)» sin año es el próximo 3 de noviembre (o este, si es hoy)."""
+    for r in FECHAS:
+        m = r.search(texto)
+        if m:
+            try:
+                return (texto[:m.start()] + texto[m.end():]).strip(), dt.date(int(m[1]), int(m[2]), int(m[3]))
+            except ValueError:
+                pass
+    m = FECHA_CORTA.search(texto)
+    if m:
+        dia, mes = int(m[1]), int(m[2])
+        anio = int(m[3]) if m[3] else hoy.year
+        if anio < 100:
+            anio += 2000
+        try:
+            f = dt.date(anio, mes, dia)
+            if not m[3] and f < hoy - dt.timedelta(days=60):
+                f = f.replace(year=anio + 1)
+            return (texto[:m.start()] + texto[m.end():]).strip(" -·,"), f
+        except ValueError:
+            pass
+    return texto.strip(), None
+
+
+def limpiar(texto: str) -> str:
+    """Sin lo que el plugin Tasks agrega (⏳ 🛫 ➕ 🔁 prioridades) para que se lea bien en el panel."""
+    texto = re.sub(r"\s*[⏳🛫➕✅🔁]\s*\d{4}-\d{2}-\d{2}", "", texto)
+    texto = re.sub(r"\s*[🔺⏫🔼🔽⏬]", "", texto)
+    return texto.strip()
+
+
+def leer(hoy: dt.date | None = None) -> list[dict]:
+    hoy = hoy or ahora().date()
+    b = boveda()
+    propias = archivo_tareas()
+    archivos = []
+    if b:
+        for raiz, dirs, nombres in os.walk(b):
+            dirs[:] = [d for d in dirs if d not in SALTAR and not d.startswith(".")]
+            archivos += [Path(raiz) / n for n in nombres if n.endswith(".md")]
+    if propias.exists() and propias not in archivos:
+        archivos.append(propias)
+    tareas = []
+    for a in archivos:
+        try:
+            lineas = a.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for i, linea in enumerate(lineas):
+            m = TAREA.match(linea)
+            if not m:
+                continue
+            texto, fecha = fecha_de(m[4], hoy)
+            if fecha is None and a != propias:
+                continue   # de las demás notas, solo las que tienen fecha
+            texto = limpiar(texto)
+            if not texto:
+                continue
+            dias = (fecha - hoy).days if fecha else None
+            tareas.append({"texto": texto, "fecha": fecha.isoformat() if fecha else "", "dias": dias,
+                           "archivo": str(a), "nota": a.stem, "linea": i + 1, "original": linea})
+    tareas.sort(key=lambda t: (t["fecha"] == "", t["fecha"], t["texto"].lower()))
+    return tareas
+
+
+def listar() -> None:
+    b = boveda()
+    print(json.dumps({"boveda": str(b) if b else "", "archivo": str(archivo_tareas()), "tareas": leer()},
+                     ensure_ascii=False))
+
+
+def crear_archivo() -> Path:
+    a = archivo_tareas()
+    a.parent.mkdir(parents=True, exist_ok=True)
+    if not a.exists():
+        a.write_text("---\ntags:\n  - tareas\n---\n# Tareas\n\nLas que agregas desde la barra de Vortexine's. "
+                     "Las de otras notas también salen si llevan fecha (📅 AAAA-MM-DD).\n\n")
+    return a
+
+
+def agregar(texto: str, fecha: str = "") -> None:
+    texto = " ".join(texto.split())
+    if not texto:
+        sys.exit("la tarea está vacía")
+    if fecha:
+        dt.date.fromisoformat(fecha)   # que sea una fecha de verdad
+    a = crear_archivo()
+    previo = a.read_text()
+    linea = f"- [ ] {texto}" + (f" 📅 {fecha}" if fecha else "")
+    a.write_text(previo + ("" if previo.endswith("\n") else "\n") + linea + "\n")
+
+
+def hecha(archivo: str, linea: int, original: str) -> None:
+    a = Path(archivo)
+    lineas = a.read_text().split("\n")
+    if not 0 < linea <= len(lineas) or lineas[linea - 1] != original:
+        sys.exit("la nota cambió: vuelve a abrir el panel")
+    m = TAREA.match(original)
+    if not m:
+        sys.exit("no es una tarea")
+    lineas[linea - 1] = f"{m[1]}x{m[3]}{m[4]} ✅ {ahora().date().isoformat()}"
+    a.write_text("\n".join(lineas))
+
+
+def abrir() -> None:
+    a = crear_archivo()
+    if boveda():
+        from urllib.parse import quote
+        destino = "obsidian://open?path=" + quote(str(a), safe="")
+    else:
+        destino = str(a)
+    subprocess.Popen(["xdg-open", destino], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+
+
+def jugando() -> bool:
+    return (ESTADO / "modo-juego").exists()
+
+
+def avisar() -> None:
+    """Una vez por tarea y por día: las de mañana después de las 5 pm; las de hoy (y vencidas) desde las 7 am."""
+    if jugando() or not shutil.which("notify-send"):
+        return
+    momento = ahora()
+    hoy = momento.date()
+    archivo = ESTADO / "tareas-avisos.json"
+    try:
+        estado = json.loads(archivo.read_text())
+    except (OSError, ValueError):
+        estado = {}
+    if estado.get("dia") != hoy.isoformat():
+        estado = {"dia": hoy.isoformat(), "avisadas": []}
+    avisar_de = []
+    for t in leer(hoy):
+        if t["dias"] is None:
+            continue
+        clave = f"{t['texto']}|{t['fecha']}"
+        toca = (t["dias"] <= 0 and momento.hour >= 7) or (t["dias"] == 1 and momento.hour >= 17)
+        if toca and clave not in estado["avisadas"]:
+            avisar_de.append(t)
+            estado["avisadas"].append(clave)
+    if not avisar_de:
+        return
+    ESTADO.mkdir(parents=True, exist_ok=True)
+    archivo.write_text(json.dumps(estado, ensure_ascii=False))
+    manana = [t for t in avisar_de if t["dias"] == 1]
+    hoy_ = [t for t in avisar_de if t["dias"] <= 0]
+    titulo = ("Para mañana: " if manana and not hoy_ else "Para hoy: ") + avisar_de[0]["texto"]
+    if len(avisar_de) > 1:
+        titulo = f"Tienes {len(avisar_de)} tareas " + ("para mañana" if manana and not hoy_ else "pendientes")
+    cuerpo = "\n".join("• " + t["texto"] + (" (mañana)" if t["dias"] == 1 else " (vencida)" if t["dias"] < 0 else "")
+                       for t in avisar_de[:5])
+    r = subprocess.run(["notify-send", "-a", "Vortexine's OS", "-i", "view-task", "-A", "ver=Ver mis tareas",
+                        titulo, cuerpo if len(avisar_de) > 1 else "Te lo recuerdo desde ahora."],
+                       capture_output=True, text=True)
+    if r.stdout.strip() == "ver":
+        serp = os.environ.get("SERPANTINUM_DIR", "/usr/share/serpantinum/src")
+        subprocess.Popen(["bash", f"{serp}/scripts/qs_manager.sh", "toggle", "tareas"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def main(args: list[str]) -> None:
+    if not args or args[0] == "listar":
+        listar()
+    elif args[0] == "agregar" and len(args) >= 2:
+        agregar(args[1], args[2] if len(args) > 2 else "")
+    elif args[0] == "hecha" and len(args) == 4:
+        hecha(args[1], int(args[2]), args[3])
+    elif args[0] == "abrir":
+        abrir()
+    elif args[0] == "avisar":
+        avisar()
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

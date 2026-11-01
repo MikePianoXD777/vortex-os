@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""vortex-enlace (Vortex 2.5): bajar con copiar el enlace. Cuando copias el enlace de un video de YouTube,
+TikTok, Instagram o X, sale un aviso con «Bajar video» y «Solo audio»; lo baja con yt-dlp a tu carpeta de
+Videos (mp4, hasta 1080p) o de Música (mp3 con portada y datos), con su avance en el aviso y «Abrir» al final.
+No avisa en modo juego ni dos veces por el mismo enlace. Lo arranca Hyprland al entrar (y vortex actualizar).
+
+  vortex-enlace                     escucha el portapapeles (wl-paste --watch); si ya escucha, sale
+  vortex-enlace revisar             lee lo copiado de la entrada y, si es un video, ofrece bajarlo
+  vortex-enlace bajar video|audio URL
+"""
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+HOME = Path.home()
+ESTADO = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "vortex"
+APP = "Vortexine's OS"
+ICONO = "folder-download"
+REPETIDO = 600   # el mismo enlace otra vez antes de 10 min no avisa
+SITIOS = [
+    ("YouTube", re.compile(r"^https?://(?:www\.|m\.|music\.)?(?:youtube\.com/(?:watch\?.*v=|shorts/|live/)|youtu\.be/)[\w-]{6,}", re.I)),
+    ("TikTok", re.compile(r"^https?://(?:(?:www|m)\.tiktok\.com/@[^/]+/(?:video|photo)/\d+|(?:vm|vt)\.tiktok\.com/\w+)", re.I)),
+    ("Instagram", re.compile(r"^https?://(?:www\.)?instagram\.com/(?:[\w.]+/)?(?:reels?|p|tv)/[\w-]+", re.I)),
+    ("X", re.compile(r"^https?://(?:www\.|mobile\.)?(?:x|twitter)\.com/\w+/status/\d+", re.I)),
+]
+
+
+def sitio(texto: str) -> str | None:
+    """El sitio si lo copiado es un solo enlace a un video (no un texto que trae un enlace)."""
+    texto = texto.strip()
+    if not texto or len(texto) > 500 or any(c.isspace() for c in texto):
+        return None
+    for nombre, r in SITIOS:
+        if r.match(texto):
+            return nombre
+    return None
+
+
+def jugando() -> bool:
+    return (ESTADO / "modo-juego").exists()
+
+
+def aviso(titulo: str, cuerpo: str = "", acciones: dict[str, str] | None = None, reemplaza: str = "",
+          progreso: int | None = None, espera: int = 0) -> tuple[str, str]:
+    """notify-send; devuelve (id, botón elegido). Con acciones espera a que des clic (o a que se vaya)."""
+    if not shutil.which("notify-send"):
+        return "", ""
+    cmd = ["notify-send", "-a", APP, "-i", ICONO, "-p"]
+    if reemplaza:
+        cmd += ["-r", reemplaza]
+    if progreso is not None:
+        cmd += ["-h", f"int:value:{progreso}"]
+    if espera:
+        cmd += ["-t", str(espera)]
+    for clave, texto in (acciones or {}).items():
+        cmd += ["-A", f"{clave}={texto}"]
+    r = subprocess.run(cmd + [titulo, cuerpo], capture_output=True, text=True)
+    lineas = r.stdout.split()
+    return (lineas[0] if lineas else ""), (lineas[1] if len(lineas) > 1 else "")
+
+
+def carpeta(tipo: str) -> Path:
+    clave, nombre = ("MUSIC", "Música") if tipo == "audio" else ("VIDEOS", "Videos")
+    try:
+        d = subprocess.run(["xdg-user-dir", clave], capture_output=True, text=True).stdout.strip()
+    except OSError:
+        d = ""
+    return Path(d) if d and d != str(HOME) else HOME / nombre
+
+
+def escuchar() -> None:
+    """Un solo escucha por sesión: el candado vive mientras wl-paste corre (lo hereda)."""
+    run = Path(os.environ.get("XDG_RUNTIME_DIR", tempfile.gettempdir()))
+    fd = os.open(run / "vortex-enlace.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return
+    os.set_inheritable(fd, True)
+    os.execvp("wl-paste", ["wl-paste", "--type", "text", "--watch", sys.argv[0], "revisar"])
+
+
+def revisar() -> None:
+    texto = sys.stdin.read(4096)
+    nombre = sitio(texto)
+    if not nombre or jugando():
+        return
+    url = texto.strip()
+    archivo = ESTADO / "enlace-ultimo.json"
+    try:
+        ultimo = json.loads(archivo.read_text())
+    except (OSError, ValueError):
+        ultimo = {}
+    if ultimo.get("url") == url and time.time() - ultimo.get("cuando", 0) < REPETIDO:
+        return
+    ESTADO.mkdir(parents=True, exist_ok=True)
+    archivo.write_text(json.dumps({"url": url, "cuando": time.time()}))
+    # wl-paste espera a que terminemos: el aviso (que espera tu clic) va aparte
+    subprocess.Popen([sys.argv[0], "ofrecer", nombre, url], stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def ofrecer(nombre: str, url: str) -> None:
+    _, eleccion = aviso(f"¿Bajar este video de {nombre}?", "Copiaste su enlace.",
+                        {"video": "Bajar video", "audio": "Solo audio"}, espera=15000)
+    if eleccion in ("video", "audio"):
+        bajar(eleccion, url)
+
+
+def por_que(error: str) -> str:
+    e = error.lower()
+    if "private" in e or "privado" in e:
+        return "El video es privado."
+    if "login" in e or "sign in" in e or "cookies" in e:
+        return "Ese sitio pide iniciar sesión para verlo."
+    if "unavailable" in e or "removed" in e or "not available" in e or "404" in e or "not found" in e:
+        return "El video ya no está disponible."
+    if "unable to download" in e or "name resolution" in e or "timed out" in e or "network" in e:
+        return "Revisa tu internet e inténtalo otra vez."
+    return "No se pudo bajar. Prueba de nuevo más tarde."
+
+
+def bajar(tipo: str, url: str) -> None:
+    if not shutil.which("yt-dlp"):
+        aviso("No se pudo bajar", "Falta yt-dlp: corre «vortex actualizar».")
+        return
+    destino = carpeta(tipo)
+    destino.mkdir(parents=True, exist_ok=True)
+    final = Path(tempfile.mkstemp(prefix="vortex-enlace-")[1])
+    cmd = ["yt-dlp", "--no-playlist", "--newline", "--no-colors", "--trim-filenames", "120",
+           "--progress-template", "download:VORTEX %(progress._percent_str)s",
+           "--print-to-file", "after_move:filepath", str(final), "-P", str(destino)]
+    if tipo == "audio":
+        cmd += ["-x", "--audio-format", "mp3", "--audio-quality", "0", "--embed-thumbnail", "--embed-metadata",
+                "--convert-thumbnails", "jpg", "-o", "%(artist,creator,uploader&{} - |)s%(track,title)s.%(ext)s"]
+    else:
+        cmd += ["-f", "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/bv*[height<=1080]+ba/b",
+                "--merge-output-format", "mp4", "--embed-metadata", "-o", "%(title)s.%(ext)s"]
+    que = "la canción" if tipo == "audio" else "el video"
+    aviso_id, _ = aviso(f"Bajando {que}…", url, progreso=0)
+    errores, ultimo = [], -10
+    p = subprocess.Popen(cmd + ["--", url], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for linea in p.stdout:
+        m = re.search(r"^VORTEX\s+([\d.]+)%", linea.strip())
+        if m:
+            pct = int(float(m[1]))
+            if pct >= ultimo + 10:   # cada 10 %, para no llenar de avisos
+                ultimo = pct
+                aviso_id, _ = aviso(f"Bajando {que}… {pct} %", url, reemplaza=aviso_id, progreso=pct)
+        elif linea.startswith("ERROR"):
+            errores.append(linea.strip())
+    p.wait()
+    try:
+        ruta = final.read_text().strip().splitlines()[-1]
+    except (OSError, IndexError):
+        ruta = ""
+    final.unlink(missing_ok=True)
+    if p.returncode != 0 or not ruta or not Path(ruta).exists():
+        aviso(f"No se pudo bajar {que}", por_que(" ".join(errores)), reemplaza=aviso_id)
+        return
+    nombre = Path(ruta).stem
+    _, eleccion = aviso("Listo: " + nombre, f"Está en tu carpeta {Path(ruta).parent.name}.",
+                        {"abrir": "Abrir", "carpeta": "Ver en la carpeta"}, reemplaza=aviso_id, espera=20000)
+    if eleccion == "abrir":
+        subprocess.Popen(["xdg-open", ruta], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif eleccion == "carpeta":
+        subprocess.Popen(["xdg-open", str(Path(ruta).parent)], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main(args: list[str]) -> None:
+    if not args:
+        escuchar()
+    elif args[0] == "revisar":
+        revisar()
+    elif args[0] == "ofrecer" and len(args) == 3:
+        ofrecer(args[1], args[2])
+    elif args[0] == "bajar" and len(args) == 3 and args[1] in ("video", "audio"):
+        bajar(args[1], args[2])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

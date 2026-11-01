@@ -1744,6 +1744,11 @@
     "notas": {
       "name": "Nota rápida",
       "desc": "Apunta algo al vuelo; se guarda sola (Super+Alt+N)"
+    },
+    "tareas": {
+      "name": "Tareas",
+      "desc": "Tus tareas y pendientes con fecha, desde tu Obsidian; te avisa un día antes",
+      "short": "Tareas"
     }
   },
   "cli": {
@@ -2256,5 +2261,23 @@
     "where": "Se guarda en Documentos",
     "copy": "Copiar todo",
     "open": "Abrir en el editor"
+  },
+  "tareas": {
+    "title": "Tareas",
+    "subtitle": "Las de hoy y mañana salen en la barra, y te aviso un día antes.",
+    "new": "Nueva tarea… (Enter para agregarla)",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "day_after": "Pasado mañana",
+    "next_week": "En una semana",
+    "no_date": "Sin fecha",
+    "yesterday": "Ayer",
+    "overdue": "Vencida",
+    "bar_one": "1 tarea",
+    "bar": "{n} tareas",
+    "empty": "Nada pendiente. Escribe una arriba, o ponle 📅 2026-11-03 a cualquier tarea de tus notas.",
+    "saved_obsidian": "Se guardan en tu Obsidian (Tareas.md)",
+    "saved_file": "Se guardan en Documentos/Tareas.md",
+    "open": "Abrir"
   }
 }

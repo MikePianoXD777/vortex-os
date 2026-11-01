@@ -78,6 +78,10 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("vortex primer-inicio")
     -- Vortex 1.8: memorias USB y tarjetas SD: las monta y avisa con «Abrir» y «Expulsar» (bin/vortex-usb).
     hl.exec_cmd("vortex-usb")
+    -- Vortex 2.5: copias el enlace de un video (YouTube, TikTok, Instagram, X) y ofrece bajarlo (bin/vortex-enlace).
+    hl.exec_cmd("vortex-enlace")
+    -- Vortex 2.5: «Hacer PDF» en el clic derecho de Thunar sobre fotos (bin/vortex-pdf); si ya está, no hace nada.
+    hl.exec_cmd("vortex-pdf accion")
     -- Vortex 1.8: fondos que cambian solos (si se encendió en Ajustes → Tema; si no, solo duerme).
     hl.exec_cmd("vortex fondos-auto correr")
     -- Vortex 1.8: tu celular (KDE Connect), solo si se encendió en su panel (Super+Shift+P).
