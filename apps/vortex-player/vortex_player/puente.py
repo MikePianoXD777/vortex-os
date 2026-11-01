@@ -19,7 +19,7 @@ from urllib.parse import quote
 from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QImage
 
-from . import audio, cuenta_google, descargas, ecualizador, letras, rutas, sincronia
+from . import audio, cuenta_google, descargas, ecualizador, letras, plataforma, rutas, sincronia
 from .avance import Avance
 from .biblioteca import Biblioteca, id_de
 from .reproductor import Reproductor
@@ -131,12 +131,14 @@ class Puente(QObject):
         self._vigia_eq.fileChanged.connect(self._eq_cambio)
         self._vigia_eq.directoryChanged.connect(self._eq_cambio)
         self._vigilar_eq()
+        self._eq_a_mpv()
 
         # Por dónde suena (y con qué códec) cada 3 s: pactl tarda ~10 ms
         self._reloj_salida = QTimer(self, interval=3000)
         self._reloj_salida.timeout.connect(self.actualizarSalida)
-        self._reloj_salida.start()
-        self.actualizarSalida()
+        if not plataforma.WINDOWS:   # pactl y PipeWire son de Linux
+            self._reloj_salida.start()
+            self.actualizarSalida()
 
         # 2.4: seguir donde te quedaste, la letra de lo que suena y «Para ti» (de lo último que escuchaste)
         self._sesion = self._leer_sesion()
@@ -176,6 +178,9 @@ class Puente(QObject):
     def _preparar_audio(self) -> None:
         """Sin configurar nada: frecuencia nativa y LDAC a 990 kbps quedan listos desde la primera vez
         (se notan al volver a entrar, o con «Aplicar ahora» en Ajustes)."""
+        if plataforma.WINDOWS:
+            self._audio_pendiente = False
+            return
         cambio = audio.config_hires()
         cambio = audio.config_ldac(bool(self.bib.ajustes().get("ldac_hq", True))) or cambio
         self._audio_pendiente = cambio
@@ -296,14 +301,14 @@ class Puente(QObject):
 
     @staticmethod
     def _a_la_papelera(ruta: str) -> None:
-        subprocess.run(["gio", "trash", ruta], capture_output=True)
+        plataforma.a_la_papelera(ruta)
         jpg = Path(ruta).with_suffix(".jpg")
         if jpg.exists():
-            subprocess.run(["gio", "trash", str(jpg)], capture_output=True)
+            plataforma.a_la_papelera(str(jpg))
 
     @Slot(str)
     def abrirCarpeta(self, ruta: str) -> None:
-        subprocess.Popen(["xdg-open", str(Path(ruta).parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        plataforma.abrir(str(Path(ruta).parent))
 
     # --- agregar música: carpetas y archivos --------------------------------------------------------
 
@@ -663,7 +668,7 @@ class Puente(QObject):
         self._poner_nube(trabajando=True, texto="Elige tu cuenta en el navegador…", error="")
 
         def abrir(url: str) -> None:
-            subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            plataforma.abrir(url)
 
         def hilo() -> None:
             try:
@@ -765,6 +770,12 @@ class Puente(QObject):
         if nuevo != self._eq:
             self._eq = nuevo
             self.cambioEq.emit()
+        self._eq_a_mpv()
+
+    def _eq_a_mpv(self) -> None:
+        """2.5: en Windows el ecualizador suena dentro de mpv."""
+        if ecualizador.en_mpv():
+            self.r.ponerEq(ecualizador.filtro_mpv(self._eq["bandas"]))
 
     @Slot(int, float)
     def ponerBanda(self, i: int, g: float) -> None:
@@ -782,6 +793,7 @@ class Puente(QObject):
 
     def _aplicar_bandas(self) -> None:
         bandas = [dict(b) for b in self._eq["bandas"]]
+        self._eq_a_mpv()
 
         def aplicar() -> None:
             ecualizador.poner_bandas(bandas)
@@ -1091,7 +1103,7 @@ class Puente(QObject):
         a = self.bib.ajustes()
         return {**a, "musica": str(rutas.musica()), "descargas": str(rutas.descargas()),
                 "audioPendiente": getattr(self, "_audio_pendiente", False),
-                "hayEq": ecualizador.script() is not None, "hayYtDlp": shutil.which("yt-dlp") is not None,
+                "hayEq": ecualizador.disponible(), "hayYtDlp": shutil.which("yt-dlp") is not None,
                 "navegadores": NAVEGADORES}
 
     canciones = Property("QVariantList", lambda s: s._canciones, notify=cambioCanciones)

@@ -3,7 +3,8 @@
 No hay dos: los dos lados leen el mismo estado (~/.local/state/serpantinum/music/eq_state.json) y lo
 cambian con el mismo script del shell (media/equalizer.sh), que arma el preset «live_eq» de EasyEffects
 para todo el sistema. Si mueves una banda aquí, el panel la ve moverse, y al revés. Fuera de
-Vortexine's (sin el script) la pestaña del ecualizador no aparece.
+Vortexine's (sin el script) la pestaña del ecualizador no aparece, salvo en Windows (2.5): ahí el
+ecualizador va dentro del mismo mpv (filtros `equalizer`) y su estado se guarda en ecualizador.json.
 """
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ import json
 import os
 import subprocess
 from pathlib import Path
+
+from . import plataforma, rutas
 
 FRECUENCIAS = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 PRESETS = ["Flat", "Bass", "Treble", "Vocal", "Pop", "Rock", "Jazz", "Classic"]
@@ -24,8 +27,46 @@ def script() -> Path | None:
     return None
 
 
+def en_mpv() -> bool:
+    """2.5: sin el script de Serpantinum (Windows), el ecualizador va dentro de mpv."""
+    # VORTEX_PLAYER_EQ_MPV=1 lo fuerza (las pruebas en Linux, sin tocar el ecualizador del sistema)
+    return os.environ.get("VORTEX_PLAYER_EQ_MPV") == "1" or (script() is None and plataforma.WINDOWS)
+
+
+def disponible() -> bool:
+    return en_mpv() or script() is not None
+
+
 def archivo_estado() -> Path:
-    return Path(os.environ.get("VORTEX_PLAYER_EQ") or Path.home() / ".local/state/serpantinum/music/eq_state.json")
+    if os.environ.get("VORTEX_PLAYER_EQ"):
+        return Path(os.environ["VORTEX_PLAYER_EQ"])
+    if en_mpv():
+        return rutas.config() / "ecualizador.json"
+    return Path.home() / ".local/state/serpantinum/music/eq_state.json"
+
+
+def _guardar(bandas: list[dict], preset: str) -> bool:
+    try:
+        archivo_estado().parent.mkdir(parents=True, exist_ok=True)
+        tmp = archivo_estado().with_suffix(".tmp")
+        tmp.write_text(json.dumps({"bandas": bandas, "preset": preset}))
+        os.replace(tmp, archivo_estado())
+        return True
+    except OSError:
+        return False
+
+
+def filtro_mpv(bandas: list[dict]) -> str:
+    """El `af` de mpv para estas bandas («» si todas están en 0). Si alguna sube, todo baja lo mismo antes,
+    para que no sature."""
+    activas = [b for b in bandas if abs(b["g"]) >= 0.05]
+    if not activas:
+        return ""
+    partes = [f"equalizer=f={round(b['f']):g}:t=o:w=1:g={round(b['g'], 1):g}" for b in activas]
+    pico = max(0.0, max(b["g"] for b in activas))
+    if pico > 0:
+        partes.insert(0, f"volume=volume={-round(pico, 1):g}dB")
+    return "lavfi=[" + ",".join(partes) + "]"
 
 
 def bandas_de(datos: dict) -> list[dict]:
@@ -72,11 +113,22 @@ def poner_bandas(bandas: list[dict]) -> bool:
     """Guarda la lista y la aplica (lo mismo que mover y «Aplicar» en el panel)."""
     if not MIN_BANDAS <= len(bandas) <= MAX_BANDAS:
         return False
+    if en_mpv():
+        return _guardar([{"f": b["f"], "g": round(max(-12.0, min(12.0, b["g"])), 1)} for b in bandas], "Custom")
     return correr("set_bands", texto_bandas(bandas)) and correr("apply")
 
 
+# Los presets del panel (EasyEffects), con sus perfiles de aquí cuando el ecualizador va en mpv
+_PRESET_PERFIL = {"Flat": "Plano", "Bass": "Graves", "Treble": "Agudos", "Vocal": "Voz", "Pop": "Pop",
+                  "Rock": "Rock", "Jazz": "Jazz", "Classic": "Clásica"}
+
+
 def poner_preset(nombre: str) -> bool:
-    return nombre in PRESETS and correr("preset", nombre)
+    if nombre not in PRESETS:
+        return False
+    if en_mpv():
+        return _guardar(bandas_de_perfil(_PRESET_PERFIL[nombre], estado()["bandas"]), nombre)
+    return correr("preset", nombre)
 
 
 # --- 2.4: perfiles (los mismos que en el teléfono, Ecualizador.kt) -----------------------------------------

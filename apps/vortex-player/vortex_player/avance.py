@@ -13,6 +13,8 @@ import os
 
 from PySide6.QtCore import Property, QObject, QProcess, Signal
 
+from . import plataforma
+
 DURA = 30                       # segundos
 CLIENTE = "extractor-args=youtube:player_client=visionos"
 
@@ -45,7 +47,7 @@ class Avance(QObject):
             self.empezo.emit()
         inicio = int(duracion * 0.35) if duracion >= 90 else 0
         self._args = ["--no-video", "--no-config", "--msg-level=all=error,cplayer=info", "--term-status-msg=",
-                      f"--ao={os.environ.get('VORTEX_PLAYER_AO', 'pipewire,pulse,alsa')}", "--volume-max=100",
+                      f"--ao={plataforma.salida_audio()}", "--volume-max=100",
                       f"--volume={max(0, min(100, int(volumen)))}", "--ytdl-format=bestaudio",
                       f"--start={inicio}", f"--end={inicio + DURA}", "--audio-client-name=Vortex Player", url]
         self._id, self._sonando, self._con_cliente = vid, False, True

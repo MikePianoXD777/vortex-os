@@ -21,3 +21,7 @@ packaging/vortex-miku/whisper.cpp-MIT.txt
 # Cachés de QtWebEngine si Miku se abre con esta carpeta como directorio actual
 DawnCache/
 GPUCache/
+
+# Vortex Player para Windows: lo que deja PyInstaller
+apps/vortex-player/build/
+apps/vortex-player/dist/

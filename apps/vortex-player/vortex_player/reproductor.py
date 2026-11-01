@@ -22,6 +22,8 @@ from pathlib import Path
 from PySide6.QtCore import Property, QObject, QProcess, QTimer, Signal, Slot
 from PySide6.QtNetwork import QLocalSocket
 
+from . import plataforma
+
 OBSERVAR = {1: "time-pos", 2: "duration", 3: "pause", 4: "idle-active"}
 
 
@@ -48,6 +50,7 @@ class Reproductor(QObject):
         self._origen = ""               # 2.4: de dónde suena («Tu biblioteca» o el nombre de la playlist)
         self._despues = 0               # 2.4: cuántas «tocar después» van detrás de la actual
         self._fundido = 0.0             # 2.4: segundos de crossfade (0 = sin)
+        self._eq = ""                   # 2.5: el ecualizador dentro de mpv (Windows), como `af`
         self._cola_fundido: list[QProcess] = []
         self._cargada = 0.0             # cuándo se cargó la canción (time.monotonic)
         self._dormir_hasta = 0.0        # 2.4: temporizador (time.monotonic); 0 = apagado
@@ -58,9 +61,10 @@ class Reproductor(QObject):
         self._pendientes: list[bytes] = []
         self._buffer = b""
         carpeta = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
-        self._socket_ruta = str(Path(carpeta) / f"vortex-player-mpv-{os.getpid()}.sock")
+        self._ipc, self._socket_ruta = plataforma.canal_mpv(f"vortex-player-mpv-{os.getpid()}", carpeta)
         if len(self._socket_ruta.encode()) > 100:   # los sockets de Unix no aceptan rutas de más de 108 bytes
-            self._socket_ruta = str(Path(tempfile.gettempdir()) / f"vortex-player-mpv-{os.getuid()}-{os.getpid()}.sock")
+            self._ipc, self._socket_ruta = plataforma.canal_mpv(
+                f"vortex-player-mpv-{plataforma.usuario()}-{os.getpid()}", tempfile.gettempdir())
         self._mpv = QProcess(self)
         self._mpv.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self._mpv.finished.connect(self._mpv_termino)
@@ -76,12 +80,12 @@ class Reproductor(QObject):
 
     def _arrancar(self) -> None:
         mpv = os.environ.get("VORTEX_PLAYER_MPV", "mpv")
-        ao = os.environ.get("VORTEX_PLAYER_AO", "pipewire,pulse,alsa")
+        ao = plataforma.salida_audio()
         self._mpv.start(mpv, ["--idle=yes", "--no-video", "--no-terminal", "--no-config", "--audio-display=no",
                               f"--ao={ao}", "--volume-max=100", f"--volume={self._volumen}",
                               "--replaygain=no", "--audio-pitch-correction=no", "--gapless-audio=weak",
                               "--audio-client-name=Vortex Player", "--pause=yes",
-                              f"--input-ipc-server={self._socket_ruta}"])
+                              f"--input-ipc-server={self._ipc}"])
         self._intentos = 0
         self._reintento.start()
 
@@ -89,7 +93,7 @@ class Reproductor(QObject):
         if self._socket.state() != QLocalSocket.LocalSocketState.UnconnectedState:
             return
         self._intentos += 1
-        if not Path(self._socket_ruta).exists():
+        if not plataforma.WINDOWS and not Path(self._socket_ruta).exists():   # la tubería de Windows no es archivo
             if self._intentos < 60:
                 self._reintento.start()
             else:
@@ -102,6 +106,8 @@ class Reproductor(QObject):
     def _conectado(self) -> None:
         for pid, nombre in OBSERVAR.items():
             self._enviar({"command": ["observe_property", pid, nombre]})
+        if self._eq:
+            self._enviar({"command": ["set_property", "af", self._eq]})
         for linea in self._pendientes:
             self._socket.write(linea)
         self._pendientes.clear()
@@ -121,10 +127,11 @@ class Reproductor(QObject):
         self._socket.flush()
         if not self._mpv.waitForFinished(1500):
             self._mpv.kill()
-        try:
-            os.unlink(self._socket_ruta)
-        except OSError:
-            pass
+        if not plataforma.WINDOWS:
+            try:
+                os.unlink(self._socket_ruta)
+            except OSError:
+                pass
 
     def _enviar(self, msg: dict) -> None:
         linea = (json.dumps(msg) + "\n").encode()
@@ -202,7 +209,7 @@ class Reproductor(QObject):
         if desde > 0:
             opciones["start"] = f"{desde:.2f}"
         if entra > 0:
-            opciones["af"] = f"lavfi=[afade=t=in:d={entra:.1f}]"
+            opciones["af"] = ",".join(x for x in (self._eq, f"lavfi=[afade=t=in:d={entra:.1f}]") if x)
         if opciones:
             self._enviar({"command": ["loadfile", c["ruta"], "replace", -1, opciones]})
         else:
@@ -437,6 +444,13 @@ class Reproductor(QObject):
     # --- 2.4: crossfade ---------------------------------------------------------------------------
 
     @Slot(float)
+    def ponerEq(self, filtro: str) -> None:
+        """2.5: el ecualizador dentro de mpv (`af`; «» = sin filtros)."""
+        if filtro == self._eq:
+            return
+        self._eq = filtro
+        self._enviar({"command": ["set_property", "af", filtro]})
+
     def ponerFundido(self, segundos: float) -> None:
         self._fundido = max(0.0, min(12.0, float(segundos)))
         self.cambioEstado.emit()
@@ -458,13 +472,14 @@ class Reproductor(QObject):
             return
         desde, resto = self._posicion, max(0.5, self._duracion - self._posicion)
         mpv = os.environ.get("VORTEX_PLAYER_MPV", "mpv")
-        ao = os.environ.get("VORTEX_PLAYER_AO", "pipewire,pulse,alsa")
+        ao = plataforma.salida_audio()
         cola = QProcess(self)
         cola.finished.connect(lambda *_: cola in self._cola_fundido and self._cola_fundido.remove(cola))
         cola.start(mpv, ["--no-video", "--no-terminal", "--no-config", "--audio-display=no", f"--ao={ao}",
                          f"--volume={self._volumen}", "--volume-max=100", "--replaygain=no",
                          "--audio-client-name=Vortex Player", f"--start={desde:.2f}",
-                         f"--af=lavfi=[afade=t=out:st={desde:.2f}:d={resto:.2f}]", c["ruta"]])
+                         "--af=" + ",".join(x for x in (self._eq, f"lavfi=[afade=t=out:st={desde:.2f}:d={resto:.2f}]") if x),
+                         c["ruta"]])
         self._cola_fundido.append(cola)
         if k == 0 and self._aleatorio:
             random.shuffle(self._orden)

@@ -1,0 +1,112 @@
+# Vortex Player para Windows (2.5): el instalador y el portátil.
+#
+# Corre con una Release cuyo tag empieza con «vortex-player-v» (por ejemplo vortex-player-v1.3.0) y le
+# sube los dos archivos; o a mano (Actions → Run workflow), y sin tag deja los archivos como artefacto.
+# mpv, ffmpeg, ffprobe, yt-dlp y deno (el JavaScript que yt-dlp pide para YouTube) se bajan de sus
+# Releases oficiales y van en la carpeta bin\ junto al .exe.
+name: Vortex Player para Windows
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de la release a la que se suben los archivos (ej. vortex-player-v1.3.0). Vacío: solo artefacto."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  windows:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'vortex-player-v')
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: apps/vortex-player
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: El tag coincide con la versión del código
+        if: env.TAG != ''
+        run: |
+          $version = python -c "import re,pathlib; print(re.search(r'VERSION = \"([^\"]+)\"', pathlib.Path('vortex_player/__init__.py').read_text(encoding='utf-8')).group(1))"
+          $tag = $env:TAG -replace '^vortex-player-v', ''
+          Write-Host "código: $version · tag: $tag"
+          if ($version -ne $tag) { throw "El tag $env:TAG no corresponde a la versión $version del código." }
+
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyside6 pyinstaller
+
+      - name: Compilar
+        run: pyinstaller empaquetado\windows\vortex-player.spec --noconfirm --clean
+
+      - name: Programas (mpv, ffmpeg, yt-dlp y deno)
+        run: |
+          $bin = "dist\vortex-player\bin"
+          $tmp = Join-Path $env:RUNNER_TEMP "programas"
+          New-Item -ItemType Directory -Force $bin, $tmp | Out-Null
+          # mpv: la compilación de shinchiro (la que recomienda mpv.io), x86_64 normal (no la «v3»)
+          gh release download -R shinchiro/mpv-winbuild-cmake -p "mpv-x86_64-2*.7z" -D $tmp
+          7z x (Get-ChildItem "$tmp\mpv-x86_64-*.7z").FullName "-o$tmp\mpv" -y | Out-Null
+          Copy-Item "$tmp\mpv\mpv.exe" $bin
+          # ffmpeg y ffprobe (los dos comparten sus DLL)
+          gh release download latest -R BtbN/FFmpeg-Builds -p "ffmpeg-master-latest-win64-gpl-shared.zip" -D $tmp
+          Expand-Archive "$tmp\ffmpeg-master-latest-win64-gpl-shared.zip" "$tmp\ffmpeg"
+          $ff = (Get-ChildItem "$tmp\ffmpeg" -Directory)[0].FullName
+          Copy-Item "$ff\bin\ffmpeg.exe", "$ff\bin\ffprobe.exe", "$ff\bin\*.dll" $bin
+          # yt-dlp y deno
+          gh release download -R yt-dlp/yt-dlp -p "yt-dlp.exe" -D $bin
+          gh release download -R denoland/deno -p "deno-x86_64-pc-windows-msvc.zip" -D $tmp
+          Expand-Archive "$tmp\deno-x86_64-pc-windows-msvc.zip" $bin
+          Get-ChildItem $bin | Format-Table Name, Length
+
+      - name: Prueba de humo
+        env:
+          QT_QPA_PLATFORM: offscreen
+          VORTEX_PLAYER_AO: "null"
+          VORTEX_PLAYER_SIN_RED: "1"
+          VORTEX_PLAYER_HUMO_LOG: ${{ runner.temp }}\humo.log
+        run: |
+          & "dist\vortex-player\bin\mpv.exe" --version | Select-Object -First 1
+          & "dist\vortex-player\bin\yt-dlp.exe" --version
+          $p = Start-Process -FilePath "dist\vortex-player\vortex-player.exe" -ArgumentList "--prueba-humo" -Wait -PassThru
+          if (Test-Path $env:VORTEX_PLAYER_HUMO_LOG) { Get-Content $env:VORTEX_PLAYER_HUMO_LOG }
+          if ($p.ExitCode -ne 0) { throw "La prueba de humo falló con código $($p.ExitCode)" }
+
+      - name: Instalador y portátil
+        run: |
+          $version = python -c "import re,pathlib; print(re.search(r'VERSION = \"([^\"]+)\"', pathlib.Path('vortex_player/__init__.py').read_text(encoding='utf-8')).group(1))"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=$version" "empaquetado\windows\vortex-player.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup falló" }
+          Compress-Archive -Path "dist\vortex-player" -DestinationPath "dist\VortexPlayer-$version-windows-x64-portable.zip"
+
+      - name: Subir a la release
+        if: env.TAG != ''
+        run: gh release upload $env:TAG (Get-ChildItem dist\VortexPlayer-*-windows-x64-*).FullName --clobber
+
+      - name: Guardar como artefacto (prueba, sin release)
+        if: env.TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: vortex-player-windows
+          path: apps/vortex-player/dist/VortexPlayer-*-windows-x64-*
+          retention-days: 7

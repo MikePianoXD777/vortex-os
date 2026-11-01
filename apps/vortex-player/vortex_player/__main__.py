@@ -18,7 +18,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
-from . import APP_ID, NOMBRE
+from . import APP_ID, NOMBRE, plataforma
 from .colores import Colores
 from .puente import Puente
 
@@ -92,7 +92,7 @@ def crear_aplicacion(argv: list[str]) -> QGuiApplication:
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon.fromTheme(APP_ID, QIcon(str(QML / "logo.svg"))))
     fuente = QFont("Adwaita Sans")
-    fuente.setFamilies(["Adwaita Sans", "Noto Sans"])
+    fuente.setFamilies(["Adwaita Sans", "Noto Sans", "Segoe UI"])   # Segoe UI: Windows
     fuente.setPixelSize(14)
     app.setFont(fuente)
     return app
@@ -109,20 +109,51 @@ def cargar_interfaz(app: QGuiApplication) -> tuple[QQmlApplicationEngine, Puente
     return motor_qml, puente
 
 
+def _prueba_humo(app: QGuiApplication, puente: Puente) -> None:
+    """--prueba-humo (2.5, para el paquete de Windows): la interfaz cargó; falta que mpv conteste y que
+    estén sus programas. Escribe el resultado en VORTEX_PLAYER_HUMO_LOG y sale con 0 si todo está."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtNetwork import QLocalSocket as Socket
+    inicio = [0]
+
+    def revisar() -> None:
+        inicio[0] += 1
+        conectado = puente.r._socket.state() == Socket.LocalSocketState.ConnectedState
+        if not conectado and inicio[0] < 100:
+            return
+        faltan = [p for p in ("mpv", "ffmpeg", "ffprobe", "yt-dlp", "deno") if not shutil.which(p)]
+        lineas = [f"mpv conectado: {conectado}", f"faltan: {', '.join(faltan) or 'nada'}"]
+        log = os.environ.get("VORTEX_PLAYER_HUMO_LOG")
+        if log:
+            Path(log).write_text("\n".join(lineas) + "\n", encoding="utf-8")
+        app.exit(0 if conectado and not faltan else 3)
+
+    reloj = QTimer(app, interval=100)
+    reloj.timeout.connect(revisar)
+    reloj.start()
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv if argv is None else argv
     if "--version" in argv:
         from . import VERSION
         print(NOMBRE, VERSION)
         return 0
+    plataforma.preparar()
     app = crear_aplicacion(argv)
     args = [a for a in argv[1:] if not a.startswith("-")]
-    nombre = f"{APP_ID}-{os.getuid()}"
-    if _avisar_a_la_abierta(nombre, args):
+    nombre = f"{APP_ID}-{plataforma.usuario()}"
+    humo = "--prueba-humo" in argv   # no le habla a la ventana que tengas abierta
+    if not humo and _avisar_a_la_abierta(nombre, args):
         return 0
     interfaz, puente = cargar_interfaz(app)
     if not interfaz.rootObjects():
         return 1
+    if humo:   # ni el socket de «una sola ventana» ni MPRIS: no toca la sesión de nadie
+        _prueba_humo(app, puente)
+        codigo = app.exec()
+        puente.r.cerrar()
+        os._exit(codigo)
     servidor = _escuchar(nombre, puente, app)
     mpris = None
     try:

@@ -7,6 +7,10 @@ from pathlib import Path
 
 
 def _xdg(var: str, defecto: str) -> Path:
+    if os.name == "nt":   # 2.5: en Windows, todo en %APPDATA% (ajustes) y %LOCALAPPDATA% (lo demás)
+        base = os.environ.get("APPDATA" if var == "XDG_CONFIG_HOME" else "LOCALAPPDATA")
+        if base:
+            return Path(base)
     return Path(os.environ.get(var) or Path.home() / defecto)
 
 
@@ -29,6 +33,10 @@ def musica() -> Path:
     """La carpeta Música de la persona (xdg-user-dir MUSIC)."""
     if os.environ.get("VORTEX_PLAYER_MUSICA"):
         return Path(os.environ["VORTEX_PLAYER_MUSICA"])
+    if os.name == "nt":
+        from PySide6.QtCore import QStandardPaths
+        p = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.MusicLocation)
+        return Path(p) if p else Path.home() / "Music"
     try:
         r = subprocess.run(["xdg-user-dir", "MUSIC"], capture_output=True, text=True, timeout=3)
         p = r.stdout.strip()

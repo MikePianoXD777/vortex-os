@@ -493,5 +493,33 @@ class Novedades26(Temporal):
         self.assertTrue(letras.guardada(self.t, "x", "y", 1) is False)
 
 
+class EcualizadorEnMpv(Temporal):
+    """2.5 (Windows): sin EasyEffects, el ecualizador se guarda aparte y suena con filtros de mpv."""
+
+    def setUp(self) -> None:
+        super().setUp()   # Temporal deja el entorno como estaba al terminar
+        os.environ.update({"VORTEX_PLAYER_EQ_MPV": "1", "VORTEX_PLAYER_CONFIG": str(self.t)})
+        os.environ.pop("VORTEX_PLAYER_EQ", None)
+
+    def test_guarda_aparte_y_arma_el_filtro(self):
+        self.assertTrue(ecualizador.en_mpv() and ecualizador.disponible())
+        self.assertEqual(ecualizador.archivo_estado(), self.t / "ecualizador.json")
+        self.assertEqual(ecualizador.filtro_mpv(ecualizador.estado()["bandas"]), "")   # todo en 0: sin filtros
+        self.assertTrue(ecualizador.poner_preset("Bass"))
+        self.assertEqual(ecualizador.estado()["preset"], "Bass")
+        self.assertTrue(ecualizador.poner_bandas([{"f": 31, "g": 3}, {"f": 1000, "g": -2}]))
+        self.assertEqual(ecualizador.filtro_mpv(ecualizador.estado()["bandas"]),
+                         "lavfi=[volume=volume=-3dB,equalizer=f=31:t=o:w=1:g=3,equalizer=f=1000:t=o:w=1:g=-2]")
+
+    @unittest.skipUnless(shutil.which("mpv"), "sin mpv")
+    def test_mpv_acepta_el_filtro_con_el_crossfade(self):
+        tono = self.t / "tono.ogg"
+        subprocess.run(["ffmpeg", "-v", "quiet", "-y", "-f", "lavfi", "-i", "sine=f=440:d=2", str(tono)], check=True)
+        f = ecualizador.filtro_mpv([{"f": 63, "g": 6}, {"f": 8000, "g": -3}])
+        r = subprocess.run(["mpv", "--no-config", "--ao=null", "--no-video", "--length=0.5",
+                            f"--af={f},lavfi=[afade=t=in:d=1]", str(tono)], capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
