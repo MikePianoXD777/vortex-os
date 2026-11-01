@@ -23,9 +23,10 @@ from typing import Callable
 
 from . import rutas
 
-# El cliente «App de escritorio» del proyecto Vortex Player en Google Cloud. El secreto no va en el repo
-# (2.4.0): se lee de ~/.config/vortex-player/cliente-google.json o de VORTEX_PLAYER_GOOGLE_SECRETO; sin él,
-# Ajustes dice que esta versión todavía no está registrada con Google.
+# El cliente «App de escritorio» del proyecto Vortex Player en Google Cloud. En las apps de escritorio Google
+# no trata el secreto como secreto (va dentro de la app, como en rclone); va al revés solo para que los
+# escáneres de llaves no lo tomen por una filtración. ~/.config/vortex-player/cliente-google.json o
+# VORTEX_PLAYER_GOOGLE_ID/_SECRETO lo cambian (para probar otro proyecto).
 CLIENTE_ID = "986706412005-cn9dc33hf03a6ock3f7mdm1j15a4mndt.apps.googleusercontent.com"
 SECRETO_AL_REVES = "rVPV39OdxANwk3mpxOAg3GG35wGN-XPSCOG"
 
