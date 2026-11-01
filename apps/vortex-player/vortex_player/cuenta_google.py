@@ -24,7 +24,7 @@ from typing import Callable
 from . import rutas
 
 # El cliente «App de escritorio» del proyecto Vortex Player en Google Cloud. El secreto no va en el repo
-# (2.4.0): se lee de ~/.config/vortex-player/google.json o de VORTEX_PLAYER_GOOGLE_SECRETO; sin él,
+# (2.4.0): se lee de ~/.config/vortex-player/cliente-google.json o de VORTEX_PLAYER_GOOGLE_SECRETO; sin él,
 # Ajustes dice que esta versión todavía no está registrada con Google.
 CLIENTE_ID = "986706412005-cn9dc33hf03a6ock3f7mdm1j15a4mndt.apps.googleusercontent.com"
 SECRETO_AL_REVES = ""
@@ -43,9 +43,10 @@ class SinPermiso(Exception):
 
 
 def _local() -> dict:
-    """El cliente de ~/.config/vortex-player/google.json ({"id": …, "secreto": …}), fuera del repo."""
+    """El cliente de ~/.config/vortex-player/cliente-google.json ({"id": …, "secreto": …}), fuera del repo
+    (google.json es tu sesión)."""
     try:
-        return json.loads((rutas.config() / "google.json").read_text())
+        return json.loads((rutas.config() / "cliente-google.json").read_text())
     except (OSError, ValueError):
         return {}
 
