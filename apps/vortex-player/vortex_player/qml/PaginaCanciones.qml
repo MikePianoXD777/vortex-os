@@ -147,6 +147,18 @@ Item {
                             }
                         }
                         Boton { text: "Aleatorio"; icono: "aleatorio"; tipo: "secundario"; enabled: vp.canciones.length > 0; onClicked: vp.tocarAleatorio() }
+                        Boton {   // 1.6: la playlist como enlace, para mandársela a alguien
+                            id: botonCompartir
+                            visible: !!raiz.playlist
+                            enabled: vp.canciones.length > 0
+                            text: "Compartir"; icono: "enlace"; tipo: "fantasma"
+                            onClicked: menuCompartir.popup(botonCompartir, 0, botonCompartir.height)
+                            Menu {
+                                id: menuCompartir
+                                MenuItem { text: "Copiar el enlace"; onTriggered: vp.compartirPlaylist("copiar") }
+                                MenuItem { text: "Mandar por WhatsApp"; onTriggered: vp.compartirPlaylist("whatsapp") }
+                            }
+                        }
                         Boton {
                             visible: !!raiz.playlist && !raiz.playlist.meGusta
                             text: "Renombrar"; icono: "editar"; tipo: "fantasma"

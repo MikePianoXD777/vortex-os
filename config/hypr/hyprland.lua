@@ -64,6 +64,10 @@ local function comando_shell()
     -- panel) en vez de devolverla; así la devuelve al segundo. (MALLOC_ARENA_MAX/MALLOC_TRIM_* son de
     -- glibc y aquí no hacen nada.)
     local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
+    -- Vortex 2.6: todas las ventanas del shell se dibujan en un solo hilo. Con NVIDIA cada hilo de
+    -- dibujo tiene su propio contexto del driver: en frío 323 MB en vez de 370, y ~45 MB menos siempre
+    -- (2 monitores, 200 + 60 Hz, sin tirones). Vulkan es mucho peor (8 ventanas: 440 MB contra 102).
+    memoria = memoria .. " QSG_RENDER_LOOP=basic"
     return "QT_LOGGING_RULES='" .. reglas .. "' " .. memoria .. " serpantinumd start"
 end
 if ok_atajos then atajos.comando_shell = comando_shell end

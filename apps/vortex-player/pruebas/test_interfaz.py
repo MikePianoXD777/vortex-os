@@ -687,5 +687,39 @@ class Interfaz(unittest.TestCase):
         self.assertEqual((d["ab_otra"], d["filtros_normal"]), ([-1.0, -1.0], ""))
         self.assertEqual(d["errores_qml"], [])
 
+    def test_compartir_playlist(self) -> None:
+        # 1.6: «Compartir» de una playlist copia un enlace de YouTube; las tuyas sin id se buscan (sin red: a mano)
+        d = self.correr("""
+            from PySide6.QtGui import QGuiApplication
+            from vortex_player import descargas
+            buscadas = []
+            def buscar_falso(texto, fuente="ytmusic", n=20, **_):
+                buscadas.append(texto.strip())
+                return [] if "Tres" in texto else [{"id": ("id" + texto.strip().split()[-1] + "xxxxxxxx")[:11]}]
+            descargas.buscar = buscar_falso
+            descargas.recomendar = lambda *a, **k: []
+            datos = {}
+            def abrir():
+                pid = puente.crearPlaylist("Para Ana")
+                for c in puente.canciones:
+                    puente.agregarAPlaylist(pid, c["ruta"])
+                puente.verPlaylist(pid)
+            def compartir():
+                puente.compartirPlaylist("copiar")
+            def ver():
+                datos["enlace"] = QGuiApplication.clipboard().text()
+                datos["buscadas"] = sorted(buscadas)
+                datos["tipo"] = list(descargas.tipo_de(datos["enlace"]) or [])
+                fin(**datos)
+            paso(2500, abrir)
+            paso(800, compartir)
+            paso(1500, ver)
+        """, "compartir_playlist")
+        self.assertEqual(d["buscadas"], ["Dos", "Tres", "Uno"])
+        self.assertTrue(d["enlace"].startswith("https://www.youtube.com/watch_videos?video_ids="))
+        self.assertTrue(d["enlace"].endswith("&title=Para%20Ana"))
+        self.assertEqual(sorted(d["tipo"][2].split(",")), ["idDosxxxxxx", "idUnoxxxxxx"])   # «Tres» no se encontró
+        self.assertEqual(d["errores_qml"], [])
+
 if __name__ == "__main__":
     unittest.main()

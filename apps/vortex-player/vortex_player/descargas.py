@@ -51,6 +51,8 @@ def tipo_de(url: str) -> tuple[str, str, str] | None:
             return "youtube", "cancion", q["v"][0]
         if p.path == "/playlist" and "list" in q:
             return "youtube", "playlist", q["list"][0]
+        if p.path == "/watch_videos" and "video_ids" in q:   # 1.6: una playlist compartida (enlaces_playlist)
+            return "youtube", "playlist", q["video_ids"][0]
         m = re.match(r"^/(?:browse|channel)/([\w-]+)", p.path)
         if m:
             return "youtube", "playlist", m.group(1)
@@ -178,6 +180,22 @@ def leer_ytdlp(salida: str, musica: bool) -> list[dict]:
                           "album": "", "duracion": int(e.get("duration") or 0),
                           "portada": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg"})
     return canciones
+
+
+POR_ENLACE = 50   # YouTube no toma más de 50 en una playlist sin cuenta
+
+
+def enlaces_playlist(nombre: str, ids: list[str]) -> list[str]:
+    """1.6: la playlist como enlace(s) de YouTube que abre cualquiera, sin cuenta: YouTube arma la lista
+    al abrirlo, y Vortex Player lo baja entero a una playlist con su nombre. De 50 en 50."""
+    ids = [i for i in dict.fromkeys(ids) if i]
+    partes = [ids[i:i + POR_ENLACE] for i in range(0, len(ids), POR_ENLACE)]
+    enlaces = []
+    for n, parte in enumerate(partes, 1):
+        titulo = nombre if len(partes) == 1 else f"{nombre} ({n}/{len(partes)})"
+        enlaces.append("https://www.youtube.com/watch_videos?" + urllib.parse.urlencode(
+            {"video_ids": ",".join(parte), "title": titulo}, quote_via=urllib.parse.quote, safe=","))
+    return enlaces
 
 
 def buscar(texto: str, fuente: str = "ytmusic", n: int = 20, yt_dlp: str = "yt-dlp",

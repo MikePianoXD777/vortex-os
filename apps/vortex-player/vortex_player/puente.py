@@ -1542,6 +1542,31 @@ class Puente(QObject):
 
         threading.Thread(target=hilo, daemon=True).start()
 
+    @Slot(str)
+    def compartirPlaylist(self, como: str) -> None:
+        """1.6: la playlist que estás viendo como enlace de YouTube («copiar» o «whatsapp»). Lo abre
+        cualquiera; en Vortex Player se pega en «Agregar música» y se baja con su nombre."""
+        canciones, nombre = list(self._canciones), self._origen()
+        if not canciones:
+            return
+        self.aviso.emit("Armando el enlace…")
+
+        def hilo() -> None:
+            ids = []
+            for c in canciones:
+                vid = c.get("id") or id_de(c["ruta"])
+                if not vid:   # las tuyas sin id: se buscan en YouTube Music, como al compartir una canción
+                    try:
+                        r = descargas.buscar(f"{c.get('artista') or ''} {c.get('titulo') or Path(c['ruta']).stem}",
+                                             "ytmusic", 1)
+                    except OSError:
+                        r = []
+                    vid = r[0]["id"] if r else ""
+                ids.append(vid)
+            self._enlace_listo.emit(como, "\n".join(descargas.enlaces_playlist(nombre, ids)), nombre)
+
+        threading.Thread(target=hilo, daemon=True).start()
+
     def _fin_enlace(self, como: str, url: str, texto: str) -> None:
         if not url:
             self.aviso.emit("No encontré esta canción en YouTube Music")
@@ -1549,7 +1574,7 @@ class Puente(QObject):
             plataforma.abrir("https://wa.me/?text=" + quote(f"{texto} {url}"))
         else:
             QGuiApplication.clipboard().setText(url)
-            self.aviso.emit("Enlace copiado")
+            self.aviso.emit("Enlace copiado" if "\n" not in url else f"{url.count(chr(10)) + 1} enlaces copiados")
 
     @Slot(str)
     def bajarDeLaRadio(self, ruta: str) -> None:

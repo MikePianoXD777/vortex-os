@@ -166,6 +166,17 @@ class Descargas(Temporal):
         self.assertIsNone(descargas.tipo_de("https://example.com/cancion.mp3"))
         self.assertIsNone(descargas.tipo_de("hola"))
 
+    def test_enlaces_playlist(self) -> None:
+        # 1.6: compartir una playlist: un enlace de YouTube (de 50 en 50) que Vortex Player sabe bajar
+        [uno] = descargas.enlaces_playlist("Para Ana & co", ["ZRtdQ81jPUQ", "", "dQw4w9WgXcQ", "ZRtdQ81jPUQ"])
+        self.assertEqual(uno, "https://www.youtube.com/watch_videos?video_ids=ZRtdQ81jPUQ,dQw4w9WgXcQ&title=Para%20Ana%20%26%20co")
+        self.assertEqual(descargas.tipo_de(uno), ("youtube", "playlist", "ZRtdQ81jPUQ,dQw4w9WgXcQ"))
+        muchos = descargas.enlaces_playlist("Larga", [f"{i:011d}" for i in range(120)])
+        self.assertEqual(len(muchos), 3)
+        self.assertTrue(muchos[0].endswith("&title=Larga%20%281%2F3%29"))
+        self.assertEqual([descargas.tipo_de(e)[2].count(",") + 1 for e in muchos], [50, 50, 20])
+        self.assertEqual(descargas.enlaces_playlist("Vacía", ["", ""]), [])
+
     def test_spotify(self) -> None:
         nombre, pistas = descargas.leer_spotify(PAGINA_SPOTIFY)
         self.assertEqual(nombre, "Mis favoritas")
