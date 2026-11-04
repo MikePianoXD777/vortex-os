@@ -199,9 +199,10 @@ paso_final() {
   fi
   # scx_lavd ya reparte la CPU: las reglas de ananicy sobran.
   systemctl disable ananicy-cpp.service 2>/dev/null || true
-  # systemd-oomd ayuda con poca RAM: se queda en equipos de menos de 8 GB.
-  if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 8000)); then
-    systemctl disable systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
+  # systemd-oomd ayuda con poca RAM: se queda en equipos de menos de 8 GB (que reportan menos de 8000 MB:
+  # el corte va en 7000). Se enmascara porque «disable» no basta: user-.slice lo pide y arrancaba solo.
+  if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 7000)); then
+    systemctl mask systemd-oomd.service systemd-oomd.socket 2>/dev/null || true
   fi
 
   # --- Ese usuario: su grupo de gamemode (prioridad al jugar) ---

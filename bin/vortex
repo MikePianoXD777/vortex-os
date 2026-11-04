@@ -1072,6 +1072,31 @@ paquetes_nuevos() {
     aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"
 }
 
+# 2.6.3: que falte memoria no cierre apps enteras (a un amigo se le cerraba Discord). Solo pide sudo si
+# hay algo que cambiar. systemd --user lee su configuración de nuevo sin cerrar nada: los scopes nuevos
+# ya salen bien; los que ya estaban abiertos se quedan como estaban hasta cerrar esa app.
+proteger_apps() {
+  local origen="$VORTEX_DIR/config/sistema/oom-usuario.conf" destino=/etc/systemd/user.conf.d/90-vortex-oom.conf
+  if [[ -f "$origen" ]] && ! cmp -s "$origen" "$destino"; then
+    if sudo install -Dm644 "$origen" "$destino"; then
+      systemctl --user daemon-reexec 2>/dev/null || true
+    else
+      aviso "no pude instalar $destino"
+    fi
+  fi
+  # «disable» no bastaba: user-.slice pide systemd-oomd y arrancaba solo, y cierra apps completas.
+  if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 7000)) &&
+    [[ "$(systemctl is-enabled systemd-oomd.service 2>/dev/null)" != masked ]]; then
+    sudo systemctl mask --now systemd-oomd.service systemd-oomd.socket || aviso "no pude apagar systemd-oomd"
+  fi
+  # min_ttl_ms=1000 hacía que el kernel matara apps con swap libre (config/sistema/mglru.conf).
+  origen="$VORTEX_DIR/config/sistema/mglru.conf" destino=/etc/tmpfiles.d/90-vortex-mglru.conf
+  if [[ -f "$origen" ]] && ! cmp -s "$origen" "$destino"; then
+    { sudo install -Dm644 "$origen" "$destino" && sudo systemd-tmpfiles --create "$destino"; } ||
+      aviso "no pude poner al día $destino"
+  fi
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
@@ -1098,6 +1123,7 @@ cmd_actualizar() {
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
   avisos_primera_vez
   fondos_nuevos
+  proteger_apps
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).

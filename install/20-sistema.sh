@@ -147,8 +147,15 @@ apagar_de_cachyos() {
 apagar_de_cachyos ananicy-cpp.service "scx_lavd ya planifica"
 # systemd-resolved NO se apaga: cachyos-settings configura NetworkManager con
 # dns=systemd-resolved (resolv.conf apunta a 127.0.0.53); sin él no habría DNS.
-# oomd sí ayuda con poca RAM: se queda en equipos de menos de 8 GB.
-if (($(ram_mb) >= 8000)); then
-  apagar_de_cachyos systemd-oomd.service "RAM de sobra"
+# oomd sí ayuda con poca RAM: se queda en equipos de menos de 8 GB. Una laptop de 8 GB reporta menos de
+# 8000 MB (el firmware y la gráfica integrada se quedan con una parte): el corte va en 7000.
+# Se enmascara porque «disable» no basta: user-.slice lo pide y arrancaba solo. Mata scopes completos.
+if (($(ram_mb) >= 7000)); then
+  if ! ((VORTEX_ES_CACHYOS)) || preguntar "¿Desactivar systemd-oomd (cierra apps completas)?" n; then
+    srun systemctl mask --now systemd-oomd.service systemd-oomd.socket
+    info "systemd-oomd enmascarado: el kernel se encarga si falta memoria"
+  fi
 fi
+# Si falta memoria y el kernel mata un proceso de una app, que no se cierre la app entera.
+escribir_sistema /etc/systemd/user.conf.d/90-vortex-oom.conf <"$VORTEX_DIR/config/sistema/oom-usuario.conf"
 bien "Servicios mínimos activados"

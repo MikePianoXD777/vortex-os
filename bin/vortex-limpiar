@@ -60,8 +60,16 @@ fi
 paso "Servicios que sobran"
 apagar=()
 for s in ananicy-cpp.service colord.service; do activo "$s" && apagar+=("$s"); done
-if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 8000)); then
-  for s in systemd-oomd.service systemd-oomd.socket; do activo "$s" && apagar+=("$s"); done
+# oomd se enmascara («disable» no basta: user-.slice lo pide). Con 8 GB se reportan menos de 8000 MB.
+enmascarar=()
+if (($(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo) >= 7000)); then
+  for s in systemd-oomd.service systemd-oomd.socket; do
+    [[ "$(systemctl is-enabled "$s" 2>/dev/null)" == masked ]] || enmascarar+=("$s")
+  done
+fi
+if ((${#enmascarar[@]})); then
+  info "se enmascara: ${enmascarar[*]}"
+  seguir "Aplicar" && run systemctl mask --now "${enmascarar[@]}"
 fi
 dormir=()   # servicio que se apaga y su socket, que lo despierta al usarlo
 activo cups.service && dormir+=("cups.service:cups.socket")

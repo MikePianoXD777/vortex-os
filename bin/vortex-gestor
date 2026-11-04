@@ -209,13 +209,15 @@ crear_scope() {
 # Pide a systemd (del usuario) un scope nuevo en app.slice con esos procesos. Si están
 # en el scope de la sesión, systemd le pide al del sistema que los mueva (es lo mismo
 # que hace «systemd-run --user --scope»).
+# Vortex 2.6.3: OOMPolicy=continue. Con el «stop» de serie, si el kernel mataba UN proceso de la app
+# por falta de memoria (en Discord y otras apps Electron, un renderer), systemd cerraba la app entera.
 scope_systemd() {
   local unidad="$1" clase="$2"
   shift 2
   "$BUSCTL" --user call org.freedesktop.systemd1 /org/freedesktop/systemd1 \
-    org.freedesktop.systemd1.Manager StartTransientUnit 'ssa(sv)a(sa(sv))' "$unidad" fail 5 \
+    org.freedesktop.systemd1.Manager StartTransientUnit 'ssa(sv)a(sa(sv))' "$unidad" fail 6 \
     PIDs au "$#" "$@" Slice s app.slice Description s "Vortex: ${clase:-app}" \
-    CPUWeight t "$PESO_FOCO" IOWeight t "$PESO_FOCO" 0 >/dev/null 2>&1
+    CPUWeight t "$PESO_FOCO" IOWeight t "$PESO_FOCO" OOMPolicy s continue 0 >/dev/null 2>&1
 }
 
 # Cambia propiedades de un scope del gestor en systemd (solo en memoria: --runtime).
