@@ -974,7 +974,7 @@ Item {
                 anchors.bottom: accesosMods.top
                 anchors.bottomMargin: window.s(12)
                 anchors.left: calendarRect.left
-                width: calendarRect.width
+                width: calendarRect.width - accesoNota.width - window.s(10)
                 height: window.s(48)
                 radius: ThemeBackend.borderRadius
                 color: juegosMa.containsMouse ? Qt.alpha(window.surface1, 0.45) : Qt.alpha(window.surface0, 0.2)
@@ -1011,6 +1011,39 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle juegos\")"])
+                }
+            }
+
+            // Vortex 2.6.2 (pedido de Mike): al ladito de la biblioteca, la nota rápida (Super+Alt+N).
+            Rectangle {
+                id: accesoNota
+                anchors.top: accesoJuegos.top
+                anchors.right: calendarRect.right
+                width: window.s(48)
+                height: accesoJuegos.height
+                radius: ThemeBackend.borderRadius
+                color: notaMa.containsMouse ? Qt.alpha(window.surface1, 0.45) : Qt.alpha(window.surface0, 0.2)
+                border.color: Qt.alpha(window.surface1, 0.4)
+                border.width: 1
+                z: 10
+                opacity: introCalendar
+                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "󰎞"
+                    font.family: ThemeBackend.iconFont
+                    font.pixelSize: window.s(20)
+                    color: window.text
+                }
+
+                MouseArea {
+                    id: notaMa
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle notas\")"])
                 }
             }
 
