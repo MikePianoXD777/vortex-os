@@ -290,7 +290,9 @@ PanelWindow {
         return false;
     }
 
-    readonly property bool isFullscreenActive: isOsdFullscreen || isToplevelFullscreen || isHyprlandFullscreen
+    // Vortex: sin isHyprlandFullscreen, que también es true con una ventana maximizada
+    // (Super+D) mientras la barra sigue visible.
+    readonly property bool isFullscreenActive: isOsdFullscreen || isToplevelFullscreen
 
     readonly property bool isBarEffectivelyHidden: barAutohide || isFullscreenActive
 

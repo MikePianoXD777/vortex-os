@@ -299,11 +299,15 @@ PanelWindow {
     property string barPosition: (rawBarSettings && rawBarSettings.position !== undefined) ? rawBarSettings.position : "top"
     property bool barAutohide: (rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false
 
+    // Vortex: la misma detección que bar/Bar.qml. hasFullscreen de Hyprland también
+    // es true con una ventana maximizada (Super+D), y la barra ahí sigue visible:
+    // los paneles se subían 46 px y la tapaban.
     readonly property bool isFullscreenActive: {
         try {
-            if (typeof Hyprland !== "undefined" && Hyprland.focusedWorkspace) {
-                return Boolean(Hyprland.focusedWorkspace.hasFullscreen || (Hyprland.activeToplevel && Hyprland.activeToplevel.fullscreen));
-            }
+            let atl = ToplevelManager.activeToplevel;
+            if (!atl || !atl.fullscreen) return false;
+            if (atl.screens && atl.screens.length > 0) return atl.screens.indexOf(masterWindow.screen) !== -1;
+            return true;
         } catch (e) {}
         return false;
     }
