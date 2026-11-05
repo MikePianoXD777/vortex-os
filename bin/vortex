@@ -1245,7 +1245,10 @@ cmd_actualizar() {
     cmp -s "$VORTEX_DIR/config/hypr/$f" "$HOME/.config/hypr/$f" && continue
     mkdir -p "$respaldo/.config/hypr"
     cp -a "$HOME/.config/hypr/$f" "$respaldo/.config/hypr/$f"
-    install -m644 "$VORTEX_DIR/config/hypr/$f" "$HOME/.config/hypr/$f"
+    # Con rename: install borra el archivo y lo vuelve a crear, y Hyprland, que lo vigila, lo leía
+    # justo cuando no existía («cannot open …/hyprland.lua», 22 de 25 veces en la VM).
+    install -m644 "$VORTEX_DIR/config/hypr/$f" "$HOME/.config/hypr/$f.nuevo"
+    mv -f "$HOME/.config/hypr/$f.nuevo" "$HOME/.config/hypr/$f"
     cambio=1
   done
   if ((cambio)); then
