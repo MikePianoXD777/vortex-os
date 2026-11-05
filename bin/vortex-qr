@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""vortex-qr (Vortex 2.7): pasar un archivo al cel con un QR. Seleccionas archivos o carpetas en Thunar →
+clic derecho → «Pasar al cel», y lo escaneas con la cámara: el cel lo baja por tu wifi, sin instalar nada
+y sin que pase por internet. Varios archivos o una carpeta se bajan juntos en un .zip.
+
+  vortex-qr ARCHIVO...   abre la ventana con el QR; se cierra sola al terminar de bajarse
+  vortex-qr accion       pone «Pasar al cel» en el clic derecho de Thunar (si no está); lo corren
+                         Hyprland al entrar y vortex actualizar
+
+El enlace lleva una clave al azar, solo funciona mientras la ventana está abierta (15 min como máximo)
+y solo da ese archivo. Si el cortafuegos (ufw) está prendido, la primera vez pide tu contraseña para
+dejar pasar los puertos PUERTOS.
+"""
+from __future__ import annotations
+
+import os
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import urllib.parse
+import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+HOME = Path.home()
+CONFIG = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+UCA = CONFIG / "Thunar/uca.xml"
+MARCA_UFW = CONFIG / "vortex/qr-ufw"
+ID_ACCION = "vortex-qr"
+ACCION = f"""<action>
+	<icon>phone</icon>
+	<name>Pasar al cel</name>
+	<submenu></submenu>
+	<unique-id>{ID_ACCION}</unique-id>
+	<command>vortex-qr %F</command>
+	<description>Lo bajas en tu cel escaneando un QR, por tu wifi (Vortexine's)</description>
+	<range></range>
+	<patterns>*</patterns>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+"""
+PUERTOS = range(1760, 1765)   # dentro de los de KDE Connect: quien ya los abrió no tiene que hacer nada
+VIDA_MS = 15 * 60 * 1000
+CIERRE_MS = 4000              # lo que queda abierta la ventana después de bajarse
+
+
+def accion() -> None:
+    """Agrega la acción a uca.xml sin tocar las que ya tengas."""
+    try:
+        xml = UCA.read_text()
+    except OSError:
+        xml = '<?xml version="1.0" encoding="UTF-8"?>\n<actions>\n</actions>\n'
+    if f"<unique-id>{ID_ACCION}</unique-id>" in xml or "</actions>" not in xml:
+        return   # ya está, o no es un uca.xml que entendamos: mejor no tocarlo
+    i = xml.rindex("</actions>")
+    UCA.parent.mkdir(parents=True, exist_ok=True)
+    UCA.write_text(xml[:i] + ACCION + xml[i:])
+
+
+def aviso(titulo: str, cuerpo: str) -> None:
+    if shutil.which("notify-send"):
+        subprocess.run(["notify-send", "-a", "Vortexine's OS", "-i", "phone", titulo, cuerpo], capture_output=True)
+    print(f"{titulo}: {cuerpo}", file=sys.stderr)
+
+
+def ip_local() -> str | None:
+    """La IP con la que este equipo sale a su red. El UDP no manda nada: solo elige la ruta."""
+    if os.environ.get("VORTEX_QR_IP"):
+        return os.environ["VORTEX_QR_IP"]
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("1.1.1.1", 9))
+            ip = s.getsockname()[0]
+        except OSError:
+            return None
+    return None if ip.startswith("127.") else ip
+
+
+def abrir_cortafuegos() -> None:
+    """Con ufw prendido, los puertos se abren una sola vez (pide la contraseña)."""
+    if MARCA_UFW.exists() or not shutil.which("ufw"):
+        return
+    if subprocess.run(["systemctl", "is-active", "--quiet", "ufw"]).returncode != 0:
+        return
+    r = subprocess.run(["pkexec", "ufw", "allow", f"{PUERTOS[0]}:{PUERTOS[-1]}/tcp"], capture_output=True)
+    if r.returncode == 0:
+        MARCA_UFW.parent.mkdir(parents=True, exist_ok=True)
+        MARCA_UFW.touch()
+
+
+def empaquetar(rutas: list[Path], carpeta: str) -> Path:
+    """Varios archivos o carpetas → un .zip, sin comprimir (fotos y videos ya lo están y así no tarda)."""
+    nombre = rutas[0].name if len(rutas) == 1 else "Archivos de Vortexine"
+    destino = Path(carpeta) / f"{nombre}.zip"
+    with zipfile.ZipFile(destino, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+        for ruta in rutas:
+            if ruta.is_dir():
+                for raiz, _, archivos in os.walk(ruta):
+                    for a in archivos:
+                        f = Path(raiz) / a
+                        if f.is_file():
+                            z.write(f, f.relative_to(ruta.parent))
+            else:
+                z.write(ruta, ruta.name)
+    return destino
+
+
+class Estado:
+    def __init__(self) -> None:
+        self.bajando = False
+        self.listo = False
+
+
+def servidor(archivo: Path, clave: str, ip: str, estado: Estado) -> ThreadingHTTPServer:
+    tam = archivo.stat().st_size
+    disposicion = "attachment; filename*=UTF-8''" + urllib.parse.quote(archivo.name)
+
+    class Manejador(BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def _cabeceras(self) -> bool:
+            if self.path.split("?")[0] != f"/{clave}":
+                self.send_error(404)
+                return False
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(tam))
+            self.send_header("Content-Disposition", disposicion)
+            self.end_headers()
+            return True
+
+        def do_HEAD(self):
+            self._cabeceras()
+
+        def do_GET(self):
+            if not self._cabeceras():
+                return
+            estado.bajando = True
+            try:
+                with archivo.open("rb") as f:
+                    shutil.copyfileobj(f, self.wfile, 1024 * 1024)
+                estado.listo = True
+            except OSError:
+                pass   # se cortó (o el navegador solo se asomó): la ventana sigue esperando
+
+    for puerto in PUERTOS:
+        try:
+            return ThreadingHTTPServer((ip, puerto), Manejador)
+        except OSError:
+            continue
+    raise OSError("sin puertos libres")
+
+
+def tam_legible(n: float) -> str:
+    for unidad in ("B", "KB", "MB"):
+        if n < 1024:
+            return f"{n:.0f} {unidad}"
+        n /= 1024
+    return f"{n:.1f} GB"
+
+
+def ventana(url: str, archivo: Path, estado: Estado) -> None:
+    from PySide6.QtCore import Qt, QTimer
+    from PySide6.QtGui import QPixmap
+    from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+
+    app = QApplication([sys.argv[0]])
+    app.setApplicationName("Pasar al cel")
+    app.setDesktopFileName("vortex-qr")
+    png = subprocess.run(["qrencode", "-t", "PNG", "-s", "9", "-m", "3", "-o", "-", url],
+                         capture_output=True, check=True).stdout
+    imagen = QPixmap()
+    imagen.loadFromData(png)
+
+    w = QWidget()
+    w.setWindowTitle("Pasar al cel")
+    w.setStyleSheet("QWidget { background: #1C1C1C; color: #DADADA; } QLabel#suave { color: #B3B3B3; }")
+    caja = QVBoxLayout(w)
+    caja.setContentsMargins(28, 24, 28, 24)
+    caja.setSpacing(14)
+
+    def texto(t: str, tam: int = 13, suave: bool = False) -> QLabel:
+        e = QLabel(t)
+        e.setWordWrap(True)
+        e.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        e.setTextFormat(Qt.TextFormat.PlainText)
+        f = e.font()
+        f.setPointSize(tam)
+        e.setFont(f)
+        if suave:
+            e.setObjectName("suave")
+        return e
+
+    caja.addWidget(texto("Escanéalo con la cámara de tu cel", 15))
+    qr = QLabel()
+    qr.setPixmap(imagen)
+    qr.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    caja.addWidget(qr)
+    caja.addWidget(texto(f"{archivo.name} · {tam_legible(archivo.stat().st_size)}"))
+    situacion = texto("Tu cel tiene que estar en la misma wifi que este equipo.", 11, True)
+    caja.addWidget(situacion)
+    # Tamaño fijo: así Hyprland la deja flotando en vez de meterla al mosaico.
+    w.setFixedSize(max(imagen.width() + 56, 440), imagen.height() + 190)
+    w.show()
+
+    def revisar() -> None:
+        if estado.listo:
+            situacion.setText("Listo: ya está en tu cel.")
+            reloj.stop()
+            QTimer.singleShot(CIERRE_MS, app.quit)
+        elif estado.bajando:
+            situacion.setText("Bajándose en tu cel…")
+
+    reloj = QTimer()
+    reloj.timeout.connect(revisar)
+    reloj.start(300)
+    QTimer.singleShot(VIDA_MS, app.quit)
+    app.exec()
+
+
+def pasar(args: list[str]) -> None:
+    rutas = [Path(a) for a in args if Path(a).exists()]
+    if not rutas:
+        sys.exit("vortex-qr: ese archivo no existe")
+    if not shutil.which("qrencode"):
+        aviso("No se pudo hacer el QR", "Falta qrencode: corre «vortex actualizar».")
+        sys.exit(1)
+    ip = ip_local()
+    if not ip:
+        aviso("No se puede pasar al cel", "Este equipo no está conectado a ninguna red.")
+        sys.exit(1)
+    abrir_cortafuegos()
+    with tempfile.TemporaryDirectory(prefix="vortex-qr-") as tmp:
+        archivo = rutas[0] if len(rutas) == 1 and rutas[0].is_file() else empaquetar(rutas, tmp)
+        clave = secrets.token_urlsafe(12)
+        estado = Estado()
+        try:
+            srv = servidor(archivo, clave, ip, estado)
+        except OSError:
+            aviso("No se puede pasar al cel", "Los puertos que usa están ocupados.")
+            sys.exit(1)
+        url = f"http://{ip}:{srv.server_address[1]}/{clave}"
+        if os.environ.get("VORTEX_QR_SALIDA"):   # las pruebas leen el enlace de aquí
+            Path(os.environ["VORTEX_QR_SALIDA"]).write_text(url + "\n")
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            ventana(url, archivo, estado)
+        except ImportError:
+            aviso("No se pudo abrir la ventana", "Falta PySide6: corre «vortex actualizar».")
+            sys.exit(1)
+        finally:
+            srv.shutdown()
+
+
+def main(args: list[str]) -> None:
+    if not args or args[0] in ("-h", "--help"):
+        sys.exit(__doc__)
+    if args[0] == "accion" and len(args) == 1:
+        accion()
+    else:
+        pasar(args)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

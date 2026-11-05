@@ -5,7 +5,8 @@
 #
 #   vortex-arreglar              la lista, para leerla
 #   vortex-arreglar revisar      la lista en JSON (la lee el panel)
-#   vortex-arreglar arreglar ID  sonido | microfono | red | wifi | portal | bluetooth | disco | hora | pacman
+#   vortex-arreglar juego        solo la revisión del último juego de Steam (JSON; nada si no hay registro)
+#   vortex-arreglar arreglar ID  sonido | microfono | red | wifi | portal | bluetooth | disco | hora | juego-registro | pacman
 #
 # Cada revisión: {"id", "titulo", "estado": "bien" | "aviso" | "mal", "detalle", "arreglo": ID o ""}.
 # Lo que necesita root (encender el Bluetooth, la hora automática, la caché de pacman, el candado de
@@ -15,6 +16,9 @@ export LC_ALL=C
 
 SYS="${VORTEX_SYS:-/sys}"
 CANDADO="${VORTEX_RAIZ:-}/var/lib/pacman/db.lck"
+STEAM="${VORTEX_STEAM:-$HOME/.local/share/Steam}"
+JUEGO_CORTO=60         # s: un juego que dura menos, quizá no abrió
+JUEGO_RECIENTE=21600   # s: lo de hace más de 6 h ya no se menciona
 
 item() { # ID TITULO ESTADO DETALLE [ARREGLO]
   jq -cn --arg id "$1" --arg titulo "$2" --arg estado "$3" --arg detalle "$4" --arg arreglo "${5:-}" \
@@ -155,8 +159,148 @@ rev_servicios() {
   return 0
 }
 
+# ---- «Este juego no abre» (2.7) ---------------------------------------------------------------------
+# Steam anota en gameprocess_log.txt cuándo abre y cierra cada juego. Si el último duró menos de un minuto
+# y hace poco, se busca la causa en lo que dejó y se explica en español. Por ahora solo juegos de Steam.
+
+# La última sesión: «APPID INICIO FIN» (FIN vacío si el juego sigue abierto); nada si no hay registro.
+ultima_sesion() {
+  local registro="$STEAM/logs/gameprocess_log.txt" a inicio fin
+  [[ -r "$registro" ]] || return 0
+  read -r a inicio fin < <(tail -n 4000 "$registro" | awk '
+    function hora(l) { return substr(l, 2, 19) }
+    match($0, /AppID [0-9]+ adding PID/) {
+      if (id == "") { split(substr($0, RSTART, RLENGTH), p, " "); id = p[2]; ini = hora($0) }
+    }
+    /Remove [0-9]+ from running list/ {
+      for (i = 1; i <= NF; i++) if ($i == "Remove") r = $(i + 1)
+      if (r == id) { ult = id "\t" ini "\t" hora($0); id = "" }
+    }
+    END { if (id != "") print id "\t" ini "\t"; else if (ult != "") print ult }' | tr ' ' '_' | tr '\t' ' ')
+  [[ -n "${a:-}" ]] || return 0
+  inicio="$(date -d "${inicio/_/ }" +%s 2>/dev/null)" || return 0
+  [[ -n "${fin:-}" ]] && { fin="$(date -d "${fin/_/ }" +%s 2>/dev/null)" || fin=""; }
+  echo "$a $inicio ${fin:-}"
+}
+
+# El manifiesto del juego, en la biblioteca donde esté instalado.
+manifiesto() { # APPID
+  local carpeta f
+  while read -r carpeta; do
+    f="$carpeta/steamapps/appmanifest_$1.acf"
+    [[ -r "$f" ]] && { echo "$f"; return 0; }
+  done < <(echo "$STEAM"; sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"$/\1/p' "$STEAM/steamapps/libraryfolders.vdf" 2>/dev/null)
+  return 1
+}
+campo_acf() { sed -n "s/^[[:space:]]*\"$2\"[[:space:]]*\"\(.*\)\"$/\1/p" "$1" | head -n1; } # ARCHIVO CAMPO
+
+# La causa, en una línea: «ESTADO<tab>TEXTO<tab>ARREGLO»; nada si no se encontró.
+causa_juego() { # APPID INICIO FIN
+  local id="$1" inicio="$2" fin="$3" modulo version acf carpeta dll log libre traza
+  # Driver actualizado sin reiniciar: el más común y el que más desconcierta
+  if [[ -r "$SYS/module/nvidia/version" ]]; then
+    modulo="$(cat "$SYS/module/nvidia/version")"
+    version="$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}' | sed 's/^[0-9]*://; s/-[^-]*$//')"
+    if [[ -n "$version" && "$modulo" != "$version" ]]; then
+      printf 'mal\tSe actualizó el driver de NVIDIA y falta reiniciar: reinicia el equipo y vuelve a abrirlo.\t\n'
+      return
+    fi
+  fi
+  libre="$(df -P "$HOME" 2>/dev/null | awk 'NR == 2 {print int($4 / 1024)}')"
+  if [[ "$libre" =~ ^[0-9]+$ ]] && ((libre < 1024)); then
+    printf 'mal\tCasi no queda disco (%s MB) y los juegos no arrancan así.\tdisco\n' "$libre"
+    return
+  fi
+  if journalctl -k --no-pager -q --since "@$inicio" --until "@$((fin + 5))" -g 'oom-kill|out of memory' -n 1 2>/dev/null | grep -q .; then
+    printf 'mal\tSe quedó sin memoria: cierra otras apps (navegador, Discord) y vuelve a abrirlo.\t\n'
+    return
+  fi
+  if journalctl -k --no-pager -q --since "@$inicio" --until "@$((fin + 5))" -g 'NVRM: Xid' -n 1 2>/dev/null | grep -q .; then
+    printf 'mal\tLa tarjeta de video dio un error mientras abría: reinicia el equipo y vuelve a intentar.\t\n'
+    return
+  fi
+  # El registro de Proton existe solo si se abrió «con registro» (o tienes PROTON_LOG puesto)
+  log="$HOME/steam-$id.log"
+  if [[ -r "$log" ]] && (($(stat -c %Y "$log") >= inicio)); then
+    dll="$(grep -aoE 'err:module:import_dll Library [^ ]+\.[dD][lL][lL]' "$log" | awk '{print $3}' | sort -u | head -n1)"
+    if [[ -n "$dll" ]]; then
+      case "${dll,,}" in
+        vcruntime* | msvcp* | msvcr* | ucrtbase*) dll="$dll (de Visual C++)" ;;
+        d3dx* | d3dcompiler* | xinput* | xaudio* | x3daudio*) dll="$dll (de DirectX)" ;;
+        mscoree*) dll="$dll (de .NET)" ;;
+      esac
+      printf 'mal\tLe falta %s. En Steam: Propiedades → Compatibilidad, prueba otra versión de Proton.\t\n' "$dll"
+      return
+    fi
+    if grep -aqE 'VK_ERROR_INCOMPATIBLE_DRIVER|No adapters found|vkCreateInstance failed' "$log"; then
+      printf 'mal\tNo pudo usar la tarjeta de video (Vulkan): reinicia el equipo; si sigue, corre «vortex actualizar».\t\n'
+      return
+    fi
+    if grep -aqE 'E_OUTOFMEMORY|std::bad_alloc|[Oo]ut of memory' "$log"; then
+      printf 'mal\tSe quedó sin memoria: cierra otras apps y vuelve a abrirlo.\t\n'
+      return
+    fi
+    if grep -aqE 'wine: Unhandled|EXCEPTION_ACCESS_VIOLATION|Unhandled exception' "$log"; then
+      printf 'mal\tEl juego tronó al arrancar. En Steam: Propiedades → Archivos instalados → Verificar; si sigue, prueba otra versión de Proton.\t\n'
+      return
+    fi
+  fi
+  # Un juego de Linux que tronó deja un volcado, con su ruta dentro de steamapps/common
+  traza="$(coredumpctl list --no-pager --no-legend -q --since "@$inicio" --until "@$((fin + 10))" 2>/dev/null | grep -F 'steamapps/common' | tail -n1)"
+  if [[ -n "$traza" ]]; then
+    printf 'mal\tEl juego tronó al arrancar. En Steam: Propiedades → Archivos instalados → Verificar.\t\n'
+    return
+  fi
+  if acf="$(manifiesto "$id")"; then
+    carpeta="$(dirname "$acf")/common/$(campo_acf "$acf" installdir)"
+    if [[ -d "$carpeta/EasyAntiCheat" || -d "$carpeta/BattlEye" || -d "$carpeta/EasyAntiCheat_EOS" ]]; then
+      printf 'aviso\tUsa anti-trampas y puede que no acepte Linux: búscalo en areweanticheatyet.com.\t\n'
+      return
+    fi
+  fi
+}
+
+rev_juego() {
+  local sesion id inicio fin acf nombre duro causa estado texto arreglo
+  sesion="$(ultima_sesion)"
+  [[ -n "$sesion" ]] || return 0
+  read -r id inicio fin <<<"$sesion"
+  [[ -n "${fin:-}" ]] || return 0 # sigue abierto: nada que decir
+  nombre="el juego $id"
+  acf="$(manifiesto "$id")" && nombre="«$(campo_acf "$acf" name)»"
+  duro=$((fin - inicio))
+  if ((duro >= JUEGO_CORTO || $(date +%s) - fin > JUEGO_RECIENTE)); then
+    item juego "Juegos" bien "El último, $nombre, abrió bien."
+    return
+  fi
+  causa="$(causa_juego "$id" "$inicio" "$fin")"
+  if [[ -n "$causa" ]]; then
+    IFS=$'\t' read -r estado texto arreglo <<<"$causa"
+    item juego "Juegos" "$estado" "$nombre se cerró a los $duro s. $texto" "$arreglo"
+  else
+    item juego "Juegos" aviso "$nombre se cerró a los $duro s y no dejó la causa. Si no abrió, ábrelo con registro para averiguarla (Steam se reinicia); si lo cerraste tú, ignora esto." juego-registro
+  fi
+}
+
+# Steam hereda PROTON_LOG y se lo pasa al juego: por eso hay que cerrarlo y abrirlo otra vez.
+juego_con_registro() {
+  local sesion id inicio fin _
+  sesion="$(ultima_sesion)"
+  read -r id inicio fin <<<"$sesion"
+  [[ -n "${id:-}" ]] || { echo "No encontré ningún juego de Steam."; return 1; }
+  [[ -n "${fin:-}" ]] || { echo "Ese juego sigue abierto: ciérralo primero."; return 1; }
+  command -v steam >/dev/null || { echo "No encontré Steam."; return 1; }
+  if pgrep -x steam >/dev/null 2>&1; then
+    steam -shutdown >/dev/null 2>&1
+    for _ in {1..30}; do pgrep -x steam >/dev/null 2>&1 || break; sleep 1; done
+    pgrep -x steam >/dev/null 2>&1 && { echo "Steam no se cerró: ciérralo tú y vuelve a intentar."; return 1; }
+  fi
+  PROTON_LOG=1 setsid -f steam "steam://rungameid/$id" </dev/null >/dev/null 2>&1
+  echo "Abriendo el juego con registro. Cuando se cierre, dale «Revisar otra vez»."
+}
+
 revisar() {
-  { rev_sonido; rev_microfono; rev_internet; rev_bluetooth; rev_disco; rev_hora; rev_actualizaciones; rev_servicios; } |
+  { rev_sonido; rev_microfono; rev_internet; rev_bluetooth; rev_disco; rev_hora; rev_actualizaciones; rev_servicios; rev_juego; } |
     jq -s '.'
 }
 
@@ -196,6 +340,7 @@ arreglar() {
       systemctl is-active --quiet bluetooth || pkexec systemctl enable --now bluetooth
       ;;
     hora) pkexec timedatectl set-ntp true ;;
+    juego-registro) juego_con_registro ;;
     pacman)
       pgrep -x 'pacman|paru|yay|pamac' >/dev/null 2>&1 && { echo "Hay una instalación corriendo: espera a que termine." >&2; return 1; }
       pkexec rm -f "$CANDADO"
@@ -211,16 +356,17 @@ arreglar() {
       despues="$(df -P --output=avail "$HOME" | tail -n1)"
       awk -v a="$antes" -v d="$despues" 'BEGIN {l = (d - a) / 1048576; if (l < 0) l = 0; printf "Se liberaron %.1f GB.\n", l}'
       ;;
-    *) echo "uso: vortex-arreglar arreglar sonido|microfono|red|wifi|portal|elegir-red|bluetooth|disco|hora|pacman" >&2; return 2 ;;
+    *) echo "uso: vortex-arreglar arreglar sonido|microfono|red|wifi|portal|elegir-red|bluetooth|disco|hora|juego-registro|pacman" >&2; return 2 ;;
   esac
 }
 
 case "${1:-}" in
   revisar) revisar ;;
+  juego) rev_juego ;;
   arreglar) arreglar "${2:-}" ;;
   "")
     revisar | jq -r '.[] | (if .estado == "bien" then "✓" elif .estado == "aviso" then "!" else "✗" end) + " " + .titulo + ": " + .detalle
       + (if .arreglo != "" and .estado != "bien" then "   (vortex-arreglar arreglar " + .arreglo + ")" else "" end)'
     ;;
-  *) echo "uso: vortex-arreglar [revisar | arreglar ID]" >&2; exit 2 ;;
+  *) echo "uso: vortex-arreglar [revisar | juego | arreglar ID]" >&2; exit 2 ;;
 esac

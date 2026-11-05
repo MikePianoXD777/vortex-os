@@ -86,6 +86,10 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("vortex-enlace")
     -- Vortex 2.5: «Hacer PDF» en el clic derecho de Thunar sobre fotos (bin/vortex-pdf); si ya está, no hace nada.
     hl.exec_cmd("vortex-pdf accion")
+    -- Vortex 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr) y, si actualizaste mientras
+    -- jugabas, las novedades que quedaron sin ver.
+    hl.exec_cmd("vortex-qr accion")
+    hl.exec_cmd("vortex novedades mostrar")
     -- Vortex 1.8: fondos que cambian solos (si se encendió en Ajustes → Tema; si no, solo duerme).
     hl.exec_cmd("vortex fondos-auto correr")
     -- Vortex 1.8: tu celular (KDE Connect), solo si se encendió en su panel (Super+Shift+P).
@@ -291,6 +295,8 @@ hl.bind("SUPER + F1", hl.dsp.event("serpantinum:toggle keybinds"))
 
 -- Vortex 1.8: copiar el texto de una zona de la pantalla (OCR, bin/vortex-texto). T de «texto».
 hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("vortex-texto"))
+-- Vortex 2.7: dictar en cualquier app (bin/vortex-dictar); otra vez corta. D de «dictar».
+hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("vortex-dictar"))
 
 -- Vortex 1.8: el panel «Tu celular» (KDE Connect, shell/src/quickshell/celular/). P de «phone».
 hl.bind("SUPER + SHIFT + P", hl.dsp.event("serpantinum:toggle celular"))

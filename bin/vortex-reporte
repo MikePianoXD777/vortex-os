@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# vortex-reporte (2.7): «Mandar reporte». Junta en un archivo de texto lo que hace falta para saber qué
+# le pasa a un equipo: versión, memoria, disco, lo que revisa «Algo no funciona», servicios caídos, apps
+# que tronaron y los errores del arranque. Lo usa el botón «Crear reporte» de ese panel y «vortex reporte».
+#
+#   vortex-reporte            crea el archivo, copia el archivo al portapapeles y dice dónde quedó
+#
+# No manda nada solo: tú decides a quién dárselo. Antes de guardarlo le quita tu usuario, el nombre del
+# equipo, las IP, las MAC y los correos. No lee tus documentos, ni el portapapeles, ni el entorno.
+set -uo pipefail
+export LC_ALL=C
+
+DESTINO="${VORTEX_REPORTE_DIR:-$(xdg-user-dir DOWNLOAD 2>/dev/null || echo "$HOME/Descargas")}"
+[[ "$DESTINO" == "$HOME" || -z "$DESTINO" ]] && DESTINO="$HOME/Descargas"
+ARCHIVO="$DESTINO/Reporte Vortexine $(date '+%Y-%m-%d %H.%M').txt"
+
+seccion() { # TITULO COMANDO...: si el comando no existe o no dice nada, lo anota en vez de fallar
+  local titulo="$1"
+  shift
+  printf '\n===== %s =====\n' "$titulo"
+  local salida
+  # timeout no sabe correr funciones de bash: por eso van exportadas y pasan por otro bash.
+  salida="$(timeout 20 bash -c '"$@"' _ "$@" 2>&1)" || true
+  printf '%s\n' "${salida:-(nada)}"
+}
+
+revision_legible() {
+  command -v vortex-arreglar >/dev/null || { echo "(sin vortex-arreglar)"; return; }
+  vortex-arreglar
+}
+
+paquetes_vortex() { pacman -Q 2>/dev/null | grep -E '^(vortex-|linux-cachyos |hyprland |nvidia-utils |mesa |steam |proton)'; }
+tarjeta() { lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D controller'; }
+pantallas() { hyprctl monitors 2>/dev/null | grep -E '^Monitor|^\s+[0-9]+x[0-9]+@'; }
+mas_memoria() { ps -eo rss=,comm= --sort=-rss | head -n 25 | awk '{printf "%7.0f MB  %s\n", $1 / 1024, $2}'; }
+fallidos() { systemctl --failed --no-legend --plain; systemctl --user --failed --no-legend --plain; }
+errores() { journalctl -b "$1" -p err --no-pager -q -o short-iso -n "$2"; }
+sin_memoria() { journalctl -k -b --no-pager -q -o short-iso -g 'out of memory|oom-kill|killed process' -n 40; }
+oom_usuario() { journalctl --user -b --no-pager -q -o short-iso -g 'oom|out of memory' -n 30; }
+tronaron() { coredumpctl list --no-pager --no-legend -q 2>/dev/null | tail -n 20; }
+juegos() { tail -n 40 "${VORTEX_STEAM:-$HOME/.local/share/Steam}/logs/gameprocess_log.txt"; }
+partidas() { tail -n 10 "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/partidas.csv"; }
+export -f revision_legible paquetes_vortex tarjeta pantallas mas_memoria fallidos errores sin_memoria \
+  oom_usuario tronaron juegos partidas
+
+armar() {
+  printf 'Reporte de Vortexine'\''s OS, %s\n' "$(date '+%Y-%m-%d %H:%M')"
+  seccion "Sistema" sh -c 'grep -E "^(PRETTY_NAME|VERSION)=" /etc/os-release; uname -r; uptime -p'
+  seccion "Paquetes" paquetes_vortex
+  seccion "Equipo" sh -c 'grep -m1 "model name" /proc/cpuinfo; nproc'
+  seccion "Tarjeta de video" tarjeta
+  seccion "Pantallas" pantallas
+  seccion "Memoria" free -m
+  seccion "Lo que más memoria usa" mas_memoria
+  seccion "Disco" df -h "$HOME"
+  seccion "Algo no funciona" revision_legible
+  seccion "Servicios que fallaron" fallidos
+  seccion "Falta de memoria (kernel)" sin_memoria
+  seccion "Falta de memoria (sesión)" oom_usuario
+  seccion "Apps que tronaron" tronaron
+  seccion "Errores de este arranque" errores 0 120
+  seccion "Errores del arranque anterior" errores -1 40
+  seccion "Steam: últimos juegos" juegos
+  seccion "Últimas partidas" partidas
+}
+
+# Lo que identifica a la persona o a su red no le sirve a quien lo revisa. La carpeta personal va antes
+# que el usuario, y el usuario solo como palabra completa (si se llama «al», no se come «normal»).
+limpiar() {
+  local usuario equipo
+  usuario="$(id -un)"
+  equipo="$(cat /proc/sys/kernel/hostname 2>/dev/null)"
+  sed -E \
+    -e "s#${HOME//#/\\#}#~#g" \
+    -e "s/\\b${usuario}\\b/usuario/g" \
+    ${equipo:+-e "s/\\b${equipo}\\b/equipo/g"} \
+    -e 's/\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b/[mac]/g' \
+    -e 's/\b([0-9]{1,3}\.){3}[0-9]{1,3}\b/[ip]/g' \
+    -e 's/\b([0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F:]+\b/[ip]/g' \
+    -e 's/[[:alnum:]._%+-]+@[[:alnum:].-]+\.[[:alpha:]]{2,}/[correo]/g' \
+    -e 's/Conectado a «[^»]*»/Conectado a «[red]»/g'
+}
+
+mkdir -p "$DESTINO" || { echo "No pude crear $DESTINO" >&2; exit 1; }
+armar | limpiar >"$ARCHIVO" || { echo "No pude escribir el reporte en $DESTINO" >&2; exit 1; }
+
+# Se copia el archivo, no su texto: Ctrl+V en una conversación lo adjunta (donde la app lo acepte).
+# wl-copy se queda en segundo plano: con su salida a /dev/null, no detiene al panel que lee la nuestra.
+command -v wl-copy >/dev/null &&
+  printf 'file://%s\n' "$(jq -rn --arg p "$ARCHIVO" '$p | split("/") | map(@uri) | join("/")')" |
+  wl-copy -t text/uri-list >/dev/null 2>&1
+
+echo "Reporte listo en ${ARCHIVO/#"$HOME"/\~}. Ya está copiado: pégalo con Ctrl+V en tu chat, o arrástralo desde esa carpeta."

@@ -60,6 +60,7 @@
       { "teclas": ["ALT + Sys_Req"], "ver": "ALT + Print", "es": "Capturar la ventana", "en": "Capture the window" },
       { "teclas": ["SHIFT + Print"], "es": "Capturar y editar", "en": "Capture and edit" },
       { "teclas": ["SUPER + SHIFT + T"], "es": "Copiar el texto de una parte de la pantalla", "en": "Copy the text from part of the screen" },
+      { "teclas": ["SUPER + SHIFT + D"], "es": "Dictar: hablas y se escribe donde estés (otra vez: cortar)", "en": "Dictate: speak and it types wherever you are (again: stop)" },
       { "teclas": ["CTRL + ALT + R"], "es": "Grabar la pantalla (otra vez: parar)", "en": "Record the screen (again: stop)" },
       { "teclas": ["SUPER + SHIFT + C"], "es": "Tomar un color de la pantalla", "en": "Pick a color from the screen" }
     ]

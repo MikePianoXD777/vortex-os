@@ -145,7 +145,7 @@ Item {
                 ? "layout=$(mmsg get keyboardlayout 2>/dev/null | jq -r '.layout // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
                 : root.isSway
                 ? "layout=$(swaymsg -t get_inputs 2>/dev/null | jq -r '[.[] | select(.type == \"keyboard\" and .xkb_active_layout_name != null)] | .[0].xkb_active_layout_name // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                : "layout=$(LC_ALL=C hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true) | .active_keymap) // .keyboards[0].active_keymap // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
+                : "layout=$(LC_ALL=C hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true and (.name | startswith(\"hl-virtual-keyboard\") | not)) | .active_keymap) // .keyboards[0].active_keymap // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
         ]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -167,6 +167,9 @@ Item {
         target: (root.hyprEvents && !root.isPreview) ? Hyprland : null
         function onRawEvent(event) {
             if (event.name !== "activelayout") return;
+            // Vortex 2.7: el teclado virtual de wtype (vortex-dictar) avisa «error» y no vuelve a avisar
+            // al irse: no es tu distribución, y sin esto la barra se quedaba diciendo «ER».
+            if (event.data.indexOf("hl-virtual-keyboard") === 0) return;
             if (module && !module.moduleActive) return;
             kbLayoutDelay.restart();
         }

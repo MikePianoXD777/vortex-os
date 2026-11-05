@@ -117,6 +117,21 @@ duracion() {
   if ((m < 60)); then echo "$m min"; else printf '%d h %d min\n' $((m / 60)) $((m % 60)); fi
 }
 
+# 2.7: un juego que se cerró casi al abrir avisa, con un botón que lleva a la explicación. Steam anota el
+# cierre un momento después, y la espera del clic no debe detener a quien llamó: todo va en segundo plano.
+juego_que_no_abrio() {
+  command -v vortex-arreglar >/dev/null && command -v notify-send >/dev/null || return 0
+  (
+    sleep "${VORTEX_PARTIDA_ESPERA_STEAM:-5}"
+    r="$(vortex-arreglar juego 2>/dev/null)"
+    [[ -n "$r" && "$(jq -r '.estado' <<<"$r" 2>/dev/null)" != bien ]] || exit 0
+    [[ "$(notify-send -a "Vortexine's OS" -i applications-games -A ver="Ver qué pasó" \
+      "¿No abrió?" "$(jq -r '.detalle' <<<"$r")" 2>/dev/null)" == ver ]] &&
+      hyprctl dispatch 'hl.dsp.event("serpantinum:toggle arreglar")' >/dev/null 2>&1
+  ) </dev/null >/dev/null 2>&1 &
+  disown
+}
+
 cmd_terminar() {
   [[ -s "$PARTIDA" ]] || return 0
   local inicio fin seg juego cpu gpu fps="" bajo="" lineas=()
@@ -129,6 +144,7 @@ cmd_terminar() {
   rm -f "$PARTIDA"
   exec 8>&-
   [[ -n "$inicio" ]] || return 0
+  ((seg >= 60)) || juego_que_no_abrio
   ((seg >= MINIMO)) || return 0
   IFS=$'\t' read -r fps bajo < <(fps_de_partida "$inicio")
   mkdir -p "$ESTADO"

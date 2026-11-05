@@ -1676,6 +1676,10 @@
       "name": "Vortexine Restore",
       "desc": "Restore points: go back to an earlier Hyprland, theme, bar or widgets if something breaks"
     },
+    "novedades": {
+      "name": "What's new",
+      "desc": "What the latest version of Vortexine's OS brings"
+    },
     "arreglar": {
       "name": "Something's not working",
       "desc": "Check and fix sound, internet, Wi-Fi, Bluetooth, disk and time"
@@ -2076,7 +2080,14 @@
       "volver": "Went back"
     }
   },
+  "novedades": {
+    "title": "What's new",
+    "empty": "This version has no notes."
+  },
   "arreglar": {
+    "open_log": "Open with log",
+    "report": "Create report",
+    "report_making": "Creating…",
     "title": "Something's not working?",
     "checking": "Checking your computer…",
     "all_good": "Everything looks fine.",

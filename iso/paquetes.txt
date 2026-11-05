@@ -171,3 +171,5 @@ calamares
 squashfs-tools
 os-prober
 ckbcomp
+qrencode
+wtype

@@ -203,6 +203,7 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Impr / Super+Shift+S | captura de una región (se copia y se guarda) |
 | Super+Impr / Alt+Impr | captura de toda la pantalla / de la ventana activa |
 | Super+Shift+T | copiar el texto de una zona de la pantalla (OCR, en español e inglés) |
+| Super+Shift+D | dictar: hablas y se escribe en la ventana activa (en español, sin internet; otra vez para cortar) |
 | Shift+Impr / Super+Shift+Impr | región / pantalla completa, abriendo el editor de capturas |
 | Ctrl+Alt+R / Super+Alt+R | grabar la pantalla sin sonido / con el sonido del equipo (otra vez para parar) |
 | Super+Shift+Alt+R | grabar una región |

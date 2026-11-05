@@ -157,6 +157,85 @@ hizo disco "pkexec sh -c" && [[ ! -e "$T/home/.cache/thumbnails" ]] && grep -q "
   bien "disco: miniaturas, Flatpak sin usar y caché de pacman" || mal "disco: $(cat "$T/registro")"
 arreglar arreglar inventado >/dev/null 2>&1; [[ $? == 2 ]] && bien "un arreglo que no existe: error" || mal "arreglo inventado"
 
+echo "== «Este juego no abre»"
+normal
+falso journalctl '[[ "$*" == *oom-kill* && -n "${OOM:-}" ]] && echo oom; [[ "$*" == *Xid* && -n "${XID:-}" ]] && echo xid; exit 0'
+falso coredumpctl '[[ -n "${TRONO:-}" ]] && echo "x 1 1 1 SIGSEGV present /juegos/steamapps/common/Prueba/juego 1M"; exit 0'
+falso pacman 'echo "nvidia-utils ${NVIDIA_PAQUETE:-500.1-2}"'
+falso steam 'echo "steam $*" >>"'"$T"'/steam-corrio"; [[ "$1" == steam://* ]] && echo "PROTON_LOG=${PROTON_LOG:-}" >>"'"$T"'/steam-corrio"; exit 0'
+J="$T/home/.local/share/Steam"
+mkdir -p "$J/logs" "$J/steamapps/common/Prueba"
+printf '"AppState"\n{\n\t"name"\t\t"Mi Juego"\n\t"installdir"\t\t"Prueba"\n}\n' >"$J/steamapps/appmanifest_77.acf"
+sesion() { # SEGUNDOS_QUE_DURO HACE_CUANTO
+  local fin=$(($(date +%s) - $2)) ini
+  ini=$((fin - $1))
+  {
+    printf '[%s] AppID 77 adding PID 10 as a tracked process "x"\n' "$(date -d "@$ini" '+%F %T')"
+    printf '[%s] AppID 77 adding PID 11 as a tracked process\n' "$(date -d "@$ini" '+%F %T')"
+    printf '[%s] AppID 77 no longer tracking PID 10, exit code 0\n' "$(date -d "@$fin" '+%F %T')"
+    printf '[%s] Remove 77 from running list\n' "$(date -d "@$fin" '+%F %T')"
+  } >"$J/logs/gameprocess_log.txt"
+}
+juego() { arreglar juego | jq -r '"\(.estado)|\(.arreglo)|\(.detalle)"'; }
+contiene() { [[ "$1" == *"$2"* ]]; }
+
+sesion 600 30
+contiene "$(juego)" 'bien||El último, «Mi Juego», abrió bien.' && bien "un juego que duró: bien" || mal "duró: $(juego)"
+sesion 6 30000
+contiene "$(juego)" 'bien|' && bien "uno de hace más de 6 h ya no se menciona" || mal "viejo: $(juego)"
+sesion 6 30
+contiene "$(juego)" 'aviso|juego-registro|«Mi Juego» se cerró a los 6 s y no dejó la causa' &&
+  bien "sin pistas: ofrece abrirlo con registro" || mal "sin pistas: $(juego)"
+[[ "$(jq -r '.[] | select(.id == "juego") | .estado' <<<"$(arreglar revisar)")" == aviso ]] &&
+  bien "sale en la lista del panel" || mal "no sale en revisar"
+
+mkdir -p "$T/sys/module/nvidia"; echo 500.1 >"$T/sys/module/nvidia/version"
+contiene "$(juego)" 'aviso|' && bien "driver al día: no lo culpa" || mal "driver igual: $(juego)"
+cambiar NVIDIA_PAQUETE=510.2-1
+contiene "$(juego)" 'falta reiniciar' && bien "driver actualizado sin reiniciar" || mal "driver: $(juego)"
+rm -rf "$T/sys/module/nvidia"; normal
+falso df '[[ "$*" == *--output=avail* ]] && { echo Avail; echo 1000000; exit 0; }
+echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "/dev/x 100000000 1 ${LIBRE:-2097152} $USO% /"'
+cambiar LIBRE=500000
+contiene "$(juego)" 'mal|disco|' && bien "poco disco: lo dice y ofrece arreglarlo" || mal "disco: $(juego)"
+normal
+cambiar OOM=1
+contiene "$(juego)" 'sin memoria' && bien "se quedó sin memoria" || mal "memoria: $(juego)"
+normal; cambiar XID=1
+contiene "$(juego)" 'tarjeta de video' && bien "error de la tarjeta de video" || mal "xid: $(juego)"
+normal; cambiar TRONO=1
+contiene "$(juego)" 'tronó' && bien "un juego de Linux que tronó" || mal "trono: $(juego)"
+normal
+mkdir -p "$J/steamapps/common/Prueba/EasyAntiCheat"
+contiene "$(juego)" 'anti-trampas' && bien "anti-trampas" || mal "anti-trampas: $(juego)"
+rmdir "$J/steamapps/common/Prueba/EasyAntiCheat"
+for caso in \
+  'err:module:import_dll Library VCRUNTIME140.dll (which is needed)|VCRUNTIME140.dll (de Visual C++)' \
+  'err:module:import_dll Library d3dx9_43.dll|d3dx9_43.dll (de DirectX)' \
+  'DXVK: No adapters found|Vulkan' \
+  'std::bad_alloc|sin memoria' \
+  'wine: Unhandled page fault|tronó al arrancar'; do
+  echo "${caso%%|*}" >"$T/home/steam-77.log"
+  contiene "$(juego)" "${caso##*|}" && bien "registro de Proton: ${caso##*|}" || mal "proton ${caso##*|}: $(juego)"
+done
+touch -d '2 days ago' "$T/home/steam-77.log"
+contiene "$(juego)" 'no dejó la causa' && bien "un registro de otra vez no cuenta" || mal "registro viejo: $(juego)"
+rm -f "$T/home/steam-77.log"
+
+rm -f "$T/steam-corrio"
+msg="$(arreglar arreglar juego-registro)"
+# Va con setsid -f: se le da un momento (sleep es de mentira en esta prueba).
+for _ in {1..30}; do grep -qs PROTON_LOG "$T/steam-corrio" && break; /usr/bin/sleep 0.1; done
+grep -qx 'steam steam://rungameid/77' "$T/steam-corrio" && grep -qx 'PROTON_LOG=1' "$T/steam-corrio" && contiene "$msg" 'con registro' &&
+  bien "«Abrir con registro» lo abre con PROTON_LOG" || mal "registro: $msg $(cat "$T/steam-corrio" 2>/dev/null)"
+printf '[%s] AppID 77 adding PID 12 as a tracked process\n' "$(date '+%F %T')" >>"$J/logs/gameprocess_log.txt"
+[[ -z "$(arreglar juego)" ]] && bien "con el juego abierto no dice nada" || mal "abierto: $(juego)"
+rm -f "$T/steam-corrio"
+contiene "$(arreglar arreglar juego-registro)" 'sigue abierto' && [[ ! -e "$T/steam-corrio" ]] &&
+  bien "con el juego abierto no reinicia Steam" || mal "reinició Steam con el juego abierto"
+rm -f "$J/logs/gameprocess_log.txt"
+[[ -z "$(arreglar juego)" ]] && bien "sin Steam no sale la fila" || mal "sin Steam: $(arreglar juego)"
+
 echo
 ((FALLOS)) && { echo "$FALLOS pruebas fallaron."; exit 1; }
 echo "Todas las pruebas pasaron."

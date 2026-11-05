@@ -59,6 +59,24 @@ Item {
         }
     }
 
+    // Vortex 2.7: el reporte para mandarle a quien te ayuda (bin/vortex-reporte). Tarda un par de segundos.
+    function crearReporte() {
+        if (reporteProc.running) return;
+        window.mensaje = "";
+        reporteProc.running = true;
+    }
+
+    Process {
+        id: reporteProc
+        command: ["vortex-reporte"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let txt = this.text.trim();
+                if (txt !== "") window.mensaje = txt;
+            }
+        }
+    }
+
     Process {
         id: arreglarProc
         stdout: StdioCollector {
@@ -132,7 +150,7 @@ Item {
 
     function iconoDe(id) {
         let iconos = { sonido: "󰕾", microfono: "󰍬", internet: "󰖩", bluetooth: "󰂯", disco: "󰋊",
-                       hora: "󰥔", pacman: "󰏗", servicios: "󰒓" };
+                       hora: "󰥔", pacman: "󰏗", servicios: "󰒓", juego: "󰊴" };
         return iconos[id] || "󰋼";
     }
 
@@ -287,6 +305,7 @@ Item {
                                         id: etiqueta
                                         anchors.centerIn: parent
                                         text: window.arreglando === fila.r.arreglo ? window.t("fixing", "Fixing…")
+                                            : fila.r.arreglo === "juego-registro" ? window.t("open_log", "Open with log")
                                             : fila.r.arreglo === "portal" || fila.r.arreglo === "elegir-red" ? window.t("open", "Open")
                                             : window.t("fix", "Fix it")
                                         font.family: ThemeBackend.fontFamily
@@ -331,6 +350,28 @@ Item {
                     font.family: ThemeBackend.fontFamily
                     font.pixelSize: window.s(11)
                     color: ThemeBackend.overlay1
+                }
+                Rectangle {
+                    Layout.preferredHeight: window.s(36)
+                    Layout.preferredWidth: reporte.implicitWidth + window.s(32)
+                    radius: height / 2
+                    color: zonaReporte.containsMouse ? ThemeBackend.surface2 : ThemeBackend.surface1
+                    Text {
+                        id: reporte
+                        anchors.centerIn: parent
+                        text: "󰈙  " + (reporteProc.running ? window.t("report_making", "Creating…") : window.t("report", "Create report"))
+                        font.family: ThemeBackend.fontFamily
+                        font.pixelSize: window.s(12)
+                        font.weight: Font.DemiBold
+                        color: ThemeBackend.text
+                    }
+                    MouseArea {
+                        id: zonaReporte
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: window.crearReporte()
+                    }
                 }
                 Rectangle {
                     Layout.preferredHeight: window.s(36)

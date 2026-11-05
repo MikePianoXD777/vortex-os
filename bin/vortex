@@ -44,6 +44,8 @@ Uso: vortex <comando>
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
+  reporte                              crea un archivo con lo que hace falta para saber qué le pasa al equipo (sin tus datos)
+  novedades                            lo nuevo de la última versión (después de actualizar sale solo)
   restore [crear|lista|ver|volver…]    Vortexine Restore: puntos de restauración de Hyprland, tema, barra,
                                        widgets y terminal («vortex restore» sin nada: la lista)
   emergencia                           si el escritorio no sirve: desde Ctrl+Alt+F3, vuelve a un punto
@@ -849,7 +851,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-qr vortex-dictar)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1063,6 +1065,8 @@ PAQUETES_NUEVOS=(
   gpu-screen-recorder # 1.10: vortex-clips (los últimos 30 s con Alt+F10)
   yt-dlp ffmpeg deno # 2.5: vortex-enlace (bajar con copiar el enlace; deno lo pide YouTube)
   imagemagick # 2.5: vortex-pdf (fotos de la tarea a PDF)
+  qrencode pyside6 # 2.7: vortex-qr (pasar un archivo al cel con un QR)
+  wtype whisper-cpp # 2.7: vortex-dictar (dictar en cualquier app)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1095,6 +1099,69 @@ proteger_apps() {
     { sudo install -Dm644 "$origen" "$destino" && sudo systemd-tmpfiles --create "$destino"; } ||
       aviso "no pude poner al día $destino"
   fi
+}
+
+# ---- Novedades (2.7) --------------------------------------------------------------------------------
+# Lo nuevo de la versión: las notas de docs/notas-VERSIÓN.md. Sale un panel solo después de actualizar o,
+# si estabas jugando, al siguiente inicio de sesión. En el lanzador siempre está «Novedades».
+novedades_version() { sed -n 's/^VORTEX_VERSION="\(.*\)"$/\1/p' "$VORTEX_DIR/install/lib.sh" 2>/dev/null; }
+
+# Las versiones con notas, de la más nueva a la más vieja, hasta la última que viste (sin incluirla).
+novedades_pendientes() {
+  local visto="" v actual
+  actual="$(novedades_version)"
+  [[ -r "$AVISOS_ESTADO/novedades-vistas" ]] && visto="$(cat "$AVISOS_ESTADO/novedades-vistas")"
+  [[ -n "$visto" ]] || { [[ -n "$actual" ]] && echo "$actual"; return 0; }
+  for v in $(find "$VORTEX_DIR/docs" -maxdepth 1 -name 'notas-*.md' -printf '%f\n' 2>/dev/null |
+    sed 's/^notas-//; s/\.md$//' | sort -rV); do
+    [[ "$v" == "$visto" ]] && break
+    # Una versión más vieja que la vista (o más nueva que la instalada) no cuenta.
+    [[ "$(printf '%s\n%s\n' "$v" "$visto" | sort -V | tail -n1)" == "$v" ]] || break
+    [[ "$(printf '%s\n%s\n' "$v" "$actual" | sort -V | tail -n1)" == "$actual" ]] && echo "$v"
+  done
+}
+
+# El texto, sin la parte de «Para actualizar» (ya actualizaste) ni el título repetido de cada nota.
+novedades_texto() {
+  local v vs primero=1
+  vs="$(novedades_pendientes)"
+  [[ -n "$vs" ]] || vs="$(novedades_version)"
+  for v in $vs; do
+    [[ -r "$VORTEX_DIR/docs/notas-$v.md" ]] || continue
+    ((primero)) || printf '\n---\n\n'
+    primero=0
+    awk '/^## Para actualizar/ {fuera = 1; next} /^## / {fuera = 0} !fuera' "$VORTEX_DIR/docs/notas-$v.md"
+  done
+}
+
+novedades_marcar() {
+  mkdir -p "$AVISOS_ESTADO" && novedades_version >"$AVISOS_ESTADO/novedades-vistas"
+}
+
+cmd_novedades() {
+  case "${1:-texto}" in
+    texto)
+      novedades_texto
+      [[ "${2:-}" == --marcar ]] && novedades_marcar
+      return 0
+      ;;
+    visto) novedades_marcar ;;
+    mostrar)
+      # Al entrar por primera vez no hay nada que contar: se instaló esta versión.
+      if [[ ! -e "$AVISOS_ESTADO/novedades-vistas" && "${2:-}" != --tras-actualizar ]]; then
+        novedades_marcar
+        return 0
+      fi
+      [[ -n "$(novedades_pendientes)" && -n "$(novedades_texto)" ]] || { novedades_marcar; return 0; }
+      # El shell acaba de reiniciar (o de arrancar): un aviso antes de que cargue se perdería.
+      sleep "${VORTEX_NOVEDADES_ESPERA:-8}"
+      # Si estás jugando no se te abre nada encima: queda para el próximo inicio de sesión.
+      [[ -e "$AVISOS_ESTADO/modo-juego" ]] && return 0
+      [[ "$(hypr activewindow -j 2>/dev/null | jq -r '.fullscreen // 0' 2>/dev/null)" =~ ^(0|false)$ ]] || return 0
+      hypr dispatch 'hl.dsp.event("serpantinum:toggle novedades")' >/dev/null 2>&1 || true
+      ;;
+    *) aviso "usa: vortex novedades [texto|mostrar]"; exit 1 ;;
+  esac
 }
 
 cmd_actualizar() {
@@ -1190,9 +1257,13 @@ cmd_actualizar() {
   fi
   # 2.5: «Hacer PDF» en el clic derecho de Thunar (bin/vortex-pdf), también para quien ya tenía Vortex.
   command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
+  # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
+  command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
   # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
   # config) se ve de inmediato y no hasta el próximo inicio de sesión.
   reiniciar_shell
+  # 2.7: lo nuevo de esta versión, ya con el shell de nuevo arriba. No espera: la terminal termina ya.
+  hypr_corriendo && setsid -f "$VORTEX_DIR/bin/vortex" novedades mostrar --tras-actualizar </dev/null >/dev/null 2>&1
   return 0
 }
 
@@ -1574,6 +1645,8 @@ case "${1:-ayuda}" in
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
   reiniciar-shell) reiniciar_shell ;;
   arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
+  reporte) exec "$VORTEX_DIR/bin/vortex-reporte" ;;
+  novedades) shift; cmd_novedades "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   sonidos) shift; cmd_sonidos "$@" ;;

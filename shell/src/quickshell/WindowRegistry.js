@@ -121,6 +121,14 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰁨"
         },
         {
+            // Vortex 2.7: lo nuevo de la última versión (vortex novedades). Sale solo al actualizar.
+            id: "novedades",
+            name: tr("widgets.novedades.name", "What's new"),
+            description: tr("widgets.novedades.desc", "What the latest version of Vortexine's OS brings"),
+            icon: "system-software-update",
+            fontIcon: "󰑣"
+        },
+        {
             // Vortex 1.10: Vortexine Restore (vortex-restore), puntos de restauración de la configuración.
             id: "restore",
             name: tr("widgets.restore.name", "Vortexine Restore"),
@@ -377,6 +385,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.10: Vortexine Restore (restore/RestorePopup.qml), al centro.
         "restore": {
             w: 720, h: 720, comp: "restore/RestorePopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 2.7: lo nuevo de la última versión (novedades/NovedadesPopup.qml), al centro.
+        "novedades": {
+            w: 720, h: 640, comp: "novedades/NovedadesPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

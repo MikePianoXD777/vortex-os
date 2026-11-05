@@ -1720,6 +1720,10 @@
       "name": "Vortexine Restore",
       "desc": "Puntos de restauración: vuelve a tu Hyprland, tema, barra o widgets de antes si algo se rompe"
     },
+    "novedades": {
+      "name": "Novedades",
+      "desc": "Lo que trae la última versión de Vortexine's OS"
+    },
     "arreglar": {
       "name": "Algo no funciona",
       "desc": "Revisa y arregla el sonido, internet, wifi, Bluetooth, disco y hora"
@@ -2118,7 +2122,14 @@
       "volver": "Volviste"
     }
   },
+  "novedades": {
+    "title": "Novedades",
+    "empty": "Esta versión no trae notas."
+  },
   "arreglar": {
+    "open_log": "Abrir con registro",
+    "report": "Crear reporte",
+    "report_making": "Creando…",
     "title": "¿Algo no funciona?",
     "checking": "Revisando tu equipo…",
     "all_good": "Todo se ve bien.",

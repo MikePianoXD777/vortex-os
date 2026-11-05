@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""vortex-dictar (Vortex 2.7): hablas y se escribe donde estés. Super+Shift+D empieza a escuchar; se corta
+solo cuando dejas de hablar (o al apretarlo otra vez) y el texto se escribe en la ventana activa.
+
+Es el oído de Miku (miku/oido.py): whisper.cpp en tu equipo, en español, sin internet y sin guardar el
+audio. El micrófono solo se abre mientras dictas. La primera vez baja el modelo (~181 MB) si Miku no
+lo había bajado ya. Si no se puede escribir en la ventana, el texto queda en el portapapeles.
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.environ.get("VORTEX_MIKU_DIR", "/usr/share/vortex-miku"))
+
+CANDADO = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "vortex-dictar.pid"
+SILENCIO = 2.0     # s: al dictar se piensa más que al platicar con Miku
+ESPERA = 10.0      # s: si no empiezas a hablar, se apaga el micrófono
+MAXIMO = 120.0     # s
+
+
+class Aviso:
+    """Una sola notificación a la vez, en vez de una nueva por cada paso. Se cierra la anterior y se manda
+    otra: el panel del shell copia el texto al llegar y no vería el cambio con «notify-send -r»."""
+
+    def __init__(self) -> None:
+        self.id = ""
+
+    def __call__(self, titulo: str, cuerpo: str = "", ms: int = 5000) -> None:
+        if not shutil.which("notify-send"):
+            return
+        if self.id and shutil.which("gdbus"):
+            subprocess.run(["gdbus", "call", "--session", "--dest", "org.freedesktop.Notifications",
+                            "--object-path", "/org/freedesktop/Notifications",
+                            "--method", "org.freedesktop.Notifications.CloseNotification", self.id],
+                           capture_output=True)
+        r = subprocess.run(["notify-send", "-a", "Vortexine's OS", "-i", "audio-input-microphone", "-p",
+                            "-t", str(ms), titulo, cuerpo], capture_output=True, text=True)
+        self.id = r.stdout.strip()
+
+
+def ya_corre() -> int | None:
+    """El PID del dictado que ya está corriendo, si hay."""
+    try:
+        pid = int(CANDADO.read_text())
+        if "vortex-dictar" in Path(f"/proc/{pid}/cmdline").read_text():
+            return pid
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def escribir(texto: str) -> bool:
+    """En la ventana activa con wtype; si no se puede, al portapapeles (devuelve False)."""
+    # wtype lee el texto según el idioma del entorno: sin UTF-8 falla con los acentos y la ñ.
+    entorno = {**os.environ, "LC_ALL": "C.UTF-8"}
+    if shutil.which("wtype") and subprocess.run(["wtype", "--", texto], capture_output=True, env=entorno).returncode == 0:
+        return True
+    if shutil.which("wl-copy"):
+        subprocess.run(["wl-copy", "--", texto], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return False
+
+
+def preparar_modelo(descargas, avisar) -> bool:
+    """Baja el modelo si falta. Apretar el atajo otra vez cancela (lo bajado se reanuda después)."""
+    if descargas.paquete_listo("oido"):
+        return True
+    avisar("Preparando el dictado", "Bajando el modelo de voz (~181 MB), solo esta vez…", 600000)
+    d = descargas.Descarga(["oido"])
+    signal.signal(signal.SIGUSR1, lambda *_: d.cancelar.set())
+    try:
+        d.correr()
+    except descargas.ErrorDescarga as e:
+        avisar("No se pudo bajar el modelo", str(e))
+        return False
+    return descargas.paquete_listo("oido")
+
+
+def dictar() -> int:
+    avisar = Aviso()
+    try:
+        from miku import descargas, oido
+    except ImportError:
+        avisar("No se puede dictar", "Falta el oído de Miku: corre «vortex actualizar».")
+        return 1
+    if not preparar_modelo(descargas, avisar):
+        return 1
+    o = oido.Oido(silencio=SILENCIO, espera=ESPERA, maximo=MAXIMO)
+    signal.signal(signal.SIGUSR1, lambda *_: o.cortar_ahora())
+    try:
+        oido.encontrar_whisper()
+        avisar("Te escucho…", "Habla; se corta solo al terminar.", int((ESPERA + MAXIMO) * 1000))
+        pcm = o.escuchar()
+        if not pcm:
+            avisar("No te oí", "Revisa que tu micrófono esté prendido.")
+            return 0
+        avisar("Escribiendo…", "", 120000)
+        # Ya no hay nada que cortar: otro apretón en este momento no debe matar al dictado.
+        signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+        texto = oido.transcribir(pcm)
+    except oido.ErrorOido as e:
+        avisar("No se pudo dictar", str(e))
+        return 1
+    if not texto:
+        avisar("No te oí", "Revisa que tu micrófono esté prendido.")
+    elif escribir(texto):
+        avisar("Listo", texto, 1500)
+    else:
+        avisar("Quedó en el portapapeles", "No pude escribir en esta ventana: pégalo con Ctrl+V.")
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) > 1:
+        print(__doc__)
+        return 0 if sys.argv[1] in ("-h", "--help") else 2
+    pid = ya_corre()
+    if pid:
+        os.kill(pid, signal.SIGUSR1)
+        return 0
+    CANDADO.write_text(str(os.getpid()))
+    try:
+        return dictar()
+    finally:
+        CANDADO.unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
