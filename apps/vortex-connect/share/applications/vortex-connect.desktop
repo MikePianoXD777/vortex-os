@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine Connect
+GenericName=Internet seguro de viaje
+GenericName[en]=Safe internet when traveling
+Comment=Entra a redes abiertas cuando viajas y cifra lo que mandas
+Comment[en]=Joins open networks when you travel and encrypts what you send
+Exec=vortex-connect
+Icon=vortex-connect
+Terminal=false
+Categories=Network;Security;
+Keywords=wifi;vpn;warp;cifrar;viaje;red;publica;pública;internet;travel;encrypt;
+StartupNotify=true
+StartupWMClass=vortex-connect

@@ -1,0 +1,12 @@
+# El paquete de WARP se deja prendido al instalarse o actualizarse. En Vortexine's OS solo corre mientras Connect
+# protege: en reposo no gasta nada.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = cloudflare-warp-bin
+
+[Action]
+Description = Vortexine Connect: dejando WARP apagado hasta que haga falta...
+When = PostTransaction
+Exec = /usr/bin/sh -c 'systemctl disable warp-svc.service >/dev/null 2>&1; systemctl --global mask warp-taskbar.service >/dev/null 2>&1; true'

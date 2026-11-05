@@ -1,0 +1,85 @@
+# Vortexine Connect para Windows: el instalador y el portátil.
+#
+# Corre con una Release cuyo tag empieza con «vortex-connect-v» (por ejemplo vortex-connect-v1.0.0) y sube los dos
+# archivos; o a mano (Actions → Run workflow), y sin tag deja los archivos como artefacto. WARP no va adentro: es de
+# Cloudflare y la persona lo baja de ellos (la app le da el botón).
+name: Vortexine Connect para Windows
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de la release a la que se suben los archivos (ej. vortex-connect-v1.0.0). Vacío: solo artefacto."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  windows:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'vortex-connect-v')
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: apps/vortex-connect
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: El tag coincide con la versión del código
+        if: env.TAG != ''
+        run: |
+          $version = python -c "import vortex_connect; print(vortex_connect.VERSION)"
+          $tag = $env:TAG -replace '^vortex-connect-v', ''
+          Write-Host "código: $version · tag: $tag"
+          if ($version -ne $tag) { throw "El tag $env:TAG no corresponde a la versión $version del código." }
+
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyside6 pyinstaller
+
+      - name: Pruebas del motor
+        run: python -m unittest pruebas.test_motor -v
+
+      - name: Compilar
+        run: pyinstaller empaquetado\windows\vortex-connect.spec --noconfirm --clean
+
+      - name: Prueba de humo (la ventana carga)
+        run: |
+          $p = Start-Process -FilePath "dist\vortex-connect\vortex-connect.exe" -ArgumentList "--prueba-humo" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "La prueba de humo falló con código $($p.ExitCode)" }
+
+      - name: Instalador y portátil
+        run: |
+          $version = python -c "import vortex_connect; print(vortex_connect.VERSION)"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=$version" "empaquetado\windows\vortex-connect.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup falló" }
+          Compress-Archive -Path "dist\vortex-connect" -DestinationPath "dist\VortexineConnect-$version-windows-x64-portable.zip"
+
+      - name: Subir a la release
+        if: env.TAG != ''
+        run: gh release upload $env:TAG (Get-ChildItem dist\VortexineConnect-*-windows-x64-*).FullName --clobber
+
+      - name: Guardar como artefacto (prueba, sin release)
+        if: env.TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: vortex-connect-windows
+          path: apps/vortex-connect/dist/VortexineConnect-*-windows-x64-*

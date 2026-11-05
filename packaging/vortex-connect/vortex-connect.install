@@ -1,0 +1,11 @@
+post_install() {
+    # Al instalar WARP junto con Connect su paquete queda prendido: se apaga de una, porque aún no protege a nadie.
+    systemctl disable --now warp-svc.service >/dev/null 2>&1 || true
+    systemctl --global mask warp-taskbar.service >/dev/null 2>&1 || true
+}
+
+post_upgrade() {
+    # No apagar aquí: si estás protegido en un café, actualizar no debe dejarte sin cifrado.
+    systemctl disable warp-svc.service >/dev/null 2>&1 || true
+    systemctl --global mask warp-taskbar.service >/dev/null 2>&1 || true
+}

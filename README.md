@@ -84,6 +84,7 @@ piezas de la ISO se prueban sin construirla: `pruebas/iso.sh`.
 | Ventanas | mosaico (como qtile) o KDE: flotantes con barra de título (plugin hyprbars) y barra de tareas abajo (el dock, se esconde y sale al bajar el mouse) | se elige en Ajustes → Pantalla o con `vortex ventanas mosaico\|kde`, sin cerrar sesión |
 | Cámara | Vortexine Video (`apps/vortex-video`) | fotos y videos con tu webcam, parecida a la Cámara de Windows; se prueba con `pruebas/vortex-video.sh` y, con cámara, `pruebas/vortex-video-camara.py` |
 | Pasar archivos | Vortexine Shared (`apps/vortex-shared`) + `sendme` | a otra compu, cerca o lejos, con IP o nombre en Tailscale + usuario, o con un código; cifrado, hay que aceptar y no ocupa nada en reposo |
+| Internet de viaje | Vortexine Connect (`apps/vortex-connect`) + Cloudflare WARP | entra a redes abiertas, te lleva por el portal y cifra lo que mandas; también para Windows y el cel |
 | Colores | matugen | toda la interfaz (y kitty) toma los colores del fondo que pongas |
 | Inicio de sesión | greetd + tuigreet | ~3 MB, frente a ~150 MB de SDDM |
 | Juegos | Steam, Proton CachyOS, gamemode, MangoHud, gamescope, **Java 27** | modo juego automático; contador de FPS con un interruptor (Ajustes → General o `vortex fps on`; Shift derecho+F12 lo esconde); `vortex java aplicar` pone ZGC en tus launchers de Minecraft |

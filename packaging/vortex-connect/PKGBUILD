@@ -1,0 +1,39 @@
+# Vortexine Connect: entra a redes abiertas cuando viajas y cifra lo que mandas con Cloudflare WARP. Empaquetado desde
+# apps/vortex-connect/ de este repo; llega a todos con «vortex actualizar».
+#
+#   cd packaging/vortex-connect && makepkg -si
+pkgname=vortex-connect
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Vortexine Connect: entra a redes abiertas cuando viajas y cifra lo que mandas"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# WARP va como dependencia y no «cuando se use»: de viaje y sin internet ya no se podría bajar.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'networkmanager' 'cloudflare-warp-bin' 'libnotify' 'glib2' 'xdg-utils')
+install=vortex-connect.install
+
+package() {
+    local origen="$startdir/../../apps/vortex-connect"
+    local share="$pkgdir/usr/share/vortex-connect"
+
+    install -d "$share"
+    cp -a "$origen/vortex_connect" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-connect" "$pkgdir/usr/bin/vortex-connect"
+    install -Dm644 "$origen/share/applications/vortex-connect.desktop" \
+        "$pkgdir/usr/share/applications/vortex-connect.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-connect.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-connect.svg"
+    install -Dm644 "$origen/share/systemd/vortex-connect-viaje.service" \
+        "$pkgdir/usr/lib/systemd/user/vortex-connect-viaje.service"
+    install -Dm644 "$origen/share/polkit/50-vortex-connect.rules" \
+        "$pkgdir/usr/share/polkit-1/rules.d/50-vortex-connect.rules"
+    install -Dm644 "$origen/share/libalpm/vortex-connect-warp.hook" \
+        "$pkgdir/usr/share/libalpm/hooks/vortex-connect-warp.hook"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

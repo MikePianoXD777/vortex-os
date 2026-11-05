@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Vortexine Connect: entra a redes abiertas cuando viajas y cifra lo que mandas.
+#   vortex-connect
+# Corre «python -m vortex_connect» con el código donde esté:
+#   1. VORTEX_CONNECT_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-connect, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_CONNECT_DIR:-}" "$aqui" /usr/share/vortex-connect; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_connect/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine Connect no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+# Dibujar en un solo hilo gasta menos memoria con NVIDIA (~45 MB) y aquí no se nota.
+export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_connect "$@"

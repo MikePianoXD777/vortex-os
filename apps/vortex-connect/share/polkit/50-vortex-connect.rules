@@ -1,0 +1,16 @@
+// Vortexine Connect prende el servicio de WARP solo mientras protege, y mientras tanto le quita al wifi su DNS para que
+// los nombres de los sitios no salgan en claro. La persona sentada frente a su sesión no necesita contraseña para eso.
+// Nada más cambia: solo ese servicio, solo prender o apagar, y solo ese ajuste de DNS.
+polkit.addRule(function (action, subject) {
+    if (!subject.local || !subject.active) {
+        return;
+    }
+    if (action.id === "org.freedesktop.systemd1.manage-units"
+        && action.lookup("unit") === "warp-svc.service"
+        && (action.lookup("verb") === "start" || action.lookup("verb") === "stop")) {
+        return polkit.Result.YES;
+    }
+    if (action.id === "org.freedesktop.resolve1.set-default-route") {
+        return polkit.Result.YES;
+    }
+});

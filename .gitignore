@@ -25,3 +25,5 @@ GPUCache/
 # Vortex Player para Windows: lo que deja PyInstaller
 apps/vortex-player/build/
 apps/vortex-player/dist/
+apps/vortex-connect/build/
+apps/vortex-connect/dist/

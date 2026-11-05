@@ -133,6 +133,17 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-shared/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shared/"*.pkg.tar.*
 fi
+# Vortexine Connect: entrar a redes abiertas de viaje y cifrar con Cloudflare WARP.
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-connect)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-connect" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortexine Connect instalado (vortex-connect)"
+  else
+    aviso "No se pudo instalar Vortexine Connect (packaging/vortex-connect)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-connect/"{pkg,src} "$VORTEX_DIR/packaging/vortex-connect/"*.pkg.tar.*
+fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
 
