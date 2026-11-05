@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Vortexine Shared: pasa archivos a otra compu con Vortexine's OS, cerca o lejos.
+#   vortex-shared
+# Corre «python -m vortex_shared» con el código donde esté:
+#   1. VORTEX_SHARED_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-shared, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_SHARED_DIR:-}" "$aqui" /usr/share/vortex-shared; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_shared/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine Shared no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+# Dibujar en un solo hilo gasta menos memoria con NVIDIA (~45 MB) y aquí no se nota.
+export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_shared "$@"

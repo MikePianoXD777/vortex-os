@@ -21,7 +21,10 @@ Rectangle {
     property var model
     property var root
     property var delegateWrapper
-    property bool expanded: false
+    // Un aviso crítico que pide decidir enseña sus botones de una vez (no escondidos tras la flechita).
+    property bool expanded: urgency === 2 && botones.length > 0
+    // «default» es picarle a la tarjeta: no lleva botón propio.
+    readonly property var botones: delegateWrapper && delegateWrapper.actionArray ? delegateWrapper.actionArray.filter(a => a.id !== "default") : []
     property real expandProgress: expanded ? 1.0 : 0.0
     Behavior on expandProgress {
         enabled: !cardHover.draggingV
@@ -42,7 +45,7 @@ Rectangle {
     property string fullBody: ""
     property string combinedBodyText: fullBody
     property int msgCount: 1
-    readonly property bool canExpand: fullBody.length > 50 || fullBody.indexOf("\n") !== -1 || (delegateWrapper && delegateWrapper.actionArray && delegateWrapper.actionArray.length > 0)
+    readonly property bool canExpand: fullBody.length > 50 || fullBody.indexOf("\n") !== -1 || (typeRoot.botones.length > 0)
 
     property alias bgContent: bgContainer.data
     property alias iconArea: iconContainer.data
@@ -858,7 +861,7 @@ Rectangle {
 
                     Item {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: (delegateWrapper && delegateWrapper.actionArray && delegateWrapper.actionArray.length > 0) ? (actionLayout.implicitHeight + s(12)) * typeRoot.expandProgress : 0
+                        Layout.preferredHeight: (typeRoot.botones.length > 0) ? (actionLayout.implicitHeight + s(12)) * typeRoot.expandProgress : 0
                         opacity: Math.max(0.0, (typeRoot.expandProgress - 0.2) / 0.8)
                         visible: opacity > 0.001
                         clip: true
@@ -879,7 +882,7 @@ Rectangle {
                             }
 
                             Repeater {
-                                model: delegateWrapper ? delegateWrapper.actionArray : []
+                                model: typeRoot.botones
                                 delegate: ClickButton {
                                     readonly property bool isPrimary: index === 0
                                     Layout.minimumWidth: s(84)

@@ -1,0 +1,8 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+Icono 1.0 Icono.qml
+Selector 1.0 Selector.qml
+Interruptor 1.0 Interruptor.qml
+BotonRedondo 1.0 BotonRedondo.qml
+Disparador 1.0 Disparador.qml
+PanelAjustes 1.0 PanelAjustes.qml

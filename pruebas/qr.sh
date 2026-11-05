@@ -51,7 +51,12 @@ probar "ni leer otras rutas" "[[ \$(curl -s --path-as-is -o /dev/null -w '%{http
 curl -s -D "$T/cabeceras" -I "$URL" >/dev/null
 probar "HEAD no cuenta como bajado (la ventana sigue)" "kill -0 $PID 2>/dev/null"
 probar "el nombre con acentos y espacios sale bien" "grep -qi \"filename\*=UTF-8''Foto%20de%20ma%C3%B1ana.jpg\" '$T/cabeceras'"
-curl -s -o "$T/bajado" "$URL"
+curl -s -r 0-9 -o "$T/inicio" "$URL"
+probar "reanudar: da el pedazo que se pide" "[[ \$(stat -c %s '$T/inicio') == 10 ]] && cmp -s -n 10 '$T/inicio' '$T/datos/Foto de mañana.jpg'"
+probar "un pedacito del principio no cierra la ventana" "kill -0 $PID 2>/dev/null"
+probar "un rango imposible: 416" "[[ \$(curl -s -r 999999999- -o /dev/null -w '%{http_code}' '$URL') == 416 ]]"
+curl -s -r 10- -o "$T/resto" "$URL"
+cat "$T/inicio" "$T/resto" >"$T/bajado"
 probar "el archivo llega completo" "cmp -s '$T/datos/Foto de mañana.jpg' '$T/bajado'"
 # Al terminar de bajarse, la ventana se cierra sola (4 s)
 for _ in {1..70}; do kill -0 "$PID" 2>/dev/null || break; sleep 0.1; done

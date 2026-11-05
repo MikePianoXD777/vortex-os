@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""vortex-memoria (Vortex 2.7): el aviso antes de quedarte sin memoria. Dice qué app se la está comiendo y
+da un botón para cerrarla. Lo lanza vortex-gestor cuando el kernel avisa de presión de memoria y queda poca
+disponible; nunca con un juego abierto. No corre en reposo: vive lo que dura el aviso.
+
+    vortex-memoria           avisa
+    vortex-memoria --ver     solo dice qué avisaría (no abre nada)
+
+Solo ofrece cerrar apps con ventana, y las cierra con amabilidad, como la X: la app puede preguntar si
+guardas. Lo que no tiene ventana se mira con «Ver qué más usa» (el administrador de tareas).
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+PROC = Path(os.environ.get("VORTEX_MEMORIA_PROC", "/proc"))
+MINIMO_KB = 300 * 1024   # con menos que esto, cerrarla no arregla nada: no se ofrece
+
+
+def gb(kb: int) -> str:
+    return f"{kb / 1048576:.1f} GB" if kb >= 104858 else f"{kb // 1024} MB"
+
+
+def disponible_kb() -> int:
+    try:
+        for linea in (PROC / "meminfo").read_text().splitlines():
+            if linea.startswith("MemAvailable:"):
+                return int(linea.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
+
+
+def grupo_de(pid: int) -> str:
+    """El cgroup de la app. Si la ventana no tiene el suyo (la lanzó algo que comparte sesión), cuenta sola:
+    agruparla sumaría y cerraría a sus vecinos."""
+    try:
+        hoja = (PROC / str(pid) / "cgroup").read_text().strip().rsplit("/", 1)[-1]
+    except OSError:
+        return f"pid:{pid}"
+    return hoja if hoja.endswith(".scope") and hoja.startswith("app-") else f"pid:{pid}"
+
+
+def uso_kb(pid: int) -> int:
+    """Lo que de verdad ocupa: memoria propia y compartida, también la que ya se fue a zram. RssFile no
+    cuenta: es caché de disco que el kernel suelta solo."""
+    total = 0
+    try:
+        for linea in (PROC / str(pid) / "status").read_text().splitlines():
+            if linea.startswith(("RssAnon:", "RssShmem:", "VmSwap:")):
+                total += int(linea.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return total
+
+
+def usos_por_grupo() -> dict[str, int]:
+    uid = os.getuid()
+    usos: dict[str, int] = {}
+    for entrada in PROC.iterdir():
+        if not entrada.name.isdigit():
+            continue
+        try:
+            if entrada.stat().st_uid != uid:
+                continue
+        except OSError:
+            continue
+        pid = int(entrada.name)
+        grupo = grupo_de(pid)
+        usos[grupo] = usos.get(grupo, 0) + uso_kb(pid)
+    return usos
+
+
+def ventanas() -> list[dict]:
+    try:
+        r = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=5)
+        datos = json.loads(r.stdout)
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return []
+    return [v for v in datos if isinstance(v, dict) and v.get("pid", 0) > 1 and v.get("mapped", True)]
+
+
+def nombre_de(clase: str) -> str:
+    """El nombre que ves en el lanzador, no la clase de la ventana (com.discordapp.Discord → Discord)."""
+    carpetas = [os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local/share")]
+    carpetas += (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    carpetas += ["/var/lib/flatpak/exports/share", str(Path.home() / ".local/share/flatpak/exports/share")]
+    buscada = clase.lower()
+    for carpeta in carpetas:
+        directorio = Path(carpeta) / "applications"
+        try:
+            archivos = list(directorio.glob("*.desktop"))
+        except OSError:
+            continue
+        for archivo in archivos:
+            try:
+                texto = archivo.read_text(errors="replace")
+            except OSError:
+                continue
+            nombre = wm = ""
+            for linea in texto.splitlines():
+                if linea.startswith("[") and linea != "[Desktop Entry]":
+                    break
+                if linea.startswith("Name=") and not nombre:
+                    nombre = linea[5:].strip()
+                elif linea.startswith("StartupWMClass="):
+                    wm = linea[15:].strip().lower()
+            if nombre and (archivo.stem.lower() == buscada or wm == buscada):
+                return nombre
+    return (clase.rsplit(".", 1)[-1] or "Esa app").replace("-", " ").strip().capitalize()
+
+
+def la_que_mas_usa() -> dict | None:
+    """La app con ventana que más memoria ocupa: su nombre, cuánto usa y sus ventanas."""
+    usos = usos_por_grupo()
+    apps: dict[str, dict] = {}
+    for v in ventanas():
+        grupo = grupo_de(v["pid"])
+        app = apps.setdefault(grupo, {"clase": v.get("class") or "", "kb": usos.get(grupo, 0), "direcciones": []})
+        app["direcciones"].append(v.get("address", ""))
+    if not apps:
+        return None
+    mayor = max(apps.values(), key=lambda a: a["kb"])
+    if mayor["kb"] < MINIMO_KB or not mayor["clase"]:
+        return None
+    mayor["nombre"] = nombre_de(mayor["clase"])
+    return mayor
+
+
+def despachar(*ordenes: str) -> None:
+    """La primera orden que Hyprland entienda: la del Hyprland con config Lua o la de antes."""
+    for orden in ordenes:
+        try:
+            if subprocess.run(["hyprctl", "dispatch", orden], capture_output=True, timeout=3).returncode == 0:
+                return
+        except (OSError, subprocess.TimeoutExpired):
+            return
+
+
+def texto_aviso(app: dict | None, queda: int) -> str:
+    if app:
+        return f"Quedan {gb(queda)}. {app['nombre']} es lo que más usa: {gb(app['kb'])}."
+    return f"Quedan {gb(queda)}. Mira qué la está usando antes de que algo se cierre solo."
+
+
+def main() -> int:
+    app = la_que_mas_usa()
+    queda = disponible_kb()
+    if "--ver" in sys.argv[1:]:
+        print(texto_aviso(app, queda))
+        return 0
+    if not shutil.which("notify-send"):
+        return 0
+    # «default» es picarle a la tarjeta: ve qué pasa, no cierra nada por accidente.
+    orden = ["notify-send", "-a", "Vortexine's OS", "-i", "dialog-warning", "-u", "critical", "-A", "default=Ver"]
+    if app:
+        orden += ["-A", f"cerrar=Cerrar {app['nombre']}"]
+    orden += ["-A", "ver=Ver qué más usa", "Te estás quedando sin memoria", texto_aviso(app, queda)]
+    try:
+        # Critical se queda hasta que la cierres; si nadie contesta, este proceso no se queda para siempre.
+        accion = subprocess.run(orden, capture_output=True, text=True, timeout=1800).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return 0
+    if accion == "cerrar" and app:
+        for d in app["direcciones"]:
+            despachar(f'hl.dsp.window.close({{ window = "address:{d}" }})', f"closewindow address:{d}")
+    elif accion in ("ver", "default"):
+        despachar('hl.dsp.exec_cmd("vortex-task-manager")', "exec vortex-task-manager")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

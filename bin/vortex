@@ -851,7 +851,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-qr vortex-dictar)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-qr vortex-dictar)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -861,6 +861,10 @@ instalar_comandos() {
     # install borra el destino y crea otro: un vortex que se esté ejecutando sigue con el suyo.
     sudo install -Dm755 "$VORTEX_DIR/bin/$c" "$destino/$c" \
       || aviso "no pude actualizar $destino/$c (a mano: sudo install -Dm755 $VORTEX_DIR/bin/$c $destino/$c)"
+    # El gestor siempre está corriendo: sin esto, lo nuevo no llega hasta volver a entrar.
+    if [[ "$c" == vortex-gestor && -z "${VORTEX_BIN_DESTINO:-}" ]]; then
+      systemctl --user try-restart vortex-gestor.service >/dev/null 2>&1 || true
+    fi
   done
 }
 
@@ -1199,11 +1203,11 @@ cmd_actualizar() {
   # para ya (no guardaba su PID: se busca su línea exacta) para soltar su RAM sin reiniciar.
   [[ -e "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego" ]] ||
     pkill -f '^bash .*/vortex-clips servicio$' 2>/dev/null || true
-  # Los paquetes propios (shell, tienda, App Installer, Vortex Player, Task Manager, Miku y Vortex Studio) vienen de packaging/ de este repo: se
+  # Los paquetes propios (shell, tienda, App Installer, Vortex Player, Task Manager, Video, Shared, Miku y Vortex Studio) vienen de packaging/ de este repo: se
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     if [[ "$pkg" == vortex-studio && -z "$instalado" ]]; then
@@ -1259,6 +1263,16 @@ cmd_actualizar() {
   command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
   # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
   command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
+  # 2.7: Vortexine Shared: el socket que recibe avisos (sin proceso en reposo), su clic derecho y, una sola vez,
+  # dejar pasar los avisos en ufw (solo Tailscale y redes privadas; pide la contraseña).
+  if command -v vortex-shared >/dev/null; then
+    (systemctl --user daemon-reload && systemctl --user enable --now vortex-shared.socket) >/dev/null 2>&1 || true
+    vortex-shared accion || true
+    if [[ ! -e "$AVISOS_ESTADO/shared-puerto-pedido" ]]; then
+      vortex-shared abrir-puerto || aviso "no se abrió el puerto de Vortexine Shared: ábrelo desde su ventana para poder recibir"
+      mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/shared-puerto-pedido"
+    fi
+  fi
   # Siempre al final, cambie o no el paquete del shell: así lo nuevo (código del repo, fondos,
   # config) se ve de inmediato y no hasta el próximo inicio de sesión.
   reiniciar_shell
@@ -1440,7 +1454,7 @@ avisos_pendientes() {
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
   # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-miku vortex-studio; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"

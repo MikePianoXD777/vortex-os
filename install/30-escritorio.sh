@@ -3,7 +3,7 @@ paso "Escritorio: Hyprland + el shell de Vortex (Serpantinum)"
 
 # Comandos de Vortex para todos (también para los atajos de Hyprland). Son copias y no
 # enlaces: lo que está en /usr/local/bin no debe poder cambiarlo el usuario sin sudo.
-for comando in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-qr vortex-dictar; do
+for comando in vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-qr vortex-dictar; do
   srun install -Dm755 "$VORTEX_DIR/bin/$comando" "/usr/local/bin/$comando"
 done
 
@@ -110,6 +110,28 @@ else
     aviso "No se pudo instalar Vortexine Task Manager (packaging/vortex-task-manager)"
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-task-manager/"{pkg,src} "$VORTEX_DIR/packaging/vortex-task-manager/"*.pkg.tar.*
+fi
+# Vortexine Video (2.7): la cámara, como la de Windows.
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-video)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-video" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortexine Video instalado (vortex-video)"
+  else
+    aviso "No se pudo instalar Vortexine Video (packaging/vortex-video)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-video/"{pkg,src} "$VORTEX_DIR/packaging/vortex-video/"*.pkg.tar.*
+fi
+# Vortexine Shared (2.7): pasar archivos a otra compu, cerca o lejos.
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-shared)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-shared" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Vortexine Shared instalado (vortex-shared)"
+  else
+    aviso "No se pudo instalar Vortexine Shared (packaging/vortex-shared)"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-shared/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shared/"*.pkg.tar.*
 fi
 # Luz nocturna (el único paquete del AUR que pide el shell).
 instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"

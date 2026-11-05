@@ -1,0 +1,35 @@
+# Vortexine Shared (2.7): pasa archivos a otra compu con Vortexine's OS, cerca o lejos, sin abrir puertos del
+# módem. Empaquetado desde apps/vortex-shared/ de este repo; llega a todos con «vortex actualizar».
+#
+#   cd packaging/vortex-shared && makepkg -si
+pkgname=vortex-shared
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Vortexine Shared: pasa archivos a otra compu con Vortexine's OS, cerca o lejos"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# sendme manda los archivos cifrados; libnotify, el aviso para aceptar; hyprland abre la carpeta desde el aviso.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'sendme' 'libnotify' 'glib2' 'xdg-utils' 'xdg-user-dirs')
+optdepends=('tailscale: mandar de lejos con la IP o el nombre, y ver tus compus')
+
+package() {
+    local origen="$startdir/../../apps/vortex-shared"
+    local share="$pkgdir/usr/share/vortex-shared"
+
+    install -d "$share"
+    cp -a "$origen/vortex_shared" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-shared" "$pkgdir/usr/bin/vortex-shared"
+    install -Dm644 "$origen/share/applications/vortex-shared.desktop" \
+        "$pkgdir/usr/share/applications/vortex-shared.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-shared.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-shared.svg"
+    install -Dm644 "$origen/share/systemd/vortex-shared.socket" "$pkgdir/usr/lib/systemd/user/vortex-shared.socket"
+    install -Dm644 "$origen/share/systemd/vortex-shared.service" "$pkgdir/usr/lib/systemd/user/vortex-shared.service"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

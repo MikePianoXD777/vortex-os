@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine Video
+GenericName=Cámara
+GenericName[en]=Camera
+Comment=Toma fotos y graba videos con tu cámara web
+Comment[en]=Take photos and record videos with your webcam
+Exec=vortex-video
+Icon=vortex-video
+Terminal=false
+Categories=AudioVideo;Video;Recorder;
+Keywords=cámara;camara;webcam;foto;fotos;video;grabar;selfie;camera;photo;record;
+StartupNotify=true
+StartupWMClass=vortex-video

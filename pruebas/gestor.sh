@@ -233,12 +233,13 @@ gestor() {
   env -u HYPRLAND_INSTANCE_SIGNATURE XDG_RUNTIME_DIR="$RUN" XDG_STATE_HOME="$T/estado" XDG_CONFIG_HOME="$T/conf" \
     VORTEX_GESTOR_PROC="$P" VORTEX_GESTOR_CGROOT="$CGR" VORTEX_GESTOR_SCX="$T/scx" VORTEX_GESTOR_PSI="$T/psi" \
     VORTEX_GESTOR_EVENTOS="$T/eventos" VORTEX_GESTOR_BUSCTL="$T/busctl" VORTEX_GESTOR_RENICE="$T/renice" \
-    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" \
+    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" \
     "$AQUI/bin/vortex-gestor" >"$T/gestor.log" 2>&1 7>&- 8>&- &
   GESTOR=$!
   PIDS_FONDO+=("$GESTOR")
 }
-echo 'DEPURAR=1' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
+printf '#!/bin/sh\n: >"%s/aviso-memoria"\n' "$T" >"$T/memoria"; chmod +x "$T/memoria"
+printf 'DEPURAR=1\nMEM_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
 echo "some avg10=3.10 avg60=1.00 avg300=0.20 total=1" >"$T/psi"
 gestor
 exec 8>"$T/inyecta"
@@ -312,6 +313,12 @@ esperar "grep -q '^juegos=1' '$EST'"
 probar "juego por contentType=game" "[[ \$(grep -c 'modo-juego on' '$T/vortex.log') == 2 ]]"
 evento "closewindow>>abcd"
 esperar "[[ \$(grep -c 'modo-juego off' '$T/vortex.log') == 2 ]]"
+
+# Poca memoria aunque el kernel todavía no avise de presión: el gestor la mira solo.
+printf 'MemTotal: 8000000 kB\nMemAvailable: 600000 kB\n' >"$P/meminfo"
+esperar "[[ -e '$T/aviso-memoria' ]]"
+probar "poca memoria sin presión: avisa igual" "[[ -e '$T/aviso-memoria' ]] && grep -q '^avisos_memoria=1' '$EST'"
+rm -f "$P/meminfo"
 
 # Shell y Hyprland nunca se mueven.
 activa 7001 dead quickshell

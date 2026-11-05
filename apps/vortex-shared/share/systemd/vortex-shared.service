@@ -1,0 +1,8 @@
+[Unit]
+Description=Vortexine Shared: atiende un aviso y se apaga
+Requires=vortex-shared.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/vortex-shared escuchar
+Nice=5

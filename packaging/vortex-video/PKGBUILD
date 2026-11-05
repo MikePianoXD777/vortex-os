@@ -1,0 +1,33 @@
+# Vortexine Video (2.7): la cámara de Vortexine's OS, como la de Windows: fotos y videos con tu webcam.
+# Empaquetado desde apps/vortex-video/ de este repo; llega a todos con «vortex actualizar».
+#
+#   cd packaging/vortex-video && makepkg -si
+pkgname=vortex-video
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Vortexine Video: toma fotos y graba videos con tu cámara web"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# qt6-multimedia-ffmpeg lee la cámara y codifica el video; sin él no hay imagen.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'qt6-multimedia' 'qt6-multimedia-ffmpeg' 'xdg-utils')
+optdepends=('ffmpeg: la miniatura del último video')
+
+package() {
+    local origen="$startdir/../../apps/vortex-video"
+    local share="$pkgdir/usr/share/vortex-video"
+
+    install -d "$share"
+    cp -a "$origen/vortex_video" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-video" "$pkgdir/usr/bin/vortex-video"
+    install -Dm644 "$origen/share/applications/vortex-video.desktop" \
+        "$pkgdir/usr/share/applications/vortex-video.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-video.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-video.svg"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

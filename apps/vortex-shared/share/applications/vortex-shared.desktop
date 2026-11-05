@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine Shared
+GenericName=Pasar archivos
+GenericName[en]=Share files
+Comment=Pasa archivos a otra compu con Vortexine's OS, cerca o lejos
+Comment[en]=Send files to another Vortexine's OS computer, near or far
+Exec=vortex-shared ventana %F
+Icon=vortex-shared
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=compartir;pasar;archivos;enviar;mandar;quick share;share;send;files;tailscale;
+StartupNotify=true
+StartupWMClass=vortex-shared

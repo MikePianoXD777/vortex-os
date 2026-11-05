@@ -1,0 +1,11 @@
+[Unit]
+Description=Vortexine Shared: recibir archivos de otra compu
+
+[Socket]
+# IPv4 y IPv6. El servicio solo atiende redes privadas y Tailscale.
+ListenStream=[::]:1770
+BindIPv6Only=both
+Accept=no
+
+[Install]
+WantedBy=sockets.target
