@@ -64,10 +64,6 @@ local function comando_shell()
     -- panel) en vez de devolverla; así la devuelve al segundo. (MALLOC_ARENA_MAX/MALLOC_TRIM_* son de
     -- glibc y aquí no hacen nada.)
     local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
-    -- Vortex 2.6: todas las ventanas del shell se dibujan en un solo hilo. Con NVIDIA cada hilo de
-    -- dibujo tiene su propio contexto del driver: en frío 323 MB en vez de 370, y ~45 MB menos siempre
-    -- (2 monitores, 200 + 60 Hz, sin tirones). Vulkan es mucho peor (8 ventanas: 440 MB contra 102).
-    memoria = memoria .. " QSG_RENDER_LOOP=basic"
     return "QT_LOGGING_RULES='" .. reglas .. "' " .. memoria .. " serpantinumd start"
 end
 if ok_atajos then atajos.comando_shell = comando_shell end
@@ -129,6 +125,12 @@ hl.bind = bind_original
 
 -- Iconos de las apps Qt del shell sin forzar un tema Qt a todo el sistema.
 hl.env("QS_ICON_THEME", "Adwaita")
+-- Vortex 2.8.2: menús y apps Qt a la frecuencia real del monitor. De fábrica, Qt avanza las animaciones
+-- a ~60 cuadros aunque la pantalla vaya a 200 Hz (medido: 60; con estas dos, 200 en el de 200 Hz y 60 en
+-- el de 60 Hz). Cuesta unos 47 MB más en el shell, porque cada ventana vuelve a dibujar en su propio hilo
+-- (por eso la 2.6 usaba QSG_RENDER_LOOP=basic, que se queda en 63). Vulkan no: gasta mucha más memoria.
+hl.env("QSG_RENDER_LOOP", "threaded")
+hl.env("QSG_USE_SIMPLE_ANIMATION_DRIVER", "1")
 
 hl.config({
     ecosystem = { no_update_news = true, no_donation_nag = true },

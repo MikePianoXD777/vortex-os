@@ -41,7 +41,6 @@ Item {
         nestLevel = (standalone || inheritedOwner !== null) ? 0 : Nesting.nestLevel(root, null, true);
     }
     readonly property bool transitioning: engine ? (engine.transitionProgress > 0.0 && engine.transitionProgress < 1.0) : false
-    property int frame: 0
 
     property var screenOverride: null
     property bool useSnapshot: false
@@ -127,7 +126,7 @@ Item {
     function refreshGeometry() {
         const w = root.hostWindow;
         const scr = root.hostScreen;
-        if (!scr) return;
+        if (!scr) return false;
         let wx = 0;
         let wy = 0;
         if (w && w.anchors && !root.effectiveScreenOverride) {
@@ -143,12 +142,12 @@ Item {
         const p0 = root.mapFromItem(null, -wx, -wy);
         const px = root.mapFromItem(null, 1 - wx, -wy);
         const gs = root.geoSig;
-        if (p0.x === gs[0] && p0.y === gs[1] && px.x === gs[2] && px.y === gs[3] && scr.width === gs[4] && scr.height === gs[5] && root.width === gs[6] && root.height === gs[7]) return;
+        if (p0.x === gs[0] && p0.y === gs[1] && px.x === gs[2] && px.y === gs[3] && scr.width === gs[4] && scr.height === gs[5] && root.width === gs[6] && root.height === gs[7]) return false;
         gs[0] = p0.x; gs[1] = p0.y; gs[2] = px.x; gs[3] = px.y; gs[4] = scr.width; gs[5] = scr.height; gs[6] = root.width; gs[7] = root.height;
         const dx = px.x - p0.x;
         const dy = px.y - p0.y;
         const len = Math.sqrt(dx * dx + dy * dy);
-        if (!isFinite(len) || len <= 0) return;
+        if (!isFinite(len) || len <= 0) return true;
         root.imageX = p0.x;
         root.imageY = p0.y;
         root.imageScale = len;
@@ -162,18 +161,47 @@ Item {
         const y1 = Math.max(y0, Math.min(1, Math.max(p0.y, p1.y) / ih));
         if (x0 !== root.validRect.x || y0 !== root.validRect.y || x1 - x0 !== root.validRect.width || y1 - y0 !== root.validRect.height)
             root.validRect = Qt.rect(x0, y0, x1 - x0, y1 - y0);
+        return true;
+    }
+
+    // Vortex 2.8.2: seguir la posición en cada cuadro solo mientras el panel se mueve. Una FrameAnimation
+    // siempre encendida mantiene las animaciones de Qt andando sin parar: a la frecuencia real del monitor
+    // eran 5 veces más CPU en reposo. Quieto, basta con mirar 20 veces por segundo si empezó a moverse.
+    property bool following: false
+
+    function follow() {
+        if (!root.active) return;
+        root.following = true;
+        followEnd.restart();
+    }
+
+    Timer {
+        id: followEnd
+        interval: 500
+        onTriggered: root.following = false
     }
 
     FrameAnimation {
-        running: root.active
+        running: root.active && root.following
         onTriggered: {
-            root.refreshGeometry();
-            if (root.consumers > 0) root.frame++;
+            if (root.refreshGeometry()) followEnd.restart();
+        }
+    }
+
+    Timer {
+        interval: 50
+        repeat: true
+        running: root.active && !root.following
+        onTriggered: {
+            if (root.refreshGeometry()) root.follow();
         }
     }
 
     onActiveChanged: {
-        if (active) refreshGeometry();
+        if (active) {
+            refreshGeometry();
+            follow();
+        }
     }
 
     FileView {
