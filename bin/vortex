@@ -453,6 +453,7 @@ cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
   restore_al_iniciar
+  bt_agente_al_iniciar
   asociar_app_installer
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
@@ -851,7 +852,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-qr vortex-dictar)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-qr vortex-dictar vortex-bt-agente)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1071,6 +1072,7 @@ PAQUETES_NUEVOS=(
   imagemagick # 2.5: vortex-pdf (fotos de la tarea a PDF)
   qrencode pyside6 # 2.7: vortex-qr (pasar un archivo al cel con un QR)
   wtype whisper-cpp # 2.7: vortex-dictar (dictar en cualquier app)
+  python-gobject # 2.8.1: vortex-bt-agente (emparejar por Bluetooth)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1261,6 +1263,8 @@ cmd_actualizar() {
   fi
   # 2.5: «Hacer PDF» en el clic derecho de Thunar (bin/vortex-pdf), también para quien ya tenía Vortex.
   command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
+  # 2.8.1: sin agente, Bluetooth no guarda la llave de los aparatos nuevos y los audífonos se caen a los segundos.
+  bt_agente_al_iniciar
   # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
   command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
   # 2.7: Vortexine Shared: el socket que recibe avisos (sin proceso en reposo), su clic derecho y, una sola vez,
@@ -1403,6 +1407,31 @@ restore_al_iniciar() {
     (systemctl --user daemon-reload && systemctl --user enable --now vortex-restore.timer) >/dev/null 2>&1 || true
   fi
   setsid bash -c 'sleep 60; hyprctl -j version >/dev/null 2>&1 && exec vortex-restore auto inicio' </dev/null >/dev/null 2>&1 &
+}
+
+# El agente de Bluetooth (bin/vortex-bt-agente): sin él, BlueZ no empareja de verdad. Se escribe y enciende si falta;
+# en un equipo sin Bluetooth, no. Es un servicio de usuario porque pregunta con avisos en tu escritorio.
+bt_agente_al_iniciar() {
+  command -v vortex-bt-agente >/dev/null || return 0
+  [[ -n "$(ls -A /sys/class/bluetooth 2>/dev/null)" ]] || return 0
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  if [[ ! -f "$d/vortex-bt-agente.service" ]]; then
+    mkdir -p "$d"
+    cat >"$d/vortex-bt-agente.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine: agente de Bluetooth (emparejar aparatos)
+
+[Service]
+ExecStart=/usr/local/bin/vortex-bt-agente
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+UNIDAD
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+  fi
+  systemctl --user enable --now vortex-bt-agente.service >/dev/null 2>&1 || true
 }
 
 # El aviso se enciende solo la primera vez (si lo apagaste, se respeta). Lo llaman «vortex actualizar» y

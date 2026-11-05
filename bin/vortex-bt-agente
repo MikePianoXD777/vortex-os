@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""vortex-bt-agente: el agente de Bluetooth de Vortexine's OS. Corre como servicio de usuario.
+
+Sin un agente registrado, BlueZ deja el adaptador en «Pairable: no» y no guarda la llave de los aparatos nuevos:
+los audífonos se conectan sin quedar emparejados y luego cortan. Con este, tu panel de Bluetooth empareja de verdad.
+
+Lo que pides desde tu PC (audífonos, bocinas) no pregunta nada: lo acepta el kernel. Lo que pide otro aparato, o lo
+que lleva un número que comparar, sale como aviso con botones. Si no contestas, o tocas la tarjeta, es que no: un
+aparato que se empareje sin que digas que sí podría hacerse pasar por un teclado.
+"""
+from __future__ import annotations
+
+import html
+import re
+import shutil
+import signal
+import sys
+
+import gi
+
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+BLUEZ = "org.bluez"
+RUTA = "/org/vortexine/bt_agente"
+CAPACIDAD = "DisplayYesNo"      # hay pantalla y botones; no hay dónde escribir un número
+ESPERA_S = 50                   # BlueZ deja de esperar al minuto: que el aviso se vaya antes
+PIN_DE_SIEMPRE = "0000"
+
+RECHAZADO = "org.bluez.Error.Rejected"
+CANCELADO = "org.bluez.Error.Canceled"
+
+INTERFAZ = Gio.DBusNodeInfo.new_for_xml("""
+<node>
+  <interface name="org.bluez.Agent1">
+    <method name="Release"/>
+    <method name="RequestPinCode"><arg type="o" direction="in"/><arg type="s" direction="out"/></method>
+    <method name="DisplayPinCode"><arg type="o" direction="in"/><arg type="s" direction="in"/></method>
+    <method name="RequestPasskey"><arg type="o" direction="in"/><arg type="u" direction="out"/></method>
+    <method name="DisplayPasskey">
+      <arg type="o" direction="in"/><arg type="u" direction="in"/><arg type="q" direction="in"/>
+    </method>
+    <method name="RequestConfirmation"><arg type="o" direction="in"/><arg type="u" direction="in"/></method>
+    <method name="RequestAuthorization"><arg type="o" direction="in"/></method>
+    <method name="AuthorizeService"><arg type="o" direction="in"/><arg type="s" direction="in"/></method>
+    <method name="Cancel"/>
+  </interface>
+</node>""").interfaces[0]
+
+
+def direccion_de(ruta: str) -> str:
+    """/org/bluez/hci0/dev_98_80_BB_41_01_D5 → 98:80:BB:41:01:D5"""
+    m = re.search(r"dev_((?:[0-9A-Fa-f]{2}_){5}[0-9A-Fa-f]{2})$", ruta)
+    return m.group(1).replace("_", ":") if m else ruta
+
+
+class Agente:
+    def __init__(self, bus: Gio.DBusConnection):
+        self.bus = bus
+        self.pendiente = None     # (invocación, aviso, tiempo límite): BlueZ pregunta de una en una
+        bus.register_object(RUTA, INTERFAZ, self.al_llamar, None, None)
+        # BlueZ olvida a los agentes si se reinicia: al volver hay que registrarse otra vez.
+        bus.signal_subscribe("org.freedesktop.DBus", "org.freedesktop.DBus", "NameOwnerChanged",
+                             "/org/freedesktop/DBus", BLUEZ, Gio.DBusSignalFlags.NONE, self.al_cambiar_bluez)
+        self.registrar()
+
+    def al_cambiar_bluez(self, _bus, _emisor, _ruta, _interfaz, _senal, parametros) -> None:
+        if parametros.unpack()[2]:
+            self.registrar()
+
+    def registrar(self) -> bool:
+        try:
+            for metodo, argumentos in (("RegisterAgent", GLib.Variant("(os)", (RUTA, CAPACIDAD))),
+                                       ("RequestDefaultAgent", GLib.Variant("(o)", (RUTA,)))):
+                self.bus.call_sync(BLUEZ, "/org/bluez", "org.bluez.AgentManager1", metodo, argumentos, None,
+                                   Gio.DBusCallFlags.NONE, 10_000, None)
+        except GLib.Error as e:
+            # Sin BlueZ todavía no pasa nada: el aviso de arriba llega cuando arranque.
+            print(f"vortex-bt-agente: no pude registrarme: {e.message}", file=sys.stderr, flush=True)
+            return False
+        return True
+
+    def nombre_de(self, ruta: str) -> str:
+        direccion = direccion_de(ruta)
+        try:
+            alias = self.bus.call_sync(BLUEZ, ruta, "org.freedesktop.DBus.Properties", "Get",
+                                       GLib.Variant("(ss)", ("org.bluez.Device1", "Alias")), None,
+                                       Gio.DBusCallFlags.NONE, 3000, None).unpack()[0]
+        except GLib.Error:
+            return direccion
+        return f"{alias} ({direccion})" if alias and alias.replace("-", ":") != direccion else direccion
+
+    def al_llamar(self, _bus, _emisor, _ruta, _interfaz, metodo, parametros, invocacion) -> None:
+        args = parametros.unpack()
+        if metodo == "Release":
+            invocacion.return_value(None)
+        elif metodo == "Cancel":
+            self.terminar(False, CANCELADO)
+            invocacion.return_value(None)
+        elif metodo == "RequestPinCode":
+            self.preguntar(invocacion, "Un aparato pide un PIN",
+                           f"«{self.nombre_de(args[0])}» quiere emparejarse. Aceptar usa {PIN_DE_SIEMPRE}, el de casi "
+                           "todos los audífonos viejos.", GLib.Variant("(s)", (PIN_DE_SIEMPRE,)))
+        elif metodo == "RequestPasskey":
+            # No hay dónde escribirlo: se dice que no en vez de contestar un número inventado.
+            invocacion.return_dbus_error(RECHAZADO, "Este equipo no puede escribir un número")
+        elif metodo == "DisplayPinCode":
+            self.mostrar(f"Escribe {args[1]} en «{self.nombre_de(args[0])}» para emparejarlo.")
+            invocacion.return_value(None)
+        elif metodo == "DisplayPasskey":
+            self.mostrar(f"Escribe {args[1]:06d} en «{self.nombre_de(args[0])}» para emparejarlo.")
+            invocacion.return_value(None)
+        elif metodo == "RequestConfirmation":
+            self.preguntar(invocacion, "Emparejar por Bluetooth",
+                           f"Acepta solo si «{self.nombre_de(args[0])}» enseña el número {args[1]:06d}.", None)
+        elif metodo == "RequestAuthorization":
+            self.preguntar(invocacion, "Un aparato quiere emparejarse",
+                           f"«{self.nombre_de(args[0])}» quiere emparejarse. Acepta solo si lo estás conectando tú.", None)
+        elif metodo == "AuthorizeService":
+            self.preguntar(invocacion, "Un aparato quiere conectarse",
+                           f"«{self.nombre_de(args[0])}» quiere conectarse. Acepta solo si lo estás conectando tú.", None)
+        else:
+            invocacion.return_dbus_error(RECHAZADO, "Método desconocido")
+
+    def mostrar(self, texto: str) -> None:
+        if shutil.which("notify-send"):
+            Gio.Subprocess.new(["notify-send", "-a", "Vortexine's OS", "-i", "bluetooth", "Emparejar por Bluetooth",
+                                html.escape(texto)], Gio.SubprocessFlags.NONE)
+
+    def preguntar(self, invocacion, titulo: str, texto: str, respuesta) -> None:
+        if self.pendiente:      # no debería pasar; si pasa, quien espera se queda con la respuesta segura
+            self.terminar(False, CANCELADO)
+        if not shutil.which("notify-send"):
+            invocacion.return_dbus_error(RECHAZADO, "No hay cómo preguntar")
+            return
+        # El nombre lo elige el otro aparato: no se le deja meter formato en el aviso.
+        orden = ["notify-send", "-a", "Vortexine's OS", "-i", "bluetooth", "-u", "critical", "-t", str(ESPERA_S * 1000),
+                 "-A", "aceptar=Aceptar", "-A", "rechazar=Rechazar", titulo, html.escape(texto)]
+        try:
+            aviso = Gio.Subprocess.new(orden, Gio.SubprocessFlags.STDOUT_PIPE)
+        except GLib.Error:
+            invocacion.return_dbus_error(RECHAZADO, "No hay cómo preguntar")
+            return
+        limite = GLib.timeout_add_seconds(ESPERA_S, self.al_vencer)
+        self.pendiente = (invocacion, aviso, limite, respuesta)
+        aviso.communicate_utf8_async(None, None, self.al_contestar, self.pendiente)
+
+    def al_vencer(self) -> bool:
+        if self.pendiente:
+            self.pendiente = self.pendiente[:2] + (0,) + self.pendiente[3:]     # ya venció: no hay que quitarlo
+            self.terminar(False, RECHAZADO)
+        return GLib.SOURCE_REMOVE
+
+    def al_contestar(self, aviso, resultado, pregunta) -> None:
+        if self.pendiente is not pregunta:
+            return      # ya se contestó: venció o BlueZ canceló
+        try:
+            _, salida, _ = aviso.communicate_utf8_finish(resultado)
+        except GLib.Error:
+            salida = ""
+        self.terminar((salida or "").strip() == "aceptar", RECHAZADO)
+
+    def terminar(self, aceptada: bool, error: str) -> None:
+        if not self.pendiente:
+            return
+        invocacion, aviso, limite, respuesta = self.pendiente
+        self.pendiente = None
+        if limite:
+            GLib.source_remove(limite)
+        aviso.force_exit()
+        if aceptada:
+            invocacion.return_value(respuesta)
+        else:
+            invocacion.return_dbus_error(error, "No se aceptó")
+
+
+def main() -> int:
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    except GLib.Error as e:
+        print(f"vortex-bt-agente: sin bus del sistema: {e.message}", file=sys.stderr)
+        return 1
+    agente = Agente(bus)     # noqa: F841  el bus lo llama mientras viva el proceso
+    bucle = GLib.MainLoop()
+    try:
+        from gi.repository import GLibUnix
+        agregar = GLibUnix.signal_add
+    except ImportError:     # PyGObject de antes de separar GLibUnix
+        agregar = GLib.unix_signal_add
+    for senal in (signal.SIGTERM, signal.SIGINT):
+        agregar(GLib.PRIORITY_DEFAULT, senal, bucle.quit)
+    bucle.run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
