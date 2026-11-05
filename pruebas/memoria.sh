@@ -92,6 +92,7 @@ correr PRUEBA_ACCION=
 probar "sin Hyprland o con basura, igual avisa" "grep -q 'quedando sin memoria' '$T/aviso'"
 
 # Cuándo avisa el gestor: sus dos funciones, solas, con un vortex-memoria falso.
+# shellcheck disable=SC2034  # JUEGOS, AVISO_* y MEMORIA las leen las funciones que carga el eval
 gestor_avisa() {  # disponible_kb total_kb juegos modo_juego ultimo_aviso → 0 si avisó
   (
     PROC="$T/pg"; mkdir -p "$PROC"
