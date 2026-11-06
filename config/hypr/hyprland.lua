@@ -149,6 +149,17 @@ elseif ok and type(teclado) == "table" then
     hl.config({ input = { kb_layout = teclado.layout, kb_variant = teclado.variant or "" } })
 end
 
+-- Vortex 2.8.5: en laptops, cursor dibujado por software. Con el automático, en algunas (sobre todo con
+-- dos gráficas) el cursor por hardware no se dibuja: existe y responde, pero no se ve.
+for _, bateria in ipairs({ "BAT0", "BAT1", "BAT2", "BATT", "BATC", "CMB0" }) do
+    local f = io.open("/sys/class/power_supply/" .. bateria .. "/type")
+    if f then
+        f:close()
+        hl.config({ cursor = { no_hardware_cursors = 1 } })
+        break
+    end
+end
+
 -- Juegos de Steam, Lutris y gamescope: sin vsync y sin que se bloquee la pantalla.
 -- Ventanas como en Caelestia: un poco transparentes (95 %) con el fondo desenfocado detrás, menos
 -- en pantalla completa y en los juegos (ahí, opacas). El modo juego apaga el desenfoque.
