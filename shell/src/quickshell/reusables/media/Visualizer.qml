@@ -168,13 +168,17 @@ Item {
         settling = true;
     }
 
-    FrameAnimation {
+    // Vortex 2.8.4: temporizador, no FrameAnimation. Una animación de Qt hace redibujar todas las ventanas del
+    // shell (el fondo incluido) a la frecuencia de su monitor; cava solo manda 30 lecturas por segundo.
+    Timer {
+        interval: 16
+        repeat: true
         running: root.settling && root.visible
         onTriggered: {
             let target = root.targets;
             let cur = root.currentLevels;
-            let rise = 1 - Math.pow(1 - root.rise, frameTime / 0.016);
-            let fall = 1 - Math.pow(1 - root.fall, frameTime / 0.016);
+            let rise = root.rise;
+            let fall = root.fall;
             let next = new Array(target.length);
             let moving = false;
             let sum = 0.0;

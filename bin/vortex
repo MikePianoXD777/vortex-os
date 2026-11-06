@@ -493,7 +493,10 @@ cmd_modo_juego() {
       # Vortex 1.10: empieza a medir la partida para el resumen del final (bin/vortex-partida)
       "$VORTEX_DIR/bin/vortex-partida" empezar 2>/dev/null || true
       # Vortex 2.0.2: los clips (Alt+F10) graban solo mientras juegas; si ya graban, no hace nada.
-      setsid "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
+      # 2.8.4: en su propio scope. Con el juego lo prende vortex-gestor, y el grabador heredaba su límite
+      # de 64 MB: se ahogaba dentro del driver de NVIDIA, Hyprland se quedaba esperando y se congelaba todo.
+      setsid systemd-run --user --scope --quiet --collect -- \
+        "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
     off)
