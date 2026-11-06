@@ -7,9 +7,9 @@ El ecualizador es el mismo del panel de música del escritorio, y con audífonos
 códec (LDAC, AAC, SBC) y puede pedir LDAC a 990 kbps.
 
 El motor no depende de Qt (calidad.py, biblioteca.py, descargas.py, audio.py, ecualizador.py); la
-interfaz (QML) vive en __main__.py, puente.py, reproductor.py, mpris.py y qml/.
+interfaz (QML) vive en __main__.py, puente.py, reproductor.py, mpris.py, presencia_discord.py y qml/.
 """
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 NOMBRE = "Vortex Player"
 APP_ID = "vortex-player"

@@ -162,6 +162,9 @@ def main(argv: list[str] | None = None) -> int:
             mpris = Mpris(puente.r, puente.portada_de, puente.mostrarVentana.emit)
     except Exception as e:  # sin D-Bus (por ejemplo, en una sesión rara): funciona igual sin MPRIS
         print("Vortex Player: sin MPRIS:", e, file=sys.stderr)
+    from .presencia_discord import PresenciaDiscord
+    presencia = PresenciaDiscord(puente.r, lambda: puente.bib.ajustes().get("discord", True))
+    puente.cambioAjustes.connect(presencia.actualizar)
     recibir(puente, args)
     codigo = app.exec()
     servidor.close()
@@ -169,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     puente._guardar_sesion()   # 2.4: el segundo exacto donde te quedaste
     puente.al_salir()          # 1.5: y en la nube, para seguir en el otro aparato
     puente.r.cerrar()
-    del mpris
+    del mpris, presencia
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(codigo)

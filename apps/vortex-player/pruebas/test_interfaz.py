@@ -130,6 +130,62 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["playlists"], ["Para correr"])
         self.assertEqual(d["errores_qml"], [])
 
+    def test_discord_con_el_reproductor_de_verdad(self) -> None:
+        d = self.correr("""
+            from PySide6.QtNetwork import QLocalServer
+            from vortex_player import presencia_discord as pd
+            servidor = QLocalServer()
+            assert servidor.listen(os.environ["XDG_RUNTIME_DIR"] + "/discord-ipc-0")
+            marcos, conexiones = [], []
+            def leer(c):
+                nuevos, _ = pd.leer_marcos(bytes(c.readAll()))
+                for op, m in nuevos:
+                    marcos.append(m)
+                    if op == pd.SALUDO:
+                        c.write(pd.marco(pd.MARCO, {"evt": "READY"}))
+            def nueva():
+                c = servidor.nextPendingConnection()
+                conexiones.append(c)
+                c.readyRead.connect(lambda: leer(c))
+            servidor.newConnection.connect(nueva)
+            presencia = pd.PresenciaDiscord(r, lambda: puente.bib.ajustes().get("discord", True), "123",
+                                            entre_envios=0, espera_ms=50)
+            puente.cambioAjustes.connect(presencia.actualizar)
+            datos = {}
+            def actividades():
+                return [m["args"].get("activity") for m in marcos if m.get("cmd") == "SET_ACTIVITY"]
+            def empezar():
+                datos["prendido_de_serie"] = puente.ajustes.get("discord", True)
+                puente.tocar(0)
+            def sonando():
+                a = actividades()[-1]
+                datos["titulo"], datos["tiempo"] = a["details"], a["timestamps"]["end"] - a["timestamps"]["start"]
+                r.alternar()
+            def pausada():
+                datos["pausa"] = actividades()[-1]
+                r.alternar()
+            def sigue():
+                datos["sigue"] = actividades()[-1]["details"]
+                puente.ponerDiscord(False)
+            def apagada():
+                datos["apagada"] = actividades()[-1]
+                datos["guardado"] = puente.ajustes.get("discord")
+                fin(**datos)
+            paso(500, empezar)
+            paso(1500, sonando)
+            paso(500, pausada)
+            paso(500, sigue)
+            paso(500, apagada)
+        """, "discord")
+        self.assertTrue(d["prendido_de_serie"])
+        self.assertIn(d["titulo"], ("Uno", "Dos", "Tres"))
+        self.assertGreater(d["tiempo"], 0)
+        self.assertIsNone(d["pausa"])
+        self.assertEqual(d["sigue"], d["titulo"])
+        self.assertIsNone(d["apagada"])
+        self.assertIs(d["guardado"], False)
+        self.assertEqual(d["errores_qml"], [])
+
     def test_mpris(self) -> None:
         d = self.correr("""
             from vortex_player.mpris import Mpris

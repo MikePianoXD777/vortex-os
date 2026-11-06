@@ -254,6 +254,15 @@ Flickable {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 12
+                Explicacion { text: "Mostrar en Discord: tu perfil dice qué estás escuchando, con la portada y el tiempo. Necesita la app de escritorio de Discord abierta." }
+                Switch {
+                    checked: vp.ajustes.discord !== false
+                    onToggled: vp.ponerDiscord(checked)
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 12
                 Explicacion { text: "Crossfade: la canción que termina se va apagando mientras la siguiente entra." }
                 Selector {
                     Layout.preferredWidth: 190

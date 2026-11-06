@@ -1088,6 +1088,11 @@ class Puente(QObject):
         if activar:
             self._pedir_radio()
 
+    @Slot(bool)
+    def ponerDiscord(self, activar: bool) -> None:
+        Biblioteca.guardar_ajuste("discord", bool(activar))
+        self.cambioAjustes.emit()
+
     def _pedir_radio(self) -> None:
         """Suena la última de la cola: se piden 10 parecidas a ella y a las dos de antes."""
         cola, i = self.r.cola, self.r.indice
