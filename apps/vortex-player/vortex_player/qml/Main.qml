@@ -111,7 +111,7 @@ ApplicationWindow {
                     }
                     Navegar { texto: "Tu biblioteca"; icono: "musica"; elegido: ventana.pagina === "canciones" && vp.vistaPlaylist < 0; onPulsado: ventana.ir("canciones") }
                     Navegar { texto: "Agregar música"; icono: "descargar"; elegido: ventana.pagina === "agregar"; onPulsado: ventana.ir("agregar")
-                        contador: { var n = 0; for (var i = 0; i < vp.descargasLista.length; i++) n += vp.descargasLista[i].estado === "bajando" || vp.descargasLista[i].estado === "espera"; return n > 0 ? n : -1 } }
+                        contador: vp.descargasPendientes > 0 ? vp.descargasPendientes : -1 }
                     Navegar { visible: !!vp.ajustes.hayEq; texto: "Ecualizador"; icono: "ecualizador"; elegido: ventana.pagina === "ecualizador"; onPulsado: ventana.ir("ecualizador") }
                     Navegar { texto: "Ajustes"; icono: "ajustes"; elegido: ventana.pagina === "ajustes"; onPulsado: ventana.ir("ajustes") }
 

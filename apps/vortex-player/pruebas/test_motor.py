@@ -342,6 +342,13 @@ class Audio(Temporal):
         self.assertTrue((self.t / "ldac").exists())
         self.assertFalse(audio.forzar_ldac("bluez_card.ZZ", self._pactl(True)))
 
+    def test_que_eventos_de_pactl_tocan_la_salida(self) -> None:
+        self.assertTrue(audio.cambia_la_salida("Event 'change' on sink #48\n"))
+        self.assertTrue(audio.cambia_la_salida("Evento «change» en server #0\n"))
+        self.assertTrue(audio.cambia_la_salida("Event 'new' on card #71\n"))
+        self.assertFalse(audio.cambia_la_salida("Event 'change' on sink-input #120\n"))
+        self.assertFalse(audio.cambia_la_salida("Event 'new' on source-output #9\n"))
+
     def test_salida_normal_y_sin_pipewire(self) -> None:
         s = audio.salida(self._pactl(False))
         self.assertEqual((s["bluetooth"], s["codec"], s["ldac"]), (False, "", False))

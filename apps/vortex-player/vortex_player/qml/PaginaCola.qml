@@ -9,7 +9,8 @@ Rectangle {
     id: raiz
     signal cerrar()
     color: Tema.fondo
-    readonly property var siguientes: rep.cola.slice(rep.indice + 1)
+    // Solo mientras se ve. Leer rep.cola desde aquí con slice() copiaba la cola entera por cada canción.
+    readonly property var siguientes: visible ? rep.colaSiguientes : []
 
     function tiempo(s) {
         s = Math.max(0, Math.floor(s || 0))
@@ -70,21 +71,28 @@ Rectangle {
         onClicked: raiz.cerrar()
     }
 
-    Flickable {
+    // Una lista que solo crea las filas que se ven: 300 filas fijas subían el Player 250 MB.
+    ListView {
+        id: listaCola
         anchors.fill: parent
-        contentHeight: columna.implicitHeight + 56
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        flickableDirection: Flickable.VerticalFlick
         ScrollBar.vertical: ScrollBar {}
+        leftMargin: 28     // ListView le pone x = 0 a cada fila: el margen va aquí
+        rightMargin: 28
+        spacing: 4
+        reuseItems: true
+        readonly property real anchoFila: Math.min(width - 56, 980)
+        model: raiz.siguientes   // con miles, las primeras 300 bastan para ver qué viene
 
-        ColumnLayout {
-            id: columna
-            x: 28
-            y: 28
-            width: Math.min(parent.width - 56, 980)
+        header: ColumnLayout {
+            width: listaCola.anchoFila
             spacing: 4
+            // Solo cambia de alto al vaciarse o llenarse la cola; sin esto el título se queda fuera de la vista
+            onHeightChanged: Qt.callLater(listaCola.positionViewAtBeginning)
 
-            Text { text: "A continuación"; color: Tema.texto; font.pixelSize: 32; font.weight: Font.Bold; Layout.bottomMargin: 14 }
+            Text { text: "A continuación"; color: Tema.texto; font.pixelSize: 32; font.weight: Font.Bold; Layout.topMargin: 28; Layout.bottomMargin: 14 }
 
             Text { visible: !!rep.cancion.ruta; text: "Sonando ahora"; color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold; Layout.bottomMargin: 4 }
             Fila { visible: !!rep.cancion.ruta; cancion: rep.cancion; actual: true }
@@ -93,41 +101,44 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.topMargin: 24
                 Layout.bottomMargin: 4
-                visible: raiz.siguientes.length > 0
+                visible: rep.colaRestantes > 0
                 Text { text: "Lo que sigue"; color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold }
                 Text { Layout.fillWidth: true; text: rep.origen ? "· de " + rep.origen : ""; color: Tema.tenue; font.pixelSize: 13; elide: Text.ElideRight }
-                Text { text: raiz.siguientes.length + (raiz.siguientes.length === 1 ? " canción" : " canciones"); color: Tema.tenue; font.pixelSize: 13 }
+                Text { text: rep.colaRestantes + (rep.colaRestantes === 1 ? " canción" : " canciones"); color: Tema.tenue; font.pixelSize: 13 }
             }
-            Repeater {
-                model: raiz.siguientes.slice(0, 300)   // con miles, las primeras 300 bastan para ver qué viene
-                ColumnLayout {
-                    required property var modelData
-                    required property int index
-                    Layout.fillWidth: true
-                    spacing: 4
-                    RowLayout {   // 1.4: donde empieza la radio
-                        visible: !!modelData.radio && (index === 0 || !raiz.siguientes[index - 1].radio)
-                        Layout.fillWidth: true
-                        Layout.topMargin: index === 0 ? 0 : 20
-                        Layout.bottomMargin: 4
-                        spacing: 8
-                        Icono { Layout.preferredWidth: 16; Layout.preferredHeight: 16; nombre: "radio"; color: Tema.azul }
-                        Text { text: "Radio"; color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold }
-                        Text { Layout.fillWidth: true; text: "· parecidas a lo que escuchabas, suenan sin bajarlas"; color: Tema.tenue; font.pixelSize: 13; elide: Text.ElideRight }
-                    }
-                    Fila {
-                        cancion: modelData
-                        numero: index + 1
-                        onTocar: rep.saltarA(rep.indice + 1 + index)
-                        onQuitar: rep.quitarDeColaEn(rep.indice + 1 + index)
-                    }
-                }
-            }
+        }
 
+        delegate: ColumnLayout {
+            required property var modelData
+            required property int index
+            width: listaCola.anchoFila
+            spacing: 4
+            RowLayout {   // 1.4: donde empieza la radio
+                visible: !!modelData.radio && (index === 0 || !raiz.siguientes[index - 1].radio)
+                Layout.fillWidth: true
+                Layout.topMargin: index === 0 ? 0 : 20
+                Layout.bottomMargin: 4
+                spacing: 8
+                Icono { Layout.preferredWidth: 16; Layout.preferredHeight: 16; nombre: "radio"; color: Tema.azul }
+                Text { text: "Radio"; color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold }
+                Text { Layout.fillWidth: true; text: "· parecidas a lo que escuchabas, suenan sin bajarlas"; color: Tema.tenue; font.pixelSize: 13; elide: Text.ElideRight }
+            }
+            Fila {
+                cancion: modelData
+                numero: index + 1
+                onTocar: rep.saltarA(rep.indice + 1 + index)
+                onQuitar: rep.quitarDeColaEn(rep.indice + 1 + index)
+            }
+        }
+
+        footer: Item {
+            width: listaCola.anchoFila
+            height: vacio.visible ? vacio.implicitHeight + 60 : 28
             ColumnLayout {
-                visible: raiz.siguientes.length === 0
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 60
+                id: vacio
+                y: 60
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: rep.colaRestantes === 0
                 spacing: 10
                 Icono { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: 46; Layout.preferredHeight: 46; nombre: "cola"; color: Tema.tenue; trazo: 1.5 }
                 Text { Layout.alignment: Qt.AlignHCenter; text: "No viene nada después"; color: Tema.texto; font.pixelSize: 18; font.weight: Font.DemiBold }

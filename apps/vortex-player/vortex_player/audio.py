@@ -83,6 +83,11 @@ def _pactl(*args: str, pactl: str = "pactl") -> str:
     return r.stdout if r.returncode == 0 else ""
 
 
+def cambia_la_salida(eventos: str) -> bool:
+    """Si lo que escribió `pactl subscribe` toca la salida. La frase cambia con el idioma; el objeto no."""
+    return any(f" {objeto} #" in eventos for objeto in ("sink", "server", "card"))
+
+
 def _hz_de(spec: str) -> int:
     for parte in spec.split():
         if parte.endswith("Hz") and parte[:-2].isdigit():

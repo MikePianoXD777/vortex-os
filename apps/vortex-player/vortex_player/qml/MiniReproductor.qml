@@ -59,7 +59,7 @@ Window {
                 Text {   // 1.5: la línea de la letra que va sonando (si la letra va con tiempos); si no, el artista
                     readonly property string linea: {
                         const l = vp.letra
-                        if (!l.sincronizada || l.ruta !== rep.cancion.ruta) return ""
+                        if (!raiz.visible || !l.sincronizada || l.ruta !== rep.cancion.ruta) return ""
                         const i = vp.lineaActual(rep.posicion)
                         return i >= 0 && l.lineas[i] ? (l.lineas[i].texto || "♪") : ""
                     }
@@ -81,7 +81,7 @@ Window {
                         onClicked: vp.bajarDeLaRadio(rep.cancion.ruta)
                     }
                     BotonIcono {
-                        readonly property bool gusta: vp.meGusta.indexOf(rep.cancion.ruta || "") >= 0
+                        readonly property bool gusta: vp.leGusta(rep.cancion.ruta || "", vp.versionGustos)
                         visible: !rep.cancion.radio
                         tam: 30; enabled: !!rep.cancion.ruta
                         icono: gusta ? "corazonLleno" : "corazon"; activo: gusta

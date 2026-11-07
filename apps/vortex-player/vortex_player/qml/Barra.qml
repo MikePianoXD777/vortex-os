@@ -99,7 +99,7 @@ Rectangle {
             }
             BotonIcono {   // 2.4: ❤️ como en Spotify, junto a la canción
                 id: corazon
-                readonly property bool gusta: vp.meGusta.indexOf(rep.cancion.ruta || "") >= 0
+                readonly property bool gusta: vp.leGusta(rep.cancion.ruta || "", vp.versionGustos)
                 visible: !!rep.cancion.ruta && !rep.cancion.radio
                 tam: 32
                 icono: gusta ? "corazonLleno" : "corazon"

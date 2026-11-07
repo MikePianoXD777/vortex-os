@@ -18,7 +18,7 @@ Item {
     // 2.4: el encabezado toma el color de la portada (de la playlist o de la primera canción), como Spotify
     property string colorPortada: ""
     readonly property string rutaColor: raiz.playlist && raiz.playlist.portadas && raiz.playlist.portadas.length
-        ? raiz.playlist.portadas[0] : vp.canciones.length ? vp.canciones[0].ruta : ""
+        ? raiz.playlist.portadas[0] : vp.totales.primera
     onRutaColorChanged: colorPortada = rutaColor ? vp.colorDe(rutaColor) : ""
     Connections {
         target: vp
@@ -32,17 +32,12 @@ Item {
         return m + ":" + (r < 10 ? "0" : "") + r
     }
 
+    // Cada lectura de vp.canciones copia la lista completa de Python a QML: los totales vienen ya hechos en
+    // vp.totales. Con 708 canciones, sumarlos aquí subía el Player a 1 GB.
     function duracionTotal() {
-        var t = 0
-        for (var i = 0; i < vp.canciones.length; i++) t += vp.canciones[i].duracion || 0
+        var t = vp.totales.duracion
         var h = Math.floor(t / 3600), m = Math.round((t % 3600) / 60)
         return h > 0 ? h + " h " + m + " min" : m + " min"
-    }
-
-    function cuantasHiRes() {
-        var n = 0
-        for (var i = 0; i < vp.canciones.length; i++) n += vp.canciones[i].nivel === "hires"
-        return n
     }
 
     ColumnLayout {
@@ -126,9 +121,9 @@ Item {
                         Keys.onEscapePressed: raiz.renombrando = false
                     }
                     Text {
-                        text: vp.canciones.length + (vp.canciones.length === 1 ? " canción" : " canciones")
-                              + (vp.canciones.length ? " · " + raiz.duracionTotal() : "")
-                              + (raiz.cuantasHiRes() ? " · " + raiz.cuantasHiRes() + " en Hi-Res" : "")
+                        text: vp.totales.cuantas + (vp.totales.cuantas === 1 ? " canción" : " canciones")
+                              + (vp.totales.cuantas ? " · " + raiz.duracionTotal() : "")
+                              + (vp.totales.hires ? " · " + vp.totales.hires + " en Hi-Res" : "")
                               + (vp.escaneando ? " · buscando música nueva…" : "")
                         color: Tema.tenue
                         font.pixelSize: 13
@@ -140,17 +135,17 @@ Item {
                             relleno: true; acento: true; tam: 52
                             icono: raiz.sonandoAqui ? "pausa" : "play"
                             ayuda: raiz.sonandoAqui ? "Pausa" : "Reproducir"
-                            enabled: vp.canciones.length > 0
+                            enabled: vp.totales.cuantas > 0
                             onClicked: {
                                 if (rep.origen === (raiz.playlist ? raiz.playlist.nombre : "Tu biblioteca") && rep.cancion.ruta) rep.alternar()
                                 else { if (rep.aleatorio) rep.alternarAleatorio(); vp.tocar(0) }
                             }
                         }
-                        Boton { text: "Aleatorio"; icono: "aleatorio"; tipo: "secundario"; enabled: vp.canciones.length > 0; onClicked: vp.tocarAleatorio() }
+                        Boton { text: "Aleatorio"; icono: "aleatorio"; tipo: "secundario"; enabled: vp.totales.cuantas > 0; onClicked: vp.tocarAleatorio() }
                         Boton {   // 1.6: la playlist como enlace, para mandársela a alguien
                             id: botonCompartir
                             visible: !!raiz.playlist
-                            enabled: vp.canciones.length > 0
+                            enabled: vp.totales.cuantas > 0
                             text: "Compartir"; icono: "enlace"; tipo: "fantasma"
                             onClicked: menuCompartir.popup(botonCompartir, 0, botonCompartir.height)
                             Menu {
@@ -309,14 +304,14 @@ Item {
             Layout.leftMargin: 28
             Layout.rightMargin: 28
             spacing: 14
-            visible: vp.canciones.length > 0
+            visible: vp.totales.cuantas > 0
             Text { Layout.preferredWidth: 28; text: "#"; color: Tema.tenue; font.pixelSize: 12; horizontalAlignment: Text.AlignRight }
             Text { Layout.fillWidth: true; Layout.leftMargin: 52; text: "Título"; color: Tema.tenue; font.pixelSize: 12 }
             Text { Layout.preferredWidth: lista.width * 0.24; text: "Álbum"; color: Tema.tenue; font.pixelSize: 12 }
             Text { Layout.preferredWidth: 120; text: "Calidad"; color: Tema.tenue; font.pixelSize: 12 }
             Text { Layout.preferredWidth: 48; text: "Duración"; color: Tema.tenue; font.pixelSize: 12; horizontalAlignment: Text.AlignRight }
         }
-        Rectangle { Layout.fillWidth: true; Layout.leftMargin: 28; Layout.rightMargin: 28; Layout.topMargin: 6; height: 1; color: Tema.borde; visible: vp.canciones.length > 0 }
+        Rectangle { Layout.fillWidth: true; Layout.leftMargin: 28; Layout.rightMargin: 28; Layout.topMargin: 6; height: 1; color: Tema.borde; visible: vp.totales.cuantas > 0 }
 
         // --- la lista ---
         ListView {
@@ -337,7 +332,7 @@ Item {
             footer: ColumnLayout {
                 id: recomendadas
                 readonly property bool aqui: !!raiz.playlist && vp.recomendandoPara === raiz.playlist.id
-                                             && vp.canciones.length > 0 && !busqueda.text
+                                             && vp.totales.cuantas > 0 && !busqueda.text
                 visible: aqui
                 width: lista.width - 12
                 height: aqui ? implicitHeight : 0
@@ -535,7 +530,7 @@ Item {
                         }
                     }
                     BotonIcono {   // 2.4: ❤️ al pasar el mouse, o siempre si ya te gusta
-                        readonly property bool gusta: vp.meGusta.indexOf(fila.modelData.ruta) >= 0
+                        readonly property bool gusta: vp.leGusta(fila.modelData.ruta, vp.versionGustos)
                         opacity: gusta || zona.containsMouse || hovered ? 1 : 0
                         tam: 30
                         icono: gusta ? "corazonLleno" : "corazon"
@@ -614,7 +609,7 @@ Item {
         property var cancion: ({})
         // 2.4: ❤️ y la cola «A continuación»
         MenuItem {
-            text: vp.meGusta.indexOf(menu.cancion.ruta || "") >= 0 ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
+            text: vp.leGusta(menu.cancion.ruta || "", vp.versionGustos) ? "Quitar de Tus me gusta" : "Guardar en Tus me gusta"
             onTriggered: vp.alternarMeGusta(menu.cancion.ruta)
         }
         MenuItem { text: "Iniciar radio"; onTriggered: vp.iniciarRadio(menu.cancion) }   // 1.5

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -84,6 +85,42 @@ class Interfaz(unittest.TestCase):
         linea = next((x for x in r.stdout.splitlines() if x.startswith("RESULTADO ")), None)
         self.assertIsNotNone(linea, r.stdout[-2000:] + r.stderr[-3000:])
         return json.loads(linea[len("RESULTADO "):])
+
+    def test_qml_no_recorre_listas_de_python(self) -> None:
+        # Cada lectura de una lista de Python desde QML la copia entera: con 708 canciones, recorrerla así
+        # subió el Player a 1 GB. Los totales y la cola ya vienen hechos (vp.totales, rep.colaSiguientes).
+        malas = re.compile(r"vp\.canciones[.\[]|rep\.cola\b(?!S|R)|vp\.meGusta\.|vp\.descargasLista\[")
+        qml = Path(__file__).parent.parent / "vortex_player" / "qml"
+        encontradas = [f"{f.name}:{n}" for f in qml.glob("*.qml")
+                       for n, l in enumerate(f.read_text().splitlines(), 1) if malas.search(l.split("//")[0])]
+        self.assertEqual(encontradas, [])
+
+    def test_totales_cola_y_me_gusta_vienen_de_python(self) -> None:
+        d = self.correr("""
+            def empezar():
+                datos["totales"] = puente.totales
+                ruta = puente.canciones[0]["ruta"]
+                datos["antes"] = puente.leGusta(ruta, 0)
+                version = puente.versionGustos
+                puente.alternarMeGusta(ruta)
+                datos["despues"] = puente.leGusta(ruta, 0)
+                datos["subio"] = puente.versionGustos > version
+                puente.tocar(0)
+            def sonando():
+                datos["restantes"] = r.colaRestantes
+                datos["siguientes"] = len(r.colaSiguientes)
+                ventana.setProperty("pagina", "cola")
+            datos = {}
+            paso(2500, empezar)
+            paso(800, sonando)
+            paso(500, lambda: fin(**datos))
+        """, "totales")
+        self.assertEqual(d["totales"]["cuantas"], 3)
+        self.assertEqual(d["totales"]["hires"], 1)
+        self.assertGreater(d["totales"]["duracion"], 0)
+        self.assertTrue(d["totales"]["primera"])
+        self.assertEqual((d["antes"], d["despues"], d["subio"]), (False, True, True))
+        self.assertEqual((d["restantes"], d["siguientes"]), (2, 2))
 
     def test_toca_salta_y_playlists(self) -> None:
         d = self.correr("""

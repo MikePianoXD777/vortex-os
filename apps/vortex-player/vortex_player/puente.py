@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
-from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import Property, QFileSystemWatcher, QObject, QProcess, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QColor, QGuiApplication, QImage
 
 from . import audio, cuenta_google, descargas, ecualizador, letras, plataforma, rutas, sincronia
@@ -84,6 +84,7 @@ class Puente(QObject):
         self._orden = "agregada"
         self._vista_playlist = -1
         self._canciones: list[dict] = []
+        self._totales = {"cuantas": 0, "duracion": 0, "hires": 0, "primera": ""}
         self._playlists: list[dict] = []
         self._descargas: list[dict] = []
         self._eq = ecualizador.estado()
@@ -145,11 +146,15 @@ class Puente(QObject):
         self._vigilar_eq()
         self._eq_a_mpv()
 
-        # Por dónde suena (y con qué códec) cada 3 s: pactl tarda ~10 ms
-        self._reloj_salida = QTimer(self, interval=3000)
-        self._reloj_salida.timeout.connect(self.actualizarSalida)
+        # Por dónde suena (y con qué códec): `pactl subscribe` avisa cuando cambia, en vez de preguntar cada 3 s
+        self._espera_salida = QTimer(self, singleShot=True, interval=400)
+        self._espera_salida.timeout.connect(self.actualizarSalida)
+        self._vigia_salida = QProcess(self)
+        self._vigia_salida.readyReadStandardOutput.connect(self._cambio_de_audio)
+        self._vigia_salida.finished.connect(self._vigia_salida_termino)
         if not plataforma.WINDOWS:   # pactl y PipeWire son de Linux
-            self._reloj_salida.start()
+            QGuiApplication.instance().aboutToQuit.connect(self._vigia_salida.kill)
+            self._escuchar_salida()
             self.actualizarSalida()
 
         # 2.4: seguir donde te quedaste, la letra de lo que suena y «Para ti» (de lo último que escuchaste)
@@ -174,6 +179,8 @@ class Puente(QObject):
 
         # 2.4: ❤️, crossfade y las letras de toda tu música guardadas para verlas sin internet
         self._me_gusta: list[str] = []
+        self._gustos: set[str] = set()
+        self._version_gustos = 0
         self.r.ponerFundido(float(self.bib.ajustes().get("fundido", 5)))
         self._letras_estado = {"con": 0, "total": 0, "trabajando": False}
         self._letras_avance.connect(self._en_letras)
@@ -262,12 +269,17 @@ class Puente(QObject):
             for p in self._playlists:   # 2.4: el mosaico de la portada
                 p["portadas"] = self.bib.primeras_de_playlist(p["id"])
             self._me_gusta = self.bib.me_gusta()
+            self._gustos = set(self._me_gusta)
+            self._version_gustos += 1
             # Lo bajado de YouTube lleva su id en el nombre («Título [id].opus»): así la búsqueda sabe qué ya tienes
             self._ids_biblioteca = {m.group(1) for (r,) in self.bib.db.execute("SELECT ruta FROM canciones")
                                     if (m := re.search(r"\[([\w-]{11})\]\.\w+$", r))}
         for c in lista:
             c["portada"] = self._portadas.get(c["ruta"], "")
         self._canciones = lista
+        self._totales = {"cuantas": len(lista), "duracion": sum(c.get("duracion") or 0 for c in lista),
+                         "hires": sum(c.get("nivel") == "hires" for c in lista),
+                         "primera": lista[0]["ruta"] if lista else ""}
         self.cambioCanciones.emit()
         self.cambioPlaylists.emit()
         self.cambioEnLinea.emit()
@@ -873,6 +885,23 @@ class Puente(QObject):
         return self._timer_eq
 
     # --- salida de audio y ajustes -----------------------------------------------------------------
+
+    def _cambio_de_audio(self) -> None:
+        texto = bytes(self._vigia_salida.readAllStandardOutput()).decode(errors="replace")
+        if audio.cambia_la_salida(texto):
+            self._espera_salida.start()   # llegan varios juntos: se lee una sola vez
+
+    def _vigia_salida_termino(self) -> None:
+        # Se reinició PipeWire, por ejemplo: pactl se sale. Se vuelve a escuchar.
+        self.actualizarSalida()
+        QTimer.singleShot(5000, self._escuchar_salida)
+
+    def _escuchar_salida(self) -> None:
+        # setpriv: si el Player muere de golpe, pactl se va con él y no se queda colgado
+        if shutil.which("setpriv"):
+            self._vigia_salida.start("setpriv", ["--pdeathsig", "KILL", "pactl", "subscribe"])
+        else:
+            self._vigia_salida.start("pactl", ["subscribe"])
 
     @Slot()
     def actualizarSalida(self) -> None:
@@ -1681,6 +1710,7 @@ class Puente(QObject):
                 "navegadores": NAVEGADORES}
 
     canciones = Property("QVariantList", lambda s: s._canciones, notify=cambioCanciones)
+    totales = Property("QVariantMap", lambda s: s._totales, notify=cambioCanciones)
     playlists = Property("QVariantList", lambda s: s._playlists, notify=cambioPlaylists)
     vistaPlaylist = Property(int, lambda s: s._vista_playlist, notify=cambioCanciones)
     descargasLista = Property("QVariantList", lambda s: s._descargas, notify=cambioDescargas)
@@ -1707,6 +1737,15 @@ class Puente(QObject):
     perfilEq = Property(str, lambda s: ecualizador.perfil_de(s._eq["bandas"]), notify=cambioEq)
     avance = Property(QObject, lambda s: s._avance, constant=True)
     meGusta = Property("QStringList", lambda s: s._me_gusta, notify=cambioPlaylists)
+    descargasPendientes = Property(int, lambda s: sum(d["estado"] in ("bajando", "espera") for d in s._descargas),
+                                   notify=cambioDescargas)
+    versionGustos = Property(int, lambda s: s._version_gustos, notify=cambioPlaylists)
+
+    @Slot(str, int, result=bool)
+    def leGusta(self, ruta: str, _version: int = 0) -> bool:
+        """`_version` hace que QML la vuelva a preguntar cuando cambian los me gusta. vp.meGusta.indexOf()
+        copiaba la lista completa por cada elemento revisado, en cada fila."""
+        return ruta in self._gustos
     letrasGuardadas = Property("QVariantMap", lambda s: s._letras_estado, notify=cambioLetras)
     resumen = Property("QVariantMap", _estado_resumen, notify=cambioResumen)
     mezcla = Property("QVariantMap", _estado_mezcla, notify=cambioMezcla)

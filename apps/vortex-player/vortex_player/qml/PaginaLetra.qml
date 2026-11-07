@@ -10,7 +10,7 @@ Rectangle {
     signal cerrar()
     property string colorPortada: ""
     readonly property var letra: vp.letra
-    readonly property int actual: letra.sincronizada ? vp.lineaActual(rep.posicion) : -1
+    readonly property int actual: visible && letra.sincronizada ? vp.lineaActual(rep.posicion) : -1
     color: colorPortada || Tema.realceFuerte
     Behavior on color { ColorAnimation { duration: 600 } }
 

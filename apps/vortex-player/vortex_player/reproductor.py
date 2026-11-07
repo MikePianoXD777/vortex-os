@@ -28,6 +28,7 @@ from PySide6.QtNetwork import QLocalSocket
 from . import plataforma
 
 OBSERVAR = {1: "time-pos", 2: "duration", 3: "pause", 4: "idle-active"}
+AVISO_POSICION = 0.2   # segundos entre avisos a la interfaz: mpv manda la posición mucho más seguido
 CLIENTE = "extractor-args=youtube:player_client=visionos"   # el mismo que el avance (avance.CLIENTE)
 
 
@@ -54,6 +55,7 @@ class Reproductor(QObject):
         self._orden: list[int] = []     # el orden en que se tocan (cambia con aleatorio)
         self._i = -1                    # posición en _orden
         self._posicion = 0.0
+        self._posicion_avisada = 0.0
         self._duracion = 0.0
         self._pausado = True
         self._volumen = 80
@@ -188,7 +190,9 @@ class Reproductor(QObject):
             if not self._pausado and 0 < nueva - self._posicion < 3:   # lo que sí sonó (no los saltos)
                 self._escuchado += nueva - self._posicion
             self._posicion = nueva
-            self.cambioPosicion.emit()
+            if abs(nueva - self._posicion_avisada) >= AVISO_POSICION:
+                self._posicion_avisada = nueva
+                self.cambioPosicion.emit()
             self._revisar_fundido()
         elif nombre == "duration":
             self._duracion = float(valor or 0)
@@ -619,6 +623,8 @@ class Reproductor(QObject):
     haySiguiente = Property(bool, lambda s: s._i + 1 < len(s._orden) or (s._repetir != "no" and bool(s._orden)),
                             notify=cambioCola)
     cola = Property("QVariantList", lambda s: [s._cola[i] for i in s._orden], notify=cambioCola)
+    colaSiguientes = Property("QVariantList", lambda s: [s._cola[i] for i in s._orden[s._i + 1:s._i + 301]], notify=cambioCola)
+    colaRestantes = Property(int, lambda s: max(0, len(s._orden) - s._i - 1), notify=cambioCola)
     dormirTexto = Property(str, _dormir_texto, notify=cambioDormir)
     dormirActivo = Property(bool, lambda s: bool(s._dormir_hasta or s._dormir_al_final), notify=cambioDormir)
     fundido = Property(float, lambda s: s._fundido, notify=cambioEstado)

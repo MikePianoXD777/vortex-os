@@ -63,7 +63,10 @@ local function comando_shell()
     -- Vortex 1.7.5: quickshell usa jemalloc, que guardaba la memoria que el shell soltaba (al cerrar un
     -- panel) en vez de devolverla; así la devuelve al segundo. (MALLOC_ARENA_MAX/MALLOC_TRIM_* son de
     -- glibc y aquí no hacen nada.)
+    -- 2.9.1: Qt ya no despierta los portales al arrancar el shell (siguen levantándose cuando una app los
+    -- pide). Solo aquí: las apps no lo heredan.
     local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
+        .. " QT_NO_XDG_DESKTOP_PORTAL=1"
     return "QT_LOGGING_RULES='" .. reglas .. "' " .. memoria .. " serpantinumd start"
 end
 if ok_atajos then atajos.comando_shell = comando_shell end
