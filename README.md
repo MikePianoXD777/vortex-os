@@ -12,6 +12,8 @@ que salen de tu fondo), y **Claude integrado** para que pueda ver lo que haces (
 > **¿Vienes del video?** Esta es la guía fácil: para quien casi no le sabe a Windows, desde bajarlo hasta
 > tenerlo en la versión más nueva. ¿Quieres conservar Windows? También: [junto a Windows](docs/guia-dual-boot.md).
 
+☕ ¿Te gusta? [Apoya el proyecto en Ko-fi](https://ko-fi.com/blackneus).
+
 ## Instalar
 
 Sobre un Arch recién instalado (con `archinstall`, perfil «minimal») o sobre tu CachyOS:
@@ -430,6 +432,12 @@ vm/preview.sh foto escritorio         # capturas y clips para mostrar Vortex
 - **Oído:** [Whisper](https://github.com/openai/whisper) de OpenAI (MIT) con
   [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (MIT). El modelo se baja la primera vez que se usa.
 - **Cerebro:** Claude, de Anthropic, con tu cuenta.
+
+## Apoya el proyecto
+
+Vortexine's OS es gratis y lo seguirá siendo. Si te gusta y quieres que siga creciendo, puedes invitar un
+café en **[Ko-fi](https://ko-fi.com/blackneus)** ☕. Cada donación ayuda a dedicarle más tiempo a nuevas
+funciones y a Vortex Player. Si no puedes donar, también ayuda mucho darle ⭐ al repo y compartir el video.
 
 ## Licencia
 
