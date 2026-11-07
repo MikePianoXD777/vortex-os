@@ -7,9 +7,10 @@ Arch Linux ligero para **jugar y programar**: kernel y paquetes de CachyOS, Hypr
 (basado en [Serpantinum](https://github.com/ilyamiro/serpantinum): barra arriba, paneles animados, colores
 que salen de tu fondo), y **Claude integrado** para que pueda ver lo que haces (con tu permiso) y ayudarte.
 
-> Estado: **0.2 en desarrollo**. En una VM (QEMU/KVM, UEFI, Arch limpio) el instalador corre completo, arranca
-> con `linux-cachyos` y `scx_lavd` en ~3 s, y el shell funciona en español con 0 avisos en su registro.
-> La ISO con instalador gráfico está en pruebas. Falta probar en hardware real.
+> ## 👉 [Cómo instalarlo, paso a paso](docs/guia-instalar.md)
+>
+> **¿Vienes del video?** Esta es la guía fácil: para quien casi no le sabe a Windows, desde bajarlo hasta
+> tenerlo en la versión más nueva. ¿Quieres conservar Windows? También: [junto a Windows](docs/guia-dual-boot.md).
 
 ## Instalar
 

@@ -10,9 +10,7 @@ Vortexine's OS.
 Necesitas:
 
 - Una USB de 8 GB o más (se borra).
-- La ISO de Vortexine's OS: se baja en 2 partes de
-  <https://github.com/MikePianoXD777/vortex-os/releases/tag/v1.0.0> y se une con un comando (ver el
-  paso 0 de [la guía sin USB](guia-sin-usb.md#0-bajar-la-iso-y-unirla)).
+- La ISO de Vortexine's OS y la USB ya hecha: pasos 2 y 3 de [la guía fácil](guia-instalar.md#paso-2-baja-vortexines-os).
 - Internet por cable o Wi-Fi durante la instalación (para las apps que elijas).
 - Una hora más o menos.
 
