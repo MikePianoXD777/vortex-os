@@ -1076,6 +1076,7 @@ PAQUETES_NUEVOS=(
   qrencode pyside6 # 2.7: vortex-qr (pasar un archivo al cel con un QR)
   wtype whisper-cpp # 2.7: vortex-dictar (dictar en cualquier app)
   python-gobject # 2.8.1: vortex-bt-agente (emparejar por Bluetooth)
+  cachyos-rate-mirrors # 2.9.2: espejos cercanos (espejos_cercanos)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1179,8 +1180,52 @@ cmd_novedades() {
   esac
 }
 
+# Sin internet no se empieza (2.9.2): antes seguía y pacman soltaba un «Could not resolve host» por cada
+# espejo del mundo (a un usuario, con el DNS caído un momento). Se espera hasta 3 veces por si la red viene
+# llegando (recién prendida o cambiando de Wi-Fi). Con VORTEX_URL local (pruebas sin red) no se revisa.
+hay_internet() {
+  local i
+  [[ -n "${VORTEX_URL:-}" && "$VORTEX_URL" != http* ]] && return 0
+  for i in 1 2 3; do
+    getent ahosts github.com >/dev/null 2>&1 && getent ahosts archlinux.org >/dev/null 2>&1 && return 0
+    ((i < 3)) && { echo "Esperando internet… ($i de 3)"; sleep 5; }
+  done
+  return 1
+}
+
+# Espejos cercanos (2.9.2). La ISO deja prendidos todos los espejos HTTPS de Arch del mundo, en orden de
+# país (el hook uncomment-mirrors de releng): pacman probaba Uzbekistán o Vietnam antes que los de tu
+# país, y sin red salía una pared de errores. cachyos-rate-mirrors (el que trae CachyOS) mide desde
+# donde estás y deja los más rápidos y al día, en la lista de Arch y en las de CachyOS. Una vez al mes, desde aquí y no con su timer: después se vuelven a poner primero
+# cdn.cachyos.org y mirror.cachyos.org, que nunca van atrasados (los otros a veces dan 404 en paquetes
+# nuevos, como en install/10-repos.sh). Si falla, se quedan las listas de antes.
+espejos_cercanos() {
+  local marca="$AVISOS_ESTADO/espejos" lista ruta nueva
+  [[ -n "$(find "$marca" -mtime -30 2>/dev/null)" ]] && return 0
+  command -v cachyos-rate-mirrors >/dev/null || return 0
+  echo "Buscando los servidores más rápidos desde donde estás (una vez al mes, tarda unos segundos)…"
+  if ! sudo cachyos-rate-mirrors >/dev/null 2>&1; then
+    aviso "no pude medir los servidores; sigo con los de antes"
+    return 0
+  fi
+  for lista in /etc/pacman.d/cachyos*-mirrorlist; do
+    [[ -f "$lista" ]] || continue
+    grep -q '^Server = https://cdn.cachyos.org' "$lista" && continue
+    ruta="$(grep -m1 -oP '^Server = \S*?\K/repo/.*' "$lista")" || continue
+    nueva="$(awk -v r="$ruta" '/^Server/ && !hecho { print "Server = https://cdn.cachyos.org" r; print "Server = https://mirror.cachyos.org" r; hecho = 1 } { print }' "$lista")"
+    sudo tee "$lista" >/dev/null <<<"$nueva"
+  done
+  mkdir -p "$AVISOS_ESTADO" && : >"$marca"
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
+    if ! hay_internet; then
+      echo
+      echo "No hay internet (o no responde el DNS): no se actualizó nada."
+      echo "Revisa tu Wi-Fi o el cable y vuelve a intentarlo."
+      exit 1
+    fi
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
     # los paquetes, ni quedarse pidiendo credenciales.
     if traer_vortex; then
@@ -1194,12 +1239,15 @@ cmd_actualizar() {
   instalar_comandos
   # Vortexine Restore: un punto con tu configuración de antes de actualizar (si cambió algo).
   [[ -x "$VORTEX_DIR/bin/vortex-restore" ]] && "$VORTEX_DIR/bin/vortex-restore" auto actualizar || true
+  espejos_cercanos
   paru -Syu
   version_sistema
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
   [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
   paquetes_nuevos
+  # La primera vez cachyos-rate-mirrors llega en paquetes_nuevos: se miden aquí y ya sirven la próxima.
+  espejos_cercanos
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
