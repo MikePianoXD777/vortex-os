@@ -5,6 +5,9 @@ disponible; nunca con un juego abierto. No corre en reposo: vive lo que dura el 
 
     vortex-memoria           avisa
     vortex-memoria --ver     solo dice qué avisaría (no abre nada)
+    vortex-memoria --juego CLASE [PID] [--ver]
+                             al abrir un juego (3.0): si le queda poca memoria, ofrece cerrar lo que más
+                             gasta (menos el juego y su lanzador). Lo lanza vortex-gestor una vez por partida.
 
 Solo ofrece cerrar apps con ventana, y las cierra con amabilidad, como la X: la app puede preguntar si
 guardas. Lo que no tiene ventana se mira con «Ver qué más usa» (el administrador de tareas).
@@ -13,6 +16,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import time
 import shutil
 import subprocess
 import sys
@@ -20,6 +25,16 @@ from pathlib import Path
 
 PROC = Path(os.environ.get("VORTEX_MEMORIA_PROC", "/proc"))
 MINIMO_KB = 300 * 1024   # con menos que esto, cerrarla no arregla nada: no se ofrece
+# Para jugar: menos de 3 GB libres (o del 40 % de la RAM, en equipos de 4 GB) ya es ir justo.
+JUEGO_MAX_KB = 3 * 1024 * 1024
+JUEGO_PARTE = 0.4
+JUEGO_APPS = 3           # cuántas apps ofrece cerrar, como mucho
+# El juego espera unos segundos a cargar antes de medir: al abrir la ventana todavía no ocupa lo suyo.
+ESPERA_S = float(os.environ.get("VORTEX_MEMORIA_ESPERA", "15"))
+# Cerrarlas cerraría el juego o te dejaría sin lanzador: nunca se ofrecen.
+LANZADORES = re.compile(
+    r"(^steam$|steamwebhelper|lutris|heroic|prismlauncher|minecraft|bottles|gamescope|sober|vinegar|"
+    r"^steam_app_|\.exe$|vortex-task-manager)", re.I)
 
 
 def gb(kb: int) -> str:
@@ -34,6 +49,20 @@ def disponible_kb() -> int:
     except (OSError, ValueError, IndexError):
         pass
     return 0
+
+
+def total_kb() -> int:
+    try:
+        for linea in (PROC / "meminfo").read_text().splitlines():
+            if linea.startswith("MemTotal:"):
+                return int(linea.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
+
+
+def justa_para_jugar(queda: int, total: int) -> bool:
+    return 0 < queda < min(JUEGO_MAX_KB, int(total * JUEGO_PARTE))
 
 
 def grupo_de(pid: int) -> str:
@@ -115,14 +144,20 @@ def nombre_de(clase: str) -> str:
     return (clase.rsplit(".", 1)[-1] or "Esa app").replace("-", " ").strip().capitalize()
 
 
-def la_que_mas_usa() -> dict | None:
-    """La app con ventana que más memoria ocupa: su nombre, cuánto usa y sus ventanas."""
+def apps_con_ventana() -> dict[str, dict]:
+    """Cada app con ventana (por su cgroup): su clase, cuánto usa y sus ventanas."""
     usos = usos_por_grupo()
     apps: dict[str, dict] = {}
     for v in ventanas():
         grupo = grupo_de(v["pid"])
         app = apps.setdefault(grupo, {"clase": v.get("class") or "", "kb": usos.get(grupo, 0), "direcciones": []})
         app["direcciones"].append(v.get("address", ""))
+    return apps
+
+
+def la_que_mas_usa() -> dict | None:
+    """La app con ventana que más memoria ocupa: su nombre, cuánto usa y sus ventanas."""
+    apps = apps_con_ventana()
     if not apps:
         return None
     mayor = max(apps.values(), key=lambda a: a["kb"])
@@ -130,6 +165,45 @@ def la_que_mas_usa() -> dict | None:
         return None
     mayor["nombre"] = nombre_de(mayor["clase"])
     return mayor
+
+
+def para_cerrar_al_jugar(clase_juego: str, pid_juego: int) -> list[dict]:
+    """Las que más gastan, sin el juego (por su cgroup y su clase) ni los lanzadores: hasta 3, de mayor a menor."""
+    grupo_juego = grupo_de(pid_juego) if pid_juego > 1 else None
+    elegidas = []
+    for grupo, app in apps_con_ventana().items():
+        clase = app["clase"]
+        if not clase or grupo == grupo_juego or clase.lower() == clase_juego.lower() or LANZADORES.search(clase):
+            continue
+        if app["kb"] >= MINIMO_KB:
+            elegidas.append(app)
+    elegidas.sort(key=lambda a: a["kb"], reverse=True)
+    for app in elegidas[:JUEGO_APPS]:
+        app["nombre"] = nombre_de(app["clase"])
+    return elegidas[:JUEGO_APPS]
+
+
+def nombre_juego(clase: str, pid: int) -> str:
+    """Los de Steam y Proton (steam_app_123, juego.exe) no tienen lanzador propio: su nombre es el título."""
+    if not clase:
+        return "tu juego"
+    if re.match(r"steam_app_\d+$", clase) or clase.lower().endswith(".exe"):
+        for v in ventanas():
+            if (v.get("pid") == pid or v.get("class") == clase) and (v.get("title") or "").strip():
+                return v["title"].strip()[:40]
+        return "tu juego"
+    return nombre_de(clase)
+
+
+def juntar(nombres: list[str]) -> str:
+    return nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
+
+
+def texto_juego(juego: str, apps: list[dict], queda: int) -> str:
+    suma = sum(a["kb"] for a in apps)
+    # Lo primero es qué hacer: el aviso cerrado muestra una sola línea.
+    return (f"Cierra {juntar([a['nombre'] for a in apps])} y {juego} tendrá unos {gb(suma)} más "
+            f"(ahora le quedan {gb(queda)}). Así va con menos tirones.")
 
 
 def despachar(*ordenes: str) -> None:
@@ -148,7 +222,54 @@ def texto_aviso(app: dict | None, queda: int) -> str:
     return f"Quedan {gb(queda)}. Mira qué la está usando antes de que algo se cierre solo."
 
 
+def cerrar(apps: list[dict]) -> None:
+    for app in apps:
+        for d in app["direcciones"]:
+            despachar(f'hl.dsp.window.close({{ window = "address:{d}" }})', f"closewindow address:{d}")
+
+
+def al_jugar(args: list[str]) -> int:
+    """El aviso al abrir un juego: solo si le queda poca memoria y hay algo que valga la pena cerrar."""
+    ver = "--ver" in args
+    args = [a for a in args if a != "--ver"]
+    clase = args[0] if args else ""
+    pid = int(args[1]) if len(args) > 1 and args[1].isdigit() else 0
+    if not ver and ESPERA_S > 0:
+        time.sleep(ESPERA_S)
+    if pid > 1 and not (PROC / str(pid)).exists():
+        return 0   # el juego ya se cerró
+    queda = disponible_kb()
+    if not justa_para_jugar(queda, total_kb()):
+        if ver:
+            print(f"Le alcanza: quedan {gb(queda)}.")
+        return 0
+    apps = para_cerrar_al_jugar(clase, pid)
+    if not apps:
+        if ver:
+            print(f"Quedan {gb(queda)}, pero no hay nada que valga la pena cerrar.")
+        return 0
+    juego = nombre_juego(clase, pid)
+    texto = texto_juego(juego, apps, queda)
+    if ver:
+        print(texto)
+        return 0
+    if not shutil.which("notify-send"):
+        return 0
+    boton = f"Cerrar {juntar([a['nombre'] for a in apps])}" if len(apps) < 3 else f"Cerrar las {len(apps)}"
+    orden = ["notify-send", "-a", "Vortexine's OS", "-i", "applications-games", "-u", "normal", "-t", "30000",
+             "-A", f"cerrar={boton}", "-A", "no=Así está bien", "Tu juego va justo de memoria", texto]
+    try:
+        accion = subprocess.run(orden, capture_output=True, text=True, timeout=120).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return 0
+    if accion == "cerrar":
+        cerrar(apps)
+    return 0
+
+
 def main() -> int:
+    if sys.argv[1:2] == ["--juego"]:
+        return al_jugar(sys.argv[2:])
     app = la_que_mas_usa()
     queda = disponible_kb()
     if "--ver" in sys.argv[1:]:
@@ -167,8 +288,7 @@ def main() -> int:
     except (OSError, subprocess.TimeoutExpired):
         return 0
     if accion == "cerrar" and app:
-        for d in app["direcciones"]:
-            despachar(f'hl.dsp.window.close({{ window = "address:{d}" }})', f"closewindow address:{d}")
+        cerrar([app])
     elif accion in ("ver", "default"):
         despachar('hl.dsp.exec_cmd("vortex-task-manager")', "exec vortex-task-manager")
     return 0

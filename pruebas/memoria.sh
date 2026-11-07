@@ -91,6 +91,49 @@ echo 'no es json' >"$T/clientes.json"
 correr PRUEBA_ACCION=
 probar "sin Hyprland o con basura, igual avisa" "grep -q 'quedando sin memoria' '$T/aviso'"
 
+# Al abrir un juego (--juego, 3.0): cuánto le queda y qué ofrece cerrar.
+printf 'MemTotal:       8000000 kB\nMemAvailable:   2000000 kB\n' >"$P/meminfo"
+proceso 100 app-Hyprland-discord-100.scope 1000000 100000 500000
+proceso 200 app-Hyprland-kitty-200.scope 400000 0 0
+proceso 500 app-vortex-steam_app_1-500.scope 3000000 0 0
+proceso 600 app-Hyprland-steam-600.scope 900000 0 0
+proceso 700 app-flatpak-com.google.Chrome-1.scope 1500000 0 0
+proceso 800 app-Hyprland-mini-800.scope 100000 0 0
+cat >"$T/clientes.json" <<'J'
+[{"pid": 100, "class": "com.discordapp.Discord", "address": "0xd1", "mapped": true},
+ {"pid": 200, "class": "kitty", "address": "0xk1", "mapped": true},
+ {"pid": 500, "class": "steam_app_1", "title": "Terraria", "address": "0xj1", "mapped": true},
+ {"pid": 600, "class": "steam", "address": "0xs1", "mapped": true},
+ {"pid": 700, "class": "com.google.Chrome", "address": "0xc1", "mapped": true},
+ {"pid": 700, "class": "com.google.Chrome", "address": "0xc2", "mapped": true},
+ {"pid": 800, "class": "mini", "address": "0xm1", "mapped": true}]
+J
+juego() { rm -f "$T/aviso" "$T/ordenes"; env VORTEX_MEMORIA_ESPERA=0 "$@"; }
+SALIDA="$(juego "$VM" --juego steam_app_1 500 --ver)"
+probar "juego: dice cuánto le queda, con el nombre del juego de Steam (su título)" "[[ '$SALIDA' == *'Terraria tendrá'*'(ahora le quedan 1.9 GB)'* ]]"
+probar "juego: ofrece las que más gastan, de mayor a menor" "[[ '$SALIDA' == 'Cierra Discord, Chrome y Kitty y '* ]]"
+probar "juego: nunca el juego ni Steam, ni lo chiquito" "[[ '$SALIDA' != *Steam*Steam* && '$SALIDA' != *Mini* ]]"
+probar "juego: suma lo que recuperas" "[[ '$SALIDA' == *'unos 4.3 GB más'* ]]"
+juego PRUEBA_ACCION=cerrar "$VM" --juego steam_app_1 500
+probar "juego: el aviso no es crítico y se va solo" "grep -qx normal '$T/aviso' && grep -qx 30000 '$T/aviso'"
+probar "juego: con 3 apps el botón dice «Cerrar las 3»" "grep -qx 'cerrar=Cerrar las 3' '$T/aviso'"
+probar "juego: Cerrar cierra todas sus ventanas" "grep -q 0xd1 '$T/ordenes' && grep -q 0xc1 '$T/ordenes' && grep -q 0xc2 '$T/ordenes' && grep -q 0xk1 '$T/ordenes'"
+probar "juego: y no el juego ni Steam" "! grep -qE '0xj1|0xs1|0xm1' '$T/ordenes'"
+juego PRUEBA_ACCION=no "$VM" --juego steam_app_1 500
+probar "juego: «Así está bien» no cierra nada" "[[ -e '$T/aviso' && ! -e '$T/ordenes' ]]"
+echo '[{"pid": 100, "class": "com.discordapp.Discord", "address": "0xd1", "mapped": true}]' >"$T/clientes.json"
+juego PRUEBA_ACCION= "$VM" --juego steam_app_1 500
+probar "juego: con una sola app, el botón la nombra" "grep -qx 'cerrar=Cerrar Discord' '$T/aviso'"
+printf 'MemTotal:       8000000 kB\nMemAvailable:   3500000 kB\n' >"$P/meminfo"
+juego PRUEBA_ACCION=cerrar "$VM" --juego steam_app_1 500
+probar "juego: con 3.5 GB libres no avisa" "[[ ! -e '$T/aviso' && ! -e '$T/ordenes' ]]"
+printf 'MemTotal:       4000000 kB\nMemAvailable:   1700000 kB\n' >"$P/meminfo"
+juego PRUEBA_ACCION= "$VM" --juego steam_app_1 500
+probar "juego: en 4 GB, con 1.7 GB libres (más del 40 %) no avisa" "[[ ! -e '$T/aviso' ]]"
+printf 'MemTotal:       8000000 kB\nMemAvailable:   1000000 kB\n' >"$P/meminfo"
+juego PRUEBA_ACCION=cerrar "$VM" --juego steam_app_1 99999
+probar "juego: si el juego ya se cerró antes de medir, no avisa" "[[ ! -e '$T/aviso' ]]"
+
 # Cuándo avisa el gestor: sus dos funciones, solas, con un vortex-memoria falso.
 # shellcheck disable=SC2034  # JUEGOS, AVISO_* y MEMORIA las leen las funciones que carga el eval
 gestor_avisa() {  # disponible_kb total_kb juegos modo_juego ultimo_aviso → 0 si avisó

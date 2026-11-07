@@ -238,7 +238,9 @@ gestor() {
   GESTOR=$!
   PIDS_FONDO+=("$GESTOR")
 }
-printf '#!/bin/sh\n: >"%s/aviso-memoria"\n' "$T" >"$T/memoria"; chmod +x "$T/memoria"
+# El aviso al abrir un juego (--juego, 3.0) se anota aparte: no es el de quedarse sin memoria.
+printf '#!/bin/sh\nif [ "$1" = --juego ]; then echo "$*" >>"%s/aviso-juego"; else : >"%s/aviso-memoria"; fi\n' "$T" "$T" >"$T/memoria"
+chmod +x "$T/memoria"
 printf 'DEPURAR=1\nMEM_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
 echo "some avg10=3.10 avg60=1.00 avg300=0.20 total=1" >"$T/psi"
 gestor
@@ -311,6 +313,8 @@ activa 4002 abcd "un.juego.raro" game
 evento "activewindowv2>>abcd"
 esperar "grep -q '^juegos=1' '$EST'"
 probar "juego por contentType=game" "[[ \$(grep -c 'modo-juego on' '$T/vortex.log') == 2 ]]"
+esperar "grep -q 'un.juego.raro' '$T/aviso-juego' 2>/dev/null"
+probar "al abrir un juego mira si le alcanza la memoria, con su clase y su pid" "grep -qx -- '--juego un.juego.raro 4002' '$T/aviso-juego'"
 evento "closewindow>>abcd"
 esperar "[[ \$(grep -c 'modo-juego off' '$T/vortex.log') == 2 ]]"
 

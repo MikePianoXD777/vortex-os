@@ -35,6 +35,7 @@ PSI_VENTANA_MS=2000  # ...dentro de esta ventana (sin privilegios: múltiplo de 
 PSI_ENFRIAR_S=20     # entre dos respuestas a la presión de memoria
 AVISO_ENFRIAR_S=600  # entre dos avisos de «te estás quedando sin memoria»
 MEM_REVISAR_S=30     # cada cuánto se mira la memoria disponible (leer un archivo: no cuesta nada)
+DISCO_REVISAR_S=600  # cada cuánto se mira si el disco se está llenando (3.0, bin/vortex-disco)
 RECLAMAR_MB=64       # cuánto comprimir de cada app de fondo con presión (0 = nada)
 DEPURAR=0            # 1 = registra cada cambio de foco
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/gestor.conf"
@@ -53,6 +54,7 @@ RENICE="${VORTEX_GESTOR_RENICE:-renice}"
 VORTEX="${VORTEX_GESTOR_VORTEX:-vortex}"
 QS="${VORTEX_GESTOR_QS:-quickshell}"
 MEMORIA="${VORTEX_GESTOR_MEMORIA:-vortex-memoria}"
+DISCO="${VORTEX_GESTOR_DISCO:-vortex-disco}"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
 # La ruta del shell que de verdad corre (quickshell -p RUTA/Shell.qml): el IPC de quickshell solo
 # encuentra la instancia por su ruta, y no siempre es la del paquete (un shell lanzado desde el repo,
@@ -389,6 +391,9 @@ empezar_juego() {
   fi
   # Con el juego delante el fondo no se ve: pausarlo no cambia nada de lo que se ve.
   fondo pause && FONDO_PAUSADO=1
+  # 3.0: si al juego le queda poca memoria, ofrece cerrar lo que más gasta (lo decide vortex-memoria,
+  # después de dejarlo cargar unos segundos). Una vez por partida: solo con el primer juego.
+  "$MEMORIA" --juego "$1" "${2:-0}" >/dev/null 2>&1 &
 }
 
 terminar_juego() {
@@ -409,7 +414,7 @@ terminar_juego() {
 agregar_juego() {
   [[ -n "${JUEGOS[$1]+x}" ]] && return 0
   JUEGOS[$1]="$2"
-  ((${#JUEGOS[@]} == 1)) && empezar_juego "$2"
+  ((${#JUEGOS[@]} == 1)) && empezar_juego "$2" "${JUEGO_DE[$1]:-0}"
   return 0
 }
 
@@ -493,6 +498,16 @@ avisar_memoria() {
   log "queda poca memoria: se avisa"
   "$MEMORIA" >/dev/null 2>&1 &
   guardar_estado
+}
+
+# El aviso de disco casi lleno (bin/vortex-disco decide si hace falta y no repite). Nunca con un juego.
+DISCO_ULTIMO=0
+revisar_disco() {
+  ((${#JUEGOS[@]})) && return 0
+  modo_juego_activo && return 0
+  ((EPOCHSECONDS - DISCO_ULTIMO >= DISCO_REVISAR_S)) || return 0
+  DISCO_ULTIMO=$EPOCHSECONDS
+  "$DISCO" revisar >/dev/null 2>&1 &
 }
 
 # --- Eventos ---
@@ -617,6 +632,7 @@ main() {
     # Sin eventos en un rato. La presión solo avisa cuando ya hay esperas; así también sale antes de eso.
     if ((rc > 128)); then
       avisar_memoria
+      revisar_disco
       continue
     fi
     ((rc == 0)) || break

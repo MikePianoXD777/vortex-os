@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# vortex-disco (3.0): el aviso de disco casi lleno. Con el disco lleno fallan las actualizaciones, los
+# juegos no arrancan y las apps pierden lo que guardan; «Algo no funciona → Disco» ya lo detectaba, pero
+# solo si lo abrías. Ahora avisa solo, con un botón que libera espacio sin tocar tus archivos (lo mismo
+# que «Algo no funciona»: cachés, apps de Flatpak que nadie usa, la caché de pacman y registros viejos).
+#
+#   vortex-disco revisar   avisa si hace falta (lo llama vortex-gestor cada 10 min; nunca con un juego)
+#   vortex-disco --ver     solo dice qué avisaría
+#
+# Dos niveles, para no molestar con discos grandes medio llenos:
+#   casi lleno     quedan menos de 5 GB: aviso que se queda hasta que lo cierres, una vez al día
+#   se llena       quedan menos de 15 GB y está al 85 % o más: aviso normal, una vez a la semana
+set -uo pipefail
+
+RUTA="${VORTEX_DISCO_RUTA:-$HOME}"
+ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
+ARREGLAR="${VORTEX_DISCO_ARREGLAR:-vortex-arreglar}"
+LLENO_MB=$((5 * 1024))
+LLENANDO_MB=$((15 * 1024))
+LLENANDO_USO=85
+
+# «uso libre_mb» del disco donde está tu carpeta
+medir() { df -P -m "$RUTA" 2>/dev/null | awk 'NR == 2 {gsub("%", "", $5); print $5, $4}'; }
+
+gb() { awk -v m="$1" 'BEGIN {printf (m >= 10240 ? "%.0f GB" : "%.1f GB"), m / 1024}'; }
+
+# lleno, llenando o nada
+nivel() {
+  local uso="$1" libre="$2"
+  if ((libre < LLENO_MB)); then
+    echo lleno
+  elif ((libre < LLENANDO_MB && uso >= LLENANDO_USO)); then
+    echo llenando
+  fi
+}
+
+# Ya avisó de este nivel hace poco: lleno, en el último día; llenando, en la última semana.
+reciente() {
+  local marca="$ESTADO/aviso-disco-$1" minutos=1440
+  [[ "$1" == llenando ]] && minutos=10080
+  [[ -n "$(find "$marca" -mmin -"$minutos" 2>/dev/null)" ]]
+}
+
+texto() {
+  if [[ "$1" == lleno ]]; then
+    echo "Quedan $(gb "$2"). Con el disco lleno fallan las actualizaciones, los juegos no arrancan y las apps pueden perder lo que guardan."
+  else
+    echo "Quedan $(gb "$2"). Libera espacio antes de que se llene."
+  fi
+}
+
+liberar() {
+  local resultado uso libre
+  resultado="$("$ARREGLAR" arreglar disco 2>/dev/null)" || resultado=""
+  read -r uso libre < <(medir)
+  [[ "$libre" =~ ^[0-9]+$ ]] || return 0
+  local cuerpo
+  cuerpo="${resultado:+$resultado }Ahora quedan $(gb "$libre")."
+  # Lo que queda ya es tuyo: Vortex no lo borra por ti.
+  [[ -n "$(nivel "$uso" "$libre")" ]] &&
+    cuerpo+=" Lo que ocupa el resto es tuyo (juegos, videos, Descargas): revisa qué ya no usas."
+  notify-send -a "Vortexine's OS" -i drive-harddisk "Espacio liberado" "$cuerpo" 2>/dev/null || true
+}
+
+revisar() {
+  local ver="$1" uso libre n
+  read -r uso libre < <(medir)
+  [[ "$uso" =~ ^[0-9]+$ && "$libre" =~ ^[0-9]+$ ]] || return 0
+  n="$(nivel "$uso" "$libre")"
+  if [[ -z "$n" ]]; then
+    ((ver)) && echo "Bien: quedan $(gb "$libre") ($uso % usado)."
+    return 0
+  fi
+  if ((ver)); then
+    texto "$n" "$libre"
+    return 0
+  fi
+  reciente "$n" && return 0
+  command -v notify-send >/dev/null || return 0
+  mkdir -p "$ESTADO" && : >"$ESTADO/aviso-disco-$n"
+  local titulo="El disco se está llenando" urgencia=normal accion
+  [[ "$n" == lleno ]] && titulo="El disco está casi lleno" urgencia=critical
+  accion="$(timeout 1800 notify-send -a "Vortexine's OS" -i drive-harddisk -u "$urgencia" -t 30000 \
+    -A "liberar=Liberar espacio" -A "no=Ahora no" "$titulo" "$(texto "$n" "$libre")" 2>/dev/null)" || accion=""
+  [[ "$accion" == liberar ]] && liberar
+  return 0
+}
+
+case "${1:-}" in
+  revisar) revisar 0 ;;
+  --ver) revisar 1 ;;
+  *) echo "uso: vortex-disco revisar | --ver" >&2; exit 2 ;;
+esac
