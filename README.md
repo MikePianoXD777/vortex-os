@@ -1,5 +1,9 @@
 # Vortexine's OS
 
+<p align="center">
+  <a href="https://ko-fi.com/blackneus"><img alt="Apóyame en Ko-fi" height="48" src="https://img.shields.io/badge/%E2%98%95_Ap%C3%B3yame_en-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white"></a>
+</p>
+
 Parte de **Vortex Suite**: las funciones de los grandes, pero fáciles de usar.
 La capacidad sí; la complejidad no.
 
@@ -12,7 +16,9 @@ que salen de tu fondo), y **Claude integrado** para que pueda ver lo que haces (
 > **¿Vienes del video?** Esta es la guía fácil: para quien casi no le sabe a Windows, desde bajarlo hasta
 > tenerlo en la versión más nueva. ¿Quieres conservar Windows? También: [junto a Windows](docs/guia-dual-boot.md).
 
-☕ ¿Te gusta? [Apoya el proyecto en Ko-fi](https://ko-fi.com/blackneus).
+> ## ☕ [¿Te gusta? Apóyame en Ko-fi](https://ko-fi.com/blackneus)
+>
+> Vortexine's OS es gratis. Con tu donación puedo dedicarle más tiempo a funciones nuevas.
 
 ## Instalar
 
@@ -434,6 +440,8 @@ vm/preview.sh foto escritorio         # capturas y clips para mostrar Vortex
 - **Cerebro:** Claude, de Anthropic, con tu cuenta.
 
 ## Apoya el proyecto
+
+<a href="https://ko-fi.com/blackneus"><img alt="Apóyame en Ko-fi" height="48" src="https://img.shields.io/badge/%E2%98%95_Ap%C3%B3yame_en-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white"></a>
 
 Vortexine's OS es gratis y lo seguirá siendo. Si te gusta y quieres que siga creciendo, puedes invitar un
 café en **[Ko-fi](https://ko-fi.com/blackneus)** ☕. Cada donación ayuda a dedicarle más tiempo a nuevas
