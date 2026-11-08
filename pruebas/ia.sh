@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prueba de la IA local (3.1, bin/vortex-ia): motor, modelos y vigilar, con nvidia-smi, lspci, ollama,
-# pacman, sudo, df, hyprctl y notify-send falsos, y /proc y /sys/class/drm de mentira. No instala nada, no
+# pacman, sudo, pkexec, df, hyprctl y notify-send falsos, y /proc y /sys/class/drm de mentira. No instala nada, no
 # baja modelos ni avisa en tu escritorio.
 #
 #   pruebas/ia.sh
@@ -58,6 +58,13 @@ echo "\$*" >>"$T/sudo"
 [ "\$1 \$2" = "pacman -S" ] && echo ollama-cuda >>"$T/instalados"
 exit 0
 F
+cat >"$T/bin/pkexec" <<F
+#!/bin/sh
+echo "\$*" >>"$T/pkexec"
+[ -n "\${PRUEBA_PKEXEC:-}" ] && exit "\$PRUEBA_PKEXEC"
+[ "\$1 \$2" = "pacman -S" ] && echo ollama-cuda >>"$T/instalados"
+exit 0
+F
 cat >"$T/bin/df" <<F
 #!/bin/sh
 printf 'S.ficheros Bloques Usados Disponibles Uso%% Montado\n/dev/x 900000 1 %s 50%% /\n' "\$(cat "$T/libre")"
@@ -96,7 +103,7 @@ paquetes() { printf '%s\n' "$@" >"$T/instalados"; }
 # cabe MODELO → «gpu», «parcial», «cpu» o «no» según «modelos --json»
 cabe() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(next(x["cabe"] for x in d["modelos"]+d["otros"] if x["modelo"]==sys.argv[2]))' "$T/json" "$1"; }
 json() { python3 -c "import json,sys; d=json.load(open('$T/json')); print($1)"; }
-limpiar() { rm -f "$T/aviso" "$T/sudo" "$T/ordenes" "$T/ollama-ordenes" "$T/ps-cuenta"; }
+limpiar() { rm -f "$T/aviso" "$T/sudo" "$T/pkexec" "$T/ordenes" "$T/ollama-ordenes" "$T/ps-cuenta"; }
 avisos() { grep -c '^---$' "$T/aviso" 2>/dev/null || echo 0; }
 echo 50000 >"$T/libre"
 
@@ -197,33 +204,38 @@ echo 4000 >"$T/libre"
 probar "sin disco para CUDA, no lo ofrece" "'$VI' motor --ver | grep -q 'no te alcanza el disco'"
 echo 50000 >"$T/libre"
 
+probar "«vortex actualizar» nunca revisa el motor de la IA" "! grep -q 'vortex-ia motor' '$AQUI/bin/vortex'"
+pendiente() { "$VI" motor --pendiente | python3 -c 'import json,sys; print(json.load(sys.stdin)["preguntar"])'; }
 limpiar; rm -f "$MARCA"
-PRUEBA_ACCION='' "$VI" motor --auto >/dev/null
-probar "--auto pregunta con una notificación con botones" "grep -qx 'si=Cambiar ahora' '$T/aviso' && grep -qx 'no=No, gracias' '$T/aviso'"
-probar "la pregunta dice cuánto baja" "grep -q 'Hay que bajar 2.8 GB (ocupa 5.7 GB)' '$T/aviso'"
-probar "si nadie contesta: no instala y vuelve a preguntar otro día" "[[ ! -e '$T/sudo' && ! -e '$MARCA' ]]"
+SALIDA="$("$VI" motor --pendiente)"
+probar "al abrir Local AI: pregunta y dice cuánto baja" "[[ '$SALIDA' == *'\"preguntar\": true'* && '$SALIDA' == *'Hay que bajar 2.8 GB (ocupa 5.7 GB)'* ]]"
+probar "--pendiente no avisa, no instala y no deja marca" "[[ ! -e '$T/aviso' && ! -e '$T/sudo' && ! -e '$T/pkexec' && ! -e '$MARCA' ]]"
+"$VI" motor </dev/null >"$T/salida"
+probar "a mano sin terminal: no instala nada" "[[ ! -e '$T/sudo' && ! -e '$T/pkexec' && ! -e '$MARCA' ]] && grep -q 'en una terminal' '$T/salida'"
+PRUEBA_PKEXEC=126 "$VI" motor --si >/dev/null 2>&1
+probar "si cierras la ventana de la contraseña: sale 2 y vuelve a preguntar" "(( \$? == 2 )) && [[ ! -e '$MARCA' && \$(pendiente) == True ]]"
 limpiar
-PRUEBA_ACCION=si "$VI" motor --auto >"$T/salida"
-probar "«Cambiar ahora» instala ollama-cuda con sudo, sin quitar Vulkan" "[[ \"\$(cat '$T/sudo')\" == 'pacman -S --needed --noconfirm ollama-cuda' ]]"
+PRUEBA_PKEXEC=1 "$VI" motor --si >/dev/null 2>&1
+probar "si pacman falla: sale 1 y queda la marca de fallo" "(( \$? == 1 )) && [[ \"\$(cat '$MARCA')\" == fallo ]]"
+rm -f "$MARCA"; limpiar
+"$VI" motor --si >"$T/salida"
+probar "«Cambiar ahora» instala con pkexec, sin quitar Vulkan" "[[ \"\$(cat '$T/pkexec')\" == 'pacman -S --needed --noconfirm ollama-cuda' && ! -e '$T/sudo' ]]"
 probar "y queda la marca de la máquina" "[[ \"\$(cat '$MARCA')\" == cuda ]]"
-limpiar
-PRUEBA_ACCION=si "$VI" motor --auto >/dev/null
-probar "--auto pregunta una sola vez" "[[ ! -e '$T/aviso' && ! -e '$T/sudo' ]]"
+probar "ya no vuelve a preguntar" "[[ \$(pendiente) == False ]]"
 
 paquetes ollama ollama-vulkan; limpiar; rm -f "$MARCA"
-PRUEBA_ACCION=no "$VI" motor --auto >/dev/null
-probar "«No, gracias» no instala nada" "[[ -e '$T/aviso' && ! -e '$T/sudo' && \"\$(cat '$MARCA')\" == no ]]"
-limpiar
-PRUEBA_ACCION=si "$VI" motor --auto >/dev/null
-probar "después del «no», no vuelve a preguntar" "[[ ! -e '$T/aviso' && ! -e '$T/sudo' ]]"
+"$VI" motor --no
+probar "«No, gracias» no instala nada" "[[ ! -e '$T/pkexec' && ! -e '$T/sudo' && \"\$(cat '$MARCA')\" == no ]]"
+probar "después del «no», no vuelve a preguntar" "[[ \$(pendiente) == False ]]"
 probar "pero a mano sí se puede: --ver dice qué haría" "'$VI' motor --ver | grep -q '^Cambiaría'"
 
-rm -f "$MARCA"; limpiar; amd 12 1
-PRUEBA_ACCION=si "$VI" motor --auto >"$T/salida"
-probar "--auto en AMD: ni pregunta ni dice nada" "[[ ! -e '$T/aviso' && ! -e '$T/sudo' && ! -s '$T/salida' ]]"
+rm -f "$MARCA"; limpiar
+paquetes ollama ollama-vulkan ollama-cuda
+probar "con ollama-cuda ya puesto: no pregunta y queda la marca" "[[ \$(pendiente) == False && \"\$(cat '$MARCA')\" == cuda ]]"
+paquetes ollama ollama-vulkan; rm -f "$MARCA"; limpiar; amd 12 1
+probar "en AMD: no pregunta" "[[ \$(pendiente) == False && ! -e '$MARCA' ]]"
 nvidia "NVIDIA GeForce RTX 3080" 10240 8000 8.6; paquetes; limpiar
-PRUEBA_ACCION=si "$VI" motor --auto >/dev/null
-probar "--auto sin Ollama instalado: nada" "[[ ! -e '$T/aviso' && ! -e '$T/sudo' && ! -e '$MARCA' ]]"
+probar "sin Ollama instalado: no pregunta" "[[ \$(pendiente) == False && ! -e '$MARCA' ]]"
 probar "pacman solo se lee (nada de -S sin sudo, ni -R)" "[[ ! -e '$T/pacman-raro' ]]"
 
 echo "vigilar"

@@ -136,6 +136,29 @@ def _ram() -> tuple[int, int]:
     return total, libre
 
 
+def motor_pendiente() -> str | None:
+    """La pregunta por el motor de la IA (CUDA en NVIDIA) si toca hacerla, o None. Solo la hace Local AI."""
+    if not shutil.which("vortex-ia"):
+        return None
+    try:
+        r = subprocess.run(["vortex-ia", "motor", "--pendiente"], capture_output=True, text=True, timeout=15)
+        datos = json.loads(r.stdout) if r.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+    if isinstance(datos, dict) and datos.get("preguntar") and datos.get("texto"):
+        return str(datos["texto"])
+    return None
+
+
+def elegir_motor(si: bool) -> str:
+    """La respuesta a esa pregunta: «ok», «cancelado» (sin contraseña: se vuelve a preguntar) o «error»."""
+    try:
+        r = subprocess.run(["vortex-ia", "motor", "--si" if si else "--no"], capture_output=True, text=True)
+    except OSError:
+        return "error"
+    return {0: "ok", 2: "cancelado"}.get(r.returncode, "error")
+
+
 def _de_vortex_ia(ram_mb: int) -> dict | None:
     """Lo que diga «vortex-ia modelos --json», si existe (lo hace otra parte de Vortexine's)."""
     if not shutil.which("vortex-ia"):

@@ -92,7 +92,10 @@ def _guion(cuerpo: str, corriendo: bool = True) -> str:
         from PySide6.QtCore import QTimer, QObject
     """ % str(RAIZ)) + FALSO + textwrap.dedent("""
         from vortex_local_ai.__main__ import crear_aplicacion, cargar_interfaz
+        from vortex_local_ai import catalogo
         from vortex_local_ai.puente import Puente
+        # Sin leer el vortex-ia de la máquina: si no, la ventanita del motor taparía las demás pruebas.
+        catalogo.motor_pendiente = lambda: None
         app = crear_aplicacion(["la"])
         falso = FalsoOllama(corriendo=%r)
         puente = Puente(app, ollama=falso, vram={"nombre": "NVIDIA GeForce RTX 3080", "total_mb": 10240,
@@ -420,6 +423,39 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["arranques"], 1)
         self.assertEqual(d["instalados"], ["qwen3:8b"])
         self.assertTrue(any("Arranqué Ollama" in a[0] and a[1] == "exito" for a in d["avisos"]), d["avisos"])
+
+    def test_pregunta_del_motor_al_abrir(self) -> None:
+        d = self.correr("""
+            from PySide6.QtCore import QMetaObject, Qt
+            elegidos = []
+            catalogo.elegir_motor = lambda si: elegidos.append(si) or "ok"
+            dialogo = hijo("dialogoMotor")
+            def preguntar():
+                datos["cerrado_al_inicio"] = not dialogo.property("visible")
+                puente.general._motor_listo("¿Lo cambio?")
+                app.processEvents()
+                datos["abierto"] = dialogo.property("visible")
+                datos["mensaje"] = dialogo.property("mensaje")
+                datos["boton_no"] = dialogo.property("textoCancelar")
+                capturar("pregunta-motor")
+                QMetaObject.invokeMethod(dialogo, "_rechazar", Qt.DirectConnection)
+            def aceptar():
+                puente.general._motor_listo("¿Lo cambio?")
+                app.processEvents()
+                QMetaObject.invokeMethod(dialogo, "_aceptar", Qt.DirectConnection)
+            def mirar():
+                datos["elegidos"] = elegidos
+                fin()
+            paso(800, preguntar)
+            paso(800, aceptar)
+            paso(800, mirar)
+        """)
+        self.assertTrue(d["cerrado_al_inicio"])
+        self.assertTrue(d["abierto"])
+        self.assertEqual(d["mensaje"], "¿Lo cambio?")
+        self.assertEqual(d["boton_no"], "No, gracias")
+        self.assertEqual(d["elegidos"], [False, True])
+        self.assertTrue(any("Listo: Ollama usará CUDA" in a[0] for a in d["avisos"]), d["avisos"])
 
 
 if __name__ == "__main__":

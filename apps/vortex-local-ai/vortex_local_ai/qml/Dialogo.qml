@@ -1,5 +1,6 @@
 // Ventanita para confirmar («¿Borrar este modelo?») o pedir un nombre («Nueva carpeta»).
-// pedir(): con campo de texto; confirmar(): solo los botones. Al aceptar sale «aceptado(texto)».
+// pedir(): con campo de texto; confirmar(): solo los botones; preguntar(): sí o no, y las dos respuestas cuentan.
+// Al aceptar sale «aceptado(texto)».
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -12,16 +13,30 @@ Popup {
     property bool peligro: false
     property bool conCampo: false
     property var alAceptar: null
+    property string textoCancelar: "Cancelar"
+    property var alRechazar: null
     signal aceptado(string texto)
 
     function confirmar(t, m, boton, peligroso, accion) {
         titulo = t; mensaje = m; textoAceptar = boton || "Aceptar"; peligro = !!peligroso
         conCampo = false; alAceptar = accion || null
+        textoCancelar = "Cancelar"; alRechazar = null
         open()
+    }
+    function preguntar(t, m, si, no, accionSi, accionNo) {
+        titulo = t; mensaje = m; textoAceptar = si; peligro = false
+        conCampo = false; alAceptar = accionSi
+        textoCancelar = no; alRechazar = accionNo
+        open()
+    }
+    function _rechazar() {
+        close()
+        if (alRechazar) alRechazar()
     }
     function pedir(t, m, valor, boton, accion) {
         titulo = t; mensaje = m || ""; textoAceptar = boton || "Aceptar"; peligro = false
         conCampo = true; alAceptar = accion || null
+        textoCancelar = "Cancelar"; alRechazar = null
         campo.text = valor || ""
         open()
         campo.forceActiveFocus()
@@ -78,7 +93,7 @@ Popup {
             Layout.topMargin: 6
             spacing: 10
             Item { Layout.fillWidth: true }
-            Boton { tipo: "fantasma"; text: "Cancelar"; onClicked: raiz.close() }
+            Boton { tipo: "fantasma"; text: raiz.textoCancelar; onClicked: raiz._rechazar() }
             Boton {
                 tipo: raiz.peligro ? "peligro" : "primario"
                 text: raiz.textoAceptar

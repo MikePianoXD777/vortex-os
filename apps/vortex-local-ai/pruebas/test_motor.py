@@ -743,6 +743,32 @@ class PruebaCatalogo(unittest.TestCase):
                 mock.patch.object(catalogo.subprocess, "run", lambda *a, **k: r):
             return catalogo.vram_disponible()
 
+    def _motor(self, codigo: int, salida: str, f, *args):
+        r = subprocess.CompletedProcess([], codigo, stdout=salida, stderr="")
+        ordenes = []
+        def correr(orden, **k):
+            ordenes.append(orden)
+            return r
+        with mock.patch.object(catalogo.shutil, "which", lambda n: "/x/" + n if n == "vortex-ia" else None), \
+                mock.patch.object(catalogo.subprocess, "run", correr):
+            return f(*args), ordenes
+
+    def test_motor_pendiente(self):
+        si = json.dumps({"preguntar": True, "texto": "¿Lo cambio?"})
+        self.assertEqual(self._motor(0, si, catalogo.motor_pendiente)[0], "¿Lo cambio?")
+        self.assertIsNone(self._motor(0, '{"preguntar": false}', catalogo.motor_pendiente)[0])
+        self.assertIsNone(self._motor(1, si, catalogo.motor_pendiente)[0])
+        self.assertIsNone(self._motor(0, "no es json", catalogo.motor_pendiente)[0])
+        with mock.patch.object(catalogo.shutil, "which", lambda n: None):
+            self.assertIsNone(catalogo.motor_pendiente())
+
+    def test_elegir_motor(self):
+        r, ordenes = self._motor(0, "", catalogo.elegir_motor, True)
+        self.assertEqual((r, ordenes), ("ok", [["vortex-ia", "motor", "--si"]]))
+        self.assertEqual(self._motor(0, "", catalogo.elegir_motor, False)[1], [["vortex-ia", "motor", "--no"]])
+        self.assertEqual(self._motor(2, "", catalogo.elegir_motor, True)[0], "cancelado")
+        self.assertEqual(self._motor(1, "", catalogo.elegir_motor, True)[0], "error")
+
     def test_tarjeta_que_se_queda_corta(self):
         for gb, entrada in ((2.0, True), (4.0, True), (2.0, False)):
             v = self._con_vortex_ia({"maquina": {"gpu": {"tipo": "amd", "nombre": "RX 550", "vram_gb": gb, "libre_gb": 1.0,

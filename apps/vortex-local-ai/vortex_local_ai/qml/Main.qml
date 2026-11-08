@@ -27,7 +27,15 @@ ApplicationWindow {
         function onMostrarVentana() { ventana.show(); ventana.raise(); ventana.requestActivate() }
         function onAviso(texto, tipo) { aviso.mostrar(texto, tipo) }
         function onIrA(p) { ventana.irA(p) }
+        function onMotorPregunta(texto) {
+            dialogoMotor.preguntar("Tu IA local puede ir más rápido", texto, "Cambiar ahora", "No, gracias",
+                                   function() { ia.responderMotor(true) }, function() { ia.responderMotor(false) })
+        }
     }
+
+    // 3.3.2: la única vez que se pregunta por el motor de la IA (CUDA en NVIDIA), al abrir Local AI.
+    // Escape o clic afuera no cuentan como respuesta: se vuelve a preguntar la próxima vez que abras.
+    Dialogo { id: dialogoMotor; objectName: "dialogoMotor" }
 
     Shortcut { sequence: "Ctrl+1"; onActivated: ventana.pagina = "chat" }
     Shortcut { sequence: "Ctrl+2"; onActivated: ventana.pagina = "modelos" }

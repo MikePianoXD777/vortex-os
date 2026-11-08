@@ -247,6 +247,7 @@ class General(QObject):
     estadoCambio = Signal()
     gpuCambio = Signal()
     configCambio = Signal()
+    motorPregunta = Signal(str)     # la pregunta por el motor de la IA (solo al abrir, una vez por máquina)
 
     def __init__(self, puente: "Puente"):
         super().__init__(puente)
@@ -262,6 +263,29 @@ class General(QObject):
     def arrancar(self) -> None:
         self.revisarOllama(True)
         self._reloj.start()
+        self.p.hilos.correr(catalogo.motor_pendiente, self._motor_listo, lambda _e: None)
+
+    def _motor_listo(self, pregunta: str | None) -> None:
+        if pregunta:
+            self.motorPregunta.emit(pregunta)
+
+    @Slot(bool)
+    def responderMotor(self, si: bool) -> None:
+        if not si:
+            self.p.hilos.correr(lambda: catalogo.elegir_motor(False), lambda _r: None, lambda _e: None)
+            return
+        self.aviso.emit("Instalando CUDA: tarda un rato. Te pedirá tu contraseña.", "info")
+
+        def listo(r: str) -> None:
+            if r == "ok":
+                self.aviso.emit("Listo: Ollama usará CUDA la próxima vez que arranque.", "exito")
+            elif r == "cancelado":
+                self.aviso.emit("No se instaló CUDA. Te vuelvo a preguntar la próxima vez que abras.", "info")
+            else:
+                self.aviso.emit("No pude instalar CUDA. Sigues con Vulkan; a mano: vortex-ia motor", "error")
+
+        self.p.hilos.correr(lambda: catalogo.elegir_motor(True), listo,
+                            lambda _e: listo("error"))
 
     def _poner_estado(self, estado: str, mensaje: str = "") -> None:
         if (estado, mensaje) != (self._estado, self._mensaje):

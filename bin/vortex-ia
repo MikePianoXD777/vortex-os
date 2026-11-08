@@ -4,8 +4,11 @@ en cualquier gráfica; este comando lo acomoda a tu PC y te dice qué modelo te 
 
     vortex-ia motor            en una NVIDIA, cambia Ollama a CUDA (más palabras por segundo); pregunta antes
     vortex-ia motor --ver      solo dice qué haría
-    vortex-ia motor --auto     lo que corre «vortex actualizar»: pregunta una sola vez por máquina, con una
-                               notificación; si dices que no, no vuelve a preguntar
+    vortex-ia motor --pendiente
+                               lo que lee Vortexine's Local AI al abrirse (JSON): si hay que preguntar y qué.
+                               Pregunta una sola vez por máquina. «vortex actualizar» nunca revisa esto
+    vortex-ia motor --si | --no
+                               la respuesta desde Local AI: --si instala (pide la contraseña en una ventana)
     vortex-ia modelos [--json] «¿qué modelo me cabe?»: mide tu gráfica y dice cuáles caben, cuáles solo en
                                parte (lentos) y cuál te recomiendo; marca los que ya tienes
     vortex-ia modelos --medir MODELO
@@ -485,59 +488,68 @@ def marcar(valor: str) -> None:
         pass
 
 
-def instalar_cuda() -> bool:
-    """Con sudo, como el resto de «vortex actualizar» (ya pidió la contraseña en la terminal)."""
+PKEXEC_CANCELADO = (126, 127)           # cerraste la ventana de la contraseña o no fue la correcta
+
+
+def instalar_cuda(lanzador: str = "sudo") -> int:
+    """El código de salida de pacman. Con sudo en una terminal; con pkexec desde Local AI (no hay terminal)."""
     print("Instalando ollama-cuda (es grande: tarda un rato)…")
     try:
-        ok = subprocess.run(["sudo", "pacman", "-S", "--needed", "--noconfirm", "ollama-cuda"]).returncode == 0
+        codigo = subprocess.run([lanzador, "pacman", "-S", "--needed", "--noconfirm", "ollama-cuda"]).returncode
     except OSError:
-        ok = False
-    if not ok:
+        codigo = 1
+    if codigo != 0:
         print("No pude instalar ollama-cuda (a mano: sudo pacman -S ollama-cuda)", file=sys.stderr)
-        return False
+        return codigo
     corriendo = ollama_lista() is not None
-    print("Listo: Ollama usa CUDA" + (" la próxima vez que arranque (al reabrir Miku)." if corriendo else "."))
-    return True
+    print("Listo: Ollama usa CUDA" + (" la próxima vez que arranque." if corriendo else "."))
+    return 0
 
 
-def preguntar(d: dict, terminal: bool) -> str:
-    """«si», «no» o "" (no contestó). A mano y en una terminal pregunta ahí; si no, con la notificación."""
-    cuerpo = (f"Tu {d['gpu']} corre la IA local (la de Miku) más rápido con CUDA, el motor de NVIDIA. Hay que "
-              f"bajar {gbs(d['baja'])} (ocupa {gbs(d['disco'])}). ¿Lo cambio?")
-    if terminal and sys.stdin.isatty() and sys.stdout.isatty():
-        try:
-            r = input(f"{cuerpo} [s/N] ").strip().lower()
-        except EOFError:
-            return ""
-        return "si" if r in ("s", "si", "sí", "y", "yes") else "no"
-    return avisar("Tu IA local puede ir más rápido", cuerpo, [("si", "Cambiar ahora"), ("no", "No, gracias")],
-                  espera_ms=120000, timeout=150)
+def pregunta_motor(d: dict) -> str:
+    return (f"Tu {d['gpu']} corre tus modelos más rápido con CUDA, el motor de NVIDIA. Hay que bajar "
+            f"{gbs(d['baja'])} (ocupa {gbs(d['disco'])}). ¿Lo cambio?")
+
+
+def motor_pendiente() -> dict:
+    """Para Local AI al abrirse: {"preguntar": bool, "texto": la pregunta}. Una sola vez por máquina."""
+    if MARCA_MOTOR.exists():
+        return {"preguntar": False}
+    d = decidir_motor()
+    if d.get("ya"):
+        marcar("cuda")
+    if not d["cambiar"]:
+        return {"preguntar": False}
+    return {"preguntar": True, "texto": pregunta_motor(d)}
 
 
 def cmd_motor(args: list[str]) -> int:
-    auto = "--auto" in args
-    if auto and MARCA_MOTOR.exists():
-        return 0                        # ya se preguntó en esta máquina
+    if "--pendiente" in args:
+        print(json.dumps(motor_pendiente(), ensure_ascii=False))
+        return 0
+    if "--no" in args:
+        marcar("no")
+        return 0
     d = decidir_motor()
-    if "--ver" in args:
+    if "--ver" in args or not d["cambiar"]:
         print(d["texto"])
         return 0
-    if d.get("ya"):
-        if auto:
-            marcar("cuda")
-        else:
-            print(d["texto"])
+    if "--si" in args:
+        codigo = instalar_cuda("pkexec")
+        if codigo in PKEXEC_CANCELADO:
+            return 2                    # sin marca: Local AI vuelve a preguntar la próxima vez
+        marcar("cuda" if codigo == 0 else "fallo")
+        return 0 if codigo == 0 else 1
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print(d["texto"] + " Córrelo en una terminal para cambiarlo.")
         return 0
-    if not d["cambiar"]:
-        if not auto or d.get("falta_disco"):
-            print(d["texto"])
+    try:
+        r = input(f"{pregunta_motor(d)} [s/N] ").strip().lower()
+    except EOFError:
         return 0
-    if auto:
-        print("IA local: " + d["texto"] + " Te pregunto en una notificación.")
-    respuesta = preguntar(d, terminal=not auto)
-    if respuesta == "si":
-        marcar("cuda" if instalar_cuda() else "fallo")
-    elif respuesta == "no":
+    if r in ("s", "si", "sí", "y", "yes"):
+        marcar("cuda" if instalar_cuda() == 0 else "fallo")
+    else:
         marcar("no")
         print("Se queda con Vulkan. Si cambias de idea: vortex-ia motor")
     return 0
@@ -624,7 +636,7 @@ def main() -> int:
     orden, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
     comandos = {"motor": cmd_motor, "modelos": cmd_modelos, "vigilar": cmd_vigilar}
     if orden not in comandos:
-        print("uso: vortex-ia motor [--auto] [--ver] | modelos [--json] [--medir MODELO] | vigilar", file=sys.stderr)
+        print("uso: vortex-ia motor [--ver|--pendiente|--si|--no] | modelos [--json] [--medir MODELO] | vigilar", file=sys.stderr)
         return 2
     return comandos[orden](args)
 

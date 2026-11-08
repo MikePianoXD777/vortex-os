@@ -1394,8 +1394,6 @@ cmd_actualizar() {
   espejos_cercanos
   paru -Syu
   version_sistema
-  # 3.1: en una NVIDIA, Ollama con CUDA (pregunta una sola vez por máquina, con una notificación).
-  command -v vortex-ia >/dev/null && { vortex-ia motor --auto || true; }
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
   [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
