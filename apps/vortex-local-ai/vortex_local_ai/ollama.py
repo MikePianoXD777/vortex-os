@@ -176,7 +176,11 @@ class Ollama:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 crudo = r.read()
         except urllib.error.HTTPError as e:
-            raise self._error_http(e.code, e.read(), modelo) from None
+            try:
+                cuerpo_error = e.read()
+            finally:
+                e.close()
+            raise self._error_http(e.code, cuerpo_error, modelo) from None
         except (urllib.error.URLError, ConnectionError, socket.timeout, TimeoutError, OSError):
             raise self._error_conexion() from None
         try:
@@ -201,21 +205,24 @@ class Ollama:
         clase = http.client.HTTPSConnection if self._https else http.client.HTTPConnection
         conexion = clase(self._host, self._puerto, timeout=timeout)
         fin = threading.Event()
+        enchufe: list = []   # el socket: http.client suelta conexion.sock al pasarle la conexión a la respuesta
 
         def vigilar():
             while not fin.is_set():
                 if cancelar.wait(0.1):
-                    try:
-                        if conexion.sock is not None:
-                            conexion.sock.shutdown(socket.SHUT_RDWR)
-                    except OSError:
-                        pass
+                    for s in enchufe:
+                        try:
+                            s.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
                     return
 
         try:
             try:
                 conexion.request("POST", self._base + ruta, body=json.dumps(datos).encode(),
                                  headers={"Content-Type": "application/json"})
+                if conexion.sock is not None:
+                    enchufe.append(conexion.sock)
                 if cancelar is not None:
                     threading.Thread(target=vigilar, daemon=True).start()
                 respuesta = conexion.getresponse()

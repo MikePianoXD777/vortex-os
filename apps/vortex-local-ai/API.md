@@ -57,7 +57,8 @@ Solo biblioteca estándar.
 ## `catalogo.py`
 - `CATALOGO: list[dict]`: `id` (nombre en Ollama, `qwen3:8b`), `nombre`, `descripcion`, `para`
   (`"chat"|"codigo"|"razonamiento"|"vision"|"vault"`), `gb` (descarga), `vram_gb` (para ir completo en
-  la GPU). Además: `contexto` (tokens, texto como «128K»), `piensa` (bool: el modelo razona antes).
+  la GPU). Además: `contexto` (tokens, texto como «128K»), `piensa` (bool: el modelo razona antes), `vision` (bool: ve
+  imágenes), `moe` (bool: mezcla de expertos, aguanta ir en parte en la CPU).
 - `vram_disponible() -> dict`: `{"nombre", "total_mb", "libre_mb", "tipo": "nvidia|amd|intel|cpu"}`.
   Orden: `vortex-ia modelos --json` (si existe) → `nvidia-smi` → `/sys/class/drm/*/device/mem_info_vram_*`
   → la RAM (`tipo="cpu"`). Además: `ram_mb` (RAM total), y si hay GPU intel/sin VRAM propia usa la RAM.
@@ -93,7 +94,8 @@ lanza `ErrorVault` (subclase de `ValueError`).
 - Además: `ruta_absoluta(ruta) -> Path`, `existe(ruta) -> bool`, `crear_carpeta(ruta) -> ruta`,
   `frontmatter(ruta) -> dict`, `raiz` (`Path`), `nombre` (nombre de la carpeta).
 - Además, funciones del módulo para el editor: `separar_frontmatter(texto) -> (dict, cuerpo)`,
-  `etiquetas_de(texto) -> list[str]`, `enlaces_de(texto) -> list[dict]`.
+  `etiquetas_de(texto) -> list[str]`, `enlaces_de(texto) -> list[dict]`,
+  `limpiar_nombre(titulo) -> str`. Además: `memoria.fragmentar(texto) -> [(seccion, texto)]`.
 
 ## `memoria.py` («Preguntar a mi vault»)
 `Memoria(vault, ollama, modelo_embeddings=None)`. Índice en SQLite en `CACHE/memoria/<vault>.sqlite`:
@@ -105,7 +107,8 @@ busca uno instalado (`catalogo.EMBEDDINGS` u otro con «embed» en el nombre).
   regresa `{"notas", "nuevas", "quitadas", "fragmentos", "cancelado": bool}`. Cancelar deja guardado lo
   que ya iba.
 - `contexto(pregunta, k=6) -> [{"ruta", "titulo", "fragmento", "puntaje"}]`, el mejor primero
-  (similitud coseno; usa numpy solo si está).
+  (similitud coseno; usa numpy solo si está). Además: `seccion` (el título # del fragmento). Como mucho 2
+  fragmentos de la misma nota.
 - `mensajes_con_contexto(pregunta, historial) -> list`: `[system, *historial, {"role": "user", …}]`,
   listo para `Ollama.chat`. El system prompt va en español con los fragmentos y pide citar con
   `[[titulo]]`.
@@ -124,7 +127,7 @@ Chats como JSON en `DATOS/chats/<id>.json`. Una conversación es:
  "vault": bool}   # opcional: True si fue «Preguntar a mi vault»
 ```
 - `lista() -> list[dict]`: sin `mensajes`, con `n_mensajes`; la más reciente primero.
-- `abrir(id) -> dict|None`.
+- `abrir(id) -> dict|None` (también `None` si el id no es válido).
 - `guardar(conv) -> id`: le pone `id`, `creado`, `titulo` (automático) si faltan, y `modificado`.
 - `borrar(id)`.
 - `titulo_automatico(primer_mensaje) -> str` (unas 6 palabras; «Chat nuevo» si está vacío).
