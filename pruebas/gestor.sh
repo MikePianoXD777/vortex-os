@@ -3,8 +3,9 @@
 #   1. sintaxis (bash -n) y shellcheck si está instalado;
 #   2. el ayudante en C contra un Hyprland falso (sockets UNIX servidos con socat) y su
 #      aviso de presión de memoria registrado en el /proc/pressure/memory de verdad;
-#   3. el gestor entero con /proc, cgroups, busctl, renice, vortex y quickshell falsos:
-#      foco, scopes, nice, modo juego (propio y ajeno), presión de memoria y salida.
+#   3. el gestor entero con /proc, cgroups, busctl, renice, vortex, quickshell y nvidia-smi falsos:
+#      foco, scopes, nice, modo juego (propio y ajeno), modo IA (Miku fuera, CPU, CUDA, Vulkan, AMD y
+#      su pelea con el modo juego), presión de memoria y salida.
 # No toca el sistema: todo pasa en una carpeta temporal.
 #
 #   pruebas/gestor.sh
@@ -203,8 +204,20 @@ EOF
 cat >"$T/vortex" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >>"$T/vortex.log"
-case "\$2" in on) mkdir -p "$T/estado/vortex"; touch "$T/estado/vortex/modo-juego" ;; off) rm -f "$T/estado/vortex/modo-juego" ;; esac
+case "\$1" in modo-juego | modo-ia) ;; *) exit 0 ;; esac
+case "\$2" in on) mkdir -p "$T/estado/vortex"; touch "$T/estado/vortex/\$1" ;; off) rm -f "$T/estado/vortex/\$1" ;; esac
 EOF
+# nvidia-smi falso: las apps de cómputo (CUDA) y «-q -d PIDS» (ahí sale Vulkan) salen de dos archivos.
+cat >"$T/nvidia-smi" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >>"$T/nvsmi.log"
+case "\$1" in
+  --query-compute-apps*) cat "$T/nvsmi-apps" 2>/dev/null ;;
+  -q) cat "$T/nvsmi-q" 2>/dev/null ;;
+esac
+EOF
+printf '#!/bin/sh\necho "$*" >>"%s/vortex-ia.log"\n' "$T" >"$T/vortex-ia"
+chmod +x "$T/nvidia-smi" "$T/vortex-ia"
 cat >"$T/quickshell" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >>"$T/qs.log"
@@ -234,6 +247,7 @@ gestor() {
     VORTEX_GESTOR_PROC="$P" VORTEX_GESTOR_CGROOT="$CGR" VORTEX_GESTOR_SCX="$T/scx" VORTEX_GESTOR_PSI="$T/psi" \
     VORTEX_GESTOR_EVENTOS="$T/eventos" VORTEX_GESTOR_BUSCTL="$T/busctl" VORTEX_GESTOR_RENICE="$T/renice" \
     VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" \
+    VORTEX_GESTOR_NVIDIA_SMI="$T/nvidia-smi" VORTEX_GESTOR_IA="$T/vortex-ia" \
     "$AQUI/bin/vortex-gestor" >"$T/gestor.log" 2>&1 7>&- 8>&- &
   GESTOR=$!
   PIDS_FONDO+=("$GESTOR")
@@ -241,7 +255,7 @@ gestor() {
 # El aviso al abrir un juego (--juego, 3.0) se anota aparte: no es el de quedarse sin memoria.
 printf '#!/bin/sh\nif [ "$1" = --juego ]; then echo "$*" >>"%s/aviso-juego"; else : >"%s/aviso-memoria"; fi\n' "$T" "$T" >"$T/memoria"
 chmod +x "$T/memoria"
-printf 'DEPURAR=1\nMEM_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
+printf 'DEPURAR=1\nMEM_REVISAR_S=1\nIA_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
 echo "some avg10=3.10 avg60=1.00 avg300=0.20 total=1" >"$T/psi"
 gestor
 exec 8>"$T/inyecta"
@@ -324,6 +338,94 @@ esperar "[[ -e '$T/aviso-memoria' ]]"
 probar "poca memoria sin presión: avisa igual" "[[ -e '$T/aviso-memoria' ]] && grep -q '^avisos_memoria=1' '$EST'"
 rm -f "$P/meminfo"
 
+# --- Modo IA (3.1) ---
+# ia_proceso PID COMM CGROUP ARGUMENTOS...: un proceso con su línea de comandos y un fd que no es de DRM.
+ia_proceso() {
+  local pid="$1" comm="$2" cg="$3"
+  shift 3
+  proceso "$pid" "$comm" "$cg" 30 "" ""
+  printf '%s\0' "$@" >"$P/$pid/cmdline"
+  mkdir -p "$P/$pid/fdinfo"
+  printf 'pos:\t0\nflags:\t02\n' >"$P/$pid/fdinfo/0"
+}
+cuenta() { grep -c -- "$1" "$T/vortex.log"; }
+mkdir -p "$P/driver/nvidia"   # hay NVIDIA
+CG_KITTY="$RAIZ/app.slice/app-vortex-kitty-4001.scope"
+# Miku: su voz con PyTorch y el Ollama que ella arranca (vortex-ollama.service) no cuentan.
+ia_proceso 9501 python3 "$RAIZ/app.slice/app-vortex-miku-9500.scope" "$T/home/.local/share/vortex/miku/natural/venv/bin/python" -m miku.voz
+echo "7f00-7f01 r-xp 0 0:0 0 /x/torch/lib/libtorch_cuda.so" >"$P/9501/maps"
+ia_proceso 9502 ollama "$RAIZ/app.slice/vortex-ollama.service" /usr/bin/ollama runner --model /m --port 4000
+printf '9501, 3000\n9502, 3400\n' >"$T/nvsmi-apps"
+sleep 2.5
+probar "IA: Miku (su voz y su Ollama) no pone el modo IA" "! grep -q 'modo-ia' '$T/vortex.log' && grep -qx 'modo_ia=apagado' '$EST'"
+probar "IA: con solo Miku ni se le pregunta a nvidia-smi" "[[ ! -e '$T/nvsmi.log' ]]"
+# llama-server en la CPU: parece IA, pero no sale en nvidia-smi ni abrió ninguna gráfica.
+ia_proceso 9601 llama-server "$CG_KITTY" /usr/bin/llama-server -m /m.gguf
+esperar "grep -q -- '-q -d PIDS' '$T/nvsmi.log' 2>/dev/null"
+sleep 1.2
+probar "IA: llama-server en la CPU no cuenta" "! grep -q 'modo-ia' '$T/vortex.log'"
+probar "IA: para confirmarlo, nvidia-smi (CUDA y luego Vulkan)" "grep -q -- '--query-compute-apps=pid,used_memory' '$T/nvsmi.log'"
+# Con Vulkan no sale entre las apps de cómputo: solo en «nvidia-smi -q».
+printf 'Processes\n    Process ID                        : 9601\n        Type                          : C+G\n        Used GPU Memory               : 2048 MiB\n' >"$T/nvsmi-q"
+esperar "grep -qx 'modo-ia on llama.cpp' '$T/vortex.log'"
+probar "IA: llama.cpp por Vulkan (sale en nvidia-smi -q): modo IA" "grep -qx 'modo-ia on llama.cpp' '$T/vortex.log'"
+rm -rf "$P/9601"
+: >"$T/nvsmi-q"
+esperar "[[ \$(cuenta 'modo-ia off') == 1 ]]"
+probar "IA: termina llama.cpp: modo-ia off" "[[ \$(cuenta 'modo-ia off') == 1 ]] && grep -q 'llama.cpp ya no usa la gráfica' '$T/gestor.log'"
+
+# Ollama con un modelo cargado, abierto desde la terminal (kitty).
+SC_IA="$CGR$RAIZ/app.slice/app-vortex-ia_Ollama-9701.scope"
+ia_proceso 9701 ollama "$CG_KITTY" /usr/bin/ollama runner --model /m --port 4001
+printf '9501, 3000\n9502, 3400\n9701, 4096\n' >"$T/nvsmi-apps"
+esperar "grep -qx 'modo-ia on Ollama' '$T/vortex.log'"
+probar "IA: Ollama con un modelo en la gráfica: vortex modo-ia on Ollama" "grep -qx 'modo-ia on Ollama' '$T/vortex.log'"
+esperar "grep -qx 'ia_pid=9701' '$EST'"
+probar "IA: estado propio, Ollama, pid 9701" "grep -qx 'modo_ia=propio' '$EST' && grep -qx 'ia_programa=Ollama' '$EST'"
+probar "IA: Ollama a su propio scope con el peso de foco" "[[ -d '$SC_IA' && \$(cat '$SC_IA/cpu.weight') == 500 ]]"
+esperar "[[ -s '$T/vortex-ia.log' ]]"
+probar "IA: llama a vortex-ia vigilar" "grep -qx vigilar '$T/vortex-ia.log'"
+activa 5001 bbb2 firefox
+evento "activewindowv2>>bbb2"
+esperar "grep -q '^foco_pid=5001' '$EST'"
+sleep 1.2
+probar "IA: avisa una sola vez y el foco no le quita la prioridad" "[[ \$(cuenta 'modo-ia on Ollama') == 1 && \$(cat '$SC_IA/cpu.weight') == 500 ]]"
+# Empieza un juego: gana el modo juego.
+activa 6001 ccc3 steam_app_570
+evento "openwindow>>ccc3,1,steam_app_570,Dota 2" "activewindowv2>>ccc3"
+esperar "[[ \$(cuenta 'modo-ia off') == 2 ]]"
+probar "IA: un juego: primero modo-juego on y luego modo-ia off" "[[ \$(tail -n2 '$T/vortex.log' | paste -sd ,) == 'modo-juego on,modo-ia off' ]]"
+probar "IA: con el juego, Ollama vuelve al peso de fondo" "[[ \$(cat '$SC_IA/cpu.weight') == 50 ]]"
+sleep 1.5
+probar "IA: con el juego abierto el modo IA no vuelve" "[[ \$(cuenta 'modo-ia on') == 2 ]] && grep -qx 'modo_ia=apagado' '$EST'"
+evento "closewindow>>ccc3"
+esperar "grep -qx 'modo-ia on Ollama --sin-aviso' '$T/vortex.log'"
+probar "IA: se cierra el juego y el modo IA vuelve, sin otro aviso" "grep -qx 'modo-ia on Ollama --sin-aviso' '$T/vortex.log' && grep -qx 'modo-juego off' '$T/vortex.log'"
+probar "IA: y Ollama recupera su prioridad" "[[ \$(cat '$SC_IA/cpu.weight') == 500 ]]"
+# Ollama suelta el modelo (su runner termina).
+rm -rf "$P/9701"
+printf '9501, 3000\n9502, 3400\n' >"$T/nvsmi-apps"
+esperar "[[ \$(cuenta 'modo-ia off') == 3 ]]"
+probar "IA: Ollama suelta el modelo: modo-ia off y su peso de fondo" "grep -qx 'modo_ia=apagado' '$EST' && [[ \$(cat '$SC_IA/cpu.weight') == 50 ]]"
+
+# AMD (sin NVIDIA): ComfyUI, por su carpeta y la VRAM de su fdinfo de DRM.
+rm -rf "$P/driver"
+ia_proceso 9801 python3 "$CG_KITTY" python main.py --listen
+mkdir -p "$P/9801/cwd/comfy"
+printf 'pos:\t0\ndrm-driver:\tamdgpu\ndrm-client-id:\t7\ndrm-memory-vram:\t2097152 KiB\n' >"$P/9801/fdinfo/5"
+esperar "grep -qx 'modo-ia on ComfyUI' '$T/vortex.log'"
+probar "IA: ComfyUI en AMD (fdinfo de DRM): modo IA" "grep -qx 'modo-ia on ComfyUI' '$T/vortex.log'"
+# Modo juego a mano (Super+G) con el modo IA puesto: también manda.
+touch "$T/estado/vortex/modo-juego"
+esperar "[[ \$(cuenta 'modo-ia off') == 4 ]]"
+probar "IA: modo juego a mano (Super+G): el modo IA se quita" "[[ \$(cuenta 'modo-ia off') == 4 ]]"
+rm -f "$T/estado/vortex/modo-juego"
+esperar "grep -qx 'modo-ia on ComfyUI --sin-aviso' '$T/vortex.log'"
+probar "IA: se quita el modo juego: vuelve callado" "grep -qx 'modo-ia on ComfyUI --sin-aviso' '$T/vortex.log'"
+rm -rf "$P/9801"
+esperar "[[ \$(cuenta 'modo-ia off') == 5 ]]"
+probar "IA: ComfyUI se cierra: modo-ia off" "[[ \$(cuenta 'modo-ia off') == 5 ]] && [[ ! -e '$T/estado/vortex/modo-ia' ]]"
+
 # Shell y Hyprland nunca se mueven.
 activa 7001 dead quickshell
 evento "activewindowv2>>dead"
@@ -399,9 +501,13 @@ psi_ultimo=1700000100
 psi_valor=some avg10=3.10 avg60=1.00 avg300=0.20, full avg10=1.00 avg60=0.10 avg300=0.00
 reclamos=1
 shell_soltar=no sabe
+modo_ia=propio
+ia_programa=Ollama
+ia_pid=9701
 EOF
 PATH="$T/shim:$PATH" XDG_RUNTIME_DIR="$T/run2" "$AQUI/bin/vortex" gestor estado >"$T/estado.txt" 2>&1
 probar "estado: corre y lo cuenta" "grep -q 'activo desde las .*(usa 5 MB)' '$T/estado.txt' && grep -q 'kitty (pid 4001), con prioridad en app-vortex-kitty-4001.scope y nice -5' '$T/estado.txt' && grep -q 'modo juego: encendido por el gestor · fondo animado: en pausa' '$T/estado.txt'"
+probar "estado: el modo IA" "grep -q 'Modo IA: encendido por el gestor (Ollama, pid 9701)' '$T/estado.txt'"
 sed 's/^/      /' "$T/estado.txt"
 rm "$T/run2/vortex/gestor"
 PATH="$T/shim:$PATH" XDG_RUNTIME_DIR="$T/run2" "$AQUI/bin/vortex" gestor estado >"$T/estado.txt" 2>&1
