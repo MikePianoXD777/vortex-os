@@ -132,6 +132,28 @@ probar "AMD: mide la VRAM en /sys/class/drm" "grep -q '^Tu gráfica: Radeon RX 6
 probar "AMD 12 GB: qwen2.5:14b cabe entero" "[[ \$(cabe qwen2.5:14b) == gpu ]]"
 probar "AMD 12 GB: gemma2:27b solo en parte" "[[ \$(cabe gemma2:27b) == parcial ]]"
 
+# La PC de entrada: Ryzen con gráficos integrados, RX 550 y 16 GB de RAM.
+LSPCI_RX550='03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Lexa PRO [Radeon 540/540X/550/550X / RX 540X/550/550X] [1002:699f] (rev c7)'
+LSPCI_RENOIR='30:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Renoir [Radeon Vega Series / Radeon Vega Mobile Series] [1002:1636] (rev d9)'
+for gb in 2 4; do
+  amd "$gb" 0
+  printf '%s\n%s\n' "$LSPCI_RX550" "$LSPCI_RENOIR" >"$T/lspci"
+  "$VI" modelos --json >"$T/json"
+  "$VI" modelos >"$T/salida"
+  probar "RX 550 de $gb GB: dice que se queda corta" "grep -q 'Se queda corta para la IA' '$T/salida'"
+  probar "RX 550 de $gb GB: no manda a una IA de internet" "! grep -q 'Mejor una en internet' '$T/salida'"
+  probar "RX 550 de $gb GB: recomienda qwen3.5:4b en el procesador" "[[ \$(json 'd[\"recomendado\"]') == qwen3.5:4b && \$(cabe qwen3.5:4b) == cpu ]]"
+  probar "RX 550 de $gb GB: qwen2.5:14b cabe en la RAM" "[[ \$(cabe qwen2.5:14b) == cpu ]]"
+done
+# Una de 2 GB que no es de entrada por su nombre tampoco sirve; una RX 5500 XT sí.
+amd 2 0
+"$VI" modelos --json >"$T/json"
+probar "cualquier tarjeta de 2 GB: los modelos van al procesador" "[[ \$(cabe llama3.2:3b) == cpu ]]"
+amd 8 0
+echo '03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 14 [Radeon RX 5500/5500M / Pro 5500M] [1002:7340] (rev c5)' >"$T/lspci"
+"$VI" modelos --json >"$T/json"
+probar "RX 5500 no se confunde con la RX 550" "[[ \$(cabe llama3.2:3b) == gpu ]]"
+
 sin_gpu
 "$VI" modelos --json >"$T/json"
 "$VI" modelos >"$T/salida"

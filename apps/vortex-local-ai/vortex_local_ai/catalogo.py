@@ -30,6 +30,11 @@ TIPOS = {
 # text es más chico, pero casi solo inglés).
 EMBEDDINGS = "qwen3-embedding:0.6b"
 
+# Con menos que esto no cabe entero ni el modelo más chico (como en «vortex-ia»): mejor usar el procesador.
+VRAM_MINIMA_MB = 3380
+# En el procesador manda la velocidad: los modelos que bajan más de esto ya se sienten lentos.
+CPU_MAX_GB = 3.5
+
 
 def _m(id, nombre, descripcion, para, gb, vram_gb, contexto, piensa=False, moe=False, vision=False):
     return {"id": id, "nombre": nombre, "descripcion": descripcion, "para": para, "gb": gb, "vram_gb": vram_gb,
@@ -44,6 +49,9 @@ CATALOGO: list[dict] = [
     _m("qwen3.5:2b", "Qwen 3.5 2B",
        "Muy rápido y entiende imágenes. Para PCs modestas o laptops.",
        "chat", 2.7, 3.5, "256K", piensa=True, vision=True),
+    _m("qwen3.5:4b", "Qwen 3.5 4B",
+       "Listo y ligero: habla bien español, ve imágenes y va bien hasta sin tarjeta de video.",
+       "chat", 3.3, 4.5, "256K", piensa=True, vision=True),
     _m("gemma4:e2b", "Gemma 4 E2B",
        "El Gemma de Google en tamaño mini: ve imágenes y escucha audio, y va bien en laptops.",
        "chat", 4.6, 5.5, "128K", piensa=True, vision=True),
@@ -139,8 +147,9 @@ def _de_vortex_ia(ram_mb: int) -> dict | None:
         return None
     if not isinstance(datos, dict):
         return None
-    for candidato in (datos, datos.get("vram"), datos.get("gpu"), datos.get("tarjeta")):
-        # vortex-ia da {"gpu": {"tipo", "nombre", "vram_gb", "libre_gb"}}
+    maquina = datos.get("maquina") if isinstance(datos.get("maquina"), dict) else {}
+    for candidato in (datos, datos.get("vram"), datos.get("gpu"), datos.get("tarjeta"), maquina.get("gpu")):
+        # vortex-ia da {"maquina": {"gpu": {"tipo", "nombre", "vram_gb", "libre_gb", "de_entrada"}}}
         if isinstance(candidato, dict) and not candidato.get("total_mb") and candidato.get("vram_gb"):
             try:
                 candidato = dict(candidato, total_mb=int(float(candidato["vram_gb"]) * 1024),
@@ -154,7 +163,7 @@ def _de_vortex_ia(ram_mb: int) -> dict | None:
                         "total_mb": int(candidato["total_mb"]),
                         "libre_mb": int(candidato.get("libre_mb") or candidato["total_mb"]),
                         "tipo": tipo if tipo in ("nvidia", "amd", "intel", "cpu") else "cpu",
-                        "ram_mb": ram_mb}
+                        "ram_mb": ram_mb, "de_entrada": bool(candidato.get("de_entrada"))}
             except (TypeError, ValueError):
                 return None
     return None
@@ -224,7 +233,8 @@ def vram_disponible() -> dict:
     """La memoria con la que puede correr los modelos: {"nombre", "total_mb", "libre_mb", "tipo", "ram_mb"}.
 
     Primero «vortex-ia modelos --json» (si existe), luego nvidia-smi, luego /sys/class/drm (AMD, Intel Arc),
-    y si no hay tarjeta, la RAM (tipo "cpu"). VORTEX_LOCAL_AI_VRAM_MB=<n> la fija (para pruebas).
+    y si no hay tarjeta o se queda corta para la IA, la RAM (tipo "cpu"). VORTEX_LOCAL_AI_VRAM_MB=<n> la fija
+    (para pruebas).
     """
     ram_mb, ram_libre = _ram()
     fija = os.environ.get("VORTEX_LOCAL_AI_VRAM_MB")
@@ -240,6 +250,9 @@ def vram_disponible() -> dict:
         except Exception:   # nunca tumbar la app por no poder leer la tarjeta
             resultado = None
         if resultado:
+            if resultado.get("de_entrada") or resultado["total_mb"] < VRAM_MINIMA_MB:
+                return {"nombre": "Procesador (tu tarjeta de video se queda corta)", "total_mb": ram_mb,
+                        "libre_mb": ram_libre, "tipo": "cpu", "ram_mb": ram_mb, "de_entrada": True}
             return resultado
     return {"nombre": "Procesador (sin tarjeta de video)", "total_mb": ram_mb, "libre_mb": ram_libre, "tipo": "cpu",
             "ram_mb": ram_mb}
@@ -288,9 +301,11 @@ def cabe(modelo, vram: dict) -> str:
 
 
 def recomendado(vram: dict) -> dict:
-    """El mejor modelo para platicar que te cabe completo; si ninguno, el más chico."""
+    """El mejor modelo para platicar que te cabe completo; si ninguno, el más chico. Sin gráfica, uno ligero."""
     platica = de_tipo("chat")
     caben = [m for m in platica if cabe(m, vram) == "si"]
+    if vram.get("tipo") == "cpu":
+        caben = [m for m in caben if m["gb"] <= CPU_MAX_GB]
     if caben:
         return max(caben, key=lambda m: m["vram_gb"])
     return min(platica, key=lambda m: m["vram_gb"])

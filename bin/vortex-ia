@@ -79,6 +79,9 @@ ALIAS = {
 POR_NOMBRE = {m[0]: m for m in MODELOS}
 RESERVA_GPU_GB = 0.5       # lo que usa el escritorio en la gráfica
 RESERVA_RAM_GB = 1.5       # lo que se deja libre de RAM al repartir un modelo
+# Tarjetas de entrada (RX 550, GT 1030…): poca memoria y lenta. Solo les caben los modelos más flojos, y sin ganarle
+# con claridad a un procesador moderno, así que se recomienda como si no hubiera gráfica.
+DE_ENTRADA = re.compile(r"\bRX ?5[345]0X?\b|\bRadeon 5[345]0X?\b|\bLexa\b|\bGT ?(710|730|1030)\b", re.I)
 
 
 # ---- utilidades --------------------------------------------------------------------------------
@@ -228,6 +231,8 @@ def maquina() -> dict:
         gpu.update(tipo="nvidia", nombre=corto(next(g["nombre"] for g in pci if g["marca"] == "nvidia")), driver=False)
     elif pci:
         gpu.update(tipo="integrada", nombre=pci[0]["nombre"])
+    gpu["de_entrada"] = gpu["vram_gb"] >= 1 and any(
+        DE_ENTRADA.search(g["nombre"]) for g in pci if g["marca"] == gpu["tipo"])
     return {"gpu": gpu, "ram_gb": ram_total, "ram_libre_gb": meminfo("MemAvailable") / 1048576}
 
 
@@ -238,12 +243,20 @@ def necesita_gb(peso_gb: float) -> float:
     return peso_gb * 1.1 + 0.6
 
 
+def vram_util_gb(m: dict) -> float:
+    """La memoria de la gráfica que sirve para la IA: 0 si es de entrada o si ni el modelo más chico cabe entero."""
+    vram = max(0.0, m["gpu"]["vram_gb"] - RESERVA_GPU_GB)
+    if m["gpu"].get("de_entrada") or vram < min(necesita_gb(x[2]) for x in MODELOS):
+        return 0.0
+    return vram
+
+
 def cabe(peso_gb: float, m: dict) -> tuple[str, int]:
     """(«gpu», «parcial», «cpu» o «no», % que iría al procesador)."""
     falta = necesita_gb(peso_gb)
     ram = max(0.0, m["ram_gb"] * 0.75 - 1)     # la que se puede prestar sin ahogar al resto
-    vram = max(0.0, m["gpu"]["vram_gb"] - RESERVA_GPU_GB)
-    if vram >= 1:
+    vram = vram_util_gb(m)
+    if vram:
         if falta <= vram:
             return "gpu", 0
         if falta - vram <= ram:
@@ -308,6 +321,9 @@ def recomendar(lista: list[dict], menor_que: float | None = None) -> dict | None
 def texto_grafica(m: dict) -> str:
     g = m["gpu"]
     ram = f"{gbs(m['ram_gb'])} de RAM"
+    if g["vram_gb"] >= 1 and not vram_util_gb(m):
+        return (f"Tu gráfica: {g['nombre']} con {gbs(g['vram_gb'])}. Se queda corta para la IA: te conviene usar "
+                f"el procesador y tus {ram}.")
     if g["vram_gb"] >= 1:
         return (f"Tu gráfica: {g['nombre']} con {gbs(g['vram_gb'])} ({gbs(g['libre_gb'])} libres ahora). "
                 f"Tienes {ram}.")
@@ -578,7 +594,7 @@ def cmd_vigilar(_args: list[str]) -> int:
     except OSError:
         return 0                        # ya hay uno vigilando
     m = maquina()
-    sin_gpu = m["gpu"]["vram_gb"] < 1   # sin gráfica que sirva, todo va al procesador y avisar no ayuda
+    sin_gpu = not vram_util_gb(m)       # sin gráfica que sirva, todo va al procesador y avisar no ayuda
     avisados: set[str] = set()
     hilos: list[threading.Thread] = []
     inicio = time.monotonic()

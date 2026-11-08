@@ -405,6 +405,8 @@ class Modelos(QObject):
         gb = (self._vram.get("total_mb") or 0) / 1024
         if not self._vram:
             texto = ""
+        elif self._vram.get("de_entrada"):
+            texto = f"Tu gráfica se queda corta · usarás el procesador y tu RAM ({gb:.0f} GB)"
         elif self._vram.get("tipo") == "cpu":
             texto = f"Sin gráfica dedicada · usarás tu RAM ({gb:.0f} GB)"
         else:

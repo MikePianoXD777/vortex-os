@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import atexit
 import json
+import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -20,6 +22,7 @@ import unittest
 import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 # Antes de importar el motor: nada de arrancar Ollama ni de usar las carpetas del usuario.
 _HOME_PRUEBAS = tempfile.mkdtemp(prefix="vortex-local-ai-pruebas-")
@@ -726,6 +729,32 @@ class PruebaCatalogo(unittest.TestCase):
         self.assertEqual(catalogo.recomendado(gpu(1))["id"], "llama3.2:3b")    # ninguno cabe: el más chico
         self.assertEqual(catalogo.recomendado(gpu(32))["id"], "qwen3.6:35b-a3b")
         self.assertEqual(catalogo.recomendado(gpu(10))["para"], "chat")
+
+    def test_recomendado_sin_grafica(self):
+        def cpu(gb):
+            return {"nombre": "CPU", "total_mb": gb * 1024, "libre_mb": gb * 1024, "tipo": "cpu", "ram_mb": gb * 1024}
+        self.assertEqual(catalogo.recomendado(cpu(16))["id"], "qwen3.5:4b")   # uno ligero, aunque quepa uno mayor
+        self.assertEqual(catalogo.recomendado(cpu(64))["id"], "qwen3.5:4b")
+        self.assertEqual(catalogo.recomendado(cpu(8))["id"], "qwen3.5:2b")
+
+    def _con_vortex_ia(self, salida: dict) -> dict:
+        r = subprocess.CompletedProcess([], 0, stdout=json.dumps(salida), stderr="")
+        with mock.patch.object(catalogo.shutil, "which", lambda n: "/x/" + n if n == "vortex-ia" else None), \
+                mock.patch.object(catalogo.subprocess, "run", lambda *a, **k: r):
+            return catalogo.vram_disponible()
+
+    def test_tarjeta_que_se_queda_corta(self):
+        for gb, entrada in ((2.0, True), (4.0, True), (2.0, False)):
+            v = self._con_vortex_ia({"maquina": {"gpu": {"tipo": "amd", "nombre": "RX 550", "vram_gb": gb, "libre_gb": 1.0,
+                                                         "de_entrada": entrada}}})
+            self.assertEqual(v["tipo"], "cpu")
+            self.assertTrue(v["de_entrada"])
+            self.assertEqual(v["total_mb"], v["ram_mb"])
+
+    def test_vortex_ia_buena_grafica(self):
+        v = self._con_vortex_ia({"maquina": {"gpu": {"tipo": "amd", "nombre": "RX 6700 XT", "vram_gb": 12.0, "libre_gb": 11.0,
+                                                     "de_entrada": False}}})
+        self.assertEqual((v["tipo"], v["nombre"], v["total_mb"]), ("amd", "RX 6700 XT", 12288))
 
     def test_vram_de_sysfs_amd(self):
         with tempfile.TemporaryDirectory() as tmp:
