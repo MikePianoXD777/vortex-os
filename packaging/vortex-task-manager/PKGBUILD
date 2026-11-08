@@ -5,8 +5,8 @@
 #
 #   cd packaging/vortex-task-manager && makepkg -si
 pkgname=vortex-task-manager
-pkgver=1.0.1
-pkgrel=1
+pkgver=1.0.2
+pkgrel=2
 pkgdesc="Vortexine Task Manager: qué usa tu PC, cerrar lo trabado y el rendimiento en vivo"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -16,7 +16,7 @@ license=('MIT')
 depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'python-psutil' 'systemd' 'polkit' 'procps-ng'
          'util-linux' 'xdg-utils' 'glib2')
 optdepends=('hyprland: agrupar los procesos por ventana (Apps)'
-            'nvidia-utils: la gráfica de la tarjeta NVIDIA (nvidia-smi)'
+            'nvidia-utils: la gráfica de la tarjeta NVIDIA y la VRAM de cada app (nvidia-smi)'
             'pciutils: el nombre de las tarjetas AMD e Intel (lspci)'
             'wireless_tools: el nombre de tu red Wi-Fi (iwgetid)')
 

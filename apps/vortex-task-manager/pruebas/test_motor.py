@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -17,9 +18,103 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from vortex_task_manager import servicios, sistema  # noqa: E402
 
 
-def proc(pid, ppid, nombre, uid=1000, cpu=0.0, mem=0, disco=0.0, estado="sleeping"):
+def proc(pid, ppid, nombre, uid=1000, cpu=0.0, mem=0, disco=0.0, estado="sleeping", vram=0):
     return {"pid": pid, "ppid": ppid, "nombre": nombre, "comando": nombre, "uid": uid, "usuario": "mike" if uid == 1000 else "root",
-            "cpu": cpu, "mem": mem, "hilos": 1, "estado": estado, "disco": disco}
+            "cpu": cpu, "mem": mem, "hilos": 1, "estado": estado, "disco": disco, "vram": vram}
+
+
+MIB = 1024 ** 2
+
+# Como la da `nvidia-smi -q -d PIDS` (driver 615, RTX 3080), con una segunda tarjeta y un proceso sin dato.
+NVIDIA_PIDS = """
+==============NVSMI LOG==============
+
+Timestamp                                              : Sat Nov  7 19:04:28 2026
+Driver Version                                         : 615.78.08
+
+Attached GPUs                                          : 2
+GPU 00000000:01:00.0
+    Processes
+        GPU instance ID                   : N/A
+        Compute instance ID               : N/A
+        Process ID                        : 1226
+            Type                          : G
+            Name                          : Hyprland
+            Used GPU Memory               : 107 MiB
+        GPU instance ID                   : N/A
+        Compute instance ID               : N/A
+        Process ID                        : 2874
+            Type                          : C+G
+            Name                          : /usr/lib/claude/claude --type=gpu-process --x=a:b
+            Used GPU Memory               : 90 MiB
+        GPU instance ID                   : N/A
+        Compute instance ID               : N/A
+        Process ID                        : 5000
+            Type                          : C
+            Name                          : ollama
+            Used GPU Memory               : 6144 MiB
+        GPU instance ID                   : N/A
+        Compute instance ID               : N/A
+        Process ID                        : 5001
+            Type                          : G
+            Name                          : raro
+            Used GPU Memory               : Not available
+GPU 00000000:02:00.0
+    Processes
+        GPU instance ID                   : N/A
+        Compute instance ID               : N/A
+        Process ID                        : 5000
+            Type                          : C
+            Name                          : ollama
+            Used GPU Memory               : 2048 MiB
+"""
+
+FDINFO_AMD = """pos:	0
+flags:	02100002
+mnt_id:	26
+ino:	1046
+drm-driver:	amdgpu
+drm-client-id:	17
+drm-pdev:	0000:03:00.0
+pasid:	32790
+drm-memory-vram:	524288 KiB
+drm-memory-gtt: 	2048 KiB
+drm-memory-cpu: 	0 KiB
+drm-engine-gfx:	123456 ns
+"""
+
+FDINFO_AMD_NUEVO = """drm-driver:	amdgpu
+drm-client-id:	18
+drm-pdev:	0000:03:00.0
+drm-memory-vram:	999 KiB
+drm-total-vram:	300 MiB
+drm-resident-vram:	256 MiB
+drm-total-gtt:	8 MiB
+"""
+
+FDINFO_I915_INTEGRADA = """drm-driver:	i915
+drm-client-id:	5
+drm-pdev:	0000:00:02.0
+drm-total-system0:	64 MiB
+drm-resident-system0:	48 MiB
+drm-total-stolen-system0:	0
+"""
+
+FDINFO_XE = """drm-driver:	xe
+drm-client-id:	9
+drm-pdev:	0000:03:00.0
+drm-total-system:	10 MiB
+drm-resident-system:	10 MiB
+drm-total-vram0:	200 MiB
+drm-resident-vram0:	128 MiB
+"""
+
+FDINFO_NVIDIA_DRM = """pos:	0
+flags:	02100002
+drm-driver:	nvidia-drm
+drm-client-id:	3
+drm-pdev:	0000:01:00.0
+"""
 
 
 class Nombres(unittest.TestCase):
@@ -92,6 +187,116 @@ class Agrupar(unittest.TestCase):
         filas = [proc(10, 1, "a", estado="stopped"), proc(11, 10, "b", estado="stopped")]
         g = sistema.agrupar(filas, [{"pid": 10, "clase": "a", "titulo": "", "direccion": "0x9"}], self.apps, uid=1000)
         self.assertTrue(g["apps"][0]["suspendido"])
+
+    def test_vram_se_suma_por_app_y_se_ordena(self):
+        filas = [proc(100, 1, "kitty", mem=50), proc(101, 100, "llama-server", vram=6000 * MIB),
+                 proc(200, 1, "firefox", mem=900, vram=300 * MIB), proc(201, 200, "firefox", vram=100 * MIB),
+                 proc(300, 1, "pipewire")]
+        ventanas = [{"pid": 100, "clase": "kitty", "titulo": "~", "direccion": "0x1"},
+                    {"pid": 200, "clase": "firefox", "titulo": "YouTube", "direccion": "0x2"}]
+        g = sistema.agrupar(filas, ventanas, self.apps, uid=1000)
+        apps = {x["nombre"]: x for x in g["apps"]}
+        self.assertEqual(apps["kitty"]["vram"], 6000 * MIB)       # la IA que corre dentro de la terminal
+        self.assertEqual(apps["firefox"]["vram"], 400 * MIB)
+        self.assertEqual(g["fondo"][0]["vram"], 0)
+        self.assertEqual([x["nombre"] for x in sistema.ordenar(g["apps"], "vram")], ["kitty", "firefox"])
+        self.assertEqual([x["nombre"] for x in sistema.ordenar(g["apps"], "mem")], ["firefox", "kitty"])
+        self.assertIn("vram", sistema.ORDENES)
+
+
+class Vram(unittest.TestCase):
+    def test_a_bytes(self):
+        self.assertEqual(sistema._a_bytes("865 MiB"), 865 * MIB)
+        self.assertEqual(sistema._a_bytes("524288 KiB"), 512 * MIB)
+        self.assertEqual(sistema._a_bytes("4096"), 4096)
+        self.assertEqual(sistema._a_bytes("2 GiB"), 2048 * MIB)
+        self.assertIsNone(sistema._a_bytes("N/A"))
+        self.assertIsNone(sistema._a_bytes("Not available"))
+
+    def test_nvidia_trae_graficos_y_computo_y_suma_tarjetas(self):
+        vram = sistema.parsear_pids_nvidia(NVIDIA_PIDS)
+        self.assertEqual(vram, {1226: 107 * MIB, 2874: 90 * MIB, 5000: 8192 * MIB})   # sin «Not available»
+        self.assertEqual(sistema.parsear_pids_nvidia("GPU 00000000:01:00.0\n    Processes : None\n"), {})
+
+    def test_vram_nvidia_sin_nvidia_smi_o_si_falla(self):
+        with mock.patch.object(sistema.shutil, "which", return_value=None):
+            self.assertIsNone(sistema.vram_nvidia())
+        roto = subprocess.CompletedProcess([], 9, "NVIDIA-SMI has failed because it couldn't communicate with the driver", "")
+        with mock.patch.object(sistema.shutil, "which", return_value="/usr/bin/nvidia-smi"), \
+             mock.patch.object(sistema.subprocess, "run", return_value=roto):
+            self.assertIsNone(sistema.vram_nvidia())
+        bien = subprocess.CompletedProcess([], 0, NVIDIA_PIDS, "")
+        with mock.patch.object(sistema.shutil, "which", return_value="/usr/bin/nvidia-smi"), \
+             mock.patch.object(sistema.subprocess, "run", return_value=bien) as run:
+            self.assertEqual(sistema.vram_nvidia()[5000], 8192 * MIB)
+            self.assertEqual(run.call_args[0][0], ["nvidia-smi", "-q", "-d", "PIDS"])
+
+    def test_fdinfo_segun_el_driver(self):
+        self.assertEqual(sistema.parsear_fdinfo_drm(FDINFO_AMD), ("0000:03:00.0/17", 512 * MIB))
+        self.assertEqual(sistema.parsear_fdinfo_drm(FDINFO_AMD_NUEVO), ("0000:03:00.0/18", 256 * MIB))  # resident gana
+        self.assertEqual(sistema.parsear_fdinfo_drm(FDINFO_XE), ("0000:03:00.0/9", 128 * MIB))          # vram, no system
+        self.assertEqual(sistema.parsear_fdinfo_drm(FDINFO_I915_INTEGRADA), ("0000:00:02.0/5", 48 * MIB))
+        self.assertEqual(sistema.parsear_fdinfo_drm(FDINFO_NVIDIA_DRM), ("0000:01:00.0/3", None))       # no dice
+        self.assertIsNone(sistema.parsear_fdinfo_drm("pos:\t0\nflags:\t02\nmnt_id:\t1\n"))              # no es de la gráfica
+
+    def _proc_falso(self) -> Path:
+        raiz = Path(tempfile.mkdtemp())
+
+        def abrir(pid, fd, destino, info):
+            (raiz / str(pid) / "fd").mkdir(parents=True, exist_ok=True)
+            (raiz / str(pid) / "fdinfo").mkdir(parents=True, exist_ok=True)
+            os.symlink(destino, raiz / str(pid) / "fd" / str(fd))
+            (raiz / str(pid) / "fdinfo" / str(fd)).write_text(info)
+        abrir(10, 3, "/dev/dri/renderD128", FDINFO_AMD)
+        abrir(10, 4, "/dev/dri/renderD128", FDINFO_AMD)          # el mismo cliente duplicado (dup)
+        abrir(10, 5, "/dev/dri/card1", FDINFO_AMD_NUEVO)         # otro cliente del mismo proceso
+        abrir(10, 6, "/home/mike/x.txt", FDINFO_AMD)             # no es de /dev/dri: no cuenta
+        abrir(11, 3, "/dev/dri/renderD128", FDINFO_AMD)          # hijo de un fork con el fd heredado
+        abrir(12, 3, "/dev/dri/renderD128", FDINFO_NVIDIA_DRM)
+        (raiz / "13").mkdir()                                   # sin fd/: de otro usuario
+        return raiz
+
+    def test_fdinfo_suma_por_proceso_sin_duplicados(self):
+        raiz = self._proc_falso()
+        vram, supo = sistema.vram_fdinfo([13, 12, 11, 10, 99], raiz)
+        self.assertTrue(supo)
+        self.assertEqual(vram, {10: 512 * MIB + 256 * MIB})
+        vram, supo = sistema.vram_fdinfo([12, 13], raiz)          # solo nvidia-drm: no se sabe
+        self.assertEqual((vram, supo), ({}, False))
+
+    def test_memoria_grafica_mide_cada_3_segundos(self):
+        llamadas = []
+
+        def falso():
+            llamadas.append(1)
+            return {5000: 6144 * MIB}
+        with mock.patch.object(sistema, "vram_nvidia", side_effect=falso):
+            m = sistema.MemoriaGrafica(nvidia=True, drm=False)
+            self.assertFalse(m.disponible)
+            self.assertEqual(m.medir([5000], ahora=100.0), {5000: 6144 * MIB})
+            self.assertTrue(m.disponible)
+            m.medir([5000], ahora=101.0)
+            m.medir([5000], ahora=102.9)
+            self.assertEqual(len(llamadas), 1)                    # entre medidas, la última
+            m.medir([5000], ahora=103.0)
+            self.assertEqual(len(llamadas), 2)
+
+    def test_sin_forma_de_saber_no_hay_columna(self):
+        with mock.patch.object(sistema, "vram_nvidia", return_value=None):
+            m = sistema.MemoriaGrafica(nvidia=True, drm=False)
+            self.assertEqual(m.medir([1], ahora=0.0), {})
+            self.assertFalse(m.disponible)
+        m = sistema.MemoriaGrafica(nvidia=False, drm=False)
+        self.assertEqual(m.medir([1], ahora=0.0), {})
+        self.assertFalse(m.disponible)
+
+    def test_nvidia_y_amd_juntas(self):
+        raiz = self._proc_falso()
+        real = sistema.vram_fdinfo
+        with mock.patch.object(sistema, "vram_nvidia", return_value={10: 100 * MIB, 5000: 6144 * MIB}), \
+             mock.patch.object(sistema, "vram_fdinfo", side_effect=lambda pids: real(pids, raiz)):
+            m = sistema.MemoriaGrafica(nvidia=True, drm=True)
+            self.assertEqual(m.medir([10, 5000], ahora=0.0), {10: 868 * MIB, 5000: 6144 * MIB})
 
 
 class ProcesosReales(unittest.TestCase):

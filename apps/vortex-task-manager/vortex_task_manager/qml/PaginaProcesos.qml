@@ -1,6 +1,7 @@
 // Procesos: arriba un resumen (cómo va la PC y qué es lo que más usa), abajo la tabla como la de
 // Windows: Apps, Segundo plano y Del sistema; cada app se abre para ver sus procesos. Las celdas se
 // pintan más fuerte mientras más usan. Clic derecho: cerrar, finalizar, forzar, suspender, prioridad…
+// Si se puede saber la memoria de la gráfica (VRAM) de cada app, sale su columna y su tarjeta arriba.
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -12,9 +13,19 @@ Item {
     readonly property int anchoCpu: 92
     readonly property int anchoMem: 112
     readonly property int anchoDisco: 104
+    readonly property int anchoVram: 104
     readonly property var res: tm.resumen
     readonly property real memTotal: res.memTotal || 1
+    // La columna «Gráfica» sale solo si hay de dónde saber la VRAM de cada app (nvidia-smi o fdinfo).
+    readonly property bool conVram: tm.vramDisponible
+    readonly property real vramTotal: res.gpu && res.gpu.total ? res.gpu.total : 8589934592
+    readonly property int anchoColumnas: anchoCpu + anchoMem + anchoDisco + (conVram ? anchoVram : 0)
 
+    // «6,2 de 10 GB»: lo usado con un decimal; el total, sin decimales si es redondo.
+    function gigas(usada, total) {
+        var t = total / 1073741824
+        return Fmt.dec(usada / 1073741824, 1) + " de " + (Math.abs(t - Math.round(t)) < 0.05 ? Math.round(t) : Fmt.dec(t, 1)) + " GB"
+    }
     function calor(r) {
         return r <= 0.004 ? "transparent" : Qt.rgba(Tema.azul.r, Tema.azul.g, Tema.azul.b, 0.07 + 0.42 * Math.min(1, r))
     }
@@ -48,6 +59,7 @@ Item {
             anchors.margins: 14
             spacing: 14
             Rectangle {
+                visible: tarjeta.width >= 200     // con la ventana angosta, el texto antes que el ícono
                 Layout.preferredWidth: 44; Layout.preferredHeight: 44
                 radius: 14
                 color: Qt.rgba(tarjeta.tinta.r, tarjeta.tinta.g, tarjeta.tinta.b, 0.14)
@@ -175,6 +187,17 @@ Item {
                 valor: pagina.res.topMem ? pagina.res.topMem.nombre || "—" : "—"
                 detalle: pagina.res.topMem && pagina.res.topMem.nombre ? Fmt.bytes(pagina.res.topMem.valor) + " de RAM" : ""
             }
+            Resumen {   // la tarjeta de video: cuánta VRAM queda (lo que más importa con IA local o jugando)
+                readonly property var g: pagina.res.gpu || ({})
+                readonly property bool llena: g.total > 0 && g.usada / g.total > 0.9
+                visible: g.total > 0
+                icono: "gpu"
+                tinta: llena ? Tema.peligro : Tema.exito
+                titulo: "Gráfica · " + (g.nombre || "")
+                valor: g.total > 0 ? pagina.gigas(g.usada, g.total) : "—"
+                detalle: pagina.res.topVram && pagina.res.topVram.nombre
+                         ? "Lo que más usa: " + pagina.res.topVram.nombre + " (" + Fmt.bytes(pagina.res.topVram.valor) + ")" : ""
+            }
         }
 
         // --- tabla ---
@@ -214,6 +237,14 @@ Item {
                     Columna { Layout.preferredWidth: pagina.anchoCpu; texto: "CPU"; orden: "cpu"; total: Fmt.pct(tm.totales.cpu || 0) }
                     Columna { Layout.preferredWidth: pagina.anchoMem; texto: "Memoria"; orden: "mem"; total: Fmt.pct(tm.totales.mem || 0) }
                     Columna { Layout.preferredWidth: pagina.anchoDisco; texto: "Disco"; orden: "disco"; total: Fmt.mbs(tm.totales.disco || 0) }
+                    Columna {
+                        visible: pagina.conVram
+                        Layout.preferredWidth: pagina.anchoVram
+                        texto: "Gráfica"
+                        orden: "vram"
+                        total: pagina.res.gpu && pagina.res.gpu.total ? Fmt.pct(100 * pagina.res.gpu.usada / pagina.res.gpu.total)
+                                                                       : Fmt.bytes(tm.totales.vram || 0)
+                    }
                     Item { Layout.preferredWidth: 10 }
                 }
                 Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Tema.borde }
@@ -338,7 +369,10 @@ Item {
                                 }
                             }
                             RowLayout {
+                                // Solo el espacio que sobra: un nombre largo se corta, no empuja las columnas.
                                 Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                                Layout.minimumWidth: 0
                                 Layout.leftMargin: 8
                                 spacing: 8
                                 Text {
@@ -347,7 +381,9 @@ Item {
                                     font.pixelSize: 13
                                     font.weight: fila.esProceso ? Font.Normal : Font.Medium
                                     elide: Text.ElideRight
-                                    Layout.maximumWidth: fila.width * 0.4
+                                    // Lo que queda tras las columnas, la flechita y el ícono (78 en un proceso, 72 en una app).
+                                    Layout.maximumWidth: Math.max(0, Math.min(fila.width * 0.4,
+                                        fila.width - pagina.anchoColumnas - (fila.esProceso ? 78 : 72)))
                                 }
                                 Text {
                                     Layout.fillWidth: true
@@ -369,6 +405,13 @@ Item {
                             Celda { Layout.preferredWidth: pagina.anchoCpu; texto: Fmt.pct(fila.f.cpu || 0); fraccion: (fila.f.cpu || 0) / 40; fuerte: !fila.esProceso }
                             Celda { Layout.preferredWidth: pagina.anchoMem; texto: Fmt.bytes(fila.f.mem || 0); fraccion: (fila.f.mem || 0) / (pagina.memTotal * 0.2); fuerte: !fila.esProceso }
                             Celda { Layout.preferredWidth: pagina.anchoDisco; texto: Fmt.mbs(fila.f.disco || 0); fraccion: (fila.f.disco || 0) / 52428800; fuerte: !fila.esProceso }
+                            Celda {
+                                visible: pagina.conVram
+                                Layout.preferredWidth: pagina.anchoVram
+                                texto: (fila.f.vram || 0) > 0 ? Fmt.bytes(fila.f.vram) : "0 MB"
+                                fraccion: (fila.f.vram || 0) / (pagina.vramTotal * 0.25)
+                                fuerte: !fila.esProceso
+                            }
                         }
 
                         MouseArea {

@@ -1,7 +1,8 @@
 """Puente entre el motor (sistema.py, servicios.py) y QML.
 
 Cada segundo (cada 3 si la ventana no está enfocada) mide en un hilo aparte —psutil, hyprctl y
-nvidia-smi tardan unas decenas de milisegundos— y la interfaz solo recibe el resultado. Las acciones que
+nvidia-smi tardan unas decenas de milisegundos— y la interfaz solo recibe el resultado. La VRAM de cada
+proceso va en ese mismo hilo, pero solo se vuelve a medir cada 3 segundos. Las acciones que
 pueden pedir contraseña (pkexec, systemctl del sistema) también van en otro hilo, para no congelarla.
 """
 from __future__ import annotations
@@ -42,6 +43,8 @@ class Puente(QObject):
         self.modelo = ModeloFilas(self)
         self._procesos = sistema.Procesos()
         self._rend = sistema.Rendimiento()
+        self._vram = sistema.MemoriaGrafica()
+        self._vram_disponible = False
         self._apps = apps if apps is not None else sistema.Aplicaciones()
         self._medir = ThreadPoolExecutor(max_workers=1, thread_name_prefix="medir")
         self._trabajos = ThreadPoolExecutor(max_workers=2, thread_name_prefix="accion")
@@ -55,7 +58,7 @@ class Puente(QObject):
         self._ver_procesos = True
         self._enfocada = True
         self._iconos: dict[str, str] = {}
-        self._totales = {"cpu": 0.0, "mem": 0.0, "disco": 0.0, "procesos": 0}
+        self._totales = {"cpu": 0.0, "mem": 0.0, "disco": 0.0, "vram": 0, "procesos": 0}
         self._resumen: dict = {}
         self._rendimiento: dict = {}
         self._historia: dict = {"cpu": [], "mem": [], "nucleos": [], "discos": {}, "redes": {}, "gpus": {}}
@@ -85,10 +88,16 @@ class Puente(QObject):
     def _muestrear(self, con_procesos: bool) -> None:
         try:
             filas = self._procesos.muestrear() if con_procesos else None
+            if filas is not None:
+                # La VRAM se mide cada 3 s (MemoriaGrafica guarda la última); aquí, fuera del hilo de la interfaz.
+                vram = self._vram.medir([f["pid"] for f in filas])
+                for f in filas:
+                    f["vram"] = vram.get(f["pid"], 0)
             grupos = sistema.agrupar(filas, sistema.ventanas_hyprland(), self._apps) if filas is not None else None
             n = len(filas) if filas is not None else self._totales["procesos"]
             hilos = sum(f["hilos"] for f in filas) if filas is not None else self._rendimiento.get("cpu", {}).get("hilos", 0)
-            self._llegoMuestra.emit({"grupos": grupos, "rend": self._rend.muestrear(n, hilos)})
+            self._llegoMuestra.emit({"grupos": grupos, "rend": self._rend.muestrear(n, hilos),
+                                     "vramDisponible": self._vram.disponible})
         except Exception as e:  # que un error raro de psutil no detenga el reloj
             self._llegoMuestra.emit({"error": str(e)})
 
@@ -98,19 +107,28 @@ class Puente(QObject):
             print("Vortexine Task Manager:", res["error"])
             return
         rend = res["rend"]
+        self._vram_disponible = bool(res.get("vramDisponible"))
         if res["grupos"] is not None:
             self._grupos = res["grupos"]
             self._por_clave = {g["clave"]: g for s in self._grupos.values() for g in s}
             todos = [g for s in self._grupos.values() for g in s]
             self._totales = {"cpu": rend["cpu"]["uso"], "mem": rend["mem"]["uso"],
-                             "disco": sum(g["disco"] for g in todos), "procesos": rend["cpu"]["procesos"]}
+                             "disco": sum(g["disco"] for g in todos), "vram": sum(g["vram"] for g in todos),
+                             "procesos": rend["cpu"]["procesos"]}
             apps = [g for g in todos if os.getpid() not in g["pids"]]     # sin contarme a mí
             top_cpu = max(apps, key=lambda g: g["cpu"], default=None)
             top_mem = max(apps, key=lambda g: g["mem"], default=None)
+            top_vram = max(apps, key=lambda g: g["vram"], default=None)
+            # La tarjeta principal: la de más VRAM (en una laptop con dos, la dedicada).
+            gpu = max((g for g in rend["gpus"] if g["vramTotal"] > 0), key=lambda g: g["vramTotal"], default=None)
             self._resumen = {
                 "cpu": rend["cpu"]["uso"], "memUsada": rend["mem"]["usada"], "memTotal": rend["mem"]["total"],
                 "topCpu": {"nombre": top_cpu["nombre"], "valor": top_cpu["cpu"], "icono": self._icono(top_cpu["icono"])} if top_cpu else {},
                 "topMem": {"nombre": top_mem["nombre"], "valor": top_mem["mem"], "icono": self._icono(top_mem["icono"])} if top_mem else {},
+                "topVram": {"nombre": top_vram["nombre"], "valor": top_vram["vram"]}
+                           if top_vram and top_vram["vram"] > 0 and self._vram_disponible else {},
+                "gpu": {"nombre": gpu["nombre"].replace("GeForce ", "").replace("Radeon ", ""),
+                        "usada": gpu["vramUsada"], "total": gpu["vramTotal"]} if gpu else {},
             }
             self._reconstruir()
         else:
@@ -163,7 +181,8 @@ class Puente(QObject):
             colapsada = seccion in self._colapsadas and not self._filtro
             filas.append({"tipo": "seccion", "clave": "s:" + seccion, "seccion": seccion, "nombre": titulo,
                           "cantidad": len(grupos), "colapsada": colapsada,
-                          "cpu": sum(g["cpu"] for g in grupos), "mem": sum(g["mem"] for g in grupos)})
+                          "cpu": sum(g["cpu"] for g in grupos), "mem": sum(g["mem"] for g in grupos),
+                          "vram": sum(g["vram"] for g in grupos)})
             if colapsada:
                 continue
             for g in sistema.ordenar(grupos, self._orden):
@@ -171,13 +190,13 @@ class Puente(QObject):
                 expandido = g["clave"] in self._expandidos and n > 1
                 filas.append({"tipo": "grupo", "clave": g["clave"], "seccion": seccion, "nombre": g["nombre"],
                               "icono": self._icono(g["icono"]), "subtitulo": g["subtitulo"], "cpu": g["cpu"],
-                              "mem": g["mem"], "disco": g["disco"], "n": n, "expandido": expandido,
+                              "mem": g["mem"], "disco": g["disco"], "vram": g["vram"], "n": n, "expandido": expandido,
                               "suspendido": g["suspendido"], "ventana": bool(g["ventanas"]), "usuario": g["usuario"]})
                 if expandido:
                     for p in sistema.ordenar([{**p, "clave": str(p["pid"])} for p in g["procesos"]], self._orden):
                         filas.append({"tipo": "proceso", "clave": f"{g['clave']}/{p['pid']}", "seccion": seccion,
                                       "padre": g["clave"], "nombre": p["nombre"], "pid": p["pid"], "cpu": p["cpu"],
-                                      "mem": p["mem"], "disco": p["disco"], "usuario": p["usuario"],
+                                      "mem": p["mem"], "disco": p["disco"], "vram": p.get("vram", 0), "usuario": p["usuario"],
                                       "suspendido": p["estado"] == "stopped", "subtitulo": ""})
         self.modelo.actualizar(filas)
         self.procesosCambio.emit()
@@ -193,6 +212,7 @@ class Puente(QObject):
     filas = Property(QObject, lambda s: s.modelo, constant=True)
     totales = Property("QVariantMap", lambda s: s._totales, notify=procesosCambio)
     resumen = Property("QVariantMap", lambda s: s._resumen, notify=procesosCambio)
+    vramDisponible = Property(bool, lambda s: s._vram_disponible, notify=procesosCambio)
     rendimiento = Property("QVariantMap", lambda s: s._rendimiento, notify=rendimientoCambio)
     historia = Property("QVariantMap", lambda s: s._historia, notify=rendimientoCambio)
     serviciosUsuario = Property("QVariantList", lambda s: s._servicios["usuario"], notify=serviciosCambio)
