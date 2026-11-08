@@ -1,4 +1,5 @@
-// Una categoría: sus apps en cuadrícula, con «Mostrar más» para las siguientes páginas.
+// Una categoría: sus apps en cuadrícula, con «Mostrar más» para las siguientes páginas. Las categorías
+// de Vortexine's (IA) traen un texto de arriba y, a veces, un comando para la terminal que se puede copiar.
 import QtQuick
 import QtQuick.Layouts
 
@@ -9,12 +10,80 @@ Pagina {
 
     Seccion {
         Layout.fillWidth: true
-        etiqueta: "Categoría"
+        etiqueta: raiz.cat.destacada === true ? "Vortexine's" : "Categoría"
         titulo: raiz.cat.nombre ? raiz.cat.nombre : ""
         tamTitulo: 28
         subtitulo: raiz.estado === "listo" && tienda.categoriaApps.length > 0
                    ? tienda.categoriaApps.length + (tienda.categoriaApps.length === 1 ? " app" : " apps") + (tienda.categoriaHayMas ? " y más" : "")
                    : ""
+
+        Rectangle {   // texto de arriba (solo las categorías que lo traen)
+            Layout.fillWidth: true
+            visible: (raiz.cat.intro ? raiz.cat.intro : "") !== ""
+            // Sin Layouts por dentro: texto que se ajusta + alto que manda en el padre = bucle de polish().
+            implicitHeight: intro.implicitHeight + 40
+            radius: Tema.radioTarjeta
+            border.width: 1
+            border.color: Tema.borde
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0; color: Tema.realce }
+                GradientStop { position: 1; color: Tema.tarjeta }
+            }
+            Column {
+                id: intro
+                x: 24
+                y: 20
+                width: parent.width - 48
+                spacing: 12
+                Text {
+                    width: parent.width
+                    text: raiz.cat.intro ? raiz.cat.intro : ""
+                    color: Tema.texto
+                    font.pixelSize: 15
+                    wrapMode: Text.WordWrap
+                }
+                Row {
+                    visible: (raiz.cat.comando ? raiz.cat.comando : "") !== ""
+                    spacing: 10
+                    Rectangle {
+                        width: comando.implicitWidth + 28
+                        height: 38
+                        radius: 12
+                        color: Tema.campo
+                        border.width: 1
+                        border.color: Tema.bordeCampo
+                        TextEdit {
+                            id: comando
+                            anchors.centerIn: parent
+                            text: raiz.cat.comando ? raiz.cat.comando : ""
+                            readOnly: true
+                            selectByMouse: true
+                            color: Tema.azul
+                            selectionColor: Tema.bordeHover
+                            font.family: "monospace"
+                            font.pixelSize: 15
+                        }
+                    }
+                    Boton {
+                        id: copiar
+                        property bool copiado: false
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: copiado ? "Copiado" : "Copiar"
+                        icono: copiado ? "visto" : ""
+                        tipo: "secundario"
+                        onClicked: {
+                            comando.selectAll()
+                            comando.copy()
+                            comando.deselect()
+                            copiado = true
+                            volver.restart()
+                        }
+                        Timer { id: volver; interval: 2000; onTriggered: copiar.copiado = false }
+                    }
+                }
+            }
+        }
 
         Rejilla {
             Layout.fillWidth: true

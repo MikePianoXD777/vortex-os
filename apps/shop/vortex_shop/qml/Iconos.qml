@@ -34,13 +34,16 @@ QtObject {
         "utilidades": "M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6",
         "sistema": "M3 5h18v12H3zM8 21h8M12 17v4",
         "comunicacion": "M4 5h16v11H10l-5 4v-4H4z",
-        "ciencia": "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 14h9"
+        "ciencia": "M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3M7.5 14h9",
+        // IA: dos destellos
+        "ia": "M10 3l1.9 5.1L17 10l-5.1 1.9L10 17l-1.9-5.1L3 10l5.1-1.9zM18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z"
     })
 
     // Nombre de ícono simbólico del tema («applications-games-symbolic») o nombre de categoría → ícono propio.
     function paraCategoria(nombre) {
         var n = (nombre || "").toLowerCase()
         var tabla = [
+            [["vortex-ia"], "ia"],
             [["game", "juego"], "juegos"],
             [["office", "productiv", "oficina"], "productividad"],
             [["graphic", "photo", "gráfic", "grafic", "imagen", "foto"], "graficos"],

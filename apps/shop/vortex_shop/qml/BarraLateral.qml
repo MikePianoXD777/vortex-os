@@ -91,6 +91,7 @@ Rectangle {
                     width: listaCategorias.width
                     icono: Iconos.paraCategoria(modelData.icono + " " + modelData.nombre)
                     texto: modelData.nombre
+                    destacado: modelData.destacada === true
                     seleccionado: raiz.seccion === "categoria" && raiz.categoriaId === modelData.id
                     onClicked: Nav.seccion("categoria", modelData.id)
                 }

@@ -1,4 +1,5 @@
-// Entrada de la barra lateral: ícono, texto y, si hace falta, un contador.
+// Entrada de la barra lateral: ícono, texto y, si hace falta, un contador. Una entrada «destacada»
+// (la categoría IA) lleva el ícono en violeta y la etiqueta «Nuevo».
 import QtQuick
 
 Rectangle {
@@ -7,6 +8,7 @@ Rectangle {
     property string texto: ""
     property int contador: 0
     property bool seleccionado: false
+    property bool destacado: false
     signal clicked()
     implicitHeight: 40
     radius: 14
@@ -29,12 +31,12 @@ Rectangle {
         width: 19
         height: 19
         nombre: raiz.icono
-        color: raiz.seleccionado ? Tema.azul : Tema.suave
+        color: raiz.seleccionado ? Tema.azul : raiz.destacado ? Tema.violeta : Tema.suave
     }
     Text {
         anchors.left: icon.right
         anchors.leftMargin: 12
-        anchors.right: insignia.visible ? insignia.left : parent.right
+        anchors.right: insignia.visible ? insignia.left : nuevo.visible ? nuevo.left : parent.right
         anchors.rightMargin: 8
         anchors.verticalCenter: parent.verticalCenter
         text: raiz.texto
@@ -60,6 +62,27 @@ Rectangle {
             color: Tema.sobreAcento
             font.pixelSize: 12
             font.weight: Font.Bold
+        }
+    }
+    Rectangle {
+        id: nuevo
+        visible: raiz.destacado && !insignia.visible
+        anchors.right: parent.right
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        width: etiquetaNuevo.implicitWidth + 14
+        height: 20
+        radius: 10
+        color: "transparent"
+        border.width: 1
+        border.color: Tema.violeta
+        Text {
+            id: etiquetaNuevo
+            anchors.centerIn: parent
+            text: "Nuevo"
+            color: Tema.violeta
+            font.pixelSize: 11
+            font.weight: Font.DemiBold
         }
     }
     MouseArea {
