@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# vortex-exe (3.2): instala, quita o abre Vortexine's Runner, la app para jugar y usar programas de Windows
+# (.exe y .msi) con Proton, como Heroic: cada programa en su propio espacio de Windows, con el Proton de
+# CachyOS (o GE-Proton) y umu-launcher. No viene de fábrica: se instala si la quieres, desde Vortexine's
+# Shop o aquí, para tu usuario y sin contraseña. Lo que corre los programas (umu-launcher y
+# proton-cachyos-slr, unos 350 MB) se instala aparte, una vez: desde la app (botón «Instalar») o con
+# «vortex runner motor».
+#
+#   vortex runner                 si está instalada y qué versión
+#   vortex runner instalar        la instala (o la pone al día) en ~/.local/share/vortex-runner
+#   vortex runner quitar          la quita; tu biblioteca y tus programas (~/.local/share/vortex-runner-datos) se quedan
+#   vortex runner abrir [ARCHIVO] la abre (con un .exe: lo agrega o lo instala)
+#   vortex runner motor           instala umu-launcher y el Proton de CachyOS (con sudo)
+#   vortex runner actualizar      la pone al día solo si ya estaba (lo llama «vortex actualizar»)
+set -euo pipefail
+
+VORTEX_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+VORTEX_RELEASE="${VORTEX_RELEASE:-/etc/vortex-release}"
+if [[ ! -d "$VORTEX_DIR/apps/vortex-runner" && -r "$VORTEX_RELEASE" ]]; then
+  repo="$(sed -n 's/^VORTEX_REPO="\(.*\)"$/\1/p' "$VORTEX_RELEASE")"
+  [[ -d "$repo/apps/vortex-runner" ]] && VORTEX_DIR="$repo"
+  unset repo
+fi
+ORIGEN="$VORTEX_DIR/apps/vortex-runner"
+DATOS="${XDG_DATA_HOME:-$HOME/.local/share}"
+DESTINO="$DATOS/vortex-runner"
+BIN="$HOME/.local/bin/vortex-runner"
+DESKTOP="$DATOS/applications/vortex-runner.desktop"
+ICONO="$DATOS/icons/hicolor/scalable/apps/vortex-runner.svg"
+
+aviso() { printf 'vortex runner: %s\n' "$*" >&2; }
+
+version_de() { sed -n 's/^VERSION = "\(.*\)"$/\1/p' "$1/vortex_runner/__init__.py" 2>/dev/null; }
+instalada() { [[ -f "$DESTINO/vortex_runner/__init__.py" ]]; }
+
+faltantes() {
+  local falta=()
+  command -v python3 >/dev/null || falta+=(python)
+  python3 -c 'import PySide6.QtQuickControls2, PySide6.QtNetwork' 2>/dev/null || falta+=(pyside6)
+  printf '%s\n' "${falta[@]}"
+}
+
+# ¿Falta algo del motor? (el Proton de CachyOS vale en cualquiera de sus variantes)
+falta_motor() {
+  command -v umu-run >/dev/null || echo umu-launcher
+  compgen -G "/usr/share/steam/compatibilitytools.d/proton-cachyos*/proton" >/dev/null || echo proton-cachyos-slr
+}
+
+instalar() {
+  [[ -f "$ORIGEN/vortex_runner/__init__.py" ]] || { aviso "no encuentro el código en $ORIGEN"; exit 1; }
+  local falta
+  falta="$(faltantes)"
+  if [[ -n "$falta" ]]; then
+    aviso "le falta: $(tr '\n' ' ' <<<"$falta")— instálalo con: sudo pacman -S --needed $(tr '\n' ' ' <<<"$falta")"
+    exit 2
+  fi
+  # Se copia a una carpeta nueva y se cambia de golpe: si algo falla, la que tenías sigue sirviendo.
+  local nueva="$DESTINO.nueva"
+  rm -rf "$nueva"
+  mkdir -p "$nueva" "$(dirname "$BIN")" "$(dirname "$DESKTOP")" "$(dirname "$ICONO")"
+  cp -a "$ORIGEN/vortex_runner" "$ORIGEN/vortex-runner" "$nueva/"
+  find "$nueva" -name '__pycache__' -type d -prune -exec rm -rf {} +
+  rm -rf "$DESTINO" && mv "$nueva" "$DESTINO"
+  ln -sfn "$DESTINO/vortex-runner" "$BIN"
+  sed "s|^Exec=vortex-runner|Exec=$DESTINO/vortex-runner|" \
+    "$ORIGEN/share/applications/vortex-runner.desktop" >"$DESKTOP"
+  install -m644 "$ORIGEN/share/icons/hicolor/scalable/apps/vortex-runner.svg" "$ICONO"
+}
+
+quitar() {
+  pkill -f "python3 -m vortex_runner" 2>/dev/null || true
+  rm -rf "$DESTINO" "$DESTINO.nueva" "$DESKTOP" "$ICONO"
+  # Los accesos de cada programa en el lanzador abren Runner: sin él no servirían.
+  rm -f "$DATOS"/applications/vortex-runner-*.desktop
+  if [[ -L "$BIN" ]]; then rm -f "$BIN"; fi
+}
+
+case "${1:-estado}" in
+  estado)
+    if instalada; then echo "Vortexine's Runner $(version_de "$DESTINO") instalada"; else echo "Vortexine's Runner no está instalada"; exit 1; fi
+    falta="$(falta_motor)"
+    [[ -z "$falta" ]] || echo "Falta el motor ($(tr '\n' ' ' <<<"$falta" | sed 's/ $//')): «vortex runner motor»"
+    ;;
+  instalar)
+    instalar
+    echo "Vortexine's Runner $(version_de "$DESTINO") instalada: búscala en el lanzador o ábrela con «vortex runner abrir»."
+    ;;
+  actualizar)
+    instalada || exit 0
+    [[ "$(version_de "$DESTINO")" == "$(version_de "$ORIGEN")" ]] &&
+      diff -rq -x __pycache__ "$ORIGEN/vortex_runner" "$DESTINO/vortex_runner" >/dev/null 2>&1 &&
+      cmp -s "$ORIGEN/share/applications/vortex-runner.desktop" <(sed "s|^Exec=$DESTINO/vortex-runner|Exec=vortex-runner|" "$DESKTOP" 2>/dev/null) &&
+      exit 0
+    instalar
+    echo "Vortexine's Runner al día ($(version_de "$DESTINO"))"
+    ;;
+  quitar)
+    quitar
+    echo "Vortexine's Runner quitada (tu biblioteca y tus programas se quedan en $DATOS/vortex-runner-datos)."
+    ;;
+  abrir)
+    instalada || { aviso "no está instalada: «vortex runner instalar»"; exit 1; }
+    shift
+    exec "$DESTINO/vortex-runner" "$@"
+    ;;
+  motor)
+    mapfile -t falta < <(falta_motor)
+    if ((${#falta[@]} == 0)); then echo "El motor ya está: umu-launcher y el Proton de CachyOS."; exit 0; fi
+    sudo pacman -S --needed "${falta[@]}"
+    ;;
+  -h | --help | ayuda) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) aviso "no conozco «$1»"; sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

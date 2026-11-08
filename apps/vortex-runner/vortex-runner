@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Vortexine's Runner: juega y usa programas de Windows (.exe) con Proton.
+#   vortex-runner [ARCHIVO.exe]
+#   vortex-runner --correr ID
+# Corre «python -m vortex_runner» con el código donde esté:
+#   1. VORTEX_RUNNER_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo (el repo, o ~/.local/share/vortex-runner, donde lo deja
+#      «vortex runner instalar»).
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_RUNNER_DIR:-}" "$aqui"; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_runner/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine's Runner no está instalado del todo: instálalo desde Vortexine's Shop o con «vortex runner instalar»." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_runner "$@"

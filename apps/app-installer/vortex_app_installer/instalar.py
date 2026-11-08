@@ -605,8 +605,12 @@ def correr_script(ruta: Path) -> None:
 
 
 def opciones_windows() -> list[dict]:
-    """Con qué se puede abrir un programa de Windows en este equipo: Wine, umu (Proton) o Proton de Steam."""
+    """Con qué se puede abrir un programa de Windows en este equipo: Vortexine's Runner (si lo instalaste
+    desde la Shop, va primero: le da su propio espacio y lo deja en tu biblioteca), Wine, umu (Proton) o
+    el Proton de Steam."""
     salida = []
+    if _runner():
+        salida.append({"id": "runner", "nombre": "Vortexine's Runner"})
     if shutil.which("wine"):
         salida.append({"id": "wine", "nombre": "Wine"})
     if shutil.which("umu-run"):
@@ -615,6 +619,12 @@ def opciones_windows() -> list[dict]:
     if proton:
         salida.append({"id": "proton", "nombre": proton.parent.name, "ruta": str(proton)})
     return salida
+
+
+def _runner() -> Path | None:
+    """El lanzador de Vortexine's Runner, donde lo deja «vortex runner instalar»."""
+    r = rutas.datos_xdg() / "vortex-runner" / "vortex-runner"
+    return r if r.is_file() and os.access(r, os.X_OK) else None
 
 
 def _proton() -> Path | None:
@@ -632,7 +642,12 @@ def abrir_windows(ruta: Path, opcion: str) -> None:
     ruta = Path(ruta)
     msi = ruta.suffix.lower() == ".msi"
     env = dict(os.environ)
-    if opcion == "wine":
+    if opcion == "runner":
+        runner = _runner()
+        if runner is None:
+            raise ErrorInstalar(tr("falta_wine"))
+        args = [str(runner), str(ruta)]   # Runner pregunta si lo instala o lo agrega a tu biblioteca
+    elif opcion == "wine":
         args = ["wine", "msiexec", "/i", str(ruta)] if msi else ["wine", str(ruta)]
     elif opcion == "umu":
         env.setdefault("WINEPREFIX", str(rutas.propios() / "windows"))

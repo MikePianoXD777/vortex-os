@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortexine's Runner: una ventana de programa con el botón de play, que sale de un remolino (el vórtice
+     de Vortexine's), en los colores de Vortexine's OS. Dibujo original de este proyecto. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vr-acento" x1="34" y1="30" x2="98" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+    <linearGradient id="vr-borde" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0.25"/>
+    </linearGradient>
+    <radialGradient id="vr-brillo" cx="64" cy="70" r="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c6a8ff" stop-opacity="0.40"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#vr-borde)" stroke-width="1.5"/>
+  <!-- el remolino, atrás -->
+  <path d="M64 30a38 38 0 1 1-34 21" fill="none" stroke="url(#vr-acento)" stroke-width="5" stroke-linecap="round" opacity="0.45"/>
+  <!-- la ventana del programa -->
+  <rect x="26" y="34" width="76" height="62" rx="9" fill="#141833" stroke="#2c3366" stroke-width="2"/>
+  <path d="M26 48h76" stroke="#2c3366" stroke-width="2"/>
+  <circle cx="35" cy="41" r="2.6" fill="#3d4896"/>
+  <circle cx="43" cy="41" r="2.6" fill="#3d4896"/>
+  <circle cx="64" cy="72" r="34" fill="url(#vr-brillo)"/>
+  <!-- el play -->
+  <path d="M56 58.5v27a3 3 0 0 0 4.5 2.6l22-13.5a3 3 0 0 0 0-5.2l-22-13.5a3 3 0 0 0-4.5 2.6z" fill="url(#vr-acento)"/>
+</svg>

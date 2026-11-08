@@ -1015,11 +1015,12 @@ class TestPropias(unittest.TestCase):
         shutil.rmtree(self.dir)
 
     def test_instalar_y_quitar(self):
-        self.assertEqual([a["id"] for a in propias.lista()], ["vortex-camera"])
+        self.assertEqual([a["id"] for a in propias.lista()], ["vortex-camera", "vortex-runner"])
         self.assertFalse(propias.lista()[0]["instalada"])
         self.assertTrue(propias.lista()[0]["icono"].startswith("file://"))
         from urllib.parse import unquote, urlparse
-        self.assertTrue(os.path.isfile(unquote(urlparse(propias.lista()[0]["icono"]).path)))
+        for app in propias.lista():
+            self.assertTrue(os.path.isfile(unquote(urlparse(app["icono"]).path)), app["id"])
         propias.instalar("vortex-camera")
         self.assertTrue(propias.instalada("vortex-camera"))
         propias.quitar("vortex-camera")

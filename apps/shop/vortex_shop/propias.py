@@ -1,4 +1,4 @@
-"""Las apps propias de Vortexine's que no vienen de fábrica (por ahora, Vortexine's Camera).
+"""Las apps propias de Vortexine's que no vienen de fábrica (Vortexine's Camera y Vortexine's Runner).
 
 No son de Flathub: las instala, quita y abre el comando `vortex` («vortex camara instalar»…), para tu
 usuario y sin contraseña. La tienda solo pregunta si están (su carpeta en ~/.local/share) y llama al
@@ -24,6 +24,16 @@ APPS: list[dict] = [
         "carpeta": "vortex-camera",
         "paquete": "vortex_camera",
         "icono": "propias/vortex-camera.svg",
+    },
+    {
+        "id": "vortex-runner",
+        "nombre": "Vortexine's Runner",
+        "resumen": "Juega y usa programas de Windows (.exe), como Heroic: cada uno en su propio espacio, con "
+                   "el Proton de CachyOS o GE-Proton. Arrastra un .exe y listo.",
+        "subcomando": "runner",
+        "carpeta": "vortex-runner",
+        "paquete": "vortex_runner",
+        "icono": "propias/vortex-runner.svg",
     },
 ]
 

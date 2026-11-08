@@ -166,3 +166,20 @@ def test_windows_con_wine(casa, monkeypatch):
     assert accion["id"] == "windows" and accion["confirmar"]
     motor.ejecutar(info, "windows", accion["datos"])
     assert casa.lanzados == [["wine", str(exe)]]
+
+
+def test_windows_con_runner(casa, monkeypatch):
+    """Con Vortexine's Runner instalado (desde la Shop), es la primera opción y le pasa el .exe."""
+    from vortex_app_installer import rutas
+    runner = rutas.datos_xdg() / "vortex-runner" / "vortex-runner"
+    runner.parent.mkdir(parents=True, exist_ok=True)
+    runner.write_text("#!/bin/sh\n")
+    runner.chmod(0o755)
+    assert instalar.opciones_windows()[0] == {"id": "runner", "nombre": "Vortexine's Runner"}
+    exe = casa.descargas / "juego.exe"
+    exe.write_bytes(b"MZ" + b"\x00" * 10)
+    info = motor.analizar(exe)
+    accion = motor.para_mostrar(info)["acciones"][0]
+    assert accion["datos"] == {"opcion": "runner"}
+    motor.ejecutar(info, "windows", accion["datos"])
+    assert casa.lanzados == [[str(runner), str(exe)]]

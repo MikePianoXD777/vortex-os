@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine's Runner
+GenericName=Programas de Windows
+GenericName[en]=Windows programs
+Comment=Juega y usa programas de Windows (.exe) con Proton, como en Steam
+Comment[en]=Play and use Windows programs (.exe) with Proton, like on Steam
+Exec=vortex-runner %f
+Icon=vortex-runner
+Terminal=false
+Categories=Game;Utility;
+Keywords=exe;windows;wine;proton;juegos;games;msi;instalador;launcher;heroic;lutris;umu;cachyos;
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-shortcut;application/x-bat;
+StartupNotify=true
+StartupWMClass=vortex-runner
