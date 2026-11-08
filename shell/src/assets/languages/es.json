@@ -279,6 +279,17 @@
       }
     },
     "display": {
+      "performance": {
+        "title": "Rendimiento",
+        "ultra": "Ultra",
+        "alto": "Alto",
+        "medio": "Medio",
+        "bajo": "Bajo",
+        "ultra_desc": "Todo encendido: efectos, animaciones y fondo de video.",
+        "alto_desc": "Sin desenfoque. Lo demás, igual.",
+        "medio_desc": "Sin desenfoque ni animaciones de ventanas.",
+        "bajo_desc": "Lo mínimo: además, fondo quieto, sin acciones rápidas ni clips al jugar y el shell a 60 Hz."
+      },
       "window_manager": {
         "title": "Gestor de ventanas",
         "desc": "Mosaico (como qtile): cada ventana toma su lugar sin encimarse. KDE: ventanas flotantes con barra de título, como en KDE o Windows. Al cambiarlo se reinicia el shell",

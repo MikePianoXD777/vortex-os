@@ -56,7 +56,12 @@ ShellRoot {
                     let a = (typeof Config !== "undefined") ? Config.getSetting("animatedWallpapers", {}) : {};
                     return (a && typeof a === "object") ? a : {};
                 }
-                readonly property bool animEnabled: animCfg.enabled !== false
+                // Vortex 3.3: el perfil de rendimiento bajo no carga el video (pausarlo no soltaba su memoria).
+                readonly property bool perfilBajo: {
+                    let dummy = barWindow.animRev;
+                    return (typeof Config !== "undefined") && Config.getSetting("rendimiento", "ultra") === "bajo";
+                }
+                readonly property bool animEnabled: animCfg.enabled !== false && !perfilBajo
                 readonly property bool animPauseCovered: animCfg.pauseCovered !== false
                 readonly property bool animPauseBattery: animCfg.pauseOnBattery !== false
                 readonly property bool animOptimize: animCfg.optimize !== false
@@ -713,10 +718,15 @@ ShellRoot {
                             // Vortex 1.7.5: sin tamaño todavía (al arrancar) se decodificaba la foto completa
                             // (una 4K son ~33 MB) antes de ajustarla a la pantalla; ahora espera al tamaño. Y
                             // sin caché: cada fondo que pasaba por aquí se quedaba guardado.
-                            source: parent.width > 0 && !barWindow.isVideoA && barWindow.pathA ? "file://" + barWindow.pathA : ""
+                            // Vortex 3.3: en el perfil bajo un video se ve como su cuadro fijo, sin cargar el reproductor.
+                            source: {
+                                if (!(parent.width > 0) || !barWindow.pathA) return "";
+                                if (!barWindow.isVideoA) return "file://" + barWindow.pathA;
+                                return barWindow.perfilBajo && barWindow.snapReadyA ? "file://" + barWindow.layerSnapshotPathA : "";
+                            }
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
-                            visible: !barWindow.isVideoA && barWindow.pathA !== ""
+                            visible: (!barWindow.isVideoA || barWindow.perfilBajo) && barWindow.pathA !== ""
                             cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
@@ -725,7 +735,7 @@ ShellRoot {
                         Loader {
                             id: videoLoaderA
                             anchors.fill: parent
-                            active: barWindow.isVideoA && barWindow.pathA !== ""
+                            active: barWindow.isVideoA && barWindow.pathA !== "" && !barWindow.perfilBajo
                             asynchronous: false
                             sourceComponent: videoLayerCompA
                             visible: barWindow.isVideoA
@@ -784,10 +794,15 @@ ShellRoot {
                             // Vortex 1.7.5: sin tamaño todavía (al arrancar) se decodificaba la foto completa
                             // (una 4K son ~33 MB) antes de ajustarla a la pantalla; ahora espera al tamaño. Y
                             // sin caché: cada fondo que pasaba por aquí se quedaba guardado.
-                            source: parent.width > 0 && !barWindow.isVideoB && barWindow.pathB ? "file://" + barWindow.pathB : ""
+                            // Vortex 3.3: en el perfil bajo un video se ve como su cuadro fijo, sin cargar el reproductor.
+                            source: {
+                                if (!(parent.width > 0) || !barWindow.pathB) return "";
+                                if (!barWindow.isVideoB) return "file://" + barWindow.pathB;
+                                return barWindow.perfilBajo && barWindow.snapReadyB ? "file://" + barWindow.layerSnapshotPathB : "";
+                            }
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
-                            visible: !barWindow.isVideoB && barWindow.pathB !== ""
+                            visible: (!barWindow.isVideoB || barWindow.perfilBajo) && barWindow.pathB !== ""
                             cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
@@ -796,7 +811,7 @@ ShellRoot {
                         Loader {
                             id: videoLoaderB
                             anchors.fill: parent
-                            active: barWindow.isVideoB && barWindow.pathB !== ""
+                            active: barWindow.isVideoB && barWindow.pathB !== "" && !barWindow.perfilBajo
                             asynchronous: false
                             sourceComponent: videoLayerCompB
                             visible: barWindow.isVideoB

@@ -70,6 +70,9 @@ Uso: vortex <comando>
                                        PC (no viene de fábrica: se instala aquí o desde Vortexine's Shop)
   runner [instalar|quitar|abrir|motor] Vortexine's Runner: juega y usa programas de Windows (.exe) con
                                        Proton, como Heroic (no viene de fábrica: aquí o desde la Shop)
+  rendimiento [estado|ultra|alto|medio|bajo]
+                                       perfil de rendimiento: menos efectos y memoria para PCs modestas
+                                       (también en Ajustes → Pantalla; de fábrica, ultra)
   ventanas [estado|mosaico|kde]        gestor de ventanas: mosaico (como qtile, de fábrica) o kde
                                        (flotantes con barra de título, como KDE o Windows). También
                                        desde Ajustes → Pantalla
@@ -500,8 +503,11 @@ cmd_modo_juego() {
       # Vortex 2.0.2: los clips (Alt+F10) graban solo mientras juegas; si ya graban, no hace nada.
       # 2.8.4: en su propio scope. Con el juego lo prende vortex-gestor, y el grabador heredaba su límite
       # de 64 MB: se ahogaba dentro del driver de NVIDIA, Hyprland se quedaba esperando y se congelaba todo.
-      setsid systemd-run --user --scope --quiet --collect -- \
-        "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
+      # 3.3: en el perfil bajo no graban (250-400 MB que el juego necesita).
+      if [[ "$(perfil_rendimiento)" != bajo ]]; then
+        setsid systemd-run --user --scope --quiet --collect -- \
+          "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
+      fi
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
       ;;
     off)
@@ -1055,6 +1061,50 @@ reiniciar_shell() {
 local c = (type(a) == "table" and a.comando_shell) and a.comando_shell() or "serpantinumd start"
 hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; '"$previo"'" .. c))' >/dev/null 2>&1 &&
     printf 'vortex: %s\n' "reinicié el shell para que cargue lo nuevo" || true
+}
+
+# Perfiles de rendimiento (3.3): cuánto se gasta en verse bonito. Ultra es lo de siempre y no deja archivo.
+#   alto   sin desenfoque
+#   medio  además, sin animaciones de ventanas
+#   bajo   además, fondo de video quieto, sin acciones rápidas, sin clips al jugar y el shell a 60 Hz
+# hyprland.lua lee ~/.config/vortex/rendimiento al cargar, así que cada «hypr reload» (modo juego, modo IA,
+# batería) vuelve al perfil y no a todos los efectos. El shell lee «rendimiento» de settings.json.
+RENDIMIENTO="$CONF/rendimiento"
+
+perfil_rendimiento() {
+  local p
+  p="$(cat "$RENDIMIENTO" 2>/dev/null)"
+  case "$p" in alto | medio | bajo) echo "$p" ;; *) echo ultra ;; esac
+}
+
+cmd_rendimiento() {
+  local nuevo="${1:-estado}" antes ajustes nuevos
+  antes="$(perfil_rendimiento)"
+  case "$nuevo" in
+    estado) echo "$antes"; return 0 ;;
+    ultra | alto | medio | bajo) ;;
+    *) aviso "usa: vortex rendimiento [estado|ultra|alto|medio|bajo]"; exit 1 ;;
+  esac
+  mkdir -p "$CONF"
+  if [[ "$nuevo" == ultra ]]; then rm -f "$RENDIMIENTO"; else printf '%s\n' "$nuevo" >"$RENDIMIENTO"; fi
+  # En el mismo archivo, no con mv: el shell vigila ese archivo y con mv deja de ver los cambios.
+  ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json"
+  if [[ -s "$ajustes" ]] && nuevos="$(jq --arg p "$nuevo" '.rendimiento = $p' "$ajustes" 2>/dev/null)"; then
+    printf '%s\n' "$nuevos" >"$ajustes"
+  elif [[ ! -s "$ajustes" ]]; then
+    mkdir -p "${ajustes%/*}"
+    printf '{\n  "rendimiento": "%s"\n}\n' "$nuevo" >"$ajustes"
+  fi
+  [[ "$nuevo" == "$antes" ]] && { echo "$nuevo"; return 0; }
+  if hypr_corriendo; then
+    hypr reload >/dev/null 2>&1 || true
+    # Lo que pida un modo encima del perfil se vuelve a poner después de la recarga.
+    [[ -e "$ESTADO/modo-juego" || -e "$ESTADO/modo-ia" || -e "$ESTADO/bateria" ]] && sin_efectos
+    command -v vortex-pantallas >/dev/null && vortex-pantallas >/dev/null 2>&1
+    # Las acciones rápidas y el dibujado a 60 Hz solo cambian al arrancar el shell.
+    [[ "$antes" == bajo || "$nuevo" == bajo ]] && reiniciar_shell
+  fi
+  echo "$nuevo"
 }
 
 # Gestor de ventanas (1.7.5): «mosaico» (de fábrica: Hyprland en mosaico, como qtile) o «kde» (cada
@@ -1890,6 +1940,7 @@ case "${1:-ayuda}" in
     ;;
   java) shift; cmd_java "$@" ;;
   ventanas) shift; cmd_ventanas "$@" ;;
+  rendimiento) shift; cmd_rendimiento "$@" ;;
   primer-inicio) cmd_primer_inicio ;;
   # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
   version)

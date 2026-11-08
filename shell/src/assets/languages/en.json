@@ -278,6 +278,17 @@
       }
     },
     "display": {
+      "performance": {
+        "title": "Performance",
+        "ultra": "Ultra",
+        "alto": "High",
+        "medio": "Medium",
+        "bajo": "Low",
+        "ultra_desc": "Everything on: effects, animations and video wallpaper.",
+        "alto_desc": "No blur. Everything else stays.",
+        "medio_desc": "No blur or window animations.",
+        "bajo_desc": "The minimum: also a still wallpaper, no quick actions or game clips, and the shell at 60 Hz."
+      },
       "window_manager": {
         "title": "Window manager",
         "desc": "Tiling (like qtile): each window takes its own spot without overlapping. KDE: floating windows with a title bar, like KDE or Windows. Changing it restarts the shell",

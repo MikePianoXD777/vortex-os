@@ -8,6 +8,8 @@ ShellRoot {
     readonly property bool performanceMode: !!(Config.getSetting("general", {}).performance)
     readonly property bool quickactionsEnabled: Config.getSetting("general", {}).quickactions !== false
     readonly property bool dockEnabled: Config.getSetting("dock", {}).enabled !== false
+    // Vortex 3.3: el perfil de rendimiento bajo quita las acciones rápidas («vortex rendimiento»).
+    readonly property bool perfilBajo: Config.getSetting("rendimiento", "ultra") === "bajo"
 
     Connections {
         target: Quickshell
@@ -104,7 +106,7 @@ ShellRoot {
         sourceComponent: WallpaperEngine {}
     }
     Loader {
-        active: !performanceMode && quickactionsEnabled
+        active: !performanceMode && quickactionsEnabled && !perfilBajo
         sourceComponent: Floating {}
     }
 

@@ -39,6 +39,8 @@ DisplayMainState {
                 delegate: DisplayMonitorCard { tab: displayTabRoot }
             }
 
+            // Vortex 3.3: perfiles de rendimiento.
+            DisplayPerformanceSection { tab: displayTabRoot }
             // Vortex (1.7.5): mosaico o ventanas flotantes como KDE, abajo de los monitores.
             DisplayWindowManagerSection { tab: displayTabRoot }
             // Vortex 1.8: modo laptop (solo en equipos con batería).

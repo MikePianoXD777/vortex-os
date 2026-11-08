@@ -67,6 +67,14 @@ local function comando_shell()
     -- pide). Solo aquí: las apps no lo heredan.
     local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
         .. " QT_NO_XDG_DESKTOP_PORTAL=1"
+    -- 3.3: en el perfil bajo el shell dibuja a 60 Hz en un solo hilo: cuesta menos memoria que «threaded».
+    local f_bajo = io.open(os.getenv("HOME") .. "/.config/vortex/rendimiento")
+    if f_bajo then
+        if f_bajo:read("l") == "bajo" then
+            memoria = memoria .. " QSG_RENDER_LOOP=basic env -u QSG_USE_SIMPLE_ANIMATION_DRIVER"
+        end
+        f_bajo:close()
+    end
     return "QT_LOGGING_RULES='" .. reglas .. "' " .. memoria .. " serpantinumd start"
 end
 if ok_atajos then atajos.comando_shell = comando_shell end
@@ -322,5 +330,16 @@ hl.bind("SUPER + SHIFT + G", hl.dsp.event("serpantinum:toggle juegos"))
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)
 if not ok_registro then avisar_atajos(fallo_registro) end
+
+-- 3.3: el perfil de rendimiento (Ajustes → Pantalla o «vortex rendimiento»). Ultra no cambia nada. Va antes de
+-- hypr-mio.lua para que lo tuyo siga ganando.
+local f_perfil = io.open(home .. "/.config/vortex/rendimiento")
+local perfil = f_perfil and f_perfil:read("l") or "ultra"
+if f_perfil then f_perfil:close() end
+if perfil == "alto" then
+    hl.config({ decoration = { blur = { enabled = false } } })
+elseif perfil == "medio" or perfil == "bajo" then
+    hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false } } })
+end
 
 pcall(dofile, home .. "/.config/vortex/hypr-mio.lua")
