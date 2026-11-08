@@ -19,9 +19,12 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  modo-ia on|off|alternar|estado       el hermano del modo juego para la IA local: apaga los efectos y
+                                       pausa el fondo animado (lo pone solo el gestor cuando Ollama,
+                                       llama.cpp, ComfyUI o PyTorch usan la gráfica)
   configurar-usuario                   deja tu usuario con la config de Vortex (sin instalar nada)
   gestor [estado|encender|apagar]      reparte solo la CPU y la RAM (prioridad a la ventana
-                                       enfocada, modo juego automático, presión de memoria)
+                                       enfocada, modo juego y modo IA automáticos, presión de memoria)
   claude                               abre Claude en una terminal (si está activado)
   claude login                         solo inicia sesión (ventana que se cierra sola)
   claude activar|desactivar|activado   conecta Vortexine's OS con Claude (viene apagado; también
@@ -502,13 +505,15 @@ cmd_modo_juego() {
     off)
       # Recargar devuelve todo a como estaba en la config.
       hypr_corriendo && hypr reload >/dev/null
+      # 3.1: con el modo IA puesto (la IA sigue trabajando) los efectos se quedan apagados.
+      [[ -e "$ESTADO/modo-ia" ]] && sin_efectos
       if command -v powerprofilesctl >/dev/null && [[ -s "$marca.anterior" ]]; then
         local anterior
         anterior="$(cat "$marca.anterior")"
         [[ -n "$anterior" ]] && { powerprofilesctl set "$anterior" 2>/dev/null || true; }
       fi
-      # Vortex: el fondo animado vuelve a correr (solo si lo pausó «on»).
-      if [[ -f "$marca.fondo" ]]; then
+      # Vortex: el fondo animado vuelve a correr (solo si lo pausó «on» y no lo quiere en pausa el modo IA).
+      if [[ -f "$marca.fondo" && ! -e "$ESTADO/modo-ia" ]]; then
         shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
       fi
       rm -f "$marca" "$marca.anterior" "$marca.fondo"
@@ -523,6 +528,96 @@ cmd_modo_juego() {
       if [[ -f "$marca" ]]; then cmd_modo_juego off; else cmd_modo_juego on; fi
       ;;
     *) aviso "usa: vortex modo-juego on|off|alternar"; exit 1 ;;
+  esac
+}
+
+# Sin animaciones, desenfoque ni sombras (lo mismo que hace el modo juego al ponerse).
+sin_efectos() {
+  hypr_corriendo || return 0
+  hypr eval 'hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false } } })' >/dev/null 2>&1 || true
+}
+
+# ¿Están grabando los clips (Alt+F10)? bin/vortex-clips deja el PID de su servicio y de su grabador.
+clips_grabando() {
+  local dir="${XDG_RUNTIME_DIR:-/tmp}/vortex-clips" f pid
+  for f in "$dir/servicio.pid" "$dir/grabador.pid"; do
+    pid="$(cat "$f" 2>/dev/null)" || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# ---- Modo IA (3.1) ---------------------------------------------------------------------------------
+# El hermano del modo juego: lo pone y lo quita solo vortex-gestor cuando una IA local usa la gráfica
+# (Ollama con un modelo cargado, llama.cpp, ComfyUI, Stable Diffusion, PyTorch…). Apaga los efectos de
+# Hyprland, pausa el fondo animado (en una PC de prueba ocupaba ~841 MB de VRAM, que el modelo puede usar)
+# y para los clips si estaban grabando; «off» lo deja todo como estaba. El modo juego manda: con él puesto
+# «on» no hace nada, y «off» no devuelve ni los efectos ni el fondo (los devuelve el modo juego al quitarse).
+#   vortex modo-ia on [PROGRAMA] [--sin-aviso]   PROGRAMA sale en el aviso: «le di la gráfica a Ollama»
+cmd_modo_ia() {
+  local marca="$ESTADO/modo-ia" juego="$ESTADO/modo-juego"
+  mkdir -p "$ESTADO"
+  case "${1:-alternar}" in
+    on)
+      shift
+      local programa="" callado=0 a
+      for a in "$@"; do
+        case "$a" in
+          --sin-aviso) callado=1 ;;
+          *) programa="$a" ;;
+        esac
+      done
+      if [[ -e "$juego" ]]; then
+        aviso "el modo juego está puesto: el modo IA espera a que termine el juego"
+        return 1
+      fi
+      sin_efectos
+      # La marca .fondo dice que lo pausó el modo IA: solo entonces «off» lo reanuda.
+      if shell_ipc wallpaper setPlayback all pause >/dev/null 2>&1; then
+        touch "$marca.fondo"
+      fi
+      # Los clips graban en la gráfica y guardan 30 s en la RAM: se paran y «off» los vuelve a prender.
+      if clips_grabando; then
+        "$VORTEX_DIR/bin/vortex-clips" detener 2>/dev/null || true
+        touch "$marca.clips"
+      fi
+      touch "$marca"
+      if ((!callado)); then
+        if [[ -n "$programa" ]]; then
+          notificar -t 4000 -i applications-science "Modo IA: le di la gráfica a $programa" \
+            "Apagué los efectos y el fondo animado mientras trabaja; al terminar vuelven solos."
+        else
+          notificar -t 4000 -i applications-science "Modo IA activado" "Efectos y fondo animado en pausa mientras la IA trabaja."
+        fi
+      fi
+      ;;
+    off)
+      [[ -e "$marca" ]] || { rm -f "$marca.fondo" "$marca.clips"; return 0; }
+      local fondo=0 clips=0
+      [[ -e "$marca.fondo" ]] && fondo=1
+      [[ -e "$marca.clips" ]] && clips=1
+      rm -f "$marca" "$marca.fondo" "$marca.clips"
+      # El modo juego se puso encima: él devuelve los efectos y el fondo al quitarse, y los clips ya
+      # graban con él.
+      [[ -e "$juego" ]] && return 0
+      if hypr_corriendo; then
+        hypr reload >/dev/null 2>&1 || true
+        # El modo laptop (desenchufada) también los quiere apagados.
+        [[ -e "$ESTADO/bateria" ]] && sin_efectos
+      fi
+      if ((fondo)); then
+        shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
+      fi
+      if ((clips)); then
+        setsid systemd-run --user --scope --quiet --collect -- \
+          "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
+      fi
+      ;;
+    alternar)
+      if [[ -f "$marca" ]]; then cmd_modo_ia off; else cmd_modo_ia on; fi
+      ;;
+    estado) if [[ -f "$marca" ]]; then echo "encendido"; else echo "apagado"; fi ;;
+    *) aviso "usa: vortex modo-ia on|off|alternar|estado"; exit 1 ;;
   esac
 }
 
@@ -587,6 +682,11 @@ gestor_estado() {
   esac
   printf '  Juegos abiertos: %s · modo juego: %s · fondo animado: %s\n' "${e[juegos]:-0}" "$modo" \
     "$([[ "${e[fondo_pausado]:-0}" == 1 ]] && echo en pausa || echo normal)"
+  case "${e[modo_ia]:-apagado}" in
+    propio) printf '  Modo IA: encendido por el gestor (%s, pid %s)\n' "${e[ia_programa]:-?}" "${e[ia_pid]:-?}" ;;
+    ajeno) echo "  Modo IA: encendido a mano (vortex modo-ia on)" ;;
+    *) echo "  Modo IA: apagado (se pone solo cuando una IA local usa la gráfica)" ;;
+  esac
   printf '  Presión de memoria: %s · avisos: %s' "${e[psi]:-?}" "${e[psi_eventos]:-0}"
   [[ "${e[psi_ultimo]:-0}" != 0 ]] && printf ' (el último a las %(%H:%M)T; memoria soltada: %s)' "${e[psi_ultimo]}" "${e[reclamos]:-0}"
   printf '\n'
@@ -1738,6 +1838,7 @@ cmd_configurar_usuario() {
 
 case "${1:-ayuda}" in
   modo-juego) shift; cmd_modo_juego "$@" ;;
+  modo-ia) shift; cmd_modo_ia "$@" ;;
   configurar-usuario) cmd_configurar_usuario ;;
   gestor) shift; cmd_gestor "$@" ;;
   claude) shift; cmd_claude "$@" ;;

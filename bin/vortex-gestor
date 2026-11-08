@@ -14,6 +14,11 @@
 #   3. Presión de memoria: el kernel avisa (PSI) y el gestor le pide al shell que suelte
 #      memoria (si el shell sabe hacerlo) y comprime lo que las apps de fondo no usan
 #      (memory.reclaim), para que la app enfocada o el juego no den tirones.
+#   4. Modo IA automático (3.1), el hermano del modo juego: si una IA local usa la gráfica (Ollama con un
+#      modelo cargado, llama.cpp, ComfyUI, Stable Diffusion, PyTorch…), su proceso recibe la prioridad de
+#      la ventana enfocada y «vortex modo-ia on» apaga los efectos, pausa el fondo animado (su memoria de
+#      la gráfica le queda al modelo) y para los clips; al terminar, todo vuelve. El modo juego manda.
+#      Miku (vortex-miku y su Ollama) nunca cuenta.
 #
 # Es liviano: un bash dormido en read y un programa en C (vortex-eventos) dormido en poll().
 # Nada se despierta si no pasa algo; no hay bucles con sleep.
@@ -21,6 +26,7 @@
 # Ajustes opcionales en ~/.config/vortex/gestor.conf (sintaxis de bash), por ejemplo:
 #   JUEGOS_CLASES='^(steam_app_[0-9]+|gamescope|aces|.+\.exe)$'
 #   PESO_FOCO=500  PESO_FONDO=50  NICE_FOCO=-5  RECLAMAR_MB=64
+#   IA_REVISAR_S=20  IA_VRAM_MB=1024   (IA_REVISAR_S=0 apaga el modo IA automático)
 set -uo pipefail
 shopt -s nullglob
 
@@ -37,6 +43,9 @@ AVISO_ENFRIAR_S=600  # entre dos avisos de «te estás quedando sin memoria»
 MEM_REVISAR_S=30     # cada cuánto se mira la memoria disponible (leer un archivo: no cuesta nada)
 DISCO_REVISAR_S=600  # cada cuánto se mira si el disco se está llenando (3.0, bin/vortex-disco)
 RECLAMAR_MB=64       # cuánto comprimir de cada app de fondo con presión (0 = nada)
+IA_REVISAR_S=20      # cada cuánto se mira si una IA local usa la gráfica (modo IA; 0 = nunca)
+IA_VRAM_MB=1024      # desde cuánta memoria de la gráfica cuenta como IA trabajando (NVIDIA, AMD con VRAM)
+IA_FALTAS=2          # revisiones seguidas sin verla antes de quitar el modo IA (Ollama cambia de modelo)
 DEPURAR=0            # 1 = registra cada cambio de foco
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex/gestor.conf"
 # shellcheck source=/dev/null
@@ -55,6 +64,8 @@ VORTEX="${VORTEX_GESTOR_VORTEX:-vortex}"
 QS="${VORTEX_GESTOR_QS:-quickshell}"
 MEMORIA="${VORTEX_GESTOR_MEMORIA:-vortex-memoria}"
 DISCO="${VORTEX_GESTOR_DISCO:-vortex-disco}"
+NVSMI="${VORTEX_GESTOR_NVIDIA_SMI:-nvidia-smi}"
+IA="${VORTEX_GESTOR_IA:-vortex-ia}"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
 # La ruta del shell que de verdad corre (quickshell -p RUTA/Shell.qml): el IPC de quickshell solo
 # encuentra la instancia por su ruta, y no siempre es la del paquete (un shell lanzado desde el repo,
@@ -71,6 +82,7 @@ shell_qml_activo() {
 ESTADO_DIR="$RUN/vortex"
 ESTADO="$ESTADO_DIR/gestor"
 MARCA_JUEGO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego"
+MARCA_IA="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-ia"
 # Las apps del usuario viven bajo su gestor de systemd; nada fuera de aquí se toca.
 RAIZ_USUARIO="/user.slice/user-$UID.slice/user@$UID.service"
 
@@ -92,12 +104,16 @@ MODO_PROPIO=0 FONDO_PAUSADO=0 PRIMER_FOCO=1
 MOVER=1 FALLOS_MOVER=0
 PSI_ESTADO="vigilada" PSI_EVENTOS=0 PSI_ULTIMO=0 PSI_TEXTO="" RECLAMOS=0 AVISO_MEMORIA=0 AVISOS_MEMORIA=0
 SHELL_SOLTAR="sin probar" SHELL_INSTANCIA=""
+IA_ACTIVA=0 IA_PROPIO=0 IA_PID=0 IA_NOMBRE="" IA_CG="" IA_ULTIMO=0 IA_SIN_VER=0 IA_CALLADO=0
+declare -A IA_HALLADAS=() # pid → programa, de los procesos de IA de la última revisión
 INICIO=$EPOCHSECONDS
 
 guardar_estado() {
   [[ -d "$ESTADO_DIR" ]] || mkdir -p "$ESTADO_DIR" 2>/dev/null || return 0
   local modo=apagado
   if ((MODO_PROPIO)); then modo=propio; elif modo_juego_activo; then modo=ajeno; fi
+  local ia=apagado
+  if ((IA_PROPIO)); then ia=propio; elif modo_ia_activo; then ia=ajeno; fi
   {
     printf 'inicio=%s\npid=%s\n' "$INICIO" "$$"
     printf 'foco_pid=%s\nfoco_clase=%s\nfoco_cgroup=%s\nfoco_nice=%s\n' \
@@ -106,6 +122,7 @@ guardar_estado() {
       "${#MIS_CG[@]}" "${#JUEGOS[@]}" "$modo" "$FONDO_PAUSADO"
     printf 'psi=%s\npsi_eventos=%s\npsi_ultimo=%s\npsi_valor=%s\nreclamos=%s\nshell_soltar=%s\navisos_memoria=%s\n' \
       "$PSI_ESTADO" "$PSI_EVENTOS" "$PSI_ULTIMO" "$PSI_TEXTO" "$RECLAMOS" "$SHELL_SOLTAR" "$AVISOS_MEMORIA"
+    printf 'modo_ia=%s\nia_programa=%s\nia_pid=%s\nia_cgroup=%s\n' "$ia" "$IA_NOMBRE" "$IA_PID" "$IA_CG"
   } >"$ESTADO" 2>/dev/null
 }
 
@@ -330,11 +347,14 @@ quitar_nice() {
 }
 
 # --- Prioridad de la ventana enfocada ---
-dar_prioridad() {
+# Le da el peso de foco a la app de un proceso: la pasa a su propio scope si hace falta o se lo pone en
+# el cgroup donde ya está. SUBIDO = ese cgroup. Lo usan la ventana enfocada y la IA del modo IA.
+subir() {
   local pid="$1" clase="$2"
-  apto "$pid" && cgroup_de "$pid" || return 0
+  SUBIDO=""
+  apto "$pid" && cgroup_de "$pid" || return 1
   if necesita_scope "$pid" "$CG"; then
-    crear_scope "$pid" "$clase" "$CG" && FOCO_CG="$NUEVO_CG"
+    crear_scope "$pid" "$clase" "$CG" && SUBIDO="$NUEVO_CG"
   elif del_usuario "$CG"; then
     if [[ -z "${MIS_CG[$CG]:-}" && -z "${AJENO_PESO[$CG]:-}" ]]; then
       # Un cgroup que no creó el gestor (flatpak, otra app): se guarda su peso para devolverlo.
@@ -343,18 +363,32 @@ dar_prioridad() {
       [[ "$peso" =~ ^[0-9]+$ ]] && AJENO_PESO[$CG]="$peso"
     fi
     if [[ -n "${MIS_CG[$CG]:-}" || -n "${AJENO_PESO[$CG]:-}" ]] && poner_peso "$CG" "$PESO_FOCO"; then
-      FOCO_CG="$CG"
+      SUBIDO="$CG"
     fi
   fi
+  [[ -n "$SUBIDO" ]]
+}
+
+dar_prioridad() {
+  local pid="$1" clase="$2"
+  apto "$pid" && cgroup_de "$pid" || return 0
+  subir "$pid" "$clase" && FOCO_CG="$SUBIDO"
   [[ -n "$FOCO_CG" && -n "${JUEGO_PID[$pid]:-}" ]] && JUEGO_CG[$FOCO_CG]=1
   dar_nice "$pid"
 }
 
 quitar_prioridad() {
-  local cg="$FOCO_CG"
   quitar_nice
   FOCO_NICE=0
+  soltar_cg "$FOCO_CG"
+}
+
+# Devuelve al peso de fondo (o al suyo, si no lo creó el gestor) el cgroup de una app que deja de tener
+# prioridad. El de la IA, mientras siga el modo IA, se queda con la suya.
+soltar_cg() {
+  local cg="$1"
   [[ -n "$cg" ]] || return 0
+  ((IA_ACTIVA)) && [[ "$cg" == "$IA_CG" ]] && return 0
   if [[ -n "${MIS_CG[$cg]:-}" ]]; then
     if [[ -n "${NORMALIZAR[$cg]:-}" ]]; then
       # Recién creado: en systemd tiene el peso de foco; se le deja el de fondo (una
@@ -394,6 +428,12 @@ empezar_juego() {
   # 3.0: si al juego le queda poca memoria, ofrece cerrar lo que más gasta (lo decide vortex-memoria,
   # después de dejarlo cargar unos segundos). Una vez por partida: solo con el primer juego.
   "$MEMORIA" --juego "$1" "${2:-0}" >/dev/null 2>&1 &
+  # El modo juego manda: el modo IA se quita (después de poner el del juego, para que los efectos y el
+  # fondo no vuelvan entre uno y otro) y regresa callado cuando se cierre el juego.
+  if ((IA_ACTIVA)); then
+    IA_CALLADO=1
+    terminar_ia "abriste un juego: manda el modo juego"
+  fi
 }
 
 terminar_juego() {
@@ -405,10 +445,12 @@ terminar_juego() {
   MODO_PROPIO=0
   # Si el modo juego sigue puesto (lo puso otro, p. ej. Super+G), el fondo sigue en pausa:
   # «vortex modo-juego off» lo reanuda cuando se quite.
-  if ((FONDO_PAUSADO)) && ! modo_juego_activo; then
+  if ((FONDO_PAUSADO)) && ! modo_juego_activo && ! modo_ia_activo; then
     fondo play
   fi
   FONDO_PAUSADO=0
+  # Si la IA seguía trabajando, el modo IA vuelve en la siguiente vuelta del ciclo, sin esperar.
+  IA_ULTIMO=0
 }
 
 agregar_juego() {
@@ -449,13 +491,13 @@ soltar_shell() {
 }
 
 # Comprime (a zram) lo que no usan las apps de fondo que ordenó el gestor; nunca la
-# enfocada ni un juego. Va en segundo plano: el kernel puede tardar un poco.
+# enfocada, ni un juego, ni la IA del modo IA. Va en segundo plano: el kernel puede tardar un poco.
 reclamar_fondo() {
   local cg
   local -a archivos=()
   ((RECLAMAR_MB > 0)) || return 0
   for cg in "${!MIS_CG[@]}"; do
-    [[ "$cg" == "$FOCO_CG" || -n "${JUEGO_CG[$cg]:-}" ]] && continue
+    [[ "$cg" == "$FOCO_CG" || "$cg" == "$IA_CG" || -n "${JUEGO_CG[$cg]:-}" ]] && continue
     if [[ ! -d "$CGROOT$cg" ]]; then
       unset 'MIS_CG[$cg]' 'NORMALIZAR[$cg]'
       continue
@@ -508,6 +550,191 @@ revisar_disco() {
   ((EPOCHSECONDS - DISCO_ULTIMO >= DISCO_REVISAR_S)) || return 0
   DISCO_ULTIMO=$EPOCHSECONDS
   "$DISCO" revisar >/dev/null 2>&1 &
+}
+
+# --- Modo IA (3.1) ---
+# Una IA local que usa la gráfica recibe la prioridad de la ventana enfocada, y «vortex modo-ia on» apaga
+# los efectos, pausa el fondo animado (en una PC de prueba ocupaba ~841 MB de VRAM, que el modelo puede
+# usar) y para los clips. El modo juego manda: con un juego no se pone, y si empieza uno se quita.
+# Revisarlo es barato: cada IA_REVISAR_S se lee el comm de cada proceso de /proc, sin lanzar nada. Solo
+# los que parecen IA se miran más (su línea de comandos y, si es python, sus librerías) y solo si queda
+# alguno se le pregunta a nvidia-smi (o, en AMD e Intel, al fdinfo de DRM del proceso).
+IA_MIKU='vortex-miku|/vortex/miku/|/apps/miku/'   # en la línea de comandos: Miku, su voz y su oído
+IA_MIKU_CG='vortex-miku|vortex-ollama\.service'   # en el cgroup: Miku y el Ollama que ella arranca
+
+modo_ia_activo() { [[ -e "$MARCA_IA" && "$MARCA_IA" -nt "$HYPR_DIR/.socket2.sock" ]]; }
+
+# NOMBRE = el programa de IA que corre en ese proceso, por su comm (ya filtrado) y su línea de comandos.
+ia_programa() {
+  local pid="$1" comm="$2" cmd
+  local -a args=()
+  NOMBRE=""
+  mapfile -d '' -t args 2>/dev/null <"$PROC/$pid/cmdline" || return 1
+  ((${#args[@]})) || return 1
+  cmd="${args[*]}"
+  # Mike pidió que nadie toque su Miku: ni ella ni su Ollama cuentan.
+  [[ "$cmd" =~ $IA_MIKU ]] && return 1
+  case "$comm" in
+    # «ollama serve» solo no tiene modelo cargado: el modelo corre en su «ollama runner».
+    ollama) [[ " $cmd " == *" runner "* ]] && NOMBRE=Ollama ;;
+    ollama_llama_se*) NOMBRE=Ollama ;; # el runner de las versiones viejas
+    llama-*) NOMBRE=llama.cpp ;;
+    koboldcpp*) NOMBRE=KoboldCpp ;;
+    invokeai*) NOMBRE=InvokeAI ;;
+    torchrun) NOMBRE=PyTorch ;;
+    python*)
+      if [[ "${cmd,,}" == *comfyui* ]] || [[ " $cmd " == *main.py* && -d "$PROC/$pid/cwd/comfy" ]]; then
+        NOMBRE=ComfyUI
+      elif [[ "${cmd,,}" =~ stable-diffusion|sd-webui|webui-forge ]] ||
+        [[ " $cmd " =~ (launch|webui)\.py && -f "$PROC/$pid/cwd/webui.py" ]]; then
+        NOMBRE="Stable Diffusion"
+      elif [[ "$cmd" == *llama_cpp.server* ]]; then
+        NOMBRE=llama.cpp
+      elif grep -qsm1 -F libtorch "$PROC/$pid/maps"; then
+        NOMBRE=PyTorch # un python con PyTorch cargado (entrenando, Whisper, etc.)
+      fi
+      ;;
+  esac
+  [[ -n "$NOMBRE" ]]
+}
+
+# IA_HALLADAS = pid → programa, de los procesos que parecen IA. Solo lee archivos de /proc.
+buscar_ia() {
+  local d pid comm
+  IA_HALLADAS=()
+  for d in "$PROC"/[0-9]*; do
+    read -r comm 2>/dev/null <"$d/comm" || continue
+    case "$comm" in
+      ollama | ollama_llama_se* | llama-* | koboldcpp* | invokeai* | torchrun | python*) ;;
+      *) continue ;;
+    esac
+    pid="${d##*/}"
+    ia_programa "$pid" "$comm" || continue
+    cgroup_de "$pid" && [[ "$CG" =~ $IA_MIKU_CG ]] && continue
+    IA_HALLADAS[$pid]="$NOMBRE"
+  done
+  ((${#IA_HALLADAS[@]}))
+}
+
+hay_nvidia() { [[ -d "$PROC/driver/nvidia" ]] && command -v "$NVSMI" >/dev/null 2>&1; }
+
+# Memoria de la gráfica del proceso según el fdinfo de DRM (amdgpu, i915, xe…): los MB, «no» si no abrió
+# ninguna gráfica (corre en la CPU) o «?» si la abrió sin decir cuánta usa (una integrada).
+drm_mb() {
+  local -a f=("$PROC/$1"/fdinfo/*)
+  ((${#f[@]})) || { echo no; return 0; }
+  awk 'FNR == 1 { id = FILENAME }
+    /^drm-driver:/ { drm = 1 }
+    /^drm-client-id:/ { id = $2 }
+    /^drm-(memory-vram|total-vram0?|total-local0):/ {
+      k = ($3 == "GiB") ? 1048576 : ($3 == "MiB") ? 1024 : 1; v[id] = $2 * k; hay = 1 }
+    END { if (!drm) print "no"; else if (!hay) print "?"; else { s = 0; for (i in v) s += v[i]; print int(s / 1024) } }' \
+    "${f[@]}" 2>/dev/null || echo no
+}
+
+# ¿Alguno de los hallados usa la gráfica de verdad? IA_PID_NUEVO e IA_NOMBRE_NUEVO = el que más usa.
+# Con NVIDIA lo dice nvidia-smi (CUDA en las apps de cómputo; Vulkan solo sale con «-q»). En AMD e Intel,
+# el fdinfo de DRM; sin permiso para leerlo (un Ollama del sistema, de otro usuario), con parecer IA basta.
+confirmar_ia() {
+  local pid mb l mejor=-1 falta=0
+  local -A vram=()
+  IA_PID_NUEVO=0 IA_NOMBRE_NUEVO=""
+  if hay_nvidia; then
+    while IFS=', ' read -r pid mb _; do
+      [[ "$pid" =~ ^[0-9]+$ ]] && vram[$pid]="${mb//[^0-9]/}"
+    done < <(timeout 10 "$NVSMI" --query-compute-apps=pid,used_memory --format=csv,noheader,nounits 2>/dev/null)
+    for pid in "${!IA_HALLADAS[@]}"; do [[ -n "${vram[$pid]+x}" ]] || falta=1; done
+    if ((falta)); then
+      pid=""
+      while read -r l; do
+        case "$l" in
+          "Process ID"*) pid="${l##*: }" ;;
+          "Used GPU Memory"*) [[ "$pid" =~ ^[0-9]+$ && -z "${vram[$pid]+x}" ]] && vram[$pid]="${l//[^0-9]/}" ;;
+        esac
+      done < <(timeout 10 "$NVSMI" -q -d PIDS 2>/dev/null)
+    fi
+  fi
+  for pid in "${!IA_HALLADAS[@]}"; do
+    if [[ -n "${vram[$pid]+x}" ]]; then
+      mb="${vram[$pid]:-$IA_VRAM_MB}" # sale en la gráfica sin decir cuánto («[N/A]»): cuenta
+    elif [[ -d "$PROC/$pid/fdinfo" && ! -r "$PROC/$pid/fdinfo" ]]; then
+      mb="$IA_VRAM_MB"
+    else
+      mb="$(drm_mb "$pid")"
+      [[ "$mb" == no ]] && continue
+      [[ "$mb" == "?" ]] && mb="$IA_VRAM_MB"
+    fi
+    if ((mb >= IA_VRAM_MB && mb > mejor)); then
+      mejor="$mb" IA_PID_NUEVO="$pid" IA_NOMBRE_NUEVO="${IA_HALLADAS[$pid]}"
+    fi
+  done
+  ((IA_PID_NUEVO > 0))
+}
+
+empezar_ia() {
+  IA_ACTIVA=1 IA_PID="$1" IA_NOMBRE="$2" IA_SIN_VER=0 IA_CG=""
+  log "$2 usa la gráfica (pid $1): modo IA"
+  subir "$1" "ia-$2" && IA_CG="$SUBIDO"
+  # Si ya estaba puesto, lo puso otro (a mano) y que lo quite él.
+  if ! modo_ia_activo; then
+    local args=(modo-ia on "$2")
+    ((IA_CALLADO)) && args+=(--sin-aviso) # vuelve después de un juego: ya se avisó
+    timeout 20 "$VORTEX" "${args[@]}" >/dev/null 2>&1 && IA_PROPIO=1
+  fi
+  IA_CALLADO=0
+  # vortex-ia (si está) avisa si el modelo no cabe en la memoria de la gráfica.
+  if command -v "$IA" >/dev/null 2>&1; then
+    "$IA" vigilar >/dev/null 2>&1 &
+  fi
+  guardar_estado
+}
+
+# Otro proceso de IA (Ollama cambió de modelo): la prioridad pasa al nuevo, sin avisar otra vez.
+cambiar_ia() {
+  local viejo="$IA_CG"
+  IA_PID="$1" IA_NOMBRE="$2" IA_CG=""
+  subir "$1" "ia-$2" && IA_CG="$SUBIDO"
+  [[ "$viejo" != "$IA_CG" && "$viejo" != "$FOCO_CG" ]] && soltar_cg "$viejo"
+  guardar_estado
+}
+
+terminar_ia() {
+  local cg="$IA_CG"
+  log "modo IA fuera: $1"
+  IA_ACTIVA=0
+  [[ "$cg" != "$FOCO_CG" ]] && soltar_cg "$cg"
+  # Solo se quita si lo puso el gestor y sigue puesto (se pudo quitar a mano antes).
+  if ((IA_PROPIO)) && [[ -e "$MARCA_IA" ]]; then
+    timeout 20 "$VORTEX" modo-ia off >/dev/null 2>&1
+  fi
+  IA_PROPIO=0 IA_PID=0 IA_NOMBRE="" IA_CG="" IA_SIN_VER=0
+  guardar_estado
+}
+
+revisar_ia() {
+  ((IA_REVISAR_S > 0)) || return 0
+  ((EPOCHSECONDS - IA_ULTIMO >= IA_REVISAR_S)) || return 0
+  IA_ULTIMO=$EPOCHSECONDS
+  # El modo juego manda (también el puesto a mano con Super+G o por gamemode).
+  if ((${#JUEGOS[@]})) || modo_juego_activo; then
+    if ((IA_ACTIVA)); then
+      IA_CALLADO=1
+      terminar_ia "hay un juego: manda el modo juego"
+    fi
+    return 0
+  fi
+  if buscar_ia && confirmar_ia; then
+    IA_SIN_VER=0
+    if ((!IA_ACTIVA)); then
+      empezar_ia "$IA_PID_NUEVO" "$IA_NOMBRE_NUEVO"
+    elif [[ "$IA_PID_NUEVO" != "$IA_PID" ]]; then
+      cambiar_ia "$IA_PID_NUEVO" "$IA_NOMBRE_NUEVO"
+    fi
+  elif ((IA_ACTIVA)); then
+    IA_SIN_VER=$((IA_SIN_VER + 1))
+    ((IA_SIN_VER >= IA_FALTAS)) && terminar_ia "${IA_NOMBRE:-la IA} ya no usa la gráfica"
+  fi
+  return 0
 }
 
 # --- Eventos ---
@@ -578,6 +805,7 @@ terminar() {
   local IFS=$' \t\n'
   ((TERMINANDO)) && return
   TERMINANDO=1
+  ((IA_ACTIVA)) && terminar_ia "el gestor se apaga"
   quitar_prioridad
   ((${#JUEGOS[@]})) && terminar_juego
   # Las apps que siguen abiertas vuelven al peso normal de systemd.
@@ -598,6 +826,9 @@ recuperar() {
     case "$l" in
       modo_juego=propio) modo_juego_activo && MODO_PROPIO=1 ;;
       fondo_pausado=1) FONDO_PAUSADO=1 ;;
+      modo_ia=propio) modo_ia_activo && IA_PROPIO=1 IA_ACTIVA=1 ;;
+      ia_pid=*) IA_PID="${l#ia_pid=}" ;;
+      ia_programa=*) IA_NOMBRE="${l#ia_programa=}" ;;
     esac
   done <"$ESTADO"
 }
@@ -625,14 +856,16 @@ main() {
   AYUDANTE=$!
   log "en marcha (Hyprland ${HYPRLAND_INSTANCE_SIGNATURE:0:12}…)"
   guardar_estado
-  local rc
+  local rc espera="$MEM_REVISAR_S"
+  ((IA_REVISAR_S > 0 && IA_REVISAR_S < espera)) && espera="$IA_REVISAR_S"
   while :; do
-    IFS=$'\037' read -r -t "$MEM_REVISAR_S" -u "$evfd" tipo a b c d
+    IFS=$'\037' read -r -t "$espera" -u "$evfd" tipo a b c d
     rc=$?
     # Sin eventos en un rato. La presión solo avisa cuando ya hay esperas; así también sale antes de eso.
     if ((rc > 128)); then
       avisar_memoria
       revisar_disco
+      revisar_ia
       continue
     fi
     ((rc == 0)) || break
@@ -642,6 +875,8 @@ main() {
       cierra) en_cierra "$a" ;;
       psi) en_psi "$a" "$b" ;;
     esac
+    # Con eventos seguidos el read nunca llega a su tiempo de espera: la IA se revisa igual cuando toca.
+    revisar_ia
   done
   log "Hyprland se cerró: el gestor termina"
   terminar 0
