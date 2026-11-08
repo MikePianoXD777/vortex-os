@@ -27,6 +27,23 @@ NO_PROGRAMA = re.compile(
     r"notification_helper|unity ?crash)", re.I)
 
 
+# Los programas que Wine/Proton ponen de serie en cada prefijo nuevo (WordPad, Internet Explorer…): no
+# son lo que instalaste.
+DE_SERIE = re.compile(
+    r"^program files( \(x86\))?/(common files|internet explorer|windows nt|windows media player|windows mail|"
+    r"windows photo viewer|windows defender|windows sidebar|windows journal|windowspowershell|microsoft\.net|"
+    r"msbuild|reference assemblies)/", re.I)
+
+
+def _de_serie(prefijo: Path) -> set[str]:
+    """Los archivos que Proton copió al crear el prefijo (su lista «tracked_files»), en minúsculas."""
+    try:
+        texto = (prefijo / "tracked_files").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    return {x.strip().lower() for x in texto.splitlines() if x.strip()}
+
+
 class ErrorBiblioteca(Exception):
     """Algo que se le puede decir tal cual a la persona."""
 
@@ -94,7 +111,9 @@ def agregar(exe: str | Path, nombre: str | None = None, prefijo: str | Path | No
     pid = _nuevo_id(nombre, str(exe))
     icono = pe.guardar_icono(exe, rutas.iconos() / pid)
     if prefijo is None:
-        prefijo = rutas.prefijos() / pid
+        # Un .exe que vive dentro de uno de nuestros prefijos (lo instalaste con Runner) corre en ese, con
+        # su registro y sus dependencias; si no, uno nuevo para él.
+        prefijo = prefijo_de(exe) or rutas.prefijos() / pid
     Path(prefijo).mkdir(parents=True, exist_ok=True)
     entrada = {"id": pid, "nombre": nombre, "exe": str(exe.resolve()), "prefijo": str(prefijo), "proton": "",
                "argumentos": "", "icono": str(icono) if icono else "", "agregado": int(time.time()),
@@ -150,6 +169,29 @@ def quitar(pid: str, borrar_prefijo: bool = False) -> None:
 
 # ---- después de un instalador ------------------------------------------------------------------
 
+def prefijo_de(exe: str | Path) -> Path | None:
+    """El prefijo de Runner donde está este .exe (prefijos/<id>/drive_c/…), o None."""
+    try:
+        rel = Path(exe).expanduser().resolve().relative_to(rutas.prefijos().resolve())
+    except ValueError:
+        return None
+    partes = rel.parts
+    if len(partes) >= 3 and partes[1] == "drive_c":
+        return rutas.prefijos() / partes[0]
+    return None
+
+
+def descartar_prefijo(prefijo: str | Path) -> bool:
+    """Borra un prefijo que no usa ningún programa de tu biblioteca (un instalador que no dejó nada, o
+    del que dijiste «Ninguno»). Solo dentro de prefijos/. Devuelve si lo borró."""
+    pref = Path(prefijo)
+    if rutas.prefijos() not in pref.parents or any(os.path.normpath(x["prefijo"]) == os.path.normpath(str(pref))
+                                                   for x in cargar()):
+        return False
+    shutil.rmtree(pref, ignore_errors=True)
+    return True
+
+
 def exes_en(prefijo: str | Path) -> set[str]:
     raiz = Path(prefijo) / "drive_c"
     salida: set[str] = set()
@@ -168,8 +210,14 @@ def exes_en(prefijo: str | Path) -> set[str]:
 def exes_nuevos(prefijo: str | Path, antes: set[str]) -> list[dict]:
     """Los .exe que dejó un instalador, el programa más probable primero: [{exe, nombre, tam}]."""
     salida = []
+    prefijo = Path(prefijo)
+    raiz = prefijo / "drive_c"
+    de_serie = _de_serie(prefijo)
     for ruta in exes_en(prefijo) - antes:
         if NO_PROGRAMA.search(Path(ruta).name):
+            continue
+        relativa = os.path.relpath(ruta, raiz).replace(os.sep, "/")
+        if DE_SERIE.match(relativa) or ("drive_c/" + relativa).lower() in de_serie:
             continue
         try:
             tam = os.path.getsize(ruta)

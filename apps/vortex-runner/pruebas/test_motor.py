@@ -171,6 +171,44 @@ class TestBiblioteca(Base):
         self.assertFalse(biblioteca.parece_instalador("Juego.exe"))
 
 
+    def test_prefijo_propio_y_descartar(self):
+        """Un .exe dentro de un prefijo nuestro usa ese prefijo; descartar borra solo prefijos sin dueño."""
+        from vortex_runner import biblioteca, rutas
+        pre = rutas.prefijos() / "instalado-abc"
+        exe = pre / "drive_c" / "Program Files" / "Juego" / "Juego.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"MZ" + b"\0" * 100)
+        self.assertEqual(biblioteca.prefijo_de(exe), pre)
+        self.assertIsNone(biblioteca.prefijo_de(self.juego))
+        e = biblioteca.agregar(exe)
+        self.assertEqual(e["prefijo"], str(pre))
+        self.assertFalse(biblioteca.descartar_prefijo(pre))          # lo usa un programa
+        self.assertTrue(pre.is_dir())
+        otro = rutas.prefijos() / "huerfano"
+        otro.mkdir()
+        self.assertTrue(biblioteca.descartar_prefijo(otro))
+        self.assertFalse(otro.exists())
+        fuera = self.tmp / "no-es-nuestro"
+        fuera.mkdir()
+        self.assertFalse(biblioteca.descartar_prefijo(fuera))      # fuera de prefijos/: nunca
+        self.assertTrue(fuera.is_dir())
+
+    def test_exes_nuevos_sin_los_de_serie(self):
+        """WordPad, Internet Explorer y lo que Proton copió al prefijo no cuentan como «lo que instalaste»."""
+        from vortex_runner import biblioteca
+        pre = self.tmp / "pre"
+        c = pre / "drive_c"
+        for rel in ("Program Files/Windows NT/Accessories/wordpad.exe",
+                    "Program Files (x86)/Internet Explorer/iexplore.exe",
+                    "Program Files/Proton Cosa/cosa.exe",
+                    "Program Files/Mi Juego/Juego.exe",
+                    "Program Files/Mi Juego/unins000.exe"):
+            (c / rel).parent.mkdir(parents=True, exist_ok=True)
+            (c / rel).write_bytes(b"MZ" + b"\0" * 100)
+        (pre / "tracked_files").write_text("drive_c/Program Files/Proton Cosa/cosa.exe\n")
+        self.assertEqual([n["exe"] for n in biblioteca.exes_nuevos(pre, set())],
+                         [str(c / "Program Files/Mi Juego/Juego.exe")])
+
 class TestCorrer(Base):
     def test_lanzar_con_umu(self):
         from vortex_runner import biblioteca, correr

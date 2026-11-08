@@ -20,7 +20,7 @@ Popup {
     modal: true
     focus: true
     padding: 26
-    closePolicy: Popup.CloseOnEscape
+    closePolicy: Popup.NoAutoClose   // hay que elegir: «Agregar» o «Ninguno» (que borra lo instalado)
     Overlay.modal: Rectangle { color: Tema.velo }
     background: Rectangle { radius: Tema.radioTarjeta; color: Tema.tarjeta; border.width: 1; border.color: Tema.borde }
 
@@ -64,7 +64,7 @@ Popup {
             Layout.topMargin: 10
             spacing: 10
             Item { Layout.fillWidth: true }
-            Boton { tipo: "fantasma"; text: "Ninguno"; onClicked: raiz.close() }
+            Boton { tipo: "fantasma"; text: "Ninguno"; onClicked: { runner.descartarInstalado(); raiz.close() } }
             Boton {
                 text: "Agregar"
                 icono: "mas"

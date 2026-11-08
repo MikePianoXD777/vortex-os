@@ -188,9 +188,12 @@ class Runner(QObject):
         self.instalandoCambio.emit()
         nuevos = biblioteca.exes_nuevos(datos["prefijo"], datos["antes"])
         if not nuevos:
-            self.aviso.emit("El instalador terminó, pero no encontré ningún programa nuevo. "
-                            "Si sí se instaló, agrégalo con «Agregar .exe» desde su carpeta.", "info")
-            self._prefijo_pendiente = datos["prefijo"]
+            # Nada que agregar (lo cancelaste, falló o no era un programa): su espacio no se queda ocupando
+            # cientos de MB.
+            biblioteca.descartar_prefijo(datos["prefijo"])
+            self.aviso.emit("El instalador terminó, pero no dejó ningún programa nuevo (¿lo cancelaste?). "
+                            "Si era un programa ya listo, usa «Agregar .exe».", "info")
+            self._prefijo_pendiente = None
             return
         self._prefijo_pendiente = datos["prefijo"]
         self.elegirInstalado.emit([{"exe": n["exe"], "nombre": n["nombre"],
@@ -206,6 +209,14 @@ class Runner(QObject):
             return
         self._recargar()
         self.aviso.emit(f"{e['nombre']} quedó en tu biblioteca.", "exito")
+
+    @Slot()
+    def descartarInstalado(self) -> None:
+        """«Ninguno»: ninguno de los .exe es el programa; se borra el espacio que creó el instalador."""
+        prefijo = getattr(self, "_prefijo_pendiente", None)
+        self._prefijo_pendiente = None
+        if prefijo:
+            biblioteca.descartar_prefijo(prefijo)
 
     @Slot(str)
     def abrirArchivo(self, ruta: str) -> None:
