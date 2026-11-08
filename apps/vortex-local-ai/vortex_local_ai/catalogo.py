@@ -140,6 +140,13 @@ def _de_vortex_ia(ram_mb: int) -> dict | None:
     if not isinstance(datos, dict):
         return None
     for candidato in (datos, datos.get("vram"), datos.get("gpu"), datos.get("tarjeta")):
+        # vortex-ia da {"gpu": {"tipo", "nombre", "vram_gb", "libre_gb"}}
+        if isinstance(candidato, dict) and not candidato.get("total_mb") and candidato.get("vram_gb"):
+            try:
+                candidato = dict(candidato, total_mb=int(float(candidato["vram_gb"]) * 1024),
+                                 libre_mb=int(float(candidato.get("libre_gb") or 0) * 1024) or None)
+            except (TypeError, ValueError):
+                continue
         if isinstance(candidato, dict) and candidato.get("total_mb"):
             try:
                 tipo = str(candidato.get("tipo") or "cpu").lower()
