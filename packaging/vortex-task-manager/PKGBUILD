@@ -6,7 +6,7 @@
 #   cd packaging/vortex-task-manager && makepkg -si
 pkgname=vortex-task-manager
 pkgver=1.0.2
-pkgrel=2
+pkgrel=3
 pkgdesc="Vortexine Task Manager: qué usa tu PC, cerrar lo trabado y el rendimiento en vivo"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'

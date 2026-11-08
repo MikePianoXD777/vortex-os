@@ -6,7 +6,7 @@
 #   cd packaging/vortex-local-ai && makepkg -si
 pkgname=vortex-local-ai
 pkgver=1.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Vortexine's Local AI: modelos de IA en tu PC y un vault de notas como Obsidian"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'

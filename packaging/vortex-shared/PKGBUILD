@@ -4,7 +4,7 @@
 #   cd packaging/vortex-shared && makepkg -si
 pkgname=vortex-shared
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Vortexine Shared: pasa archivos a otra compu con Vortexine's OS, cerca o lejos"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'

@@ -4,7 +4,7 @@
 #   cd packaging/vortex-video && makepkg -si
 pkgname=vortex-video
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Vortexine Video: toma fotos y graba videos con tu cámara web"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'

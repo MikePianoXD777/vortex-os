@@ -4,7 +4,7 @@
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
   "logo": {
     "type": "file",
-    "color": { "1": "#7c6cf0", "2": "#a78bfa", "3": "#c4b5fd" },
+    "color": { "1": "#46E6FF", "2": "#70A9FF", "3": "#9A6BFF" },
     "padding": { "top": 1, "left": 2, "right": 3 }
   },
   "display": {

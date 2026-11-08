@@ -17,6 +17,6 @@ printf '\e[0m'
 command -v fastfetch >/dev/null || exit 0
 if [[ -n "${KITTY_WINDOW_ID:-}" || "${TERM:-}" == xterm-kitty ]]; then
   exec fastfetch -c "$aqui/fastfetch.jsonc" --logo-type kitty --logo "$aqui/vortex-logo.png" \
-    --logo-width 20 --logo-height 10
+    --logo-width 20
 fi
 exec fastfetch -c "$aqui/fastfetch.jsonc" --logo-type file --logo "$aqui/vortex-logo.txt"
