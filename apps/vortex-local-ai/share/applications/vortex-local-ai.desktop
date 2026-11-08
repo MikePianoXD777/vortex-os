@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Vortexine's Local AI
+GenericName=Inteligencia artificial local
+GenericName[en]=Local AI
+Comment=Chatea con modelos de IA que corren en tu PC y guarda tus notas en un vault como Obsidian
+Comment[en]=Chat with AI models running on your PC and keep your notes in an Obsidian-like vault
+Exec=vortex-local-ai
+Icon=vortex-local-ai
+Terminal=false
+Categories=Utility;Office;Development;
+Keywords=ia;ai;chat;modelos;ollama;llm;local;vault;notas;obsidian;markdown;asistente;
+StartupNotify=true
+StartupWMClass=vortex-local-ai
