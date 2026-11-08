@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Vortexine's Local AI: chat con modelos de IA que corren en tu PC (Ollama) y un vault de notas.
+#   vortex-local-ai
+# Corre «python -m vortex_local_ai» con el código donde esté:
+#   1. VORTEX_LOCAL_AI_DIR, si la defines (para probar otra copia);
+#   2. la carpeta de este mismo archivo, si es el repo;
+#   3. /usr/share/vortex-local-ai, donde lo instala el paquete.
+set -euo pipefail
+
+aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+raiz=""
+for candidato in "${VORTEX_LOCAL_AI_DIR:-}" "$aqui" /usr/share/vortex-local-ai; do
+  if [[ -n "$candidato" && -f "$candidato/vortex_local_ai/__init__.py" ]]; then
+    raiz="$candidato"
+    break
+  fi
+done
+if [[ -z "$raiz" ]]; then
+  echo "Vortexine's Local AI no está instalado del todo: no encuentro su código." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m vortex_local_ai "$@"

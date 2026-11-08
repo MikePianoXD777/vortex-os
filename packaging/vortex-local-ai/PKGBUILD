@@ -1,0 +1,36 @@
+# Vortexine's Local AI: chat con modelos de IA que corren en tu PC (Ollama), el catálogo de modelos de
+# Vortexine para bajar los que te caben y un vault de notas en Markdown como Obsidian, al que la IA le
+# puede preguntar. Empaquetado desde apps/vortex-local-ai/ de este repo; llega a todos con
+# «vortex actualizar».
+#
+#   cd packaging/vortex-local-ai && makepkg -si
+pkgname=vortex-local-ai
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Vortexine's Local AI: modelos de IA en tu PC y un vault de notas como Obsidian"
+arch=('any')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+# ollama corre los modelos (la versión con CUDA o ROCm la elige otro comando de Vortexine's);
+# qt6-declarative y qt6-svg dibujan la interfaz; xdg-utils abre los enlaces.
+depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'ollama' 'xdg-utils')
+optdepends=('nvidia-utils: saber cuánta memoria tiene tu tarjeta NVIDIA (nvidia-smi)')
+
+package() {
+    local origen="$startdir/../../apps/vortex-local-ai"
+    local share="$pkgdir/usr/share/vortex-local-ai"
+
+    install -d "$share"
+    cp -a "$origen/vortex_local_ai" "$share/"
+    find "$share" -name '__pycache__' -type d -prune -exec rm -rf {} +
+    find "$share" -type d -exec chmod 755 {} +
+    find "$share" -type f -exec chmod 644 {} +
+    python -m compileall -q -s "$pkgdir" -p / "$share"
+
+    install -Dm755 "$origen/vortex-local-ai" "$pkgdir/usr/bin/vortex-local-ai"
+    install -Dm644 "$origen/share/applications/vortex-local-ai.desktop" \
+        "$pkgdir/usr/share/applications/vortex-local-ai.desktop"
+    install -Dm644 "$origen/share/icons/hicolor/scalable/apps/vortex-local-ai.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-local-ai.svg"
+    install -Dm644 "$startdir/../../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
