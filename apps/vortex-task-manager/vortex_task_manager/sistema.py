@@ -9,7 +9,8 @@ lanzador (.desktop), buscado por la clase de su ventana o por su ejecutable.
 
 El CPU de cada proceso está en % de toda la máquina (no de un núcleo), igual que en Windows; la memoria
 es la privada (RSS menos la compartida) y el disco, lo que leyó y escribió por segundo (solo de tus
-procesos: los de otros usuarios no se pueden leer sin root).
+procesos: los de otros usuarios no se pueden leer sin root). La memoria de la gráfica (VRAM) sale de
+nvidia-smi en NVIDIA y de /proc/PID/fdinfo en AMD e Intel, cada 3 segundos (MemoriaGrafica).
 """
 from __future__ import annotations
 
@@ -180,6 +181,7 @@ class Procesos:
                         "cpu": p.cpu_percent(None) / CPUS,
                         "mem": max(0, mem.rss - getattr(mem, "shared", 0)),
                         "hilos": p.num_threads(), "estado": p.status(), "disco": 0.0,
+                        "vram": 0,     # lo llena MemoriaGrafica (cada 3 s), no psutil
                     }
                     try:
                         io = p.io_counters()
@@ -211,7 +213,7 @@ def ventanas_hyprland() -> list[dict]:
 
 
 def _suma(procesos: list[dict], clave: str) -> float:
-    return sum(p[clave] for p in procesos)
+    return sum(p.get(clave, 0) for p in procesos)
 
 
 def _grupo(clave: str, nombre: str, icono: str, procesos: list[dict], subtitulo: str = "",
@@ -220,7 +222,7 @@ def _grupo(clave: str, nombre: str, icono: str, procesos: list[dict], subtitulo:
         "clave": clave, "nombre": nombre, "icono": icono, "subtitulo": subtitulo,
         "procesos": procesos, "pids": [p["pid"] for p in procesos], "ventanas": ventanas or [],
         "cpu": _suma(procesos, "cpu"), "mem": _suma(procesos, "mem"), "disco": _suma(procesos, "disco"),
-        "hilos": int(_suma(procesos, "hilos")),
+        "vram": int(_suma(procesos, "vram")), "hilos": int(_suma(procesos, "hilos")),
         "suspendido": bool(procesos) and all(p["estado"] == psutil.STATUS_STOPPED for p in procesos),
         "usuario": procesos[0]["usuario"] if procesos else "",
     }
@@ -278,13 +280,13 @@ def agrupar(filas: list[dict], ventanas: list[dict], apps: Aplicaciones, uid: in
     return {"apps": grupos_apps, "fondo": armar("fondo", fondo), "sistema": armar("sistema", sistema)}
 
 
-ORDENES = ("nombre", "cpu", "mem", "disco")
+ORDENES = ("nombre", "cpu", "mem", "disco", "vram")
 
 
 def ordenar(grupos: list[dict], por: str = "nombre") -> list[dict]:
     if por == "nombre":
         return sorted(grupos, key=lambda g: (g["nombre"].lower(), g["clave"]))
-    return sorted(grupos, key=lambda g: (-g[por], g["nombre"].lower()))
+    return sorted(grupos, key=lambda g: (-g.get(por, 0), g["nombre"].lower()))
 
 
 def coincide(grupo: dict, filtro: str) -> bool:
@@ -535,6 +537,153 @@ def gpus_sysfs() -> list[dict]:
                      "vramTotal": float(_leer(dev / "mem_info_vram_total", "0") or 0),
                      "temp": temp or 0.0, "watts": 0.0})
     return gpus
+
+
+# --- Memoria de la gráfica (VRAM) por proceso ---
+
+_UNIDADES = {"K": 1, "M": 2, "G": 3, "T": 4}
+
+
+def _a_bytes(valor: str) -> int | None:
+    """«865 MiB», «123456 KiB», «4096» (en bytes) → bytes. None si no es un número («N/A», «Not available»)."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(?:([KMGT])i?B)?\s*", valor)
+    if not m:
+        return None
+    return int(float(m.group(1)) * 1024 ** _UNIDADES.get(m.group(2) or "", 0))
+
+
+def parsear_pids_nvidia(texto: str) -> dict[int, int]:
+    """La salida de `nvidia-smi -q -d PIDS` → {pid: bytes}. A diferencia de --query-compute-apps (solo
+    CUDA), trae también los procesos gráficos (tipo G: juegos, el compositor, el shell); con varias
+    tarjetas, lo de cada una se suma."""
+    por_pid: dict[int, int] = {}
+    pid = None
+    for linea in texto.splitlines():
+        if ":" not in linea:
+            continue
+        clave, valor = (x.strip() for x in linea.split(":", 1))
+        if clave == "Process ID":
+            pid = int(valor) if valor.isdigit() else None
+        elif clave == "Used GPU Memory" and pid is not None:
+            b = _a_bytes(valor)
+            if b is not None:
+                por_pid[pid] = por_pid.get(pid, 0) + b
+            pid = None
+    return por_pid
+
+
+def vram_nvidia() -> dict[int, int] | None:
+    """{pid: bytes} de las tarjetas NVIDIA (unos 20 ms). None si no hay nvidia-smi o no contestó."""
+    if not shutil.which("nvidia-smi"):
+        return None
+    try:
+        r = subprocess.run(["nvidia-smi", "-q", "-d", "PIDS"], capture_output=True, text=True, timeout=4)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0 or "Processes" not in r.stdout:
+        return None
+    return parsear_pids_nvidia(r.stdout)
+
+
+# Lo que dice cada driver en /proc/PID/fdinfo, de lo más fiel a lo menos: lo que de verdad ocupa
+# (resident) antes que lo reservado (total). amdgpu: «drm-memory-vram» (y desde Linux 6.x
+# «drm-resident-vram»); xe: «drm-resident-vram0»; i915 con tarjeta: «drm-resident-local0»; i915
+# integrado, que no tiene VRAM propia y usa la RAM: «drm-resident-system0».
+_CLAVES_DRM = [re.compile(p) for p in (r"drm-resident-(vram|local)\d*", r"drm-memory-vram", r"drm-total-(vram|local)\d*",
+                                       r"drm-resident-system\d*", r"drm-total-system\d*")]
+
+
+def parsear_fdinfo_drm(texto: str) -> tuple[str, int | None] | None:
+    """Un /proc/PID/fdinfo/N → (cliente, bytes en la gráfica). None si no es de la gráfica; bytes None si
+    el driver no dice cuánta memoria usa (nvidia-drm, por ejemplo). El cliente (drm-pdev + drm-client-id)
+    sirve para no contar dos veces el mismo, que sale en cada fd duplicado y en los hijos de un fork."""
+    claves: dict[str, str] = {}
+    for linea in texto.splitlines():
+        if linea.startswith("drm-") and ":" in linea:
+            k, v = linea.split(":", 1)
+            claves[k.strip()] = v.strip()
+    if "drm-client-id" not in claves:
+        return None
+    cliente = claves.get("drm-pdev", "") + "/" + claves["drm-client-id"]
+    for patron in _CLAVES_DRM:
+        valores = [_a_bytes(v) for k, v in claves.items() if patron.fullmatch(k)]
+        valores = [v for v in valores if v is not None]
+        if valores:
+            return cliente, sum(valores)
+    return cliente, None
+
+
+def vram_fdinfo(pids: list[int], raiz: str | Path = "/proc") -> tuple[dict[int, int], bool]:
+    """AMD e Intel: suma por proceso lo que dicen sus archivos abiertos de /dev/dri (solo se pueden leer
+    los de tus procesos). Cada cliente cuenta una vez, para el primer proceso que lo tiene. Devuelve
+    ({pid: bytes}, si algún driver dijo cuánta memoria usa)."""
+    por_pid: dict[int, int] = {}
+    vistos: set[str] = set()
+    supo = False
+    for pid in sorted(pids):
+        base = Path(raiz) / str(pid)
+        try:
+            fds = os.listdir(base / "fd")
+        except OSError:          # de otro usuario o ya se cerró
+            continue
+        for fd in fds:
+            try:
+                if not os.readlink(base / "fd" / fd).startswith("/dev/dri/"):
+                    continue
+                datos = parsear_fdinfo_drm((base / "fdinfo" / fd).read_text(encoding="utf-8", errors="replace"))
+            except OSError:
+                continue
+            if datos is None or datos[1] is None:
+                continue
+            supo = True
+            cliente, b = datos
+            if cliente in vistos:
+                continue
+            vistos.add(cliente)
+            por_pid[pid] = por_pid.get(pid, 0) + b
+    return por_pid, supo
+
+
+def hay_gpu_drm() -> bool:
+    """Si hay una tarjeta AMD o Intel (las que dicen su memoria en fdinfo)."""
+    return any(_leer(c / "device/vendor") in ("0x1002", "0x8086") for c in Path("/sys/class/drm").glob("card[0-9]"))
+
+
+class MemoriaGrafica:
+    """La VRAM de cada proceso. Mide cada `intervalo` segundos (nvidia-smi tarda unos 20 ms y leer los
+    fdinfo de todos tus procesos, otro poco); entre medidas devuelve la última. `disponible` dice si hay
+    de dónde sacarla: si no, la columna «Gráfica» no sale."""
+
+    INTERVALO = 3.0
+
+    def __init__(self, intervalo: float = INTERVALO, nvidia: bool | None = None, drm: bool | None = None):
+        self.intervalo = intervalo
+        self._nvidia = bool(shutil.which("nvidia-smi")) if nvidia is None else nvidia
+        self._drm = hay_gpu_drm() if drm is None else drm
+        self._cuando: float | None = None
+        self._por_pid: dict[int, int] = {}
+        self.disponible = False
+
+    def medir(self, pids: list[int], ahora: float | None = None) -> dict[int, int]:
+        ahora = time.monotonic() if ahora is None else ahora
+        if self._cuando is not None and ahora - self._cuando < self.intervalo:
+            return self._por_pid
+        self._cuando = ahora
+        por_pid: dict[int, int] = {}
+        hubo = False
+        if self._nvidia:
+            nv = vram_nvidia()
+            if nv is not None:
+                hubo = True
+                por_pid.update(nv)
+        if self._drm:
+            otras, supo = vram_fdinfo(pids)
+            hubo = hubo or supo
+            for pid, b in otras.items():
+                por_pid[pid] = por_pid.get(pid, 0) + b
+        self._por_pid = por_pid
+        self.disponible = self.disponible or hubo     # una vez que se supo, la columna se queda
+        return por_pid
 
 
 class Rendimiento:

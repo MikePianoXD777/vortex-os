@@ -20,7 +20,12 @@ GUION = textwrap.dedent("""
     import json, os, shutil, subprocess, sys, tempfile
     sys.path.insert(0, %r)
     from PySide6.QtCore import QTimer
+    from vortex_task_manager import sistema
     from vortex_task_manager.__main__ import crear_aplicacion, cargar_interfaz
+    # VRAM falsa (no depende de qué tarjeta tenga la PC): 300 MB para este mismo proceso.
+    sistema.vram_nvidia = lambda: {os.getpid(): 300 * 1024 * 1024}
+    _iniciar = sistema.MemoriaGrafica.__init__
+    sistema.MemoriaGrafica.__init__ = lambda self: _iniciar(self, intervalo=0.5, nvidia=True, drm=False)
     app = crear_aplicacion(["tm"])
     motor, puente = cargar_interfaz(app)
     errores = []
@@ -36,6 +41,10 @@ GUION = textwrap.dedent("""
         filas = puente.modelo.filas()
         datos["secciones"] = [f["nombre"] for f in filas if f["tipo"] == "seccion"]
         datos["grupos"] = sum(f["tipo"] == "grupo" for f in filas)
+        datos["vramDisponible"] = puente.vramDisponible
+        yo = next(g for s in puente._grupos.values() for g in s if os.getpid() in g["pids"])
+        datos["vramMia"] = yo["vram"]
+        datos["vramFilas"] = all("vram" in f for f in filas if f["tipo"] != "seccion")
         puente.filtro = nombre
     def filtrado():
         filas = puente.modelo.filas()
@@ -52,6 +61,10 @@ GUION = textwrap.dedent("""
         g = next(f for f in puente.modelo.filas() if f["tipo"] == "grupo" and f["n"] > 1)
         puente.alternarGrupo(g["clave"])
         datos["abierto"] = any(f["tipo"] == "proceso" and f["padre"] == g["clave"] for f in puente.modelo.filas())
+        puente.orden = "vram"
+        datos["ordenVram"] = puente.orden
+        grupos = [f for f in puente.modelo.filas() if f["tipo"] == "grupo" and f["seccion"] == "fondo"]
+        datos["vramOrdenada"] = [f["vram"] for f in grupos] == sorted((f["vram"] for f in grupos), reverse=True)
         v.setProperty("pagina", "rendimiento")
     def rendimiento():
         datos["historia"] = len(puente.historia["cpu"])
@@ -82,6 +95,11 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["errores"], [])
         self.assertIn("Segundo plano", d["secciones"])
         self.assertGreater(d["grupos"], 3)
+        self.assertTrue(d["vramDisponible"])
+        self.assertGreaterEqual(d["vramMia"], 300 * 1024 * 1024)
+        self.assertTrue(d["vramFilas"])
+        self.assertEqual(d["ordenVram"], "vram")
+        self.assertTrue(d["vramOrdenada"])
         self.assertTrue(d["filtrado"])
         self.assertTrue(d["detalles"])
         self.assertTrue(d["finalizado"])
