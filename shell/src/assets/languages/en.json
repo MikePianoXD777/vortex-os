@@ -1692,6 +1692,12 @@
       "desc": "Tempo, time signature and tap; tune your voice or instrument (solfège, guitar)",
       "short": "Metronome"
     },
+    "apps_abiertas": {
+      "title": "Open apps",
+      "empty": "No open apps",
+      "close": "Close",
+      "go": "Go to"
+    },
     "estudio": {
       "name": "Study timer",
       "desc": "Pomodoro: study blocks with breaks, with no notifications while you study",

@@ -1736,6 +1736,12 @@
       "desc": "Tempo, compás y tap; afina tu voz o tu instrumento (solfeo, guitarra)",
       "short": "Metrónomo"
     },
+    "apps_abiertas": {
+      "title": "Apps abiertas",
+      "empty": "No hay apps abiertas",
+      "close": "Cerrar",
+      "go": "Ir a"
+    },
     "estudio": {
       "name": "Temporizador de estudio",
       "desc": "Pomodoro: bloques de estudio con descansos, sin notificaciones mientras estudias",

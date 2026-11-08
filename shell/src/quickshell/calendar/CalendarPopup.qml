@@ -1166,6 +1166,239 @@ Item {
                 }
             }
 
+            // Vortex 3.1.1 (pedido de Mike): abajo, entre el calendario y el clima, las apps abiertas
+            // (de todos los escritorios). Clic: te lleva a esa ventana; la X la cierra (como su X).
+            Rectangle {
+                id: appsAbiertas
+                anchors.top: accesosEstudio.top
+                anchors.left: calendarRect.right
+                anchors.leftMargin: window.s(40)
+                anchors.right: weatherContainer.left
+                anchors.rightMargin: window.s(40)
+                height: window.s(48)
+                radius: ThemeBackend.borderRadius
+                color: Qt.alpha(window.surface0, 0.2)
+                border.color: Qt.alpha(window.surface1, 0.4)
+                border.width: 1
+                z: 10
+                opacity: introCalendar
+                transform: Translate { y: window.s(30) * (1.0 - introCalendar) }
+
+                // Una entrada por app (sus ventanas juntas), en el orden del dock
+                property var apps: []
+                function recalcular() {
+                    if (typeof WindowTracker === "undefined") { apps = []; return; }
+                    let lista = [];
+                    let orden = WindowTracker.groupOrder || [];
+                    for (let i = 0; i < orden.length; i++) {
+                        let g = WindowTracker.groups[orden[i]];
+                        if (!g || !g.activeWindow) continue;
+                        let e = (typeof AppMatcher !== "undefined") ? AppMatcher.entry(g.desktopId || g.appId) : null;
+                        let nombre = (e && e.name) ? e.name : (g.appId || g.activeWindow.title || "?");
+                        let icono = (e && e.icon) ? e.icon : (g.appId || "");
+                        lista.push({ clave: g.groupKey, nombre: nombre, icono: icono, cuantas: g.count,
+                                     titulo: g.activeWindow.title || nombre, enfocada: g.focused, grupo: g });
+                    }
+                    apps = lista;
+                }
+                Connections {
+                    target: (typeof WindowTracker !== "undefined") ? WindowTracker : null
+                    function onUpdated() { if (window.visible) appsAbiertas.recalcular(); }
+                }
+                Connections {
+                    target: window
+                    function onVisibleChanged() {
+                        if (typeof WindowTracker === "undefined") return;
+                        if (window.visible) { WindowTracker.subscribe(); appsAbiertas.recalcular(); }
+                        else WindowTracker.unsubscribe();
+                    }
+                }
+                Component.onCompleted: if (window.visible && typeof WindowTracker !== "undefined") { WindowTracker.subscribe(); recalcular(); }
+
+                Text {
+                    id: appsTitulo
+                    anchors.left: parent.left
+                    anchors.leftMargin: window.s(14)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "󰖯"
+                    font.family: ThemeBackend.iconFont
+                    font.pixelSize: window.s(18)
+                    color: window.textAccent
+                }
+
+                Text {
+                    id: appsNombre
+                    anchors.left: appsTitulo.right
+                    anchors.leftMargin: window.s(8)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("widgets.apps_abiertas.title", "Open apps")
+                    font.family: ThemeBackend.fontFamily
+                    font.weight: Font.Black
+                    font.pixelSize: window.s(13)
+                    color: window.text
+                }
+
+                Text {
+                    anchors.left: appsNombre.right
+                    anchors.leftMargin: window.s(12)
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: appsAbiertas.apps.length === 0
+                    text: I18n.t("widgets.apps_abiertas.empty", "No open apps")
+                    font.family: ThemeBackend.fontFamily
+                    font.pixelSize: window.s(13)
+                    color: window.subtext0
+                }
+
+                ListView {
+                    id: listaApps
+                    anchors.left: appsNombre.right
+                    anchors.leftMargin: window.s(12)
+                    anchors.right: parent.right
+                    anchors.rightMargin: window.s(6)
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: window.s(36)
+                    orientation: ListView.Horizontal
+                    spacing: window.s(6)
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: appsAbiertas.apps
+
+                    // La rueda del mouse también la mueve de lado
+                    WheelHandler {
+                        onWheel: (ev) => {
+                            let d = ev.angleDelta.y !== 0 ? ev.angleDelta.y : ev.angleDelta.x;
+                            listaApps.contentX = Math.max(0, Math.min(listaApps.contentWidth - listaApps.width,
+                                listaApps.contentX - d));
+                        }
+                    }
+
+                    delegate: Rectangle {
+                        id: chipApp
+                        required property var modelData
+                        height: listaApps.height
+                        width: filaChip.implicitWidth + window.s(16)
+                        radius: height / 2
+                        color: chipMa.containsMouse ? Qt.alpha(window.surface1, 0.55)
+                             : (modelData.enfocada ? Qt.alpha(window.textAccent, 0.18) : Qt.alpha(window.surface1, 0.25))
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        MouseArea {
+                            id: chipMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: (ev) => {
+                                let g = chipApp.modelData.grupo;
+                                if (ev.button === Qt.MiddleButton) {
+                                    WindowTracker.close(g.activeWindow);
+                                    return;
+                                }
+                                WindowTracker.focusWindow(g.activeWindow);
+                                Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"]);
+                            }
+                        }
+
+                        Row {
+                            id: filaChip
+                            anchors.left: parent.left
+                            anchors.leftMargin: window.s(8)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: window.s(6)
+
+                            Item {
+                                width: window.s(20)
+                                height: window.s(20)
+                                anchors.verticalCenter: parent.verticalCenter
+                                Image {
+                                    id: iconoApp
+                                    anchors.fill: parent
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    smooth: true
+                                    mipmap: true
+                                    sourceSize.width: window.s(40)
+                                    sourceSize.height: window.s(40)
+                                    property bool fallo: false
+                                    visible: source !== "" && status === Image.Ready && !fallo
+                                    source: {
+                                        let ic = chipApp.modelData.icono || "";
+                                        if (!ic) return "";
+                                        if (ic.startsWith("file://") || ic.startsWith("image://")) return ic;
+                                        return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
+                                    }
+                                    onStatusChanged: if (status === Image.Error) fallo = true
+                                }
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !iconoApp.visible
+                                    text: chipApp.modelData.nombre.charAt(0).toUpperCase()
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(13)
+                                    color: window.text
+                                }
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: chipApp.modelData.nombre
+                                width: Math.min(implicitWidth, window.s(150))
+                                elide: Text.ElideRight
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: window.s(12)
+                                color: window.text
+                            }
+
+                            // Cuántas ventanas tiene, si son varias
+                            Rectangle {
+                                visible: chipApp.modelData.cuantas > 1
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(height, cuantasTxt.implicitWidth + window.s(8))
+                                height: window.s(18)
+                                radius: height / 2
+                                color: Qt.alpha(window.textAccent, 0.3)
+                                Text {
+                                    id: cuantasTxt
+                                    anchors.centerIn: parent
+                                    text: chipApp.modelData.cuantas
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(10)
+                                    color: window.text
+                                }
+                            }
+
+                            // La X: cierra la ventana (si tiene algo sin guardar, la app pregunta)
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: window.s(20)
+                                height: window.s(20)
+                                radius: width / 2
+                                color: cerrarMa.containsMouse ? Qt.alpha(window.red, 0.35) : "transparent"
+                                opacity: chipMa.containsMouse || cerrarMa.containsMouse ? 1 : 0.45
+                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰅖"
+                                    font.family: ThemeBackend.iconFont
+                                    font.pixelSize: window.s(13)
+                                    color: window.text
+                                }
+                                MouseArea {
+                                    id: cerrarMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: WindowTracker.close(chipApp.modelData.grupo.activeWindow)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Item {
                 id: weatherContainer
                 anchors.right: parent.right
