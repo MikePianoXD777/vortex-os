@@ -8,7 +8,10 @@ TextEdit {
     property string markdown: ""
     signal notaPedida(string nombre)
     textFormat: TextEdit.MarkdownText
-    text: markdown
+    // TextEdit pinta los enlaces de azul puro (no hace caso a palette.link): el texto de cada enlace va
+    // dentro de un <span> del color del tema. Las imágenes (![...]) se quedan igual.
+    text: markdown.replace(/(^|[^!])\[([^\]\n]+)\]\(([^)\s]+)\)/g,
+        (_, antes, texto, url) => antes + "[<span style=\"color:" + Tema.azul + "\">" + texto + "</span>](" + url + ")")
     readOnly: true
     selectByMouse: true
     wrapMode: TextEdit.Wrap
