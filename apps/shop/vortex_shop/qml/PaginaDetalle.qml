@@ -81,6 +81,61 @@ Pagina {
         }
     }
 
+    // Para tu PC: qué gráfica le conviene y un dato extra (solo las apps de la categoría IA lo traen)
+    Rectangle {
+        Layout.fillWidth: true
+        Layout.maximumWidth: 820
+        visible: (raiz.d.grafica ? raiz.d.grafica : "") !== "" || (raiz.d.nota ? raiz.d.nota : "") !== ""
+        implicitHeight: paraPC.implicitHeight + 32
+        radius: Tema.radioTarjeta
+        color: Tema.tarjeta
+        border.width: 1
+        border.color: Tema.violeta
+        // Sin Layouts por dentro: con texto que se ajusta, un RowLayout cuyo alto manda en el del
+        // padre entra en un bucle de polish() (y la memoria crece sin fin).
+        Icono {
+            x: 20
+            y: 18
+            width: 24
+            height: 24
+            nombre: "ia"
+            color: Tema.violeta
+        }
+        Column {
+            id: paraPC
+            x: 60
+            y: 16
+            width: parent.width - 80
+            spacing: 6
+            Text {
+                text: "Para tu PC"
+                color: Tema.violeta
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                font.letterSpacing: 1.4
+                font.capitalization: Font.AllUppercase
+            }
+            Text {
+                width: parent.width
+                visible: text !== ""
+                text: raiz.d.grafica ? raiz.d.grafica : ""
+                textFormat: Text.PlainText
+                color: Tema.texto
+                font.pixelSize: 15
+                wrapMode: Text.WordWrap
+            }
+            Text {
+                width: parent.width
+                visible: text !== ""
+                text: raiz.d.nota ? raiz.d.nota : ""
+                textFormat: Text.PlainText
+                color: Tema.suave
+                font.pixelSize: 14
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
     // Cargando el resto
     Rectangle {
         Layout.fillWidth: true

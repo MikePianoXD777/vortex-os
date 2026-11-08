@@ -107,16 +107,17 @@ class TestCatalogo(BaseCatalogo):
     def test_categorias(self):
         cats = self.cat.categorias()
         self.assertTrue(all(isinstance(c, Categoria) for c in cats))
-        self.assertEqual(len(cats), 11)
-        self.assertEqual((cats[0].id, cats[0].nombre), ("game", "Juegos"))
+        self.assertEqual(len(cats), 12)                                    # IA + las 11 de Flathub
+        self.assertEqual((cats[0].id, cats[0].nombre), ("ia", "IA"))
+        self.assertEqual((cats[1].id, cats[1].nombre), ("game", "Juegos"))
         self.assertTrue(all(c.icono.endswith("-symbolic") and c.nombre for c in cats))
         self.assertIn("audiovideo", [c.id for c in cats])
 
     def test_categoria_nueva_de_flathub_sale_al_final(self):
         self.srv.datos_escribir("categorias.json", ["game", "robotica", "../x"])
         cats = self.cat.categorias()
-        self.assertEqual([c.id for c in cats], ["game", "robotica"])
-        self.assertEqual(cats[1].nombre, "Robotica")
+        self.assertEqual([c.id for c in cats], ["ia", "game", "robotica"])
+        self.assertEqual(cats[2].nombre, "Robotica")
 
     def test_destacados_completa_con_tendencias(self):
         apps = self.cat.destacados()
@@ -231,10 +232,93 @@ class TestCatalogo(BaseCatalogo):
         try:
             c = Catalogo(cache_dir=self.cache + "3")
             self.assertEqual(c.api, self.srv.url)
-            self.assertEqual(len(c.categorias()), 11)
+            self.assertEqual(len(c.categorias()), 12)   # IA + las 11 de Flathub
         finally:
             del os.environ["VORTEX_SHOP_API"]
         self.assertEqual(Catalogo(api="file:///etc/passwd").api, catalogo_mod.API_POR_DEFECTO)
+
+
+def ficha_falsa(app_id, nombre):
+    """Una ficha /appstream mínima con la forma de la real (para apps que no están en datos/)."""
+    return {"id": app_id, "name": nombre, "summary": "AI summary in English", "developer_name": "Alguien",
+            "icon": "https://dl.flathub.org/media/%s/icon.png" % app_id.replace(".", "/"),
+            "description": "<p>Run AI models locally.</p>", "project_license": "MIT",
+            "categories": ["Utility"], "metadata": {"flathub::verification::verified": "true"},
+            "releases": [{"version": "1.0", "timestamp": "1700000000"}], "screenshots": [], "urls": {}}
+
+
+class TestCategoriaIA(BaseCatalogo):
+    """La categoría «IA»: lista de Vortexine's, no de Flathub."""
+
+    def test_existe_primero_y_destacada(self):
+        cats = self.cat.categorias()
+        ia = cats[0]
+        self.assertEqual((ia.id, ia.nombre), (catalogo_mod.CATEGORIA_IA, "IA"))
+        self.assertTrue(ia.destacada)
+        self.assertEqual([c.id for c in cats].count("ia"), 1)
+        self.assertFalse(any(c.destacada for c in cats[1:]))              # solo IA sobresale
+        self.assertIn("en tu PC", ia.intro)
+        self.assertEqual(ia.comando, "vortex-ia modelos")
+
+    def test_si_flathub_algun_dia_tiene_ia_no_sale_dos_veces(self):
+        self.srv.datos_escribir("categorias.json", ["ia", "game"])
+        self.assertEqual([c.id for c in self.cat.categorias()], ["ia", "game"])
+
+    def test_lista_bien_formada(self):
+        ids = [a["id"] for a in catalogo_mod.IA]
+        self.assertGreaterEqual(len(ids), 6)
+        self.assertEqual(len(ids), len(set(ids)), "hay apps repetidas en IA")
+        for a in catalogo_mod.IA:
+            self.assertTrue(es_id_valido(a["id"]), a["id"])
+            self.assertTrue(set(a) <= {"id", "resumen", "grafica", "nota"}, a["id"])
+            self.assertTrue(20 <= len(a["resumen"]) <= 110, "resumen corto y claro: %s" % a["id"])
+            self.assertTrue(a["grafica"].strip(), "falta la gráfica: %s" % a["id"])
+            for texto in (a["resumen"], a["grafica"], a.get("nota", "")):
+                self.assertEqual(texto, texto.strip())
+                self.assertTrue(texto == "" or texto.endswith("."), "termina en punto: %r" % texto)
+        # Las que se esperan, con su id de Flathub verificado.
+        for esperado in ("com.jeffser.Alpaca", "ai.jan.Jan", "ai.lmstudio.lm-studio", "io.gpt4all.gpt4all",
+                         "net.mkiol.SpeechNote", "org.upscayl.Upscayl"):
+            self.assertIn(esperado, ids)
+
+    def test_sin_repetidas_con_las_recomendadas(self):
+        self.assertFalse(set(a["id"] for a in catalogo_mod.IA) & set(RECOMENDADAS))
+
+    def test_las_de_ollama_lo_dicen(self):
+        alpaca = next(a for a in catalogo_mod.IA if a["id"] == "com.jeffser.Alpaca")
+        self.assertIn("Ollama", alpaca["resumen"])
+        self.assertIn("localhost:11434", alpaca["nota"])
+
+    def test_por_categoria_ia_con_datos_de_flathub_y_textos_propios(self):
+        self.srv.datos_escribir("appstream_com.jeffser.Alpaca.json", ficha_falsa("com.jeffser.Alpaca", "Alpaca"))
+        self.srv.datos_escribir("appstream_org.upscayl.Upscayl.json", ficha_falsa("org.upscayl.Upscayl", "Upscayl"))
+        apps = self.cat.por_categoria("ia")
+        # Las que el Flathub falso no tiene se saltan; las que sí, en el orden de la lista.
+        self.assertEqual([a.id for a in apps], ["com.jeffser.Alpaca", "org.upscayl.Upscayl"])
+        alpaca = apps[0]
+        self.assertEqual(alpaca.nombre, "Alpaca")
+        self.assertTrue(alpaca.icono_url.startswith("https://"))            # el ícono es el de Flathub
+        self.assertTrue(alpaca.verificado)
+        self.assertEqual(alpaca.resumen, catalogo_mod.IA[0]["resumen"])    # en español, el de Vortexine's
+        self.assertTrue(alpaca.grafica and alpaca.nota)
+        self.assertEqual(apps[1].nota, "")
+        pedidos = self.srv.pedidos()
+        self.assertFalse(any(p.startswith("GET /collection/category/ia") for p in pedidos))   # no se pide a Flathub
+        self.assertEqual(self.cat.por_categoria("ia", 2), [])              # una sola página
+        self.assertEqual([a.id for a in self.cat.por_categoria("IA")], [a.id for a in apps])
+
+    def test_detalle_de_una_app_de_ia(self):
+        self.srv.datos_escribir("appstream_com.jeffser.Alpaca.json", ficha_falsa("com.jeffser.Alpaca", "Alpaca"))
+        d = self.cat.detalle("com.jeffser.Alpaca")
+        self.assertEqual(d.resumen, catalogo_mod.IA[0]["resumen"])
+        self.assertEqual(d.grafica, catalogo_mod.IA[0]["grafica"])
+        self.assertIn("Run AI models locally.", d.descripcion)
+        self.assertEqual(self.cat.detalle(PRISM).grafica, "")                 # las demás no cambian
+
+    def test_ia_sin_red(self):
+        cat = Catalogo(cache_dir=os.path.join(self.tmp, "otra"), api="http://127.0.0.1:%d" % puerto_cerrado())
+        with self.assertRaises(SinRed):
+            cat.por_categoria("ia")
 
 
 class TestCache(BaseCatalogo):
@@ -243,7 +327,7 @@ class TestCache(BaseCatalogo):
         self.cat.buscar("minecraft")
         n = len(self.srv.pedidos())
         otra = Catalogo(cache_dir=self.cache, api=self.srv.url)           # otro objeto, misma carpeta
-        self.assertEqual(len(otra.categorias()), 11)
+        self.assertEqual(len(otra.categorias()), 12)   # IA + las 11 de Flathub
         self.assertEqual(len(otra.buscar("minecraft")), 8)
         self.assertEqual(len(self.srv.pedidos()), n)
         self.assertTrue(os.listdir(self.cache))
@@ -284,7 +368,7 @@ class TestCache(BaseCatalogo):
         self.cat.categorias()
         reloj[0] += 5 * 24 * 3600
         self.srv.parar()                                                  # conexión rechazada
-        self.assertEqual(len(self.cat.categorias()), 11)
+        self.assertEqual(len(self.cat.categorias()), 12)   # IA + las 11 de Flathub
 
     def test_sin_red_y_sin_cache_es_sin_red(self):
         c = Catalogo(cache_dir=self.cache + "-vacia", api="http://127.0.0.1:%d" % puerto_cerrado())
@@ -316,7 +400,7 @@ class TestCache(BaseCatalogo):
         for f in os.listdir(self.cache):
             with open(os.path.join(self.cache, f), "w") as fh:
                 fh.write("{esto no es json")
-        self.assertEqual(len(self.cat.categorias()), 11)
+        self.assertEqual(len(self.cat.categorias()), 12)   # IA + las 11 de Flathub
         for f in os.listdir(self.cache):
             self.assertEqual(json.loads(leer_archivo(os.path.join(self.cache, f)))["datos"],
                              json.loads(leer_archivo(os.path.join(AQUI, "datos", "categorias.json"))))
@@ -329,7 +413,7 @@ class TestCache(BaseCatalogo):
 
     def test_cache_en_una_carpeta_que_no_se_puede_escribir(self):
         c = Catalogo(cache_dir="/proc/no-se-puede-escribir/aqui", api=self.srv.url)
-        self.assertEqual(len(c.categorias()), 11)                         # funciona igual, solo sin caché
+        self.assertEqual(len(c.categorias()), 12)                         # funciona igual, solo sin caché
 
 
 class TestTexto(unittest.TestCase):

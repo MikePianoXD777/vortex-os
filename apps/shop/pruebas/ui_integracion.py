@@ -162,6 +162,34 @@ def main() -> int:
     comprobar(esperar_hasta(lambda: (ESTADO / "remotos.txt").exists() and "flathub" in (ESTADO / "remotos.txt").read_text()),
               "al arrancar deja Flathub como fuente del usuario (flatpak remote-add --user)")
 
+    # --- Categoría IA: la franja del inicio lleva a ella; texto de arriba, comando y «Para tu PC» ---
+    import json
+    from vortex_shop.catalogo import IA
+    for app_id, nombre in (("com.jeffser.Alpaca", "Alpaca"), ("org.upscayl.Upscayl", "Upscayl")):
+        (RAIZ / "datos" / f"appstream_{app_id}.json").write_text(json.dumps({
+            "id": app_id, "name": nombre, "summary": "AI app", "developer_name": "Alguien",
+            "icon": "", "description": "<p>Local AI.</p>",
+            "project_license": "MIT", "metadata": {"flathub::verification::verified": "true"}}))
+    comprobar(esperar_hasta(lambda: bool(puente.categorias) and puente.categorias[0]["id"] == "ia"),
+              "IA es la primera categoría")
+    comprobar(puente.categorias[0]["destacada"] is True and not any(c["destacada"] for c in puente.categorias[1:]),
+              "solo IA está destacada")
+    comprobar(esperar_hasta(lambda: "Nuevo · IA en tu PC" in textos(v)), "el inicio muestra la franja de IA")
+    comprobar(clic_en(v, "Ver apps de IA"), "clic en «Ver apps de IA»")
+    comprobar(esperar_hasta(lambda: puente.categoriaActual.get("id") == "ia" and puente.categoriaEstado == "listo"),
+              "abre la categoría IA")
+    comprobar([a["id"] for a in puente.categoriaApps] == ["com.jeffser.Alpaca", "org.upscayl.Upscayl"],
+              f"con sus apps en orden ({[a['id'] for a in puente.categoriaApps]})")
+    comprobar(puente.categoriaApps[0]["resumen"] == IA[0]["resumen"], "con el resumen en español de Vortexine's")
+    comprobar(esperar_hasta(lambda: "vortex-ia modelos" in textos(v) and any("en tu PC" in t for t in textos(v))),
+              "la página muestra el texto de arriba y el comando «vortex-ia modelos»")
+    comprobar(not puente.categoriaHayMas, "sin «Mostrar más»")
+    llamar(v, "verDetalle", "com.jeffser.Alpaca")
+    comprobar(esperar_hasta(lambda: puente.detalleEstado == "listo"), "el detalle de Alpaca carga")
+    comprobar(esperar_hasta(lambda: "Para tu PC" in textos(v) and IA[0]["grafica"] in textos(v)),
+              "el detalle muestra «Para tu PC» con la gráfica")
+    llamar(v, "navegar", "inicio", "")
+
     # --- Buscar ---
     llamar(v, "escribirBusqueda", "minecraft")
     comprobar(esperar_hasta(lambda: puente.busquedaEstado == "listo" and len(puente.busquedaApps) > 0), "buscar «minecraft» da resultados")

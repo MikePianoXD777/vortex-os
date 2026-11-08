@@ -78,7 +78,15 @@ def _app_a_dict(a: Any) -> dict:
         "verificado": bool(a.verificado),
         "descargas": -1 if d is None else int(d),
         "descargasTexto": _descargas(d),
+        # Solo las de la categoría «IA» los traen: qué gráfica les conviene y un dato extra.
+        "grafica": getattr(a, "grafica", "") or "",
+        "nota": getattr(a, "nota", "") or "",
     }
+
+
+def _categoria_a_dict(c: Any) -> dict:
+    return {"id": c.id, "nombre": c.nombre, "icono": c.icono, "intro": getattr(c, "intro", "") or "",
+            "comando": getattr(c, "comando", "") or "", "destacada": bool(getattr(c, "destacada", False))}
 
 
 def _detalle_a_dict(a: Any) -> dict:
@@ -100,7 +108,7 @@ def _marcador(app_id: str) -> dict:
     """Ficha provisional de una app de la que aún no tenemos datos (solo su id)."""
     nombre = app_id.split(".")[-1].replace("-", " ").replace("_", " ") or app_id
     return {"id": app_id, "nombre": nombre[:1].upper() + nombre[1:], "resumen": "", "icono": "",
-            "desarrollador": "", "verificado": False, "descargas": -1, "descargasTexto": ""}
+            "desarrollador": "", "verificado": False, "descargas": -1, "descargasTexto": "", "grafica": "", "nota": ""}
 
 
 def _es_app(app_id: str) -> bool:
@@ -282,8 +290,7 @@ class Puente(QObject):
     @Slot()
     def cargarCategorias(self) -> None:
         def ok(cats: list) -> None:
-            self._poner(self.categoriasCambio, categorias=[
-                {"id": c.id, "nombre": c.nombre, "icono": c.icono} for c in cats])
+            self._poner(self.categoriasCambio, categorias=[_categoria_a_dict(c) for c in cats])
         self._lanzar(self._motor.catalogo.categorias, ok, lambda e: None)
 
     @Slot()
@@ -311,11 +318,11 @@ class Puente(QObject):
 
     @Slot(str)
     def abrirCategoria(self, cat_id: str) -> None:
-        nombre = next((c["nombre"] for c in self._v["categorias"] if c["id"] == cat_id), cat_id)
-        icono = next((c["icono"] for c in self._v["categorias"] if c["id"] == cat_id), "")
+        actual = next((dict(c) for c in self._v["categorias"] if c["id"] == cat_id),
+                      {"id": cat_id, "nombre": cat_id, "icono": "", "intro": "", "comando": "", "destacada": False})
         self._gen["categoria"] += 1
         self._pagina = 1
-        self._poner(self.categoriaCambio, categoriaActual={"id": cat_id, "nombre": nombre, "icono": icono},
+        self._poner(self.categoriaCambio, categoriaActual=actual,
                     categoriaApps=[], categoriaEstado="cargando", categoriaHayMas=False,
                     categoriaCargandoMas=False)
         self._pedir_pagina(cat_id, 1)
@@ -427,7 +434,7 @@ class Puente(QObject):
     # --- Fichas conocidas, instaladas y actualizaciones ---
 
     _CLAVES_BASE = ("id", "nombre", "resumen", "icono", "desarrollador", "verificado",
-                    "descargas", "descargasTexto")
+                    "descargas", "descargasTexto", "grafica", "nota")
 
     def _recordar(self, ficha: dict) -> None:
         self._info[ficha["id"]] = {k: ficha[k] for k in self._CLAVES_BASE}

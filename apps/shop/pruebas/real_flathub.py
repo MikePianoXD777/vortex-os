@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Prueba REAL y de solo lectura contra la API de Flathub: busca «minecraft», pide la ficha de Prism
-Launcher, las categorías y las recomendadas. No instala nada ni toca el sistema (la caché va a una
+Launcher, las categorías, las apps de la categoría IA y las recomendadas. No instala nada ni toca el sistema (la caché va a una
 carpeta temporal). La corre pruebas/tienda.sh si hay internet.
 
     python3 -I apps/shop/pruebas/real_flathub.py
@@ -14,7 +14,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from vortex_shop.catalogo import RECOMENDADAS, Catalogo        # noqa: E402
+from vortex_shop.catalogo import IA, RECOMENDADAS, Catalogo    # noqa: E402
 from vortex_shop.errores import SinRed                          # noqa: E402
 
 PRISM = "org.prismlauncher.PrismLauncher"
@@ -53,7 +53,13 @@ def main():
         revisar("detalle: verificada y con categorías", d.verificado and "Juegos" in d.categorias, d.categorias)
 
         cats = cat.categorias()
-        revisar("categorías", len(cats) >= 8 and cats[0].id == "game" and cats[0].nombre == "Juegos", [c.id for c in cats])
+        revisar("categorías", len(cats) >= 9 and cats[0].id == "ia" and cats[1].id == "game" and cats[1].nombre == "Juegos",
+                [c.id for c in cats])
+        ia = cat.por_categoria("ia")
+        faltan = [a["id"] for a in IA if a["id"] not in [x.id for x in ia]]
+        revisar("todas las apps de IA existen en Flathub (id exacto)", not faltan, faltan)
+        revisar("las apps de IA traen nombre, ícono de Flathub y gráfica",
+                all(a.nombre and a.icono_url.startswith("https://") and a.grafica for a in ia))
         juegos = cat.por_categoria("game")
         revisar("juegos: primera página llena", len(juegos) == Catalogo.POR_PAGINA, len(juegos))
         revisar("juegos: segunda página distinta", cat.por_categoria("game", 2)[0].id != juegos[0].id)

@@ -1,4 +1,5 @@
-// Inicio: bienvenida, «Recomendadas para Vortexine's» (fila que se desplaza), «Apps de Vortexine's»
+// Inicio: bienvenida, la franja de la categoría destacada (IA), «Recomendadas para Vortexine's»
+// (fila que se desplaza), «Apps de Vortexine's»
 // (las nuestras que no vienen de fábrica) y «Populares» (cuadrícula).
 import QtQuick
 import QtQuick.Layouts
@@ -62,6 +63,78 @@ Pagina {
                 font.pixelSize: 15
                 wrapMode: Text.WordWrap
             }
+        }
+    }
+
+    // La categoría destacada (IA): una franja que lleva a ella, para que se note desde el inicio.
+    Rectangle {
+        id: franjaIA
+        readonly property var cat: {
+            var cats = tienda.categorias
+            for (var i = 0; i < cats.length; i++)
+                if (cats[i].destacada === true)
+                    return cats[i]
+            return null
+        }
+        Layout.fillWidth: true
+        visible: cat !== null
+        // Sin Layouts por dentro: texto que se ajusta + alto que manda en el padre = bucle de polish().
+        implicitHeight: Math.max(52, textosIA.implicitHeight) + 36
+        radius: Tema.radioTarjeta
+        color: zonaIA.containsMouse ? Tema.tarjetaHover : Tema.tarjeta
+        border.width: 1
+        border.color: Tema.violeta
+        Behavior on color { ColorAnimation { duration: 120 } }
+        MouseArea {
+            id: zonaIA
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: Nav.seccion("categoria", franjaIA.cat.id)
+        }
+        Rectangle {
+            id: iconoIA
+            x: 22
+            anchors.verticalCenter: parent.verticalCenter
+            width: 52
+            height: 52
+            radius: 16
+            color: Tema.realce
+            Icono { anchors.centerIn: parent; width: 28; height: 28; nombre: "ia"; color: Tema.violeta }
+        }
+        Column {
+            id: textosIA
+            anchors.left: iconoIA.right
+            anchors.leftMargin: 18
+            anchors.right: botonIA.left
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 3
+            Text {
+                text: "Nuevo · IA en tu PC"
+                color: Tema.violeta
+                font.pixelSize: 12
+                font.weight: Font.DemiBold
+                font.letterSpacing: 1.4
+                font.capitalization: Font.AllUppercase
+            }
+            Text {
+                width: parent.width
+                text: "Platica con una IA, dicta o mejora tus fotos, sin cuenta y sin internet"
+                color: Tema.texto
+                font.pixelSize: 17
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+        }
+        Boton {
+            id: botonIA
+            anchors.right: parent.right
+            anchors.rightMargin: 18
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Ver apps de IA"
+            tipo: "secundario"
+            onClicked: Nav.seccion("categoria", franjaIA.cat.id)
         }
     }
 

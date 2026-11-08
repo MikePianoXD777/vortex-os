@@ -14,6 +14,9 @@ Endpoints que se usan (todos verificados contra la API real; los de lista exigen
     GET  /app-picks/app-of-the-day/{AAAA-MM-DD}                  la app del día y las de la semana
     GET  /app-picks/apps-of-the-week/{AAAA-MM-DD}
 
+La categoría «IA» no existe en Flathub: es una lista de Vortexine's (IA, más abajo) que se arma con
+las fichas de /appstream y sale primero, destacada.
+
 El idioma se pide con «locale» y Flathub traduce lo que tenga traducido (nombre y resumen de las
 apps que lo tienen; si no, viene en inglés). Solo biblioteca estándar.
 
@@ -77,6 +80,53 @@ RECOMENDADAS = [
     "com.github.tchx84.Flatseal",         # Flatseal (permisos de las apps)
 ]
 
+# La categoría «IA»: apps para correr IA en tu PC, sin cuenta y sin internet después de bajarlas. No es
+# una categoría de Flathub (no existe allá): la arma la tienda con esta lista, en este orden, y sale
+# primero en la barra lateral, destacada. Todas verificadas en Flathub (/appstream/<id>) el 07/11/2026.
+#   resumen  lo que se ve en la tarjeta y en la ficha, para alguien que no sabe nada de IA;
+#   grafica  qué gráfica le conviene (sale en la ficha, en «Para tu PC»);
+#   nota     un dato extra para la ficha (cómo usa Ollama, si es de código cerrado…), si hace falta.
+# Ollama ya viene en Vortexine's (http://localhost:11434): las que pueden usarlo lo dicen.
+CATEGORIA_IA = "ia"
+IA = [
+    {"id": "com.jeffser.Alpaca",
+     "resumen": "Platica con una IA en tu PC, sin internet. Puede usar el Ollama que ya trae Vortexine's.",
+     "grafica": "Corre en cualquier PC; con una gráfica NVIDIA o AMD responde mucho más rápido.",
+     "nota": "Para usar el Ollama de Vortexine's, en Alpaca agrega una instancia «Ollama» con la dirección "
+             "http://localhost:11434. El Ollama propio de Alpaca es un complemento aparte de casi 2 GB: no "
+             "hace falta."},
+    {"id": "ai.jan.Jan",
+     "resumen": "Un asistente como ChatGPT que corre completo en tu PC. Los modelos se bajan desde la app.",
+     "grafica": "Funciona solo con el procesador; con una gráfica NVIDIA (o AMD con Vulkan) va mucho más rápido.",
+     "nota": "Trae su propio motor de IA: no usa el Ollama del sistema."},
+    {"id": "ai.lmstudio.lm-studio",
+     "resumen": "Busca, baja y prueba modelos de IA con un clic; te avisa cuáles caben en tu PC.",
+     "grafica": "Mejor con 16 GB de RAM y una gráfica de 8 GB o más; con menos, usa modelos chicos.",
+     "nota": "Es gratis, pero de código cerrado. Trae su propio motor: no usa el Ollama del sistema."},
+    {"id": "io.gpt4all.gpt4all",
+     "resumen": "Chatea con una IA en tu PC y hazle preguntas sobre tus propios documentos.",
+     "grafica": "Corre bien hasta sin gráfica; con una NVIDIA o AMD (Vulkan) va más rápido.",
+     "nota": "Trae su propio motor: no usa el Ollama del sistema."},
+    {"id": "dev.ibrahimcetin.reins",
+     "resumen": "Un chat ligero y sencillo para el Ollama que ya trae Vortexine's.",
+     "grafica": "La rapidez la pone Ollama: con una gráfica NVIDIA o AMD responde más rápido.",
+     "nota": "Pesa muy poco porque no trae motor propio: usa el Ollama del sistema (http://localhost:11434)."},
+    {"id": "net.mkiol.SpeechNote",
+     "resumen": "Dicta y la IA escribe lo que dices; también lee textos en voz alta y traduce, sin internet.",
+     "grafica": "Funciona sin gráfica; con una NVIDIA el dictado es más rápido.",
+     "nota": "Los idiomas y las voces se bajan dentro de la app, la primera vez."},
+    {"id": "org.upscayl.Upscayl",
+     "resumen": "Agranda tus fotos y dibujos con IA sin que se vean pixeleados.",
+     "grafica": "Necesita una gráfica con Vulkan: casi todas las NVIDIA, AMD e Intel recientes."},
+    {"id": "io.gitlab.theevilskeleton.Upscaler",
+     "resumen": "Mejora y agranda imágenes con IA. Sencilla y muy ligera.",
+     "grafica": "Usa la gráfica (Vulkan); con una integrada también funciona, solo que más lento."},
+]
+_IA = {a["id"]: a for a in IA}
+INTRO_IA = ("Corre modelos de IA en tu PC: sin cuenta y sin internet después de bajarlos. "
+            "Para ver cuáles te caben, abre una terminal y escribe:")
+COMANDO_IA = "vortex-ia modelos"
+
 # Categorías de Flathub (las que devuelve /collection/category) con su nombre y su ícono simbólico.
 # El orden es el de la pantalla; las que Flathub agregue después salen al final con su id.
 _CATEGORIAS = [
@@ -134,6 +184,8 @@ class App:
     desarrollador: str
     verificado: bool
     descargas_mes: "int | None" = None
+    grafica: str = ""            # solo las de la categoría «IA»: qué gráfica le conviene
+    nota: str = ""               # y un dato extra para la ficha
 
 
 @dataclass
@@ -141,6 +193,9 @@ class Categoria:
     id: str
     nombre: str
     icono: str
+    intro: str = ""              # texto de arriba de la página de la categoría
+    comando: str = ""            # un comando para la terminal que va debajo del texto
+    destacada: bool = False      # sobresale en la barra lateral y en el inicio
 
 
 @dataclass
@@ -259,6 +314,21 @@ def _version(releases):
         if mejor is None or t > marca:
             mejor, marca = _texto(rel.get("version")), t
     return mejor
+
+
+def categoria_ia():
+    """La categoría «IA» (no es de Flathub: la arma la tienda con la lista IA)."""
+    return Categoria(CATEGORIA_IA, "IA", "vortex-ia-symbolic", intro=INTRO_IA, comando=COMANDO_IA, destacada=True)
+
+
+def con_datos_ia(app):
+    """La app con el resumen en español, la gráfica y la nota de la lista IA (si es de esa lista)."""
+    datos = _IA.get(app.id)
+    if datos:
+        app.resumen = datos["resumen"]
+        app.grafica = datos["grafica"]
+        app.nota = datos.get("nota", "")
+    return app
 
 
 class Catalogo:
@@ -431,14 +501,21 @@ class Catalogo:
         tenga no salen."""
         return self._resolver_varias(RECOMENDADAS)
 
+    def apps_ia(self):
+        """Las apps de la categoría «IA» (lista IA), con los datos de Flathub y el resumen, la gráfica
+        y la nota de Vortexine's. Las que Flathub ya no tenga no salen."""
+        return [con_datos_ia(a) for a in self._resolver_varias([a["id"] for a in IA])]
+
     def categorias(self):
-        """Las categorías de Flathub, en español y en el orden de la pantalla."""
+        """La categoría «IA» de Vortexine's y, detrás, las de Flathub, en español y en el orden de la
+        pantalla."""
         ids = self._pedir("/collection/category", TTL_DETALLES)
         ids = [i.strip().lower() for i in ids if isinstance(i, str)] if isinstance(ids, list) else []
         conocidas = {c[0]: c for c in _CATEGORIAS}
-        salida = [Categoria(*conocidas[i]) for i, *_ in _CATEGORIAS if i in ids]
+        salida = [categoria_ia()]
+        salida += [Categoria(*conocidas[i]) for i, *_ in _CATEGORIAS if i in ids]
         for i in ids:
-            if i not in conocidas and re.fullmatch(r"[a-z0-9_-]{1,40}", i):
+            if i not in conocidas and i != CATEGORIA_IA and re.fullmatch(r"[a-z0-9_-]{1,40}", i):
                 salida.append(Categoria(i, i.capitalize(), _CATEGORIA_NUEVA))
         return salida
 
@@ -449,6 +526,8 @@ class Catalogo:
         if not re.fullmatch(r"[a-z0-9_-]{1,40}", cat_id):
             return []
         pagina = max(1, _entero(pagina) or 1)
+        if cat_id == CATEGORIA_IA:   # la de Vortexine's: una sola página, en el orden de la lista
+            return self.apps_ia() if pagina == 1 else []
         try:
             datos = self._pedir("/collection/category/" + urllib.parse.quote(cat_id, safe=""), TTL_LISTAS,
                                 params={"page": pagina, "per_page": POR_PAGINA,
@@ -501,7 +580,7 @@ class Catalogo:
             if nombre and nombre not in etiquetas:
                 etiquetas.append(nombre)
         tam = _entero(resumen.get("download_size")) if isinstance(resumen, dict) else None
-        return AppDetalle(
+        ficha_app = AppDetalle(
             id=base.id, nombre=base.nombre, resumen=base.resumen, icono_url=base.icono_url,
             desarrollador=base.desarrollador, verificado=base.verificado, descargas_mes=None,
             descripcion=html_a_texto(ficha.get("description")) or base.resumen,
@@ -512,3 +591,4 @@ class Catalogo:
             tamano_descarga=tam if tam and tam > 0 else None,
             categorias=etiquetas,
         )
+        return con_datos_ia(ficha_app)
