@@ -955,7 +955,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-qr vortex-dictar vortex-bt-agente)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-ia vortex-qr vortex-dictar vortex-bt-agente)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1342,6 +1342,8 @@ cmd_actualizar() {
   espejos_cercanos
   paru -Syu
   version_sistema
+  # 3.1: en una NVIDIA, Ollama con CUDA (pregunta una sola vez por máquina, con una notificación).
+  command -v vortex-ia >/dev/null && { vortex-ia motor --auto || true; }
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
   [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
@@ -1366,12 +1368,14 @@ cmd_actualizar() {
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
-    if [[ "$pkg" == vortex-studio && -z "$instalado" ]]; then
-      [[ -e "$AVISOS_ESTADO/studio-ofrecido" ]] && continue
-      mkdir -p "$AVISOS_ESTADO" && : >"$AVISOS_ESTADO/studio-ofrecido"
+    # Vortex Studio (1.10) y Vortexine's Local AI (3.1) llegan una sola vez: si los quitas, no vuelven.
+    if [[ ( "$pkg" == vortex-studio || "$pkg" == vortex-local-ai ) && -z "$instalado" ]]; then
+      local marca_ofrecido="$AVISOS_ESTADO/${pkg#vortex-}-ofrecido"
+      [[ -e "$marca_ofrecido" ]] && continue
+      mkdir -p "$AVISOS_ESTADO" && : >"$marca_ofrecido"
     fi
     [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar ]] || continue
     # makepkg no corre como root ni escribe en una carpeta de root (/usr/share/vortex-os): ahí se
@@ -1647,7 +1651,7 @@ avisos_pendientes() {
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
   # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio; do
+  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"
