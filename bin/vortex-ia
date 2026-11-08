@@ -1,0 +1,617 @@
+#!/usr/bin/env python3
+"""vortex-ia (3.1): la IA local (Ollama) sin adivinar. Vortexine's trae Ollama con su motor Vulkan, que sirve
+en cualquier gráfica; este comando lo acomoda a tu PC y te dice qué modelo te cabe.
+
+    vortex-ia motor            en una NVIDIA, cambia Ollama a CUDA (más palabras por segundo); pregunta antes
+    vortex-ia motor --ver      solo dice qué haría
+    vortex-ia motor --auto     lo que corre «vortex actualizar»: pregunta una sola vez por máquina, con una
+                               notificación; si dices que no, no vuelve a preguntar
+    vortex-ia modelos [--json] «¿qué modelo me cabe?»: mide tu gráfica y dice cuáles caben, cuáles solo en
+                               parte (lentos) y cuál te recomiendo; marca los que ya tienes
+    vortex-ia modelos --medir MODELO
+                               corre un prompt corto con un modelo que ya tienes y dice cuántos tokens por
+                               segundo da (no baja nada)
+    vortex-ia vigilar          lo lanza vortex-gestor en el modo IA: mientras haya modelos cargados, avisa
+                               una vez por modelo si quedó en parte en el procesador (va lento)
+
+El motor: ollama-cuda NO choca con ollama-vulkan (son carpetas aparte en /usr/lib/ollama); se instala
+junto, y Vulkan se queda de respaldo. Pesa porque arrastra el paquete «cuda» (~2.4 GB de descarga). En AMD
+se queda Vulkan: ROCm ocupa 1.3 GB y casi no gana. El CUDA de Arch (13) ya no sirve para las NVIDIA de
+antes de la serie 16/20 (Maxwell, Pascal, Volta): esas también se quedan en Vulkan.
+"""
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+PROC = Path(os.environ.get("VORTEX_IA_PROC", "/proc"))
+DRM = Path(os.environ.get("VORTEX_IA_DRM", "/sys/class/drm"))
+ESTADO = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "vortex"
+MARCA_MOTOR = ESTADO / "ia-motor"
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+INTERVALO_S = float(os.environ.get("VORTEX_IA_INTERVALO", "15"))
+# Al empezar el modo IA el modelo puede tardar en cargar: vigilar lo espera este rato antes de rendirse.
+GRACIA_S = float(os.environ.get("VORTEX_IA_GRACIA", "60"))
+CC_MINIMA = 7.5            # CUDA 13 solo sirve de Turing (GTX 16xx, RTX 20xx) para arriba
+# Si pacman no puede calcularlo: ollama-cuda (384 MB) + cuda (2.43 GB); en disco, 480 MB + 5.2 GB.
+DESCARGA_APROX_MB = 2870
+DISCO_APROX_MB = 5800
+GB = 1024 ** 3
+
+# Los modelos que se recomiendan. El peso es el de su etiqueta en ollama.com/library (Q4, revisado el
+# 07/11/2026; qwen3.5 da un rango y va el menor, que es la Q4 que baja por defecto). «puntos» es qué tan
+# bueno es para platicar en español: se recomienda el de más puntos que quepa entero en la gráfica.
+#   (nombre en Ollama, nombre bonito, GB, puntos, nota)
+MODELOS = [
+    ("llama3.2:3b", "Llama 3.2 3B", 2.0, 2, "chico y rápido"),
+    ("phi3:mini", "Phi-3 Mini", 2.2, 1, "chico; mejor en inglés"),
+    ("qwen3.5:4b", "Qwen 3.5 4B", 3.3, 4, "el que usa Miku"),
+    ("mistral:7b", "Mistral 7B", 4.4, 3, ""),
+    ("qwen2.5:7b", "Qwen 2.5 7B", 4.7, 4, ""),
+    ("deepseek-r1:7b", "DeepSeek R1 7B", 4.7, 3, "piensa antes de contestar: tarda más"),
+    ("llama3.1:8b", "Llama 3.1 8B", 4.9, 4, ""),
+    ("gemma2:9b", "Gemma 2 9B", 5.4, 5, ""),
+    ("qwen3.5:9b", "Qwen 3.5 9B", 6.6, 7, ""),
+    ("phi3:medium", "Phi-3 Medium", 7.9, 3, "mejor en inglés"),
+    ("qwen2.5:14b", "Qwen 2.5 14B", 9.0, 6, ""),
+    ("deepseek-r1:14b", "DeepSeek R1 14B", 9.0, 5, "piensa antes de contestar: tarda más"),
+    ("phi4:14b", "Phi-4 14B", 9.1, 5, ""),
+    ("gemma2:27b", "Gemma 2 27B", 16.0, 7, ""),
+    ("qwen3.5:27b", "Qwen 3.5 27B", 17.0, 9, ""),
+    ("qwen2.5:32b", "Qwen 2.5 32B", 20.0, 8, ""),
+    ("deepseek-r1:32b", "DeepSeek R1 32B", 20.0, 7, "piensa antes de contestar: tarda más"),
+]
+# Otros nombres del mismo modelo («ollama pull llama3.1» baja el 8b).
+ALIAS = {
+    "llama3.2:latest": "llama3.2:3b", "phi3:latest": "phi3:mini", "phi3:3.8b": "phi3:mini",
+    "phi3:14b": "phi3:medium", "mistral:latest": "mistral:7b", "qwen2.5:latest": "qwen2.5:7b",
+    "llama3.1:latest": "llama3.1:8b", "gemma2:latest": "gemma2:9b", "qwen3.5:latest": "qwen3.5:9b",
+    "phi4:latest": "phi4:14b",
+}
+POR_NOMBRE = {m[0]: m for m in MODELOS}
+RESERVA_GPU_GB = 0.5       # lo que usa el escritorio en la gráfica
+RESERVA_RAM_GB = 1.5       # lo que se deja libre de RAM al repartir un modelo
+
+
+# ---- utilidades --------------------------------------------------------------------------------
+
+def correr(orden: list[str], timeout: float = 10, entorno: dict | None = None) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run(orden, capture_output=True, text=True, timeout=timeout,
+                              env=dict(os.environ, **entorno) if entorno else None)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def gbs(valor_gb: float) -> str:
+    """10.0 → «10 GB», 6.64 → «6.6 GB», 0.4 → «400 MB»."""
+    if valor_gb < 1:
+        return f"{round(valor_gb * 1024 / 10) * 10:.0f} MB"
+    if abs(valor_gb - round(valor_gb)) < 0.05:
+        return f"{round(valor_gb):.0f} GB"
+    return f"{valor_gb:.1f} GB"
+
+
+def normal(nombre: str) -> str:
+    nombre = nombre.strip()
+    if ":" not in nombre:
+        nombre += ":latest"
+    return ALIAS.get(nombre, nombre)
+
+
+def nombre_bonito(modelo: str) -> str:
+    m = POR_NOMBRE.get(normal(modelo))
+    return m[1] if m else modelo
+
+
+def despachar(*ordenes: str) -> None:
+    """La primera orden que Hyprland entienda: la del Hyprland con config Lua o la de antes."""
+    for orden in ordenes:
+        r = correr(["hyprctl", "dispatch", orden], timeout=3)
+        if r is None or r.returncode == 0:
+            return
+
+
+def avisar(titulo: str, cuerpo: str, botones: list[tuple[str, str]], icono: str = "dialog-information",
+           espera_ms: int = 30000, timeout: float = 120) -> str:
+    """La notificación con botones (como vortex-memoria). Devuelve el botón elegido, o "" si nadie contesta."""
+    if not shutil.which("notify-send"):
+        return ""
+    orden = ["notify-send", "-a", "Vortexine's OS", "-i", icono, "-u", "normal", "-t", str(espera_ms)]
+    for clave, texto in botones:
+        orden += ["-A", f"{clave}={texto}"]
+    r = correr(orden + [titulo, cuerpo], timeout=timeout)
+    return r.stdout.strip() if r else ""
+
+
+# ---- la máquina --------------------------------------------------------------------------------
+
+def meminfo(clave: str) -> int:
+    try:
+        for linea in (PROC / "meminfo").read_text().splitlines():
+            if linea.startswith(clave + ":"):
+                return int(linea.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0
+
+
+def graficas_lspci() -> list[dict]:
+    """Las gráficas que ve lspci: fabricante (nvidia, amd, intel) y su nombre comercial."""
+    r = correr(["lspci", "-nn"])
+    salida = []
+    for linea in (r.stdout.splitlines() if r and r.returncode == 0 else []):
+        if not re.search(r"VGA compatible controller|3D controller|Display controller", linea):
+            continue
+        ids = re.search(r"\[([0-9a-f]{4}):[0-9a-f]{4}\]", linea)
+        if not ids:
+            continue
+        marca = {"10de": "nvidia", "1002": "amd", "8086": "intel"}.get(ids.group(1), "otra")
+        texto = linea[:ids.start()].split(": ", 1)[-1]
+        corchetes = re.findall(r"\[([^\]]+)\]", texto)
+        nombre = corchetes[-1] if corchetes and corchetes[-1] not in ("AMD/ATI", "AMD") else texto.strip()
+        salida.append({"marca": marca, "nombre": nombre.strip()})
+    return salida
+
+
+def nvidia_smi() -> dict | None:
+    """La NVIDIA con más memoria, si el driver de NVIDIA contesta: nombre, VRAM total y libre, y su CUDA."""
+    r = correr(["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"])
+    if not r or r.returncode != 0:
+        return None
+    gpus = []
+    for linea in r.stdout.splitlines():
+        partes = [p.strip() for p in linea.split(",")]
+        try:
+            gpus.append({"nombre": partes[0], "total_mb": int(float(partes[1])), "libre_mb": int(float(partes[2]))})
+        except (ValueError, IndexError):
+            continue
+    if not gpus:
+        return None
+    # La capacidad CUDA va aparte: los drivers viejos no conocen el campo y fallaría todo.
+    r = correr(["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader,nounits"])
+    capas = r.stdout.splitlines() if r and r.returncode == 0 else []
+    for i, g in enumerate(gpus):
+        try:
+            g["cc"] = float(capas[i])
+        except (ValueError, IndexError):
+            g["cc"] = None
+    return max(gpus, key=lambda g: g["total_mb"])
+
+
+def amd_sysfs() -> dict | None:
+    """La AMD con más VRAM, de /sys/class/drm/card*/device/mem_info_vram_*."""
+    mejor = None
+    for tarjeta in sorted(DRM.glob("card*")):
+        if not re.fullmatch(r"card\d+", tarjeta.name):
+            continue
+        d = tarjeta / "device"
+        try:
+            if (d / "vendor").read_text().strip() != "0x1002":
+                continue
+            total = int((d / "mem_info_vram_total").read_text()) // 1048576
+            usado = int((d / "mem_info_vram_used").read_text()) // 1048576 if (d / "mem_info_vram_used").exists() else 0
+        except (OSError, ValueError):
+            continue
+        if not mejor or total > mejor["total_mb"]:
+            mejor = {"total_mb": total, "libre_mb": max(0, total - usado)}
+    return mejor
+
+
+def corto(nombre: str) -> str:
+    return re.sub(r"^(NVIDIA\s+)?(GeForce\s+)?", "", nombre).strip() or nombre
+
+
+def maquina() -> dict:
+    """Qué hay: la gráfica que sirve para la IA (o ninguna) y la RAM."""
+    ram_total = meminfo("MemTotal") / 1048576
+    pci = graficas_lspci()
+    gpu: dict = {"tipo": "ninguna", "nombre": "", "vram_gb": 0.0, "libre_gb": 0.0, "cc": None, "driver": True}
+    nv = nvidia_smi()
+    amd = None if nv else amd_sysfs()
+    if nv:
+        gpu.update(tipo="nvidia", nombre=corto(nv["nombre"]), vram_gb=nv["total_mb"] / 1024,
+                   libre_gb=nv["libre_mb"] / 1024, cc=nv["cc"])
+    elif amd and amd["total_mb"] >= 2048:      # menos es la de un procesador (APU): comparte la RAM
+        nombre = next((g["nombre"] for g in pci if g["marca"] == "amd"), "AMD")
+        gpu.update(tipo="amd", nombre=nombre, vram_gb=amd["total_mb"] / 1024, libre_gb=amd["libre_mb"] / 1024)
+    elif any(g["marca"] == "nvidia" for g in pci):
+        # Hay NVIDIA pero su driver no contesta (nouveau o sin instalar): no se sabe su VRAM.
+        gpu.update(tipo="nvidia", nombre=corto(next(g["nombre"] for g in pci if g["marca"] == "nvidia")), driver=False)
+    elif pci:
+        gpu.update(tipo="integrada", nombre=pci[0]["nombre"])
+    return {"gpu": gpu, "ram_gb": ram_total, "ram_libre_gb": meminfo("MemAvailable") / 1048576}
+
+
+# ---- modelos -----------------------------------------------------------------------------------
+
+def necesita_gb(peso_gb: float) -> float:
+    """Lo que ocupa cargado: el archivo más el contexto (8K, como Miku) y los búferes de cálculo."""
+    return peso_gb * 1.1 + 0.6
+
+
+def cabe(peso_gb: float, m: dict) -> tuple[str, int]:
+    """(«gpu», «parcial», «cpu» o «no», % que iría al procesador)."""
+    falta = necesita_gb(peso_gb)
+    ram = max(0.0, m["ram_gb"] * 0.75 - 1)     # la que se puede prestar sin ahogar al resto
+    vram = max(0.0, m["gpu"]["vram_gb"] - RESERVA_GPU_GB)
+    if vram >= 1:
+        if falta <= vram:
+            return "gpu", 0
+        if falta - vram <= ram:
+            return "parcial", round((falta - vram) / falta * 100)
+        return "no", 100
+    return ("cpu", 100) if falta <= ram else ("no", 100)
+
+
+def ollama_lista() -> list[tuple[str, float]] | None:
+    """Los modelos que ya bajaste (nombre, GB), o None si Ollama no contesta."""
+    if not shutil.which("ollama"):
+        return None
+    r = correr(["ollama", "list"])
+    if not r or r.returncode != 0:
+        return None
+    salida = []
+    for linea in r.stdout.splitlines()[1:]:
+        partes = linea.split()
+        if not partes:
+            continue
+        peso = re.search(r"(\d+(?:\.\d+)?)\s*(GB|MB|KB)", linea)
+        gb = float(peso.group(1)) / {"GB": 1, "MB": 1024, "KB": 1048576}[peso.group(2)] if peso else 0.0
+        salida.append((partes[0], gb))
+    return salida
+
+
+def evaluar(m: dict | None = None, tienes: list[tuple[str, float]] | None = None) -> dict:
+    """Cada modelo de la tabla con si cabe, y el recomendado. Los que tienes y no están en la tabla, aparte."""
+    m = m or maquina()
+    nombres = {normal(n) for n, _ in (tienes or [])}
+    lista = []
+    for nombre, bonito, peso, puntos, nota in MODELOS:
+        donde, cpu = cabe(peso, m)
+        lista.append({"modelo": nombre, "nombre": bonito, "gb": peso, "necesita_gb": round(necesita_gb(peso), 1),
+                      "cabe": donde, "procesador_pct": cpu, "puntos": puntos, "nota": nota,
+                      "tienes": nombre in nombres})
+    otros = []
+    for nombre, peso in tienes or []:
+        if normal(nombre) in POR_NOMBRE or not peso:
+            continue
+        donde, cpu = cabe(peso, m)
+        otros.append({"modelo": nombre, "nombre": nombre, "gb": round(peso, 1), "cabe": donde,
+                      "procesador_pct": cpu, "tienes": True})
+    rec = recomendar(lista)
+    for x in lista:
+        x["recomendado"] = rec is not None and x["modelo"] == rec["modelo"]
+    return {"maquina": m, "modelos": lista, "otros": otros, "recomendado": rec["modelo"] if rec else None,
+            "ollama": tienes is not None}
+
+
+def recomendar(lista: list[dict], menor_que: float | None = None) -> dict | None:
+    """El de más puntos que cabe entero en la gráfica (si empatan, el más grande); sin gráfica, el mejor que no
+    pase de 3.5 GB."""
+    def sirve(x):
+        if menor_que is not None and x["gb"] >= menor_que:
+            return False
+        return x["cabe"] == "gpu" or (x["cabe"] == "cpu" and x["gb"] <= 3.5)
+    candidatos = [x for x in lista if sirve(x)]
+    return max(candidatos, key=lambda x: (x["puntos"], x["gb"])) if candidatos else None
+
+
+def texto_grafica(m: dict) -> str:
+    g = m["gpu"]
+    ram = f"{gbs(m['ram_gb'])} de RAM"
+    if g["vram_gb"] >= 1:
+        return (f"Tu gráfica: {g['nombre']} con {gbs(g['vram_gb'])} ({gbs(g['libre_gb'])} libres ahora). "
+                f"Tienes {ram}.")
+    if g["tipo"] == "nvidia":
+        return (f"Tu gráfica: {g['nombre']}, pero su driver de NVIDIA no contesta (nvidia-smi): la IA va con el "
+                f"procesador y tus {ram}.")
+    if g["tipo"] in ("integrada", "amd"):
+        return f"Tu gráfica viene en el procesador ({g['nombre']}): la IA usa tus {ram}, y va lenta."
+    return f"No encontré gráfica: la IA usa el procesador y tus {ram}, y va lenta."
+
+
+def cmd_modelos(args: list[str]) -> int:
+    if "--medir" in args:
+        i = args.index("--medir")
+        return medir(args[i + 1] if i + 1 < len(args) else "")
+    ev = evaluar(tienes=ollama_lista())
+    if "--json" in args:
+        print(json.dumps(ev, ensure_ascii=False, indent=2))
+        return 0
+    m = ev["maquina"]
+    print(texto_grafica(m))
+    rec = next((x for x in ev["modelos"] if x["recomendado"]), None)
+    if rec:
+        donde = "entero en la gráfica" if rec["cabe"] == "gpu" else "en el procesador"
+        ya = " Ya lo tienes." if rec["tienes"] else f" Para bajarlo: ollama pull {rec['modelo']}"
+        print(f"Te recomiendo: {rec['nombre']} ({rec['modelo']}, {gbs(rec['gb'])}): cabe {donde}.{ya}")
+    else:
+        print("No te cabe ninguno bien: con tan poca memoria la IA local no vale la pena. Mejor una en internet.")
+    grupos = [("gpu", "Te caben enteros en la gráfica (rápidos):"),
+              ("parcial", "Caben solo en parte: lo que no cabe va al procesador y van lentos:"),
+              ("cpu", "Caben en la RAM, sin gráfica (lentos):"),
+              ("no", "No te caben:")]
+    todos = ev["modelos"] + ev["otros"]
+    for clave, titulo in grupos:
+        filas = [x for x in todos if x["cabe"] == clave]
+        if not filas:
+            continue
+        print(f"\n{titulo}")
+        for x in filas:
+            extra = ["el que te recomiendo"] if x.get("recomendado") else []
+            if clave == "parcial":
+                extra.append(f"~{x['procesador_pct']} % en el procesador")
+            if x["tienes"]:
+                extra.append("ya lo tienes")
+            if x.get("nota"):
+                extra.append(x["nota"])
+            print(f"  {'*' if x.get('recomendado') else '-'} {x['nombre']:<16} {x['modelo']:<16} "
+                  f"{gbs(x['gb']):>7}" + (f"   {'; '.join(extra)}" if extra else ""))
+    if not ev["ollama"]:
+        print("\n(Ollama no está corriendo: no pude ver cuáles ya tienes.)")
+    print("\nLos pesos son los de ollama.com/library; cargados ocupan un poco más (el contexto de la plática).")
+    return 0
+
+
+def medir(modelo: str) -> int:
+    """Tokens por segundo con un prompt corto. Solo con un modelo que ya tienes: no baja nada."""
+    if not modelo:
+        print("uso: vortex-ia modelos --medir MODELO", file=sys.stderr)
+        return 2
+    tienes = ollama_lista()
+    if tienes is None:
+        print("Ollama no está corriendo (arráncalo, por ejemplo abriendo Miku con la IA local).", file=sys.stderr)
+        return 1
+    if normal(modelo) not in {normal(n) for n, _ in tienes}:
+        print(f"No tienes {modelo}. Bájalo primero con: ollama pull {modelo}", file=sys.stderr)
+        return 1
+    print(f"Midiendo {nombre_bonito(modelo)} (la primera vez tarda en cargarlo)…")
+    r = correr(["ollama", "run", modelo, "--verbose", "Explica en dos frases qué es un arcoíris."], timeout=600)
+    if not r:
+        print("Ollama tardó demasiado o no arrancó.", file=sys.stderr)
+        return 1
+    tasa = re.search(r"^\s*eval rate:\s*([\d.]+)\s*tokens/s", r.stderr + r.stdout, re.M)
+    if r.returncode != 0 or not tasa:
+        print("No pude medirlo: " + (r.stderr.strip().splitlines() or ["Ollama no dijo nada"])[-1], file=sys.stderr)
+        return 1
+    tps = float(tasa.group(1))
+    juicio = "va volando" if tps >= 40 else "va bien" if tps >= 15 else "se puede usar" if tps >= 6 else "va lento"
+    print(f"{nombre_bonito(modelo)}: {tps:.1f} tokens por segundo ({juicio}).")
+    return 0
+
+
+# ---- motor -------------------------------------------------------------------------------------
+
+def instalado(paquete: str) -> bool:
+    r = correr(["pacman", "-Q", paquete])
+    return bool(r and r.returncode == 0)
+
+
+def tam_bytes(texto: str) -> float:
+    numero, unidad = texto.split()[:2]
+    return float(numero) * {"B": 1, "KiB": 1024, "MiB": 1024 ** 2, "GiB": GB}.get(unidad, 1)
+
+
+def tamanos_cuda() -> tuple[float, float]:
+    """(GB a bajar, GB en disco) de ollama-cuda con lo que arrastra y aún no tienes. Lo calcula pacman sin root."""
+    r = correr(["pacman", "-Sp", "--print-format", "%n %s", "ollama-cuda"], entorno={"LC_ALL": "C"})
+    if not r or r.returncode != 0:
+        return DESCARGA_APROX_MB / 1024, DISCO_APROX_MB / 1024
+    nombres, baja = [], 0.0
+    for linea in r.stdout.splitlines():
+        partes = linea.split()
+        if len(partes) == 2 and partes[1].isdigit():
+            nombres.append(partes[0])
+            baja += int(partes[1])
+    disco = 0.0
+    r = correr(["pacman", "-Si", *nombres], entorno={"LC_ALL": "C"}) if nombres else None
+    for linea in (r.stdout.splitlines() if r and r.returncode == 0 else []):
+        if linea.startswith("Installed Size"):
+            try:
+                disco += tam_bytes(linea.split(":", 1)[1])
+            except (ValueError, IndexError):
+                pass
+    return baja / GB, (disco / GB if disco else DISCO_APROX_MB / 1024)
+
+
+def libre_disco_gb() -> float:
+    r = correr(["df", "-P", "-m", "/"])
+    try:
+        return int(r.stdout.splitlines()[1].split()[3]) / 1024
+    except (AttributeError, IndexError, ValueError):
+        return 1e9      # sin df no se frena por eso
+
+
+def decidir_motor() -> dict:
+    """Qué haría «motor»: {"cambiar": bool, "texto": por qué, "gpu": nombre, "baja"/"disco": GB}."""
+    if not instalado("ollama"):
+        return {"cambiar": False, "texto": "Ollama no está instalado: no hay nada que cambiar."}
+    if instalado("ollama-cuda"):
+        return {"cambiar": False, "ya": True, "texto": "Ollama ya usa CUDA (ollama-cuda): es lo más rápido en NVIDIA."}
+    pci = graficas_lspci()
+    nv = nvidia_smi()
+    if not nv:
+        if any(g["marca"] == "nvidia" for g in pci):
+            return {"cambiar": False, "texto": "Tienes NVIDIA, pero su driver no contesta (nvidia-smi): CUDA lo "
+                                               "necesita. Ollama se queda con Vulkan."}
+        if any(g["marca"] == "amd" for g in pci):
+            return {"cambiar": False, "texto": "Tu gráfica es AMD: Ollama se queda con Vulkan (ROCm ocupa 1.3 GB y "
+                                               "casi no es más rápido)."}
+        return {"cambiar": False, "texto": "No hay NVIDIA: Ollama se queda con Vulkan."}
+    nombre = corto(nv["nombre"])
+    if nv["cc"] is not None and nv["cc"] < CC_MINIMA:
+        return {"cambiar": False, "texto": f"Tu {nombre} es de antes de la serie 16/20 y el CUDA de Arch ya no la "
+                                           "soporta: Ollama se queda con Vulkan, que sí le sirve."}
+    baja, disco = tamanos_cuda()
+    if libre_disco_gb() < disco + 2:
+        return {"cambiar": False, "falta_disco": True, "gpu": nombre,
+                "texto": f"CUDA haría más rápida la IA en tu {nombre}, pero ocupa {gbs(disco)} y no te alcanza el "
+                         "disco. Libera espacio y córrelo otra vez: vortex-ia motor"}
+    return {"cambiar": True, "gpu": nombre, "baja": baja, "disco": disco,
+            "texto": f"Cambiaría Ollama a CUDA (ollama-cuda) en tu {nombre}: más palabras por segundo. Baja "
+                     f"{gbs(baja)} y ocupa {gbs(disco)} en el disco; Vulkan se queda de respaldo."}
+
+
+def marcar(valor: str) -> None:
+    try:
+        ESTADO.mkdir(parents=True, exist_ok=True)
+        MARCA_MOTOR.write_text(valor + "\n")
+    except OSError:
+        pass
+
+
+def instalar_cuda() -> bool:
+    """Con sudo, como el resto de «vortex actualizar» (ya pidió la contraseña en la terminal)."""
+    print("Instalando ollama-cuda (es grande: tarda un rato)…")
+    try:
+        ok = subprocess.run(["sudo", "pacman", "-S", "--needed", "--noconfirm", "ollama-cuda"]).returncode == 0
+    except OSError:
+        ok = False
+    if not ok:
+        print("No pude instalar ollama-cuda (a mano: sudo pacman -S ollama-cuda)", file=sys.stderr)
+        return False
+    corriendo = ollama_lista() is not None
+    print("Listo: Ollama usa CUDA" + (" la próxima vez que arranque (al reabrir Miku)." if corriendo else "."))
+    return True
+
+
+def preguntar(d: dict, terminal: bool) -> str:
+    """«si», «no» o "" (no contestó). A mano y en una terminal pregunta ahí; si no, con la notificación."""
+    cuerpo = (f"Tu {d['gpu']} corre la IA local (la de Miku) más rápido con CUDA, el motor de NVIDIA. Hay que "
+              f"bajar {gbs(d['baja'])} (ocupa {gbs(d['disco'])}). ¿Lo cambio?")
+    if terminal and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            r = input(f"{cuerpo} [s/N] ").strip().lower()
+        except EOFError:
+            return ""
+        return "si" if r in ("s", "si", "sí", "y", "yes") else "no"
+    return avisar("Tu IA local puede ir más rápido", cuerpo, [("si", "Cambiar ahora"), ("no", "No, gracias")],
+                  espera_ms=120000, timeout=150)
+
+
+def cmd_motor(args: list[str]) -> int:
+    auto = "--auto" in args
+    if auto and MARCA_MOTOR.exists():
+        return 0                        # ya se preguntó en esta máquina
+    d = decidir_motor()
+    if "--ver" in args:
+        print(d["texto"])
+        return 0
+    if d.get("ya"):
+        if auto:
+            marcar("cuda")
+        else:
+            print(d["texto"])
+        return 0
+    if not d["cambiar"]:
+        if not auto or d.get("falta_disco"):
+            print(d["texto"])
+        return 0
+    if auto:
+        print("IA local: " + d["texto"] + " Te pregunto en una notificación.")
+    respuesta = preguntar(d, terminal=not auto)
+    if respuesta == "si":
+        marcar("cuda" if instalar_cuda() else "fallo")
+    elif respuesta == "no":
+        marcar("no")
+        print("Se queda con Vulkan. Si cambias de idea: vortex-ia motor")
+    return 0
+
+
+# ---- vigilar -----------------------------------------------------------------------------------
+
+def cargados() -> list[tuple[str, int]] | None:
+    """(modelo, % en el procesador) de cada modelo cargado en Ollama; None si Ollama no contesta."""
+    r = correr(["ollama", "ps"])
+    if not r or r.returncode != 0:
+        return None
+    salida = []
+    for linea in r.stdout.splitlines()[1:]:
+        partes = linea.split()
+        if not partes:
+            continue
+        mezcla = re.search(r"(\d+)%/(\d+)%\s+CPU/GPU", linea)
+        if mezcla:
+            cpu = int(mezcla.group(1))
+        elif re.search(r"100%\s+CPU", linea):
+            cpu = 100
+        else:
+            cpu = 0
+        salida.append((partes[0], cpu))
+    return salida
+
+
+def texto_lento(modelo: str, cpu: int, ev: dict) -> str:
+    peso = POR_NOMBRE.get(normal(modelo), (0, 0, 0.0))[2] or next(
+        (x["gb"] for x in ev["otros"] if x["modelo"] == modelo), 0.0)
+    otro = recomendar(ev["modelos"], menor_que=peso) if peso else recomendar(ev["modelos"])
+    if otro and normal(otro["modelo"]) == normal(modelo):
+        otro = None
+    consejo = f"Cierra lo que use la gráfica o prueba uno más chico: {otro['modelo']}" if otro else \
+        "Cierra lo que use la gráfica"
+    if cpu >= 100:
+        return f"{nombre_bonito(modelo)} no cupo en tu gráfica y va todo en el procesador (muy lento). {consejo}."
+    return (f"{nombre_bonito(modelo)} no cabe completo en tu gráfica y va lento ({cpu} % en el procesador). "
+            f"{consejo}.")
+
+
+def avisar_lento(texto: str) -> None:
+    accion = avisar("La IA va lenta", texto, [("ver", "Ver qué usa la gráfica")], icono="dialog-warning")
+    if accion in ("ver", "default"):
+        despachar('hl.dsp.exec_cmd("vortex-task-manager")', "exec vortex-task-manager")
+
+
+def cmd_vigilar(_args: list[str]) -> int:
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    candado = open(RUNTIME / "vortex-ia-vigilar.lock", "w")
+    try:
+        fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0                        # ya hay uno vigilando
+    m = maquina()
+    sin_gpu = m["gpu"]["vram_gb"] < 1   # sin gráfica que sirva, todo va al procesador y avisar no ayuda
+    avisados: set[str] = set()
+    hilos: list[threading.Thread] = []
+    inicio = time.monotonic()
+    ev = None
+    while True:
+        lista = cargados()
+        if not lista:
+            if time.monotonic() - inicio >= GRACIA_S:
+                break
+        else:
+            inicio = -1e18              # ya hubo modelos: en cuanto se descarguen todos, termina
+            for modelo, cpu in lista:
+                if cpu <= 0 or modelo in avisados or sin_gpu:
+                    continue
+                avisados.add(modelo)
+                ev = ev or evaluar(m)
+                hilo = threading.Thread(target=avisar_lento, args=(texto_lento(modelo, cpu, ev),))
+                hilo.start()
+                hilos.append(hilo)
+        time.sleep(INTERVALO_S)
+    for hilo in hilos:                  # que el botón siga sirviendo aunque ya no haya modelos
+        hilo.join()
+    return 0
+
+
+def main() -> int:
+    orden, args = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
+    comandos = {"motor": cmd_motor, "modelos": cmd_modelos, "vigilar": cmd_vigilar}
+    if orden not in comandos:
+        print("uso: vortex-ia motor [--auto] [--ver] | modelos [--json] [--medir MODELO] | vigilar", file=sys.stderr)
+        return 2
+    return comandos[orden](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
