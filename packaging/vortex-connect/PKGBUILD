@@ -4,7 +4,7 @@
 #   cd packaging/vortex-connect && makepkg -si
 pkgname=vortex-connect
 pkgver=1.0.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Vortexine Connect: entra a redes abiertas cuando viajas y cifra lo que mandas"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'

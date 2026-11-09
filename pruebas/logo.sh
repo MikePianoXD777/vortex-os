@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# El logo de Vortexine's OS («Rotor», docs/logo/rotor.svg) es el mismo en todo: el icono y el logo de cada app, el
-# instalador, el shell y la terminal. Si algo se queda con otro dibujo, esta prueba lo dice.
+# El logo de Vortexine's OS («Rotor», docs/logo/rotor.svg) es solo del sistema: el ícono del sistema (instalador e
+# ícono «vortex-os», también el de la Shop), el shell y la terminal. Las apps Vortexine llevan su propio logo
+# (Mike, 09/11/2026): esta prueba también revisa que ninguna se quede con el Rotor.
 #
 #   pruebas/logo.sh
 set -uo pipefail
@@ -14,20 +15,17 @@ mal() { printf '  MAL %s\n' "$*"; FALLOS=$((FALLOS + 1)); }
 distintos=0
 while IFS= read -r f; do
   cmp -s "$f" "$MAESTRO" || { mal "$f no es el logo"; distintos=$((distintos + 1)); }
-done < <(git ls-files --cached --others --exclude-standard \
-  'apps/*/share/icons/hicolor/scalable/apps/*.svg' 'apps/*/qml/logo.svg' 'apps/shop/vortex_shop/qml/vortex-os.svg' \
-  'apps/shop/vortex_shop/qml/propias/*.svg' 'apps/miku/icono/*.svg' \
+done < <(git ls-files --cached --others --exclude-standard 'apps/shop/vortex_shop/qml/vortex-os.svg' \
   'iso/airootfs/etc/calamares/branding/vortex/vortex-os.svg' 'iso/airootfs/usr/share/icons/hicolor/scalable/apps/*.svg')
-[[ $distintos == 0 ]] && bien "apps e instalador: el mismo logo"
+[[ $distintos == 0 ]] && bien "sistema e instalador: el logo Rotor"
 
-for t in 16 24; do
-  f="apps/app-installer/share/icons/hicolor/${t}x$t/apps/vortex-app-installer.svg"
-  if [[ "$(sed "s/width=\"$t\" height=\"$t\"/width=\"256\" height=\"256\"/" "$f")" == "$(cat "$MAESTRO")" ]]; then
-    bien "App Installer a $t px: el mismo dibujo"
-  else
-    mal "App Installer a $t px: otro dibujo"
-  fi
-done
+rotor_en_apps=0
+while IFS= read -r f; do
+  cmp -s "$f" "$MAESTRO" && { mal "$f es el Rotor: las apps llevan su propio logo"; rotor_en_apps=$((rotor_en_apps + 1)); }
+done < <(git ls-files --cached --others --exclude-standard \
+  'apps/*/share/icons/hicolor/*/apps/*.svg' 'apps/*/qml/logo.svg' 'apps/shop/vortex_shop/qml/propias/*.svg' \
+  'apps/miku/icono/*.svg')
+[[ $rotor_en_apps == 0 ]] && bien "apps: cada una con su propio logo"
 
 # La silueta del shell tiene las mismas aspas que el logo, sin degradado (el shell la pinta con el color del tema).
 aspas() { grep -o '<path d="[^"]*"' "$1"; }

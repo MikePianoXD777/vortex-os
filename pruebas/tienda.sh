@@ -61,9 +61,9 @@ probar "el .desktop: nombre, categorías, clase de ventana y palabras clave en e
    grep -q '^Keywords=.*tienda.*juegos.*instalar.*flatpak' '$TIENDA/share/applications/vortexines-shop.desktop'"
 probar "el ícono es un SVG válido con los colores de Vortexine's" \
   "python3 -I -c 'import sys, xml.dom.minidom as m; m.parse(sys.argv[1])' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg' &&
-   grep -qi '#46E6FF' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg' &&
-   grep -qi '#9A6BFF' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg' &&
-   true"
+   grep -qi '#9ec5ff' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg' &&
+   grep -qi '#c6a8ff' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg' &&
+   grep -qi '#0b0d1a' '$TIENDA/share/icons/hicolor/scalable/apps/vortexines-shop.svg'"
 
 echo "== Motor (catálogo contra un Flathub falso, flatpak falso)"
 # Las pruebas no deben ver tu flatpak ni tu caché: HOME y PATH propios los pone test_motor.py.

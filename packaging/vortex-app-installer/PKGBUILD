@@ -6,7 +6,7 @@
 #   cd packaging/vortex-app-installer && makepkg -si
 pkgname=vortex-app-installer
 pkgver=1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Vortex App Installer: instala o descomprime lo que descargas, sin terminal"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
