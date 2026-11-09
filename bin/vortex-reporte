@@ -40,8 +40,28 @@ oom_usuario() { journalctl --user -b --no-pager -q -o short-iso -g 'oom|out of m
 tronaron() { coredumpctl list --no-pager --no-legend -q 2>/dev/null | tail -n 20; }
 juegos() { tail -n 40 "${VORTEX_STEAM:-$HOME/.local/share/Steam}/logs/gameprocess_log.txt"; }
 partidas() { tail -n 10 "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/partidas.csv"; }
+# Para «se trabó todo y tuve que apagarla» (09/11/2026): quien manda el reporte ya reinició, así que lo que
+# sirve está en el arranque anterior. Si se acabó la memoria, si la tarjeta de video se colgó, si el kernel se
+# trabó, si Hyprland dejó un reporte de choque y en qué modo de ventanas estaba (en «kde» carga el plugin
+# hyprbars, que corre dentro de Hyprland).
+ventanas() {
+  printf 'Modo: %s\n' "$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/ventanas" 2>/dev/null || echo mosaico)"
+  hyprctl plugin list 2>/dev/null | grep -i -E '^plugin|hyprbars' | head -n 5
+}
+arranques() { journalctl --list-boots --no-pager -q 2>/dev/null | tail -n 4; }
+trabado_antes() {
+  journalctl -k -b -1 --no-pager -q -o short-iso -n 40 -g \
+    'out of memory|oom-kill|killed process|NVRM: Xid|NVRM: GPU .*(fallen off|lost)|GPU hang|ring .* timeout|gpu reset|blocked for more than|soft lockup|hard lockup|watchdog: BUG'
+}
+choque_hyprland() {
+  local f
+  f="$(ls -t "${XDG_CACHE_HOME:-$HOME/.cache}"/hyprland/hyprlandCrashReport*.txt 2>/dev/null | head -n 1)"
+  [[ -n "$f" ]] || return 0
+  printf '%s (%s)\n' "${f##*/}" "$(date -r "$f" '+%Y-%m-%d %H:%M')"
+  head -n 40 "$f"
+}
 export -f revision_legible paquetes_vortex tarjeta pantallas mas_memoria fallidos errores sin_memoria \
-  oom_usuario tronaron juegos partidas
+  oom_usuario tronaron juegos partidas ventanas arranques trabado_antes choque_hyprland
 
 armar() {
   printf 'Reporte de Vortexine'\''s OS, %s\n' "$(date '+%Y-%m-%d %H:%M')"
@@ -60,6 +80,10 @@ armar() {
   seccion "Apps que tronaron" tronaron
   seccion "Errores de este arranque" errores 0 120
   seccion "Errores del arranque anterior" errores -1 40
+  seccion "Ventanas" ventanas
+  seccion "Últimos arranques" arranques
+  seccion "Si se trabó antes de reiniciar (memoria, video, kernel)" trabado_antes
+  seccion "Choque de Hyprland" choque_hyprland
   seccion "Steam: últimos juegos" juegos
   seccion "Últimas partidas" partidas
 }

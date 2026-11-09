@@ -29,14 +29,21 @@ FIN
 printf '#!/bin/sh\nexit 0\n' >"$T/bin/wl-copy"
 printf '#!/bin/sh\nsleep 60\n' >"$T/bin/hyprctl.lento"
 chmod +x "$T/bin/"*
+# Sin XDG_*: si no, el reporte lee tu caché y tu config reales (los choques de tu Hyprland, tu modo de ventanas).
+unset XDG_CACHE_HOME XDG_CONFIG_HOME XDG_STATE_HOME
 export PATH="$T/bin:$PATH" HOME="$T/casa de prueba" VORTEX_REPORTE_DIR="$T/salida"
 
+mkdir -p "$T/casa de prueba/.cache/hyprland"
+echo "Hyprland received signal 11 (SIGSEGV)" >"$T/casa de prueba/.cache/hyprland/hyprlandCrashReport1234.txt"
 msg="$("$AQUI/bin/vortex-reporte")"
 R="$(ls "$T"/salida/*.txt 2>/dev/null | head -n1)"
 probar "crea un archivo y dice dónde" "[[ -s '$R' && \$msg == *'Reporte listo'* ]]"
-for s in Sistema Memoria Disco "Algo no funciona" "Errores de este arranque"; do
+for s in Sistema Memoria Disco "Algo no funciona" "Errores de este arranque" Ventanas "Últimos arranques" \
+  "Si se trabó antes de reiniciar (memoria, video, kernel)" "Choque de Hyprland"; do
   probar "trae la sección «$s»" "grep -q '===== $s =====' '$R'"
 done
+probar "dice el modo de ventanas" "grep -q '^Modo: mosaico' '$R'"
+probar "trae el reporte de choque de Hyprland" "grep -q 'hyprlandCrashReport1234.txt' '$R' && grep -q 'received signal 11' '$R'"
 probar "sin el usuario" "! grep -qw '$USUARIO' '$R'"
 probar "sin el nombre del equipo" "! grep -qw '$EQUIPO' '$R'"
 probar "sin la carpeta personal, pero se entiende la ruta" "! grep -q 'casa de prueba' '$R' && grep -q '~/secreto.txt' '$R'"
