@@ -1,5 +1,12 @@
 # Vortexine's OS 3.3.2
 
+## Lo nuevo
+
+### Logo nuevo: Rotor
+
+Vortexine's OS estrena logo, una turbina de tres aspas. Ya está en el shell, en la terminal, en el instalador y en las
+apps del sistema.
+
 ## Lo arreglado
 
 ### `vortex actualizar` ya no se detiene a preguntar por la IA
