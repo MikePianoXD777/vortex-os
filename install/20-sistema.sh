@@ -98,6 +98,15 @@ srun sysctl -q -p /etc/sysctl.d/90-vortex.conf || aviso "no pude aplicar los sys
 srun systemd-tmpfiles --boot --create /etc/tmpfiles.d/thp.conf /etc/tmpfiles.d/90-vortex-mglru.conf \
   || aviso "no pude aplicar THP/MGLRU ahora; se aplican al reiniciar"
 escribir_sistema /etc/systemd/journald.conf.d/90-vortex.conf <"$VORTEX_DIR/config/sistema/journald.conf"
+# Vortex 3.3.4: el Wi-Fi MediaTek (ASUS Vivobook Go…) se cae con el ahorro de energía: se apaga solo en
+# esas tarjetas (PCIe 14c3, clase de red, o SDIO 037a). «vortex actualizar» hace lo mismo en las viejas.
+for d in /sys/bus/pci/devices/* /sys/bus/sdio/devices/*; do
+  v="$(cat "$d/vendor" 2>/dev/null)" || continue
+  if [[ "$v" == 0x037a || ( "$v" == 0x14c3 && "$(cat "$d/class" 2>/dev/null)" == 0x0280* ) ]]; then
+    escribir_sistema /etc/NetworkManager/conf.d/90-vortex-wifi-mediatek.conf <"$VORTEX_DIR/config/sistema/wifi-mediatek.conf"
+    break
+  fi
+done
 escribir_sistema /etc/scx_loader.toml <"$VORTEX_DIR/config/sistema/scx_loader.toml"
 
 # --- Pantalla de inicio: greetd + tuigreet ---

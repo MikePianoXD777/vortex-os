@@ -1238,6 +1238,33 @@ paquetes_nuevos() {
     aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"
 }
 
+# 3.3.4: el Wi-Fi MediaTek (MT7921, MT7922, MT7902: ASUS Vivobook Go y muchas laptops) se cae o va lento
+# con el ahorro de energía del Wi-Fi: NetworkManager lo apaga, solo si la PC tiene una tarjeta de red
+# MediaTek (PCIe 14c3 o SDIO 037a, con driver o sin él). Solo pide sudo si hay algo que cambiar; el ajuste
+# vale desde la próxima vez que se conecte.
+tiene_wifi_mediatek() {
+  local d
+  for d in "${VORTEX_SYS:-/sys}"/bus/pci/devices/* "${VORTEX_SYS:-/sys}"/bus/sdio/devices/*; do
+    case "$(cat "$d/vendor" 2>/dev/null)" in
+      0x14c3) [[ "$(cat "$d/class" 2>/dev/null)" == 0x0280* ]] && return 0 ;;
+      0x037a) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+wifi_mediatek() {
+  local origen="$VORTEX_DIR/config/sistema/wifi-mediatek.conf"
+  local destino="${VORTEX_NM_CONF:-/etc/NetworkManager/conf.d}/90-vortex-wifi-mediatek.conf"
+  [[ -f "$origen" ]] && tiene_wifi_mediatek || return 0
+  cmp -s "$origen" "$destino" && return 0
+  if sudo install -Dm644 "$origen" "$destino"; then
+    nmcli general reload conf >/dev/null 2>&1 || true
+  else
+    aviso "no pude apagar el ahorro de energía del Wi-Fi MediaTek ($destino)"
+  fi
+}
+
 # 2.6.3: que falte memoria no cierre apps enteras (a un amigo se le cerraba Discord). Solo pide sudo si
 # hay algo que cambiar. systemd --user lee su configuración de nuevo sin cerrar nada: los scopes nuevos
 # ya salen bien; los que ya estaban abiertos se quedan como estaban hasta cerrar esa app.
@@ -1406,6 +1433,7 @@ cmd_actualizar() {
   avisos_primera_vez
   fondos_nuevos
   proteger_apps
+  wifi_mediatek
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
