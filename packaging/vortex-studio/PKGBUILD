@@ -1,7 +1,7 @@
 # Vortex Studio (editor de video de la Vortex Suite) para todo el sistema, desde su release
 # de GitHub. Lo elige el instalador gráfico de la ISO; también sirve con «makepkg -si».
 pkgname=vortex-studio
-pkgver=1.0.1
+pkgver=2.0.0
 pkgrel=1
 pkgdesc='Editor de video no lineal de la Vortex Suite'
 arch=('x86_64')
@@ -12,7 +12,7 @@ license=('MIT')
 depends=('glibc' 'hicolor-icon-theme' 'fontconfig' 'freetype2' 'expat')
 options=('!strip' '!debug')
 source=("https://github.com/MikePianoXD777/vortex-studio/releases/download/v${pkgver}/VortexStudio-${pkgver}-linux-x86_64.tar.gz")
-sha256sums=('95ce97e0ff8c94bb253c47bdc7dec5929ab6da8d9f716de2811a043ddb71ca8e')
+sha256sums=('13bbcee2721bc66cda4c1de53d8828ccf7733bfb96811fc7b5b7e79531324805')
 
 package() {
   local raiz="$srcdir/VortexStudio-${pkgver}-linux-x86_64"
