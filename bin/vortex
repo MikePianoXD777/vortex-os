@@ -10,6 +10,16 @@ if [[ ! -f "$VORTEX_DIR/install.sh" && -r "$VORTEX_RELEASE" ]]; then
   [[ -f "$repo/install.sh" ]] && VORTEX_DIR="$repo"
   unset repo
 fi
+
+# El vortex-mcp que maneja el navegador de Claude: el instalado si este vortex es el instalado (el mismo que
+# corre Claude Code, para que los dos sean de la misma versión); el del repo si se corre desde el repo.
+ruta_vortex_mcp() {
+  if [[ "$(readlink -f "${BASH_SOURCE[0]}")" == /usr/local/bin/* && -x /usr/local/bin/vortex-mcp ]]; then
+    echo /usr/local/bin/vortex-mcp
+  else
+    echo "$VORTEX_DIR/bin/vortex-mcp"
+  fi
+}
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex"
 ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
@@ -32,6 +42,12 @@ Uso: vortex <comando>
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
                                        en tu primer inicio con red si elegiste Claude al instalar)
+  claude navegador [firefox|brave] [URL|cerrar]
+                                       abre un navegador aparte (sin tus cuentas) que Claude puede ver,
+                                       manejar y depurar, y bajar o subir archivos en ~/Descargas/Claude;
+                                       «cerrar» lo cierra y olvida todo
+  claude avisos [todo|cambios]         avisar también cuando Claude solo mira (todo) o solo
+                                       cuando cambia algo (cambios, lo normal)
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
   actualizar                           actualiza Vortex, su shell y el sistema
   actualizaciones [revisar|on|off|sonido ARCHIVO]
@@ -816,13 +832,36 @@ cmd_claude() {
       ;;
     pausa)
       mkdir -p "$CONF"; touch "$pausa"
-      echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles."
+      # 3.4: también se cierra su navegador (el Firefox o Brave aparte de «vortex claude navegador»).
+      "$(ruta_vortex_mcp)" navegador cerrar >/dev/null 2>&1 || true
+      echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles, ni manejar su navegador."
       ;;
     reanudar)
       rm -f "$pausa"
       echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
       ;;
     instalar) shift; cmd_claude_instalar "$@" ;;
+    # 3.4: los avisos del navegador y de los archivos. Por defecto solo avisa lo que cambia algo (abrir,
+    # clic, escribir, bajar, subir, borrar); con «todo», también cuando solo mira (leer, consola, red…).
+    avisos)
+      case "${2:-}" in
+        todo | cambios) mkdir -p "$CONF"; echo "$2" >"$CONF/claude-avisos"
+          if [[ $2 == todo ]]; then echo "Te aviso cada vez que Claude mire o haga algo en su navegador o sus archivos."
+          else echo "Te aviso solo cuando Claude cambie algo (abrir, clic, escribir, bajar, subir, borrar)."; fi ;;
+        "") cat "$CONF/claude-avisos" 2>/dev/null || echo cambios ;;
+        *) aviso "usa: vortex claude avisos [todo|cambios]"; exit 1 ;;
+      esac
+      ;;
+    # 3.4: un Firefox aparte (sin tus cuentas, cookies ni historial) que Claude puede ver, manejar y
+    # depurar con las herramientas navegador_* de vortex-mcp. Solo lo abres tú; al cerrarlo olvida todo.
+    navegador)
+      shift
+      case "${1:-abrir}" in
+        cerrar | estado) exec "$(ruta_vortex_mcp)" navegador "$1" ;;
+        abrir) shift; exec "$(ruta_vortex_mcp)" navegador abrir "$@" ;;
+        *) exec "$(ruta_vortex_mcp)" navegador abrir "$@" ;;
+      esac
+      ;;
     # Solo para iniciar sesión (lo usa Miku): una ventanita que se cierra sola al terminar. Miku no
     # necesita ninguna consola abierta: usa Claude por su cuenta, en segundo plano.
     login)
@@ -863,7 +902,7 @@ cmd_claude() {
       fi
       exec "$term" -e bash -lc "cd ~; $orden" vortex "$yo"
       ;;
-    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar]"; exit 1 ;;
+    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar|navegador [firefox|brave|chromium|chrome] [cerrar|estado|URL]|avisos [todo|cambios]]"; exit 1 ;;
   esac
 }
 
@@ -1238,6 +1277,33 @@ paquetes_nuevos() {
     aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"
 }
 
+# 3.3.4: el Wi-Fi MediaTek (MT7921, MT7922, MT7902: ASUS Vivobook Go y muchas laptops) se cae o va lento
+# con el ahorro de energía del Wi-Fi: NetworkManager lo apaga, solo si la PC tiene una tarjeta de red
+# MediaTek (PCIe 14c3 o SDIO 037a, con driver o sin él). Solo pide sudo si hay algo que cambiar; el ajuste
+# vale desde la próxima vez que se conecte.
+tiene_wifi_mediatek() {
+  local d
+  for d in "${VORTEX_SYS:-/sys}"/bus/pci/devices/* "${VORTEX_SYS:-/sys}"/bus/sdio/devices/*; do
+    case "$(cat "$d/vendor" 2>/dev/null)" in
+      0x14c3) [[ "$(cat "$d/class" 2>/dev/null)" == 0x0280* ]] && return 0 ;;
+      0x037a) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+wifi_mediatek() {
+  local origen="$VORTEX_DIR/config/sistema/wifi-mediatek.conf"
+  local destino="${VORTEX_NM_CONF:-/etc/NetworkManager/conf.d}/90-vortex-wifi-mediatek.conf"
+  [[ -f "$origen" ]] && tiene_wifi_mediatek || return 0
+  cmp -s "$origen" "$destino" && return 0
+  if sudo install -Dm644 "$origen" "$destino"; then
+    nmcli general reload conf >/dev/null 2>&1 || true
+  else
+    aviso "no pude apagar el ahorro de energía del Wi-Fi MediaTek ($destino)"
+  fi
+}
+
 # 2.6.3: que falte memoria no cierre apps enteras (a un amigo se le cerraba Discord). Solo pide sudo si
 # hay algo que cambiar. systemd --user lee su configuración de nuevo sin cerrar nada: los scopes nuevos
 # ya salen bien; los que ya estaban abiertos se quedan como estaban hasta cerrar esa app.
@@ -1406,6 +1472,7 @@ cmd_actualizar() {
   avisos_primera_vez
   fondos_nuevos
   proteger_apps
+  wifi_mediatek
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).

@@ -274,6 +274,21 @@ class Biblioteca:
             args = (q, q, q)
         return [self._fila(r) for r in self.db.execute(f"{sql} ORDER BY {orden_sql}", args)]
 
+    def para_agregar(self, pid: int, buscar: str = "", limite: int = 60) -> list[dict]:
+        """Canciones de tu biblioteca para agregar a una playlist (1.7.2), con «enPlaylist» si ya están.
+
+        Las que todavía no están, primero; entre ellas, las más nuevas.
+        """
+        dentro = {r for (r,) in self.db.execute("SELECT ruta FROM playlist_canciones WHERE playlist = ?", (pid,))}
+        sql, args = "SELECT * FROM canciones", ()
+        if buscar.strip():
+            q = f"%{buscar.strip()}%"
+            sql, args = sql + " WHERE titulo LIKE ? OR artista LIKE ? OR album LIKE ?", (q, q, q)
+        filas = [{**self._fila(r), "enPlaylist": r["ruta"] in dentro}
+                 for r in self.db.execute(f"{sql} ORDER BY agregada DESC", args)]
+        filas.sort(key=lambda c: c["enPlaylist"])          # estable: conserva «más nuevas primero»
+        return filas[:limite]
+
     def cancion(self, ruta: str) -> dict | None:
         r = self.db.execute("SELECT * FROM canciones WHERE ruta = ?", (ruta,)).fetchone()
         return self._fila(r) if r else None

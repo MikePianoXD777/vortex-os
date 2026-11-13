@@ -26,6 +26,14 @@ Item {
     }
     readonly property bool sonandoAqui: !rep.pausado && rep.origen === (raiz.playlist ? raiz.playlist.nombre : "Tu biblioteca")
 
+    function abrirAgregar() {
+        if (!raiz.playlist) return
+        campoAgregar.text = ""
+        vp.buscarParaPlaylist(raiz.playlist.id, "")
+        agregarCanciones.open()
+        campoAgregar.forceActiveFocus()
+    }
+
     function tiempo(s) {
         s = Math.max(0, Math.round(s || 0))
         var m = Math.floor(s / 60), r = s % 60
@@ -142,6 +150,12 @@ Item {
                             }
                         }
                         Boton { text: "Aleatorio"; icono: "aleatorio"; tipo: "secundario"; enabled: vp.totales.cuantas > 0; onClicked: vp.tocarAleatorio() }
+                        Boton {   // 1.7.2: agregarle canciones desde la misma playlist, como en Spotify
+                            objectName: "botonAgregarCanciones"
+                            visible: !!raiz.playlist
+                            text: "Agregar canciones"; icono: "mas"; tipo: "secundario"
+                            onClicked: raiz.abrirAgregar()
+                        }
                         Boton {   // 1.6: la playlist como enlace, para mandársela a alguien
                             id: botonCompartir
                             visible: !!raiz.playlist
@@ -586,11 +600,20 @@ Item {
                     Layout.fillWidth: true
                     visible: !busqueda.text
                     horizontalAlignment: Text.AlignHCenter
-                    text: raiz.playlist ? "Clic derecho en una canción de tu biblioteca → «Agregar a la playlist»."
+                    text: raiz.playlist ? "Busca en tu biblioteca y agrégale canciones."
                         : "Pega un enlace de YouTube Music, YouTube o Spotify, o agrega tus archivos FLAC y WAV. También puedes arrastrarlos a la ventana."
                     color: Tema.tenue
                     font.pixelSize: 13
                     wrapMode: Text.WordWrap
+                }
+                Boton {
+                    objectName: "vaciaAgregarCanciones"
+                    visible: !busqueda.text && !!raiz.playlist
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    text: "Agregar canciones"
+                    icono: "mas"
+                    onClicked: raiz.abrirAgregar()
                 }
                 Boton {
                     visible: !busqueda.text && !raiz.playlist
@@ -618,6 +641,7 @@ Item {
         MenuSeparator {}
         Menu {
             id: submenu
+            objectName: "submenuPlaylist"
             title: "Agregar a la playlist"
             Instantiator {
                 model: vp.playlists
@@ -651,6 +675,114 @@ Item {
         MenuItem {
             text: menu.cancion.origen === "youtube" ? "Borrar (va a la papelera)" : "Quitar de la biblioteca"
             onTriggered: vp.quitarDeBiblioteca(menu.cancion.ruta)
+        }
+    }
+
+    // 1.7.2: «Agregar canciones»: buscar en tu biblioteca y agregarlas a esta playlist sin salir de ella.
+    // Antes, una playlist nueva quedaba vacía y solo se llenaba con clic derecho desde la biblioteca.
+    Popup {
+        id: agregarCanciones
+        objectName: "agregarCanciones"
+        anchors.centerIn: parent
+        width: Math.min(620, raiz.width - 60)
+        height: Math.min(560, raiz.height - 60)
+        modal: true
+        padding: 22
+        background: Rectangle { color: Tema.barra; radius: Tema.radioGrande; border.width: 1; border.color: Tema.borde }
+        Overlay.modal: Rectangle { color: Tema.velo }
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    Layout.fillWidth: true
+                    text: "Agregar canciones a «" + (raiz.playlist ? raiz.playlist.nombre : "") + "»"
+                    color: Tema.texto; font.pixelSize: 20; font.weight: Font.Bold
+                    elide: Text.ElideRight
+                }
+                BotonIcono { icono: "cerrar"; ayuda: "Cerrar"; onClicked: agregarCanciones.close() }
+            }
+            TextField {
+                id: campoAgregar
+                Layout.fillWidth: true
+                implicitHeight: 40
+                placeholderText: "Busca en tu biblioteca: canción, artista o álbum"
+                placeholderTextColor: Tema.tenue
+                color: Tema.texto
+                leftPadding: 38
+                selectByMouse: true
+                onTextChanged: timerAgregar.restart()
+                background: Rectangle {
+                    radius: 20
+                    color: Tema.campo
+                    border.width: campoAgregar.activeFocus ? 1 : 0
+                    border.color: Tema.azul
+                    Icono { x: 12; anchors.verticalCenter: parent.verticalCenter; width: 17; height: 17; nombre: "buscar"; color: Tema.tenue }
+                }
+                Timer { id: timerAgregar; interval: 180; onTriggered: if (raiz.playlist) vp.buscarParaPlaylist(raiz.playlist.id, campoAgregar.text) }
+            }
+            ListView {
+                id: listaAgregar
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 2
+                model: agregarCanciones.visible ? vp.paraAgregar : []
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                delegate: Rectangle {
+                    id: filaAgregar
+                    required property var modelData
+                    width: ListView.view.width
+                    height: 56
+                    radius: 8
+                    color: hoverAgregar.hovered ? Tema.tarjetaHover : "transparent"
+                    HoverHandler { id: hoverAgregar }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 12
+                        Portada { Layout.preferredWidth: 42; Layout.preferredHeight: 42; ruta: filaAgregar.modelData.ruta }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Text { Layout.fillWidth: true; text: filaAgregar.modelData.titulo || ""; color: Tema.texto; font.pixelSize: 14; elide: Text.ElideRight }
+                            Text { Layout.fillWidth: true; text: filaAgregar.modelData.artista || ""; color: Tema.tenue; font.pixelSize: 12; elide: Text.ElideRight }
+                        }
+                        Text {
+                            visible: filaAgregar.modelData.enPlaylist
+                            text: "Ya está"
+                            color: Tema.tenue; font.pixelSize: 12
+                        }
+                        Boton {
+                            visible: !filaAgregar.modelData.enPlaylist
+                            text: "Agregar"; tipo: "secundario"
+                            onClicked: vp.agregarAPlaylist(raiz.playlist.id, filaAgregar.modelData.ruta)
+                        }
+                    }
+                }
+                // nada en tu biblioteca: búscala en YouTube Music (desde ahí se baja directo a la playlist)
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    visible: listaAgregar.count === 0
+                    width: Math.min(400, parent.width - 40)
+                    spacing: 10
+                    Text {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        text: campoAgregar.text ? "No la tienes en tu biblioteca" : "Todavía no hay música en tu biblioteca"
+                        color: Tema.texto; font.pixelSize: 16; font.weight: Font.DemiBold
+                    }
+                    Boton {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "Buscar en YouTube Music"; icono: "descargar"; tipo: "secundario"
+                        onClicked: { agregarCanciones.close(); raiz.buscarEnInternet(campoAgregar.text) }
+                    }
+                }
+            }
         }
     }
 

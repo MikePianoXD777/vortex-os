@@ -45,8 +45,34 @@ partidas() { tail -n 10 "${XDG_STATE_HOME:-$HOME/.local/state}/vortex/partidas.c
 # trabó, si Hyprland dejó un reporte de choque y en qué modo de ventanas estaba (en «kde» carga el plugin
 # hyprbars, que corre dentro de Hyprland).
 ventanas() {
-  printf 'Modo: %s\n' "$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/ventanas" 2>/dev/null || echo mosaico)"
+  local modo v so log
+  modo="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/ventanas" 2>/dev/null || echo mosaico)"
+  printf 'Modo: %s\n' "$modo"
   hyprctl plugin list 2>/dev/null | grep -i -E '^plugin|hyprbars' | head -n 5
+  [[ "$modo" == kde ]] || return 0
+  # En «kde» todas las ventanas flotan encimadas; sin la barra no hay con qué moverlas ni cerrarlas con el
+  # mouse. hyprland.lua busca la barra en ~/.local/share/vortex/hyprbars/hyprbars-<versión>.so.
+  v="$(Hyprland --version 2>/dev/null | sed -n '1s/^Hyprland \([^ ]*\) .*/\1/p')"
+  so="$HOME/.local/share/vortex/hyprbars/hyprbars-$v.so"
+  log="${XDG_DATA_HOME:-$HOME/.local/share}/vortex/hyprbars/compilar.log"
+  if [[ -n "$v" && -s "$so" ]]; then printf 'Barra de título: hyprbars-%s.so está\n' "$v"
+  else printf 'Barra de título: FALTA hyprbars-%s.so (las ventanas flotan sin barra)\n' "${v:-?}"; fi
+  [[ -s "$log" ]] && { echo "Última compilación:"; tail -n 8 "$log"; }
+  return 0
+}
+# Qué ventanas hay y cómo están (flotante, fija, pantalla completa). Sin títulos: dicen qué página o archivo
+# tienes abierto.
+ventanas_abiertas() {
+  hyprctl clients -j 2>/dev/null | jq -r '.[] |
+    "\(.class)  escritorio=\(.workspace.name)  flotante=\(.floating)  fija=\(.pinned)  completa=\(.fullscreen)  \(.size[0])x\(.size[1])"'
+}
+swap_presion() { swapon --show 2>/dev/null; echo "Presión de memoria ahora:"; cat /proc/pressure/memory; }
+# Si se acabó la memoria pero se apagó antes de que el kernel matara algo, en el kernel no queda nada; el gestor
+# sí deja «presión de memoria» y «queda poca memoria» en el journal de la sesión.
+sesion_antes() {
+  journalctl --user -b -1 --no-pager -q -o short-iso -n 30 -g 'memoria|Hyprland se cerró' -u vortex-gestor.service
+  echo "Avisos y errores de la sesión:"
+  journalctl --user -b -1 -p warning --no-pager -q -o short-iso -n 40
 }
 arranques() { journalctl --list-boots --no-pager -q 2>/dev/null | tail -n 4; }
 trabado_antes() {
@@ -61,7 +87,8 @@ choque_hyprland() {
   head -n 40 "$f"
 }
 export -f revision_legible paquetes_vortex tarjeta pantallas mas_memoria fallidos errores sin_memoria \
-  oom_usuario tronaron juegos partidas ventanas arranques trabado_antes choque_hyprland
+  oom_usuario tronaron juegos partidas ventanas ventanas_abiertas swap_presion sesion_antes arranques \
+  trabado_antes choque_hyprland
 
 armar() {
   printf 'Reporte de Vortexine'\''s OS, %s\n' "$(date '+%Y-%m-%d %H:%M')"
@@ -71,6 +98,7 @@ armar() {
   seccion "Tarjeta de video" tarjeta
   seccion "Pantallas" pantallas
   seccion "Memoria" free -m
+  seccion "Swap y presión de memoria" swap_presion
   seccion "Lo que más memoria usa" mas_memoria
   seccion "Disco" df -h "$HOME"
   seccion "Algo no funciona" revision_legible
@@ -81,8 +109,10 @@ armar() {
   seccion "Errores de este arranque" errores 0 120
   seccion "Errores del arranque anterior" errores -1 40
   seccion "Ventanas" ventanas
+  seccion "Ventanas abiertas" ventanas_abiertas
   seccion "Últimos arranques" arranques
   seccion "Si se trabó antes de reiniciar (memoria, video, kernel)" trabado_antes
+  seccion "Si se trabó antes de reiniciar (sesión)" sesion_antes
   seccion "Choque de Hyprland" choque_hyprland
   seccion "Steam: últimos juegos" juegos
   seccion "Últimas partidas" partidas

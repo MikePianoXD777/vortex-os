@@ -121,6 +121,7 @@ ApplicationWindow {
                         Layout.leftMargin: 12
                         Text { Layout.fillWidth: true; text: "Playlists"; color: Tema.tenue; font.pixelSize: 12; font.weight: Font.DemiBold; font.capitalization: Font.AllUppercase; font.letterSpacing: 1 }
                         BotonIcono {
+                            objectName: "nuevaPlaylist"
                             icono: "mas"; tam: 28; ayuda: "Nueva playlist"
                             onClicked: ventana.ir("canciones", vp.crearPlaylist("Nueva playlist"))
                         }
