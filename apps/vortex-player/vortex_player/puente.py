@@ -47,6 +47,7 @@ class Puente(QObject):
     cambioEscaneo = Signal()
     cambioEnLinea = Signal()
     cambioRecomendaciones = Signal()
+    cambioParaAgregar = Signal()
     aviso = Signal(str)
     mostrarVentana = Signal()
     portadaLista = Signal(str)
@@ -108,6 +109,9 @@ class Puente(QObject):
         self._recom_error = ""
         self._recom_vuelta = 0
         self._recom_guardadas: dict[int, list[dict]] = {}
+        # 1.7.2: «Agregar canciones» dentro de una playlist (buscar en tu biblioteca)
+        self._para_agregar: list[dict] = []
+        self._para_agregar_de = (-1, "")
         # 2.1.1: escuchar 30 s de una recomendada o de un resultado antes de bajarla
         self._avance = Avance(self)
         self._seguir_tras_avance = False
@@ -351,6 +355,16 @@ class Puente(QObject):
         self._recargar()
         self._cambio_local()
         self.aviso.emit("Agregada a la playlist")
+        if self._para_agregar_de[0] == pid:
+            self.buscarParaPlaylist(*self._para_agregar_de)
+
+    @Slot(int, str)
+    def buscarParaPlaylist(self, pid: int, texto: str) -> None:
+        """1.7.2: dentro de una playlist, «Agregar canciones» busca en tu biblioteca (como Spotify)."""
+        self._para_agregar_de = (pid, texto)
+        with self.candado:
+            self._para_agregar = self.bib.para_agregar(pid, texto) if pid >= 0 else []
+        self.cambioParaAgregar.emit()
 
     @Slot(int, str)
     def quitarDePlaylist(self, pid: int, ruta: str) -> None:
@@ -1721,6 +1735,7 @@ class Puente(QObject):
     escaneando = Property(bool, lambda s: s._escaneando, notify=cambioEscaneo)
     enLinea = Property("QVariantList", lambda s: s._con_estado(s._en_linea), notify=cambioEnLinea)
     recomendaciones = Property("QVariantList", lambda s: s._sin_las_tuyas(s._recom), notify=cambioRecomendaciones)
+    paraAgregar = Property("QVariantList", lambda s: s._para_agregar, notify=cambioParaAgregar)
     recomendandoPara = Property(int, lambda s: s._recom_para, notify=cambioRecomendaciones)
     cargandoRecomendaciones = Property(bool, lambda s: s._recom_cargando, notify=cambioRecomendaciones)
     errorRecomendaciones = Property(str, lambda s: s._recom_error, notify=cambioRecomendaciones)

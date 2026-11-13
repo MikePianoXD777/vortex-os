@@ -167,6 +167,49 @@ class Interfaz(unittest.TestCase):
         self.assertEqual(d["playlists"], ["Para correr"])
         self.assertEqual(d["errores_qml"], [])
 
+    def test_nueva_playlist_y_agregarle_canciones(self) -> None:
+        # 1.7.2: Mike (13/11): «el botón para agregar playlist no me deja agregar». El «+» creaba la playlist,
+        # pero quedaba vacía y sin forma de llenarla desde ahí (solo clic derecho desde la biblioteca).
+        d = self.correr("""
+            from PySide6.QtCore import QObject
+            def hijo(nombre):
+                return ventana.findChild(QObject, nombre)
+            def empezar():
+                hijo("nuevaPlaylist").clicked.emit()
+                datos["playlists"] = [p["nombre"] for p in puente.playlists]
+                datos["pid"] = puente.vistaPlaylist
+                datos["vacia_boton"] = bool(hijo("vaciaAgregarCanciones").property("visible"))
+                datos["encabezado_boton"] = bool(hijo("botonAgregarCanciones").property("visible"))
+                hijo("vaciaAgregarCanciones").clicked.emit()
+            def abierto():
+                datos["dialogo"] = bool(hijo("agregarCanciones").property("visible"))
+                datos["para_agregar"] = sorted(c["titulo"] for c in puente.paraAgregar)
+                puente.buscarParaPlaylist(datos["pid"], "Dos")
+                datos["filtrada"] = [c["titulo"] for c in puente.paraAgregar]
+                puente.agregarAPlaylist(datos["pid"], puente.paraAgregar[0]["ruta"])
+                datos["marcada"] = [c["enPlaylist"] for c in puente.paraAgregar]
+                puente.buscarParaPlaylist(datos["pid"], "")
+                datos["orden"] = [c["enPlaylist"] for c in puente.paraAgregar]
+                datos["playlist"] = [c["titulo"] for c in puente.canciones]
+                datos["vacia_boton_despues"] = bool(hijo("vaciaAgregarCanciones").property("visible"))
+            datos = {}
+            paso(2500, empezar)
+            paso(400, abierto)
+            paso(300, lambda: fin(**datos))
+        """, "agregar_a_playlist")
+        self.assertEqual(d["playlists"], ["Nueva playlist"])
+        self.assertGreaterEqual(d["pid"], 0, "el «+» no abrió la playlist nueva")
+        self.assertTrue(d["vacia_boton"], "la playlist vacía no ofrece «Agregar canciones»")
+        self.assertTrue(d["encabezado_boton"])
+        self.assertTrue(d["dialogo"], "no se abrió «Agregar canciones»")
+        self.assertEqual(d["para_agregar"], ["Dos", "Tres", "Uno"])
+        self.assertEqual(d["filtrada"], ["Dos"])
+        self.assertEqual(d["marcada"], [True])
+        self.assertEqual(d["orden"], [False, False, True])   # las que ya están, al final
+        self.assertEqual(d["playlist"], ["Dos"])
+        self.assertFalse(d["vacia_boton_despues"])
+        self.assertEqual(d["errores_qml"], [])
+
     def test_discord_con_el_reproductor_de_verdad(self) -> None:
         d = self.correr("""
             from PySide6.QtNetwork import QLocalServer

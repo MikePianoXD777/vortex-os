@@ -10,6 +10,6 @@ El motor no depende de Qt (calidad.py, biblioteca.py, descargas.py, audio.py, ec
 interfaz (QML) vive en __main__.py, puente.py, reproductor.py, mpris.py, presencia_discord.py y qml/.
 """
 
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 NOMBRE = "Vortex Player"
 APP_ID = "vortex-player"
