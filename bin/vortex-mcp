@@ -38,7 +38,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 PROTOCOLOS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 CONF = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "vortex"
 PAUSA = CONF / "claude-pausa"
@@ -58,8 +58,8 @@ INSTRUCCIONES = (
     "leer correo o mensajes: eso lo hace él a mano. "
     "Archivos: baja solo lo que el usuario te pida en ese momento (navegador_descargar), a su carpeta de Claude; "
     "trabaja con ellos con archivos_*; nada de lo bajado se ejecuta ni se instala. Sube (navegador_subir) solo "
-    "archivos de esa carpeta o rutas que él te diga. Cuando una herramienta pida «confirmado», pregúntale en el chat "
-    "y pon «confirmado»: true solo si te dice que sí."
+    "archivos de esa carpeta o rutas que él te diga. Lo delicado (bajar ejecutables, subir de otra carpeta o a un "
+    "sitio de internet) se lo pregunta la herramienta a él directamente; tú no lo puedes confirmar por él."
 )
 
 
@@ -504,6 +504,11 @@ def leer_estado_navegador() -> dict | None:
     try:
         estado = json.loads(NAV_ESTADO.read_text())
         os.kill(int(estado["pid"]), 0)
+        # Que ese pid siga siendo el navegador de Claude (con su perfil) y no otro programa que heredó el número.
+        linea = Path(f"/proc/{int(estado['pid'])}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        if estado.get("perfil") and estado["perfil"] not in linea:
+            NAV_ESTADO.unlink(missing_ok=True)
+            return None
         estado.setdefault("nombre", "firefox")
         estado.setdefault("protocolo", "bidi")
         return estado
@@ -666,6 +671,22 @@ class Navegador:
     def resumen(self) -> dict:
         return self.js_json("() => JSON.stringify({titulo: document.title, url: location.href})")
 
+    def pagina(self) -> str:
+        """La pestaña actual, si lo que muestra se puede leer: solo http, https o about:blank. Una pestaña con
+        file://, about:config, chrome://… (por un enlace, una redirección o JavaScript) se vacía y no se lee:
+        así nadie se salta la carpeta de Claude ni la lista negra leyendo archivos del equipo."""
+        id_ = self.ctx()
+        url = (getattr(self, "urls", {}) or {}).get(id_, "")
+        if not url_permitida(url):
+            try:
+                self.navegar("about:blank")
+            except ErrorHerramienta:
+                pass
+            raise ErrorHerramienta("La pestaña tenía un archivo del equipo o una página interna del navegador "
+                                   f"({urllib.parse.urlsplit(url).scheme}:): eso no se lee y la dejé en blanco. Los archivos de "
+                                   "la carpeta de Claude se leen con archivos_leer.")
+        return id_
+
     def _descarga(self, id_, **datos) -> None:
         d = self.descargas.get(id_)
         if d is None:
@@ -739,7 +760,9 @@ class NavegadorFirefox(Navegador):
     # --- Operaciones ---
 
     def ctx(self) -> str:
-        ids = [c["context"] for c in self.comando("browsingContext.getTree", {"maxDepth": 0}).get("contexts") or []]
+        arbol = self.comando("browsingContext.getTree", {"maxDepth": 0}).get("contexts") or []
+        ids = [c["context"] for c in arbol]
+        self.urls = {c["context"]: c.get("url", "") for c in arbol}
         if not ids:
             self.contexto = self.comando("browsingContext.create", {"type": "tab"})["context"]
         elif self.contexto not in ids:
@@ -806,7 +829,7 @@ class NavegadorFirefox(Navegador):
     def js(self, funcion: str, *args, sandbox: str = SANDBOX, timeout: float = 30) -> dict:
         """Corre una función en la pestaña actual: {"type", "value"} o, si es un elemento, {"type": "node", "nodo"}."""
         r = self.comando("script.callFunction", {
-            "functionDeclaration": funcion, "target": {"context": self.ctx(), "sandbox": sandbox},
+            "functionDeclaration": funcion, "target": {"context": self.pagina(), "sandbox": sandbox},
             "arguments": [self._valor(a) for a in args], "awaitPromise": True, "resultOwnership": "none",
         }, timeout=timeout)
         if r.get("type") == "exception":
@@ -819,7 +842,7 @@ class NavegadorFirefox(Navegador):
 
     def evaluar(self, codigo: str) -> dict:
         r = self.comando("script.evaluate", {"expression": codigo, "awaitPromise": True,
-                                             "target": {"context": self.ctx(), "sandbox": SANDBOX_EVAL}}, timeout=30)
+                                             "target": {"context": self.pagina(), "sandbox": SANDBOX_EVAL}}, timeout=30)
         if r.get("type") == "exception":
             d = r.get("exceptionDetails") or {}
             return {"excepcion": True, "texto": str(d.get("text") or ""), "pila": self._pila((d.get("stackTrace") or {}).get("callFrames"))}
@@ -847,7 +870,7 @@ class NavegadorFirefox(Navegador):
                          [{"type": "keyDown", "value": v} for v in valores] + [{"type": "keyUp", "value": v} for v in reversed(valores)]}])
 
     def captura(self, nodo: dict | None, pagina_entera: bool) -> str:
-        params = {"context": self.ctx(), "format": {"type": "image/jpeg", "quality": 0.8}}
+        params = {"context": self.pagina(), "format": {"type": "image/jpeg", "quality": 0.8}}
         if nodo:
             params["clip"] = {"type": "element", "element": nodo}
         elif pagina_entera:
@@ -989,7 +1012,9 @@ class NavegadorChromium(Navegador):
         return self.sesiones[pestana]
 
     def ctx(self) -> str:
-        ids = [t["targetId"] for t in self._paginas()]
+        paginas = self._paginas()
+        ids = [t["targetId"] for t in paginas]
+        self.urls = {t["targetId"]: t.get("url", "") for t in paginas}
         if not ids:
             self.contexto = self.comando("Target.createTarget", {"url": "about:blank"})["targetId"]
         elif self.contexto not in ids:
@@ -1064,7 +1089,7 @@ class NavegadorChromium(Navegador):
         return {"value": v}
 
     def js(self, funcion: str, *args, sandbox: str = SANDBOX, timeout: float = 30) -> dict:
-        s = self.sesion()
+        s = self.sesion(self.pagina())
         for intento in range(2):
             try:
                 r = self.comando("Runtime.callFunctionOn", {
@@ -1088,6 +1113,7 @@ class NavegadorChromium(Navegador):
         return {"type": v.get("type"), "value": v.get("value")}
 
     def evaluar(self, codigo: str) -> dict:
+        self.pagina()
         r = self.comando("Runtime.evaluate", {"expression": codigo, "contextId": self._mundo(SANDBOX_EVAL), "awaitPromise": True,
                                               "returnByValue": True}, self.sesion(), timeout=30)
         if r.get("exceptionDetails"):
@@ -1137,6 +1163,7 @@ class NavegadorChromium(Navegador):
         self.comando("Input.dispatchKeyEvent", dict(base, type="keyUp"), s)
 
     def captura(self, nodo: dict | None, pagina_entera: bool) -> str:
+        self.pagina()
         params = {"format": "jpeg", "quality": 80}
         if nodo:
             c = self._caja(nodo)
@@ -1201,9 +1228,11 @@ def navegador() -> Navegador:
 
 # --- Confirmaciones: la persona dice que sí en ese momento ---------------------------------------------------
 #
-# Si el cliente (Claude Code) sabe preguntar (elicitation de MCP), se le pregunta a la persona con un cuadro
-# y Claude no lo puede contestar por ella. Si no, la herramienta pide «confirmado: true», que Claude solo debe
-# poner después de preguntar en el chat; Claude Code le muestra esa llamada a la persona antes de hacerla.
+# Lo delicado (bajar un ejecutable, subir algo de fuera de la carpeta de Claude o a un sitio de internet) lo
+# tiene que aceptar la persona, no Claude: una página podría engañarlo (prompt injection). Si el cliente
+# (Claude Code) sabe preguntar (elicitation de MCP), sale un cuadro que contesta la persona. Si no, una
+# notificación con botones («Sí» / «No») que solo ella puede tocar. Sin respuesta en 60 s, es que no. Ningún
+# argumento de la herramienta lo puede saltar (en la 0.3.0 bastaba «confirmado»: true; ya no).
 
 CLIENTE = {"confirma": False}
 PENDIENTES: collections.deque = collections.deque()
@@ -1234,8 +1263,20 @@ def pedir_al_cliente(metodo: str, params: dict) -> dict:
         PENDIENTES.append(linea)
 
 
-def confirmar(args: dict, pregunta: str) -> None:
-    """Sigue solo si la persona dijo que sí; si no, ErrorHerramienta con lo que hay que hacer."""
+def preguntar_con_notificacion(pregunta: str) -> bool:
+    if not shutil.which("notify-send"):
+        return False
+    try:
+        r = subprocess.run(["notify-send", "-a", "Vortexine's OS", "-u", "critical", "-i", "dialog-question", "-t", "60000",
+                            "-A", "si=Sí, adelante", "-A", "no=No", "Claude pide permiso", pregunta],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=65)
+        return r.stdout.strip() == "si"
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def confirmar(_args: dict, pregunta: str) -> None:
+    """Sigue solo si la persona dijo que sí, fuera del alcance de Claude; si no, ErrorHerramienta."""
     if CLIENTE["confirma"]:
         r = pedir_al_cliente("elicitation/create", {
             "message": pregunta,
@@ -1245,10 +1286,21 @@ def confirmar(args: dict, pregunta: str) -> None:
         if r.get("action") == "accept" and (r.get("content") or {}).get("confirmar") is True:
             return
         raise ErrorHerramienta("La persona no lo confirmó: no se hizo.")
-    if args.get("confirmado") is True:
+    if preguntar_con_notificacion(pregunta):
         return
-    raise ErrorHerramienta(f"Hace falta que la persona lo confirme: {pregunta} Pregúntaselo en el chat y, solo si dice "
-                           "que sí, vuelve a llamar con «confirmado»: true.")
+    raise ErrorHerramienta("La persona no lo confirmó: le pregunté con una notificación con botones y dijo que no o no "
+                           "contestó en un minuto. No se hizo. Esto solo lo puede aceptar ella (no sirve ningún argumento); "
+                           "si de verdad lo quiere, que vuelva a pedirlo y toque «Sí, adelante» en la notificación, o que "
+                           "lo haga a mano.")
+
+
+def guardar_cliente(confirma: bool) -> None:
+    """Para que «vortex claude navegador» sepa cómo se van a confirmar las cosas."""
+    try:
+        RUNTIME.mkdir(parents=True, exist_ok=True)
+        (RUNTIME / "mcp-cliente.json").write_text(json.dumps({"elicitation": confirma, "fecha": time.time()}))
+    except OSError:
+        pass
 
 
 def ocultar_url(url: str) -> str:
@@ -1260,11 +1312,46 @@ def ocultar_url(url: str) -> str:
     if not u.scheme.startswith("http"):
         return str(url)[:300]
     netloc = u.hostname or ""
-    if u.port:
-        netloc += f":{u.port}"
+    try:
+        if u.port:
+            netloc += f":{u.port}"
+    except ValueError:
+        return str(url)[:300]
     q = urllib.parse.parse_qsl(u.query, keep_blank_values=True)
     q = [(k, "[oculto]" if PARAM_SENSIBLE.search(k) else v) for k, v in q]
     return urllib.parse.urlunsplit((u.scheme, netloc, u.path, urllib.parse.urlencode(q, safe="[]/:"), ""))[:500]
+
+
+def url_permitida(url: str) -> bool:
+    """Lo único que el navegador de Claude abre y lee: http, https y about:blank (ni file:, ni view-source:,
+    jar:, ftp:, data:, javascript:, about:config ni chrome://)."""
+    url = str(url or "").strip()
+    if url in ("", "about:blank", "about:srcdoc"):
+        return True
+    try:
+        return urllib.parse.urlsplit(url).scheme.lower() in ("http", "https")
+    except ValueError:
+        return False
+
+
+def es_interna(host: str) -> bool:
+    """Si el nombre lleva a este equipo o a la red local (127.x, 10.x, 192.168.x, fe80::…)."""
+    import ipaddress
+    host = (host or "").strip("[]").lower()
+    if not host or host == "localhost" or host.endswith((".local", ".lan", ".internal", ".home")):
+        return True
+    try:
+        ips = {i[4][0] for i in socket.getaddrinfo(host, None)}
+    except OSError:
+        return False
+    for ip in ips:
+        try:
+            d = ipaddress.ip_address(ip.split("%")[0])
+        except ValueError:
+            continue
+        if d.is_private or d.is_loopback or d.is_link_local or d.is_reserved or d.is_unspecified or d.is_multicast:
+            return True
+    return False
 
 
 def privada(url: str) -> bool:
@@ -1327,6 +1414,8 @@ def navegador_estado(_: dict) -> list[dict]:
     for i, c in enumerate(nav.pestanas()):
         lineas.append(f"  {i}{' (actual)' if c['id'] == actual else ''}: {ocultar_url(c['url'])}")
     lineas.append(f"Carpeta de archivos: {carpeta_claude()}")
+    lineas.append("Lo delicado se le pregunta a la persona " + ("con un cuadro de Claude Code." if CLIENTE["confirma"]
+                  else "con una notificación con botones (este cliente no sabe preguntar con un cuadro)."))
     return [texto(nav.ocultar("\n".join(lineas)))]
 
 
@@ -1337,11 +1426,13 @@ def navegador_abrir(args: dict) -> list[dict]:
         raise ErrorHerramienta("Falta la «url».")
     if re.match(r"^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(/|$)", url):
         url = "http://" + url
+    elif re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(?!\d)", url) and not url.lower().startswith(("http:", "https:")):
+        pass  # trae su propio esquema (data:, javascript:, about:config, file:…): lo decide url_permitida
     elif "://" not in url and url != "about:blank":
         url = "https://" + url
-    esquema = urllib.parse.urlsplit(url).scheme
-    if url != "about:blank" and esquema not in ("http", "https", "file"):
-        raise ErrorHerramienta("Solo abro páginas http, https o file.")
+    if not url_permitida(url):
+        raise ErrorHerramienta("Solo abro páginas http o https. Archivos del equipo (file://) no: los de la carpeta de "
+                               "Claude se leen con archivos_leer.")
     if privada(url):
         raise ErrorHerramienta("Correo y mensajes no: son privados. Si la persona quiere, que los abra ella.")
     if args.get("pestana_nueva"):
@@ -1685,6 +1776,10 @@ def navegador_red(args: dict) -> list[dict]:
                        "las cabeceras de sesión, cookies y tokens no se muestran):\n" + "\n".join(lineas))
 
 
+# Ojo: esta lista es solo un primer filtro y se puede esquivar (document['coo' + 'kie']). La garantía de verdad
+# es el sandbox: navegador_evaluar corre en su propio mundo aislado (Xray en Firefox, «isolated world» en
+# Chromium) con JS_PRELUDIO_EVAL, que tapa cookies, almacenamiento y contraseñas ahí dentro, y además todo lo
+# que sale pasa por ocultar(). Si algún día se cambia el sandbox, revisar esto primero.
 BLOQUEADO_EVAL = re.compile(r"wrappedJSObject|XPCNativeWrapper|unwaiveXrays|Components\.|ChromeUtils|\bcookie|localStorage|"
                             r"sessionStorage|indexedDB|cookieStore|credentials|FormData", re.I)
 
@@ -1822,7 +1917,7 @@ EXT_TEXTO = (".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".xml", ".html
 NOMBRES_SENSIBLES = re.compile(
     r"(^\.env|\.env$|\.pem$|\.key$|\.p12$|\.pfx$|\.kdbx?$|\.gpg$|\.asc$|id_(rsa|ed25519|ecdsa|dsa)|token|secret|credential|"
     r"passw|contraseñ|sudo|\.netrc$|git-credentials|\.npmrc$|\.pypirc$|cookies|login data|key[34]\.db$|logins\.json$|"
-    r"wallet|keychain|keyring|\.ovpn$|shadow$)", re.I)
+    r"wallet|keychain|keyring|\.ovpn$|shadow$|history$|^seed|\.kdbx$|\.age$|\.jks$|\.keystore$)", re.I)
 
 
 def carpeta_claude() -> Path:
@@ -1978,8 +2073,25 @@ def descargar_url(url: str, args: dict) -> str:
     zona = zona_entrada()
     archivo = zona / "descarga"
     pedido = urllib.request.Request(url, headers={"User-Agent": f"Vortexine-Claude/{VERSION}"})
+    desde_internet = not es_interna(u.hostname or "")
+
+    class Redireccion(urllib.request.HTTPRedirectHandler):
+        """Cada salto se revisa igual que la URL de inicio: nada de correo, ni de otros esquemas, ni de saltar
+        de internet a este equipo o a la red local."""
+
+        def redirect_request(self, req, fp, code, msg, headers, nueva):
+            n = urllib.parse.urlsplit(nueva)
+            if n.scheme not in ("http", "https"):
+                raise ErrorHerramienta("La descarga redirigió a algo que no es http: no la sigo.")
+            if privada(nueva):
+                raise ErrorHerramienta("La descarga redirigió a correo o mensajes: no la sigo.")
+            if desde_internet and es_interna(n.hostname or ""):
+                raise ErrorHerramienta("La descarga redirigió de internet a este equipo o a la red local: no la sigo.")
+            return super().redirect_request(req, fp, code, msg, headers, nueva)
+
+    abridor = urllib.request.build_opener(Redireccion)
     try:
-        with urllib.request.urlopen(pedido, timeout=30) as r:
+        with abridor.open(pedido, timeout=30) as r:
             if urllib.parse.urlsplit(r.geturl()).scheme not in ("http", "https"):
                 raise ErrorHerramienta("La descarga redirigió a algo que no es http.")
             largo = r.headers.get("Content-Length")
@@ -2062,22 +2174,27 @@ def navegador_descargar(args: dict) -> list[dict]:
 
 
 def ruta_prohibida(p: Path) -> str | None:
-    """Si la ruta es de las que nunca se suben (llaves, contraseñas, configuración, notas…), por qué."""
+    """Si la ruta es de las que nunca se suben (llaves, contraseñas, configuración, historiales, notas…), por qué.
+
+    Se revisa la ruta tal cual y ya resuelta (sin enlaces ni «..»): un atajo a ~/.ssh tampoco pasa."""
     home = Path.home()
-    raices = [home / ".ssh", home / ".gnupg", home / ".config", home / ".local/share/keyrings", home / ".password-store",
-              home / ".mozilla", home / ".local/share/vortex", home / ".pki", home / ".aws", home / ".kube", home / ".docker",
-              home / ".var/app", home / ".cache", home / ".local/state", *(perfil_de(n) for n in NAVEGADORES),
+    raices = [home / ".ssh", home / ".gnupg", home / ".config", home / ".local/share", home / ".local/state",
+              home / ".password-store", home / ".mozilla", home / ".librewolf", home / ".thunderbird", home / ".claude",
+              home / ".claude.json", home / ".netrc", home / ".pki", home / ".aws", home / ".kube", home / ".docker",
+              home / ".var", home / ".cache", *(perfil_de(n) for n in NAVEGADORES),
               Path("/etc"), Path("/root"), Path("/proc"), Path("/sys"), Path("/dev"), Path("/boot"), Path("/var"), Path("/run")]
     for candidata in {p, p.resolve()}:
         for r in raices:
-            try:
-                if candidata == r or candidata.is_relative_to(r):
-                    return f"«{r}» guarda configuración, llaves o datos privados"
-            except ValueError:
-                pass
+            if candidata == r or candidata.is_relative_to(r):
+                return f"«{r}» guarda configuración, llaves o datos privados"
+        # Todo lo oculto de la carpeta personal (~/.algo): configuración, historiales de la terminal, llaves…
+        if candidata.is_relative_to(home):
+            oculta = next((x for x in candidata.relative_to(home).parts if x.startswith(".")), None)
+            if oculta:
+                return f"«{oculta}» es una carpeta o archivo oculto de la carpeta personal (configuración, historiales o llaves)"
         for parte in candidata.parts:
             if NOMBRES_SENSIBLES.search(parte):
-                return f"el nombre «{parte}» parece de contraseñas, llaves o tokens"
+                return f"el nombre «{parte}» parece de contraseñas, llaves, carteras o historiales"
         # Una bóveda de notas (Obsidian): ahí van notas privadas y hasta contraseñas.
         for padre in [candidata, *candidata.parents]:
             if (padre / ".obsidian").is_dir():
@@ -2239,8 +2356,13 @@ def archivos_leer(args: dict) -> list[dict]:
                 with zipfile.ZipFile(p) as z:
                     lista = [f"{i.filename} ({tamano(i.file_size)})" for i in z.infolist()[:300]]
             else:
-                with tarfile.open(p) as t:
-                    lista = [f"{m.name} ({tamano(m.size)}){' [enlace]' if m.issym() or m.islnk() else ''}" for m in t.getmembers()[:300]]
+                with tarfile.open(p, "r|*") as t:  # en streaming: un .tar.gz enorme no se descomprime entero
+                    lista = []
+                    for m in t:
+                        lista.append(f"{m.name} ({tamano(m.size)}){' [enlace]' if m.issym() or m.islnk() else ''}")
+                        if len(lista) >= 300:
+                            lista.append("… (hay más)")
+                            break
         except (OSError, zipfile.BadZipFile, tarfile.TarError) as e:
             raise ErrorHerramienta(f"No pude abrir el comprimido: {e}") from e
         return [texto(de_pagina(f"«{p.name}» ({tamano(tam)}) trae:\n" + "\n".join(lista), origen)
@@ -2348,21 +2470,22 @@ def archivos_extraer(args: dict) -> list[dict]:
                         copiar(fuente, final, total)
                     n += 1
         else:
+            # En streaming y en una sola pasada: cada miembro se revisa al llegar y se cortan las bombas sin
+            # descomprimir todo antes. Si algo no cuadra, se borra lo que ya salió.
             try:
-                t = tarfile.open(p)
+                t = tarfile.open(p, "r|*")
             except tarfile.TarError as e:
                 raise ErrorHerramienta(f"No es un zip ni un tar que se pueda abrir: {e}") from e
             with t:
-                miembros = t.getmembers()
-                if len(miembros) > 10000:
-                    raise ErrorHerramienta("El comprimido trae más de 10 000 archivos: no lo extraigo.")
-                for m in miembros:
-                    if not (m.isfile() or m.isdir()):
-                        raise ErrorHerramienta(f"El comprimido trae un enlace o un archivo especial («{m.name}»): no lo extraigo.")
-                    revisar_nombre(m.name)
                 destino.mkdir()
                 os.chmod(destino, 0o700)
-                for m in miembros:
+                miembros = 0
+                for m in t:
+                    miembros += 1
+                    if miembros > 10000:
+                        raise ErrorHerramienta("El comprimido trae más de 10 000 archivos: no lo extraigo.")
+                    if not (m.isfile() or m.isdir()):
+                        raise ErrorHerramienta(f"El comprimido trae un enlace o un archivo especial («{m.name}»): no lo extraigo.")
                     final = revisar_nombre(m.name)
                     if m.isdir():
                         final.mkdir(parents=True, exist_ok=True)
@@ -2488,6 +2611,7 @@ def cli_navegador(argv: list[str]) -> int:
                 except OSError:
                     break
             shutil.rmtree(e.get("perfil") or perfil_de(e["nombre"]), ignore_errors=True)
+        shutil.rmtree(carpeta_claude() / ".entrando" / "navegador", ignore_errors=True)
         print("Cerré el navegador de Claude (olvida cookies, almacenamiento e historial).")
         return 0
     if orden != "abrir":
@@ -2515,10 +2639,14 @@ def cli_navegador(argv: list[str]) -> int:
         return 1
     headless = "--headless" in argv
     urls = [a for a in argv if not a.startswith("--") and a not in NAVEGADORES]
+    if urls and not url_permitida(urls[0]):
+        print("Solo abro páginas http o https.", file=sys.stderr)
+        return 2
     perfil = perfil_de(elegido)
     # Lo que baje el navegador por su cuenta (antes de que Claude se conecte y las bloquee, o si la persona lo usa
     # a mano) cae en una zona aparte que las herramientas no tocan, nunca directo en la carpeta de Claude.
     aparte = carpeta_claude() / ".entrando" / "navegador"
+    shutil.rmtree(aparte, ignore_errors=True)  # lo que quedó de la vez anterior se tira
     aparte.mkdir(parents=True, exist_ok=True)
     os.chmod(aparte.parent, 0o700)
     os.chmod(aparte, 0o700)
@@ -2575,6 +2703,14 @@ def cli_navegador(argv: list[str]) -> int:
                                       "protocolo": protocolo, "inicio": time.time()}))
     avisar(f"Abrí un {elegido.capitalize()} aparte para Claude (sin tus cuentas). Ciérralo, o corta todo con «vortex claude pausa».")
     print(f"Listo: el navegador de Claude ({elegido.capitalize()}) está abierto. Ciérralo con «vortex claude navegador cerrar».")
+    try:
+        cliente = json.loads((RUNTIME / "mcp-cliente.json").read_text())
+    except (OSError, ValueError):
+        cliente = None
+    if not cliente or not cliente.get("elicitation"):
+        print("Ojo: lo delicado (bajar ejecutables, subir archivos de otra carpeta o a internet) te lo pregunto con una "
+              "notificación con botones" + (", porque tu Claude no sabe preguntar con un cuadro." if cliente else ".")
+              + " Si no contestas en un minuto, es que no.")
     return 0
 
 
@@ -2719,8 +2855,7 @@ HERRAMIENTAS = {
         {"url": {"type": "string", "description": "La dirección del archivo (http/https)."},
          "selector": {"type": "string", "description": "O el enlace/botón que lo baja (selector CSS)."},
          "texto": {"type": "string", "description": "O el enlace/botón por lo que dice."},
-         "segundos": {"type": "number", "description": "Cuánto esperar a que termine (por defecto 60)."},
-         "confirmado": {"type": "boolean", "description": "Solo después de que la persona dijo que sí en el chat, cuando la herramienta lo pida."}},
+         "segundos": {"type": "number", "description": "Cuánto esperar a que termine (por defecto 60)."},},
         False,
     ),
     "navegador_subir": (
@@ -2731,8 +2866,7 @@ HERRAMIENTAS = {
         {"archivos": {"type": "array", "items": {"type": "string"}, "description": "Nombres en la carpeta de Claude o rutas que pidió la persona."},
          "selector": {"type": "string", "description": "El campo de archivo (o la zona donde se sueltan)."},
          "texto": {"type": "string", "description": "O el campo por lo que dice."},
-         "arrastrar": {"type": "boolean", "description": "Soltarlos arrastrando (para zonas de «arrastra aquí»), máximo 20 MB."},
-         "confirmado": {"type": "boolean", "description": "Solo después de que la persona dijo que sí en el chat, cuando la herramienta lo pida."}},
+         "arrastrar": {"type": "boolean", "description": "Soltarlos arrastrando (para zonas de «arrastra aquí»), máximo 20 MB."},},
         False,
     ),
     "archivos_listar": (archivos_listar, "Lista lo que hay en la carpeta de Claude (lo descargado), con tamaño y fecha.", {}),
@@ -2793,6 +2927,7 @@ def manejar(msg: dict) -> None:
         pedida = params.get("protocolVersion")
         CLIENTE["confirma"] = isinstance((params.get("capabilities") or {}).get("elicitation"), dict) \
             and not os.environ.get("VORTEX_SIN_ELICITACION")
+        guardar_cliente(CLIENTE["confirma"])
         responder(id_, {
             "protocolVersion": pedida if pedida in PROTOCOLOS else PROTOCOLOS[0],
             "capabilities": {"tools": {}},

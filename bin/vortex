@@ -10,6 +10,16 @@ if [[ ! -f "$VORTEX_DIR/install.sh" && -r "$VORTEX_RELEASE" ]]; then
   [[ -f "$repo/install.sh" ]] && VORTEX_DIR="$repo"
   unset repo
 fi
+
+# El vortex-mcp que maneja el navegador de Claude: el instalado si este vortex es el instalado (el mismo que
+# corre Claude Code, para que los dos sean de la misma versión); el del repo si se corre desde el repo.
+ruta_vortex_mcp() {
+  if [[ "$(readlink -f "${BASH_SOURCE[0]}")" == /usr/local/bin/* && -x /usr/local/bin/vortex-mcp ]]; then
+    echo /usr/local/bin/vortex-mcp
+  else
+    echo "$VORTEX_DIR/bin/vortex-mcp"
+  fi
+}
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/vortex"
 ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
@@ -823,7 +833,7 @@ cmd_claude() {
     pausa)
       mkdir -p "$CONF"; touch "$pausa"
       # 3.4: también se cierra su navegador (el Firefox o Brave aparte de «vortex claude navegador»).
-      "$VORTEX_DIR/bin/vortex-mcp" navegador cerrar >/dev/null 2>&1 || true
+      "$(ruta_vortex_mcp)" navegador cerrar >/dev/null 2>&1 || true
       echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles, ni manejar su navegador."
       ;;
     reanudar)
@@ -847,9 +857,9 @@ cmd_claude() {
     navegador)
       shift
       case "${1:-abrir}" in
-        cerrar | estado) exec "$VORTEX_DIR/bin/vortex-mcp" navegador "$1" ;;
-        abrir) shift; exec "$VORTEX_DIR/bin/vortex-mcp" navegador abrir "$@" ;;
-        *) exec "$VORTEX_DIR/bin/vortex-mcp" navegador abrir "$@" ;;
+        cerrar | estado) exec "$(ruta_vortex_mcp)" navegador "$1" ;;
+        abrir) shift; exec "$(ruta_vortex_mcp)" navegador abrir "$@" ;;
+        *) exec "$(ruta_vortex_mcp)" navegador abrir "$@" ;;
       esac
       ;;
     # Solo para iniciar sesión (lo usa Miku): una ventanita que se cierra sola al terminar. Miku no

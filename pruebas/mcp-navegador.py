@@ -177,6 +177,13 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         self.wfile.write(cuerpo)
 
     def do_GET(self):
+        saltos = {"/a-archivo": "file:///etc/passwd", "/a-correo": "https://mail.google.com/mail/datos.csv"}
+        if self.path in saltos:
+            self.send_response(302)
+            self.send_header("Location", saltos[self.path])
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         paginas = {"/archivos": PAGINA_ARCHIVOS, "/auto": PAGINA_AUTO, "/subir": PAGINA_SUBIR}
         if self.path in paginas:
             cuerpo = paginas[self.path].encode()
@@ -290,7 +297,10 @@ def main():
     puerto = srv.server_address[1]
     base = f"http://127.0.0.1:{puerto}"
     (tmp / "bin").mkdir()
-    (tmp / "bin/notify-send").write_text(f"#!/bin/sh\necho \"$*\" >> {tmp}/avisos.log\n")
+    # notify-send falso: anota cada aviso y, si trae botones (-A), contesta lo que diga el archivo «respuesta»
+    # (como si la persona tocara «Sí» o «No»); sin ese archivo, nadie contesta.
+    (tmp / "bin/notify-send").write_text(f"#!/bin/sh\necho \"$*\" >> {tmp}/avisos.log\n"
+                                         f"case \"$*\" in *\"-A \"*) cat {tmp}/respuesta 2>/dev/null ;; esac\n")
     (tmp / "bin/notify-send").chmod(0o755)
     env = dict(os.environ, HOME=str(tmp / "home"), XDG_CONFIG_HOME=str(tmp / "config"), XDG_DATA_HOME=str(tmp / "data"),
                XDG_RUNTIME_DIR=str(tmp / "run"), XDG_CACHE_HOME=str(tmp / "cache"), XDG_STATE_HOME=str(tmp / "state"),
@@ -325,7 +335,9 @@ def main():
         print("== Sin navegador abierto")
         c = Cliente(env)
         init = c.pedir("initialize", {"protocolVersion": "2025-06-18"})["result"]
-        probar("versión 0.3.0", init["serverInfo"]["version"] == "0.3.0")
+        probar("versión 0.3.1", init["serverInfo"]["version"] == "0.3.1")
+        probar("ninguna herramienta acepta «confirmado»", all("confirmado" not in h["inputSchema"]["properties"]
+                                                             for h in c.pedir("tools/list")["result"]["tools"]))
         probar("las instrucciones hablan del navegador y de los archivos",
                "vortex claude navegador" in init["instructions"] and "navegador_descargar" in init["instructions"])
         nombres = {h["name"]: h for h in c.pedir("tools/list")["result"]["tools"]}
@@ -344,6 +356,8 @@ def main():
         print(f"== Abrir el navegador (headless, perfil temporal: {nombre_nav})")
         a = subprocess.run([sys.executable, str(MCP), "navegador", "abrir", cual, "--headless"], env=env, capture_output=True, text=True, timeout=60)
         probar("abre", a.returncode == 0, a.stdout + a.stderr)
+        probar("avisa que lo delicado se pregunta con una notificación (el cliente no sabe preguntar)",
+               "notificación con botones" in a.stdout and "no sabe preguntar" in a.stdout, a.stdout)
         if cdp:
             prefs = json.loads((perfil / "Default/Preferences").read_text()) if (perfil / "Default/Preferences").exists() else {}
             probar("el perfil es el temporal, sin contraseñas ni autocompletar",
@@ -442,6 +456,58 @@ def main():
         t, r = c.usar("navegador_abrir", url="https://mail.google.com/")
         probar("no abre correo ni mensajes", r.get("isError"))
 
+        print("== Archivos del equipo por el navegador (file://): nunca")
+        home = tmp / "home"
+        (home / ".ssh").mkdir(mode=0o700, exist_ok=True)
+        (home / ".ssh/id_rsa").write_text("LLAVE PRIVADA")
+        carpeta.mkdir(parents=True, exist_ok=True)
+        (carpeta / "nota.txt").write_text("hola desde la carpeta")
+        for url in ("file:///etc/passwd", f"file://{home}/.ssh/id_rsa", f"file://{carpeta}/nota.txt", "view-source:file:///etc/passwd",
+                    "jar:file:///tmp/x.zip!/a", "ftp://127.0.0.1/", "data:text/html,<p>hola</p>", "javascript:alert(1)",
+                    "about:config", "chrome://settings"):
+            t, r = c.usar("navegador_abrir", url=url)
+            probar(f"no abre {url.split(',')[0]}", r.get("isError") and "http" in t, t)
+        t, _ = c.usar("archivos_leer", nombre="nota.txt")
+        probar("lo de la carpeta de Claude se lee con archivos_leer", "hola desde la carpeta" in t, t)
+        c.usar("navegador_abrir", url=f"{base}/a-archivo")
+        t, r = c.usar("navegador_leer")
+        probar("una redirección a file:// no deja leer nada del equipo", "root:" not in t, t)
+        c.usar("navegador_abrir", url="about:blank")
+        c.usar("navegador_evaluar", expresion=f"location.href = 'file://{home}/.ssh/id_rsa'")
+        time.sleep(1)
+        for herramienta in ("navegador_leer", "navegador_captura", "navegador_evaluar"):
+            t, r = c.usar(herramienta, **({"expresion": "document.body.innerText"} if herramienta == "navegador_evaluar" else {}))
+            t2, _ = c.usar("navegador_estado")
+            probar(f"si JavaScript la manda a file://, {herramienta} no la lee", "LLAVE PRIVADA" not in t and "file:" not in t2, t + t2)
+        (carpeta / "nota.txt").unlink()
+        # Los navegadores ya frenan casi todos los saltos a file://; esto prueba la red de abajo: si una pestaña
+        # llega a mostrar un archivo del equipo, vortex-mcp la vacía y no la lee.
+        import importlib.machinery
+        import importlib.util
+        cargador = importlib.machinery.SourceFileLoader("vortex_mcp_prueba", str(MCP))
+        vm = importlib.util.module_from_spec(importlib.util.spec_from_loader("vortex_mcp_prueba", cargador))
+        cargador.exec_module(vm)
+
+        class Falso(vm.Navegador):
+            def __init__(self):
+                self.ido = []
+            def ctx(self):
+                self.urls = {"p": self.url}
+                return "p"
+            def navegar(self, url):
+                self.ido.append(url)
+        for url, debe in (("file:///etc/passwd", False), ("view-source:http://x/", False), ("about:config", False),
+                          ("chrome://settings", False), ("http://127.0.0.1/", True), ("about:blank", True)):
+            n = Falso()
+            n.url = url
+            try:
+                n.pagina()
+                paso = True
+            except vm.ErrorHerramienta:
+                paso = False
+            probar(f"una pestaña en {url} {'se lee' if debe else 'no se lee y se vacía'}",
+                   paso == debe and (debe or n.ido == ["about:blank"]))
+
         print("== Descargar")
         c.usar("navegador_abrir", url=f"{base}/auto")
         time.sleep(2)
@@ -461,11 +527,19 @@ def main():
         t, r = c.usar("navegador_descargar", texto="Informe en PDF")
         probar("baja por el texto del enlace (un PDF)", "informe.pdf" in en_carpeta(), t)
         t, r = c.usar("navegador_descargar", selector="#sh")
-        probar("un script pide confirmación y no se baja", r.get("isError") and "confirmado" in t and "instalar.sh" not in en_carpeta(), t)
+        probar("un script pide permiso con una notificación con botones y, si nadie dice que sí, no se baja",
+               r.get("isError") and "no lo confirmó" in t and "instalar.sh" not in en_carpeta() and "Claude pide permiso" in avisos(), t)
         t, r = c.usar("navegador_descargar", url=f"{base}/dl/programa")
-        probar("un ejecutable sin extensión (ELF) también", r.get("isError") and "confirmado" in t and "programa" not in en_carpeta(), t)
+        probar("un ejecutable sin extensión (ELF) también", r.get("isError") and "no lo confirmó" in t and "programa" not in en_carpeta(), t)
         t, r = c.usar("navegador_descargar", url=f"{base}/dl/instalar.sh", confirmado=True)
-        probar("confirmado, se guarda pero sin permiso de ejecución",
+        probar("«confirmado»: true puesto por Claude no basta", r.get("isError") and "instalar.sh" not in en_carpeta(), t)
+        (tmp / "respuesta").write_text("no\n")
+        t, r = c.usar("navegador_descargar", url=f"{base}/dl/instalar.sh")
+        probar("si la persona toca «No», no se baja", r.get("isError") and "instalar.sh" not in en_carpeta(), t)
+        (tmp / "respuesta").write_text("si\n")
+        t, r = c.usar("navegador_descargar", url=f"{base}/dl/instalar.sh")
+        (tmp / "respuesta").unlink()
+        probar("si toca «Sí», se guarda pero sin permiso de ejecución",
                "instalar.sh" in en_carpeta() and sin_ejecutar(carpeta / "instalar.sh"), t)
         t, r = c.usar("navegador_descargar", url=f"{base}/dl/grande.dat")
         probar("más grande que el tope: no se guarda", r.get("isError") and "máximo" in t and "grande.dat" not in en_carpeta(), t)
@@ -477,6 +551,10 @@ def main():
         probar("baja por URL", {"foto.png", "bueno.zip", "malo.zip", "enlace.tar"} <= set(en_carpeta()), str(en_carpeta()))
         t, r = c.usar("navegador_descargar", url="file:///etc/passwd")
         probar("solo http y https", r.get("isError"))
+        t, r = c.usar("navegador_descargar", url=f"{base}/a-archivo")
+        probar("una redirección a file:// no se sigue", r.get("isError") and "passwd" not in en_carpeta(), t)
+        t, r = c.usar("navegador_descargar", url=f"{base}/a-correo")
+        probar("una redirección a correo tampoco", r.get("isError") and "correo" in t, t)
 
         print("== Trabajar con los archivos")
         t, _ = c.usar("archivos_leer", nombre="datos.csv")
@@ -521,9 +599,6 @@ def main():
         t, r = c.usar("navegador_subir", selector="#zona", archivos=["informe.pdf"], arrastrar=True)
         t2, _ = c.usar("navegador_leer", que="texto", selector="#resultado")
         probar("arrastrando a una zona", "soltaste informe.pdf" in t2, t + t2)
-        home = tmp / "home"
-        (home / ".ssh").mkdir(mode=0o700)
-        (home / ".ssh/id_rsa").write_text("LLAVE PRIVADA")
         (home / "Notas/.obsidian").mkdir(parents=True)
         (home / "Notas/lista.md").write_text("notas")
         (home / "proyecto").mkdir()
@@ -531,16 +606,32 @@ def main():
         (home / ".config/vortex").mkdir(parents=True, exist_ok=True)
         (home / ".config/vortex/algo.txt").write_text("x")
         (carpeta / "atajo.txt").symlink_to(home / ".ssh/id_rsa")
+        sensibles = [".claude/settings.json", ".claude.json", ".bash_history", ".zsh_history", ".local/share/fish/fish_history",
+                     ".thunderbird/perfil/prefs.js", ".librewolf/perfil/logins.txt", ".mozilla/firefox/perfil/places.sqlite",
+                     ".local/share/algo/datos.txt", ".local/state/algo/estado.txt", ".aws/credentials", ".kube/config",
+                     ".docker/config.json", ".netrc", ".pki/nssdb/cert9.db", ".gnupg/pubring.kbx", ".algo-oculto/notas.txt",
+                     "Documentos/claves.kdbx", "Documentos/llave.gpg", "Documentos/publica.asc", "Documentos/cert.pfx",
+                     "Documentos/cert.p12", "Documentos/wallet.dat", "Documentos/seed.txt", "Documentos/SUdo.md"]
+        for s in sensibles:
+            (home / s).parent.mkdir(parents=True, exist_ok=True)
+            (home / s).write_text("dato privado")
+        (tmp / "respuesta").write_text("si\n")  # aunque la persona diga que sí: esto nunca
         for ruta in ("~/.ssh/id_rsa", str(home / "Notas/lista.md"), str(home / "proyecto/.env"), str(home / ".config/vortex/algo.txt"),
-                     "atajo.txt", "../../.ssh/id_rsa", "/etc/hostname"):
-            t, r = c.usar("navegador_subir", selector="#archivo", archivos=[ruta], confirmado=True)
+                     "atajo.txt", "../../.ssh/id_rsa", "/etc/hostname", *(f"~/{s}" for s in sensibles),
+                     "/proc/self/environ", "/sys/kernel/hostname", "/dev/null"):
+            t, r = c.usar("navegador_subir", selector="#archivo", archivos=[ruta])
             probar(f"nunca sube de una ruta sensible ({ruta})", r.get("isError") and "nunca se sube" in t, t)
-        (home / "Documentos").mkdir()
+        (tmp / "respuesta").unlink()
+        (home / "Documentos").mkdir(exist_ok=True)
         (home / "Documentos/carta.txt").write_text("una carta")
         t, r = c.usar("navegador_subir", selector="#archivo", archivos=[str(home / "Documentos/carta.txt")])
-        probar("de otra carpeta pide confirmación", r.get("isError") and "confirmado" in t, t)
+        probar("de otra carpeta pide permiso y, sin respuesta, no sube", r.get("isError") and "no lo confirmó" in t, t)
         t, r = c.usar("navegador_subir", selector="#archivo", archivos=[str(home / "Documentos/carta.txt")], confirmado=True)
-        probar("y con la confirmación lo sube", not r.get("isError"), t)
+        probar("«confirmado»: true no basta", r.get("isError") and "no lo confirmó" in t, t)
+        (tmp / "respuesta").write_text("si\n")
+        t, r = c.usar("navegador_subir", selector="#archivo", archivos=[str(home / "Documentos/carta.txt")])
+        (tmp / "respuesta").unlink()
+        probar("si la persona toca «Sí», lo sube", not r.get("isError"), t)
         t, _ = c.usar("archivos_borrar", nombre="tabla.csv")
         time.sleep(0.5)  # notify-send va aparte
         probar("borra dentro de la carpeta y avisa", "tabla.csv" not in en_carpeta() and "borró «tabla.csv»" in avisos(), t)
@@ -596,6 +687,22 @@ def main():
             probar("y si dice que no, no lo hace", r.get("isError") and "no lo confirmó" in t and "programa" not in en_carpeta(), t)
         finally:
             e2.cerrar()
+
+        print("== Cerrar con cuidado")
+        (carpeta / ".entrando/navegador/suelto.bin").write_text("algo que bajó la página")
+        estado_nav = tmp / "run/vortex/navegador-claude.json"
+        guardado = estado_nav.read_text()
+        ajeno = subprocess.Popen(["sleep", "60"], start_new_session=True)
+        datos = json.loads(guardado)
+        datos["pid"] = ajeno.pid
+        estado_nav.write_text(json.dumps(datos))
+        e = subprocess.run([sys.executable, str(MCP), "navegador", "estado"], env=env, capture_output=True, text=True, timeout=20)
+        subprocess.run([sys.executable, str(MCP), "navegador", "cerrar"], env=env, capture_output=True, timeout=20)
+        probar("si el pid guardado ya es de otro programa, no lo cuenta ni lo mata", "cerrado" in e.stdout and ajeno.poll() is None, e.stdout)
+        ajeno.kill()
+        estado_nav.write_text(guardado)
+        subprocess.run([sys.executable, str(MCP), "navegador", "cerrar"], env=env, capture_output=True, timeout=20)
+        probar("al cerrar se tira lo que el navegador bajó solo", not (carpeta / ".entrando/navegador").exists())
 
         print("== vortex claude navegador / pausa")
         vortex = str(AQUI / "bin/vortex")
