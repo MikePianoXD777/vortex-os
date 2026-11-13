@@ -32,8 +32,12 @@ Uso: vortex <comando>
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
                                        en tu primer inicio con red si elegiste Claude al instalar)
-  claude navegador [URL|cerrar]        abre un Firefox aparte (sin tus cuentas) que Claude puede ver,
-                                       manejar y depurar; «cerrar» lo cierra y olvida todo
+  claude navegador [firefox|brave] [URL|cerrar]
+                                       abre un navegador aparte (sin tus cuentas) que Claude puede ver,
+                                       manejar y depurar, y bajar o subir archivos en ~/Descargas/Claude;
+                                       «cerrar» lo cierra y olvida todo
+  claude avisos [todo|cambios]         avisar también cuando Claude solo mira (todo) o solo
+                                       cuando cambia algo (cambios, lo normal)
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
   actualizar                           actualiza Vortex, su shell y el sistema
   actualizaciones [revisar|on|off|sonido ARCHIVO]
@@ -818,7 +822,7 @@ cmd_claude() {
       ;;
     pausa)
       mkdir -p "$CONF"; touch "$pausa"
-      # 3.4: también se cierra su navegador (el Firefox aparte de «vortex claude navegador»).
+      # 3.4: también se cierra su navegador (el Firefox o Brave aparte de «vortex claude navegador»).
       "$VORTEX_DIR/bin/vortex-mcp" navegador cerrar >/dev/null 2>&1 || true
       echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles, ni manejar su navegador."
       ;;
@@ -827,6 +831,17 @@ cmd_claude() {
       echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
       ;;
     instalar) shift; cmd_claude_instalar "$@" ;;
+    # 3.4: los avisos del navegador y de los archivos. Por defecto solo avisa lo que cambia algo (abrir,
+    # clic, escribir, bajar, subir, borrar); con «todo», también cuando solo mira (leer, consola, red…).
+    avisos)
+      case "${2:-}" in
+        todo | cambios) mkdir -p "$CONF"; echo "$2" >"$CONF/claude-avisos"
+          if [[ $2 == todo ]]; then echo "Te aviso cada vez que Claude mire o haga algo en su navegador o sus archivos."
+          else echo "Te aviso solo cuando Claude cambie algo (abrir, clic, escribir, bajar, subir, borrar)."; fi ;;
+        "") cat "$CONF/claude-avisos" 2>/dev/null || echo cambios ;;
+        *) aviso "usa: vortex claude avisos [todo|cambios]"; exit 1 ;;
+      esac
+      ;;
     # 3.4: un Firefox aparte (sin tus cuentas, cookies ni historial) que Claude puede ver, manejar y
     # depurar con las herramientas navegador_* de vortex-mcp. Solo lo abres tú; al cerrarlo olvida todo.
     navegador)
@@ -877,7 +892,7 @@ cmd_claude() {
       fi
       exec "$term" -e bash -lc "cd ~; $orden" vortex "$yo"
       ;;
-    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar|navegador [cerrar|estado|URL]]"; exit 1 ;;
+    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar|navegador [firefox|brave|chromium|chrome] [cerrar|estado|URL]|avisos [todo|cambios]]"; exit 1 ;;
   esac
 }
 
