@@ -32,6 +32,8 @@ Uso: vortex <comando>
   claude pausa|reanudar|estado         corta o devuelve a Claude el acceso a tu pantalla
   claude instalar                      instala Claude Code para tu usuario (la ISO lo hace sola
                                        en tu primer inicio con red si elegiste Claude al instalar)
+  claude navegador [URL|cerrar]        abre un Firefox aparte (sin tus cuentas) que Claude puede ver,
+                                       manejar y depurar; «cerrar» lo cierra y olvida todo
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
   actualizar                           actualiza Vortex, su shell y el sistema
   actualizaciones [revisar|on|off|sonido ARCHIVO]
@@ -816,13 +818,25 @@ cmd_claude() {
       ;;
     pausa)
       mkdir -p "$CONF"; touch "$pausa"
-      echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles."
+      # 3.4: también se cierra su navegador (el Firefox aparte de «vortex claude navegador»).
+      "$VORTEX_DIR/bin/vortex-mcp" navegador cerrar >/dev/null 2>&1 || true
+      echo "Claude ya no puede ver tu pantalla, ventanas ni portapapeles, ni manejar su navegador."
       ;;
     reanudar)
       rm -f "$pausa"
       echo "Claude puede volver a ver tu pantalla cuando se lo pidas."
       ;;
     instalar) shift; cmd_claude_instalar "$@" ;;
+    # 3.4: un Firefox aparte (sin tus cuentas, cookies ni historial) que Claude puede ver, manejar y
+    # depurar con las herramientas navegador_* de vortex-mcp. Solo lo abres tú; al cerrarlo olvida todo.
+    navegador)
+      shift
+      case "${1:-abrir}" in
+        cerrar | estado) exec "$VORTEX_DIR/bin/vortex-mcp" navegador "$1" ;;
+        abrir) shift; exec "$VORTEX_DIR/bin/vortex-mcp" navegador abrir "$@" ;;
+        *) exec "$VORTEX_DIR/bin/vortex-mcp" navegador abrir "$@" ;;
+      esac
+      ;;
     # Solo para iniciar sesión (lo usa Miku): una ventanita que se cierra sola al terminar. Miku no
     # necesita ninguna consola abierta: usa Claude por su cuenta, en segundo plano.
     login)
@@ -863,7 +877,7 @@ cmd_claude() {
       fi
       exec "$term" -e bash -lc "cd ~; $orden" vortex "$yo"
       ;;
-    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar]"; exit 1 ;;
+    *) aviso "usa: vortex claude [activar|desactivar|activado|pausa|reanudar|estado|instalar|navegador [cerrar|estado|URL]]"; exit 1 ;;
   esac
 }
 
