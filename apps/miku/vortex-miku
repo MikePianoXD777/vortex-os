@@ -30,9 +30,10 @@
   vortex-miku camara on|off|estado  que Miku pueda tomar UNA foto con la webcam cuando se lo pides («mira el
                                     cuarto», «¿qué estoy haciendo?»); apagada de fábrica. La foto se manda a
                                     la IA que uses, no se guarda y nunca graba video
-  vortex-miku companera on|off|estado|acepto|bitacora|borrar-bitacora
+  vortex-miku companera on|off|estado|acepto|tono|bitacora|borrar-bitacora
                                     modo compañera: se asoma sola (cada 45 min como mucho, 6 al día, nunca de
-                                    23 a 9 ni si juegas), avisa, cuenta 5 s y toma UNA foto; apagado de fábrica
+                                    23 a 9 ni si juegas), avisa, cuenta 5 s y toma UNA foto; apagado de fábrica.
+                                    «tono carinosa|suave»: contenta de verte y juguetona (de fábrica) o tranquila
   vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas, o que
                                     quiere decirte algo); nunca mientras juegas o estás en una llamada
 
@@ -1099,6 +1100,7 @@ def orden_companera(args: list[str]) -> int:
         activo = cfg["companera"] and cfg["companera_consentimiento"]
         print(f"companera={'on' if activo else 'off'}")
         if activo:
+            print(f"tono={cfg['companera_tono']}")
             print(f"asomadas_hoy={companera.veces_hoy()}/{companera.TOPE_DIA}")
             motivo = companera.motivo_para_no(cfg, ocupado=corazon.ocupado)
             print(f"ahora={motivo or 'puede-asomarse'}")
@@ -1127,6 +1129,13 @@ def orden_companera(args: list[str]) -> int:
             companera.anotar("Modo compañera apagado")
             print("companera=off")
             return 0
+        elif sub == "tono":
+            elegido = (args[1].lower() if len(args) > 1 else "").replace("ñ", "n")
+            if elegido not in companera.TONOS:
+                return error("uso: vortex-miku companera tono carinosa|suave", 2)
+            config.guardar({"companera_tono": elegido})
+            print(f"tono={elegido}")
+            return 0
         elif sub in ("bitacora", "bitácora"):
             lineas = companera.leer_bitacora()
             print("\n".join(lineas) if lineas else "La bitácora está vacía.")
@@ -1136,7 +1145,7 @@ def orden_companera(args: list[str]) -> int:
             print("Bitácora borrada.")
             return 0
         else:
-            return error("uso: vortex-miku companera on|off|estado|acepto|bitacora|borrar-bitacora", 2)
+            return error("uso: vortex-miku companera on|off|estado|acepto|tono|bitacora|borrar-bitacora", 2)
     except OSError as e:
         return error(f"no pude guardar {rutas.CONFIG}: {e}")
     print("companera=on")

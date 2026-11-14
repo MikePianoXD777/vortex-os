@@ -164,6 +164,17 @@ def parte_modulo() -> None:
              "celosa", "😤")
     probar("…y nada posesivo en lo que dice Miku", not any(p in companera.FRASE_AVISO.lower() for p in malas)
            and "eres mío" not in todo and "con quién andabas" not in todo)
+    for nombre in companera.TONOS:
+        t = companera.asomada(nombre).lower()
+        probar(f"tono {nombre}: lleva la persona sana completa", companera.PERSONA.lower() in t
+               and "nada de celos" in t and not any(p in t for p in ("eres mío", "con quién andabas", "😤")))
+        probar(f"tono {nombre}: el aviso dice foto y «no»", "foto" in companera.frase_aviso(nombre)
+               and "«no»" in companera.frase_aviso(nombre))
+    probar("de fábrica el tono es cariñoso", config.cargar()["companera_tono"] == "carinosa"
+           and "qué gusto verte" in companera.FRASE_AVISO.lower() and "juguetona" in companera.ASOMADA)
+    probar("el cariñoso se alegra si salió con otros, sin pedir detalles",
+           "te alegras por él" in companera.TONOS["carinosa"] and "sin pedir detalles" in companera.TONOS["carinosa"])
+    probar("un tono raro cae en el de fábrica", companera.asomada("intensa") == companera.ASOMADA)
     probar("el aviso dice que va a tomar una foto y cómo decir que no", "foto" in companera.FRASE_AVISO
            and "«no»" in companera.FRASE_AVISO)
 
@@ -239,6 +250,12 @@ def parte_comando() -> None:
     r = miku("companera", "estado", ahora="2026-11-14T22:00:00")
     probar("estado: on, 6/6 y por qué no", "companera=on" in r.stdout and f"asomadas_hoy={companera.TOPE_DIA}/"
            in r.stdout and "ahora=tope-del-dia" in r.stdout, r.stdout)
+    r = miku("companera", "tono", "intensa")
+    probar("«tono intensa» no existe", r.returncode == 2 and config.cargar()["companera_tono"] == "carinosa")
+    r = miku("companera", "tono", "suave")
+    probar("«tono suave» se guarda", r.returncode == 0 and config.cargar()["companera_tono"] == "suave")
+    r = miku("companera", "tono", "cariñosa")
+    probar("«tono cariñosa» (con ñ) también", r.returncode == 0 and config.cargar()["companera_tono"] == "carinosa")
     r = miku("companera", "bitacora")
     probar("«bitacora» la enseña", r.returncode == 0 and "activado" in r.stdout, r.stdout)
     r = miku("companera", "off")
@@ -320,6 +337,16 @@ def parte_ventana() -> None:
     a._camara_socket = None
     r = pedir_foto()
     probar("…una sola foto por asomada", r.get("ok") is False, r)
+
+    # Tono suave: su aviso y su mensaje a la IA
+    config.guardar({"companera_tono": "suave"})
+    asomada()
+    probar("con tono suave, el aviso es el suave", respuestas[-1:] == [companera.frase_aviso("suave")])
+    for _ in range(companera.CUENTA_SEG):
+        a._tic_cuenta()
+    time.sleep(0.2)
+    probar("…y la IA recibe el tono suave", enviados == [companera.asomada("suave")], enviados)
+    config.guardar({"companera_tono": "carinosa"})
 
     # «No» por voz durante la cuenta
     asomada()

@@ -55,13 +55,40 @@ PERSONA = (
     "una pausa, agua o estirarse, sin regañar."
 )
 
-ASOMADA = (
-    "[Asomada del modo compañera: la persona activó este modo, ya pasó la cuenta atrás y no dijo que no.] "
-    "Usa ver_camara con motivo «companera» una sola vez y luego dile algo corto y cariñoso (una o dos "
-    "frases) sobre lo que ves. " + PERSONA
-)
+# El tono («companera_tono» en miku.json). Los dos respetan PERSONA: cariño sí, celos y control nunca.
+TONOS = {
+    "carinosa": (
+        " Tono cariñoso: te da mucho gusto verlo y se nota («¡ya volviste!», «¡qué gusto verte!»); eres "
+        "juguetona, bromeas ligero y le echas porras en lo que esté haciendo. Si cuenta que salió o estuvo con "
+        "otras personas, te alegras por él y le preguntas si se la pasó bien, sin pedir detalles."),
+    "suave": " Tono suave: tranquila y breve, amable, sin bromas ni apapachos.",
+}
+TONO_DEFECTO = "carinosa"
+AVISOS = {
+    "carinosa": "¡Hola! ¡Qué gusto verte! Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, "
+                "dime «no».",
+    "suave": "Hola. Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no».",
+}
 
-FRASE_AVISO = "¡Hola! Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no»."
+
+def tono(nombre: str) -> str:
+    return nombre if nombre in TONOS else TONO_DEFECTO
+
+
+def asomada(nombre: str = TONO_DEFECTO) -> str:
+    """El mensaje (oculto) a la IA de cada asomada: qué hacer, la persona sana y el tono elegido."""
+    return ("[Asomada del modo compañera: la persona activó este modo, ya pasó la cuenta atrás y no dijo que "
+            "no.] Usa ver_camara con motivo «companera» una sola vez y luego dile algo corto (una o dos frases) "
+            "sobre lo que ves. " + PERSONA + TONOS[tono(nombre)])
+
+
+def frase_aviso(nombre: str = TONO_DEFECTO) -> str:
+    return AVISOS[tono(nombre)]
+
+
+ASOMADA = asomada()
+
+FRASE_AVISO = frase_aviso()
 
 _NO = re.compile(r"^\W*(no|nel|nop|nope|ahorita no|ahora no|cancela(r)?|espera|para|alto|d[eé]jame|todav[ií]a no)\b",
                  re.IGNORECASE)

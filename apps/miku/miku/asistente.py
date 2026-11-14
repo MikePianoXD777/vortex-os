@@ -1069,12 +1069,14 @@ class Asistente(QObject):
             self.cerrar.emit()
             return
         self._en_cuenta, self._cuenta, self._cuenta_espera, self._cuenta_oyendo = True, companera.CUENTA_SEG, 0, False
+        self._tono = companera.tono(disco.get("companera_tono", ""))
+        aviso = companera.frase_aviso(self._tono)
         self.usuario.emit("")
-        self.respuesta.emit(companera.FRASE_AVISO, True)
-        self._acumulado = companera.FRASE_AVISO
+        self.respuesta.emit(aviso, True)
+        self._acumulado = aviso
         self._poner_acciones([["companera_cancelar", "No, ahora no"], ["companera_dia", "Ya no me molestes hoy"]])
         self._cambiar_estado(REPOSO, self._texto_cuenta())
-        self._decir(companera.FRASE_AVISO)
+        self._decir(aviso)
         companera.anotar("Miku se asomó (modo compañera): aviso y cuenta atrás")
         self._reloj_cuenta.start()
 
@@ -1100,7 +1102,7 @@ class Asistente(QObject):
             self.estado.emit(self.estado_actual, self._texto_cuenta())
             return
         self._terminar_cuenta()
-        self.enviar(companera.ASOMADA, oculto=True)
+        self.enviar(companera.asomada(getattr(self, "_tono", companera.TONO_DEFECTO)), oculto=True)
         # Esta pregunta es la de la asomada (la IA no alcanza a pedir la foto antes: el permiso se atiende
         # en este mismo hilo).
         self._turno_companera = self._pregunta_id
