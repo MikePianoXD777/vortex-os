@@ -275,7 +275,13 @@
         "camera_title": "Miku puede usar la cámara",
         "camera_desc": "Cuando se lo pides («Miku, mira el cuarto»), toma UNA foto. La foto se manda a la IA que uses (Claude, por internet, o tu IA local), no se guarda y nunca graba video. Cada vez que la use verás un aviso",
         "companion_title": "Modo compañera",
-        "companion_desc": "De vez en cuando (como mucho cada 45 minutos y 6 veces al día, nunca de 23:00 a 9:00 ni mientras juegas) Miku se asoma: te habla, cuenta 5 segundos y, si no le dices que no, toma UNA foto. Di «no» o pulsa Esc para que no. Al prenderlo primero te explica qué hace"
+        "companion_desc": "De vez en cuando (como mucho cada 45 minutos y 6 veces al día, nunca de 23:00 a 9:00 ni mientras juegas) Miku se asoma: te habla, cuenta 5 segundos y, si no le dices que no, toma UNA foto. Di «no» o pulsa Esc para que no. Al prenderlo primero te explica qué hace",
+        "companion_nocount_title": "Dejar que Miku se asome sin avisarme antes",
+        "companion_nocount_desc": "Solo para mayores de 18 años. Miku podrá tomar una foto del cuarto en cualquier momento del modo compañera, sin cuenta atrás. Verás el indicador y una notificación en cada foto, y queda en el registro",
+        "companion_tone_title": "Tono de Miku",
+        "companion_tone_desc": "Cariñosa: contenta de verte y juguetona. Suave: tranquila y breve",
+        "tone_affectionate": "Cariñosa",
+        "tone_gentle": "Suave"
       },
       "fps": {
         "title": "Contador de FPS en los juegos",

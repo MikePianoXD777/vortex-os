@@ -28,6 +28,9 @@ SettingsBlob {
     // true = Miku puede tomar UNA foto con la cámara cuando se lo pides (2.2); de fábrica, apagada.
     property bool camaraOn: false
     property bool companeraOn: false
+    property bool sinCuentaOn: false
+    property string tono: "carinosa"
+    readonly property var tonoCodes: ["carinosa", "suave"]
     // false = no hay vortex-miku (el paquete no está instalado) o no contestó.
     property bool available: true
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
@@ -82,6 +85,26 @@ SettingsBlob {
         recheckTimer.restart();
     }
 
+    // Cualquier orden de «vortex-miku» (la casilla y el tono del modo compañera).
+    function runArgs(args) {
+        if (toggleProc.running)
+            return;
+        toggleProc.command = ["bash", "-c", section.runScript, "vortex-miku"].concat(args);
+        toggleProc.running = true;
+        recheckTimer.restart();
+    }
+
+    // La casilla: marcarla abre a Miku con el texto y «Soy mayor de 18 años»; solo se marca si lo confirmas
+    // ahí. Desmarcarla es inmediato.
+    function setSinCuenta(on) {
+        section.runArgs(on ? ["companera", "sin-cuenta", "on", "--ventana"] : ["companera", "sin-cuenta", "off"]);
+    }
+
+    function setTono(code) {
+        if (code !== section.tono)
+            section.runArgs(["companera", "tono", code]);
+    }
+
     function run(option, on) {
         if (toggleProc.running)
             return;
@@ -98,6 +121,8 @@ SettingsBlob {
         let platicadora = "";
         let camara = "";
         let companera = "";
+        let sinCuenta = "";
+        let tono = "";
         let claude = "?";
         let ia = "claude";
         let lines = text.split("\n");
@@ -119,6 +144,10 @@ SettingsBlob {
                 camara = l.substring(7);
             else if (l.indexOf("companera=") === 0)
                 companera = l.substring(10);
+            else if (l.indexOf("sin_cuenta=") === 0)
+                sinCuenta = l.substring(11);
+            else if (l.indexOf("tono=") === 0)
+                tono = l.substring(5);
         }
         section.ia = ia;
         section.available = (rc === 0);
@@ -139,6 +168,11 @@ SettingsBlob {
         if (rc === 0 && (companera === "on" || companera === "off"))
             section.companeraOn = (companera === "on");
         companeraToggle.checked = section.companeraOn;
+        if (rc === 0 && (sinCuenta === "on" || sinCuenta === "off"))
+            section.sinCuentaOn = (sinCuenta === "on");
+        sinCuentaToggle.checked = section.sinCuentaOn;
+        if (rc === 0 && section.tonoCodes.indexOf(tono) !== -1)
+            section.tono = tono;
     }
 
     Process {
@@ -303,6 +337,68 @@ SettingsBlob {
             handleOffColor: ThemeBackend.text
             onToggled: function (on) {
                 section.setCompanera(on);
+            }
+        }
+    }
+
+    // La casilla «asomarse sin avisar» (apagada de fábrica, +18). Solo quita la cuenta atrás: el indicador, la
+    // notificación, el registro y los límites siguen. Apagar el modo compañera la desmarca.
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_companera_sin_cuenta"
+        icon: "󰄄"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.companion_nocount_title") || "Let Miku check in without warning me first"
+        description: I18n.t("guide.general.assistant.companion_nocount_desc") || "Over 18 only. Miku will be able to take a photo of the room at any moment in companion mode, with no countdown. You will see the indicator and a notification for every photo, and it stays in the log"
+        searchKeywords: "asistente miku compañera sin avisar sin cuenta regresiva cuenta atrás mayor de edad foto companion countdown"
+        visible: section.available && section.companeraOn
+
+        Toggle {
+            id: sinCuentaToggle
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            enabled: !section.busy
+            checked: section.sinCuentaOn
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function (on) {
+                section.setSinCuenta(on);
+            }
+        }
+    }
+
+    // El tono de Miku en el modo compañera: cariñosa (de fábrica) o suave. No hay tono celoso.
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_companera_tono"
+        icon: "󰋕"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.companion_tone_title") || "Miku's tone"
+        description: I18n.t("guide.general.assistant.companion_tone_desc") || "Affectionate: happy to see you and playful. Gentle: calm and brief"
+        searchKeywords: "asistente miku compañera tono cariñosa suave personalidad companion tone"
+        visible: section.available && section.companeraOn
+
+        Dropdown {
+            id: tonoDropdown
+            implicitWidth: rootObj.s(180)
+            implicitHeight: rootObj.s(32)
+            options: [I18n.t("guide.general.assistant.tone_affectionate") || "Affectionate", I18n.t("guide.general.assistant.tone_gentle") || "Gentle"]
+            currentIndex: {
+                let idx = section.tonoCodes.indexOf(section.tono);
+                return idx !== -1 ? idx : 0;
+            }
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface0
+            hoverColor: ThemeBackend.surface1
+            dropdownColor: ThemeBackend.surface0
+            borderColor: Qt.alpha(ThemeBackend.surface2, 0.6)
+            textColor: ThemeBackend.text
+            activeTextColor: ThemeBackend.crust
+            cornerRadius: ThemeBackend.borderRadius
+            fontPixelSize: rootObj.s(11)
+            onValueChanged: function (index, value) {
+                section.setTono(section.tonoCodes[index]);
             }
         }
     }

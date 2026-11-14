@@ -71,19 +71,41 @@ AVISOS = {
 }
 
 
+# La casilla «asomarse sin avisar» (apagada de fábrica). Solo quita la cuenta atrás: el indicador, la
+# notificación, la bitácora y todos los límites siguen igual. Para marcarla hay que confirmar ser mayor de 18.
+CASILLA_SIN_CUENTA = "Dejar que Miku se asome sin avisarme antes"
+TEXTO_SIN_CUENTA = ("Miku podrá tomar una foto del cuarto en cualquier momento del modo compañera, sin cuenta atrás. "
+                    "Verás el indicador y una notificación en cada foto, y queda en el registro.")
+SOY_MAYOR = "Soy mayor de 18 años"
+AVISOS_SIN_CUENTA = {
+    "carinosa": "¡Hola! ¡Qué gusto verte! Me asomo a ver cómo vas y tomo una foto.",
+    "suave": "Hola. Me asomo a ver cómo vas y tomo una foto.",
+}
+# Apagar el modo compañera retira el permiso y desmarca la casilla.
+APAGADO = {"companera": False, "companera_consentimiento": False, "companera_sin_cuenta": False,
+           "companera_mayor": False}
+
+
+def sin_cuenta(cfg: dict) -> bool:
+    """¿Se asoma sin cuenta atrás? Solo con el modo activo, la casilla marcada Y la mayoría de edad confirmada."""
+    return bool(cfg.get("companera") and cfg.get("companera_consentimiento") and cfg.get("companera_sin_cuenta")
+                and cfg.get("companera_mayor"))
+
+
 def tono(nombre: str) -> str:
     return nombre if nombre in TONOS else TONO_DEFECTO
 
 
-def asomada(nombre: str = TONO_DEFECTO) -> str:
+def asomada(nombre: str = TONO_DEFECTO, sin_aviso: bool = False) -> str:
     """El mensaje (oculto) a la IA de cada asomada: qué hacer, la persona sana y el tono elegido."""
-    return ("[Asomada del modo compañera: la persona activó este modo, ya pasó la cuenta atrás y no dijo que "
-            "no.] Usa ver_camara con motivo «companera» una sola vez y luego dile algo corto (una o dos frases) "
+    contexto = ("la persona activó este modo y marcó que te asomes sin cuenta atrás" if sin_aviso else
+                "la persona activó este modo, ya pasó la cuenta atrás y no dijo que no")
+    return (f"[Asomada del modo compañera: {contexto}.] Usa ver_camara con motivo «companera» una sola vez y luego dile algo corto (una o dos frases) "
             "sobre lo que ves. " + PERSONA + TONOS[tono(nombre)])
 
 
-def frase_aviso(nombre: str = TONO_DEFECTO) -> str:
-    return AVISOS[tono(nombre)]
+def frase_aviso(nombre: str = TONO_DEFECTO, sin_aviso: bool = False) -> str:
+    return (AVISOS_SIN_CUENTA if sin_aviso else AVISOS)[tono(nombre)]
 
 
 ASOMADA = asomada()

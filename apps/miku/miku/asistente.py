@@ -147,6 +147,7 @@ class Asistente(QObject):
         self._cuenta_oyendo = False
         self._turno_companera = -1                # la pregunta (oculta) de la asomada: la única que puede usar su foto
         self._cerrar_luego = False                # tras decir «va, no miro» se cierra sola
+        self._vio_bienvenida = False              # vio la bienvenida en esta ventana (para la casilla)
         self._voz_forzada = os.environ.pop("VORTEX_MIKU_VOZ", "") or None   # la visita con GPU chica: la ligera
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
         self._turno = 0                  # sube cada vez que se calla a Miku; descarta el audio de un turno viejo
@@ -1052,11 +1053,25 @@ class Asistente(QObject):
         modo, self._companera = self._companera, ""
         if self._cerrado:
             return
+        if modo == "mayoria":                     # la casilla desde Ajustes, con el modo ya activo
+            try:
+                activo = bool(config.cargar().get("companera_consentimiento"))
+            except (OSError, ValueError):
+                activo = False
+            if activo:
+                self._vio_bienvenida = True
+                self.usuario.emit("")
+                self.respuesta.emit(companera.CASILLA_SIN_CUENTA + "?", True)
+                self._accion_companera("companera_sin_cuenta")
+                return
+            modo = "consentimiento"               # sin el modo activo, primero la bienvenida completa
         if modo == "consentimiento":
+            self._vio_bienvenida = True
             self.usuario.emit("")
             self.respuesta.emit("¿Activo el modo compañera?", True)
             self.aviso.emit(companera.CONSENTIMIENTO)
-            self._poner_acciones([["companera_si", "Sí, activar el modo compañera"], ["companera_no", "No"]])
+            self._poner_acciones([["companera_si", "Sí, activar el modo compañera"],
+                                  ["companera_sin_cuenta", companera.CASILLA_SIN_CUENTA], ["companera_no", "No"]])
             return
         if modo != "asomarse":
             return
@@ -1070,6 +1085,16 @@ class Asistente(QObject):
             return
         self._en_cuenta, self._cuenta, self._cuenta_espera, self._cuenta_oyendo = True, companera.CUENTA_SEG, 0, False
         self._tono = companera.tono(disco.get("companera_tono", ""))
+        if companera.sin_cuenta(disco):          # la casilla: sin cuenta atrás; el indicador y el aviso, igual
+            self._en_cuenta = False
+            self.enviar(companera.asomada(self._tono, sin_aviso=True), oculto=True)
+            self._turno_companera = self._pregunta_id
+            frase = companera.frase_aviso(self._tono, sin_aviso=True)
+            self.respuesta.emit(frase, False)
+            self.aviso.emit("📷 Miku se asoma sin cuenta atrás (lo marcaste en Ajustes): va a tomar una foto.")
+            self._decir(frase)
+            companera.anotar("Miku se asomó sin cuenta atrás (casilla marcada)")
+            return
         aviso = companera.frase_aviso(self._tono)
         self.usuario.emit("")
         self.respuesta.emit(aviso, True)
@@ -1128,7 +1153,7 @@ class Asistente(QObject):
         if orden == "apagar":
             if activo:
                 try:
-                    config.guardar({"companera": False, "companera_consentimiento": False})
+                    config.guardar(companera.APAGADO)
                 except OSError as e:
                     self._responder_local(dijo, f"No pude apagarlo ({e.strerror or e}). Prueba en Ajustes.")
                     return True
@@ -1186,9 +1211,34 @@ class Asistente(QObject):
             companera.anotar("Modo compañera activado (aceptaste la bienvenida)")
             self._poner_acciones([])
             self.aviso.emit("Listo: el modo compañera está activado. Me asomo de vez en cuando, siempre con aviso.")
+        elif id_accion == "companera_sin_cuenta":    # primer paso de la casilla: el texto y «Soy mayor de 18»
+            self.aviso.emit(companera.TEXTO_SIN_CUENTA + "\n\nPara marcarla confirma que eres mayor de 18 años. "
+                            "La desmarcas cuando quieras en Ajustes (y apagar el modo compañera también la desmarca).")
+            self._poner_acciones([["companera_mayor", companera.SOY_MAYOR],
+                                  ["companera_si", "Mejor con cuenta atrás"], ["companera_no", "No"]])
+        elif id_accion == "companera_mayor":
+            try:
+                disco = config.cargar()
+            except (OSError, ValueError):
+                disco = {}
+            if not (self._vio_bienvenida or disco.get("companera_consentimiento")):
+                self._companera = "consentimiento"
+                self._companera_al_abrir()
+                return
+            try:
+                config.guardar({"companera": True, "companera_consentimiento": True, "camara": True,
+                                "camara_aviso": True, "companera_sin_cuenta": True, "companera_mayor": True})
+            except OSError as e:
+                self.aviso.emit(f"No pude guardar el ajuste ({e.strerror or e}).")
+                return
+            self.cfg.update(companera=True, companera_consentimiento=True, camara=True, camara_aviso=True)
+            companera.anotar("Casilla «asomarse sin avisar» marcada (confirmó ser mayor de 18)")
+            self._poner_acciones([])
+            self.aviso.emit("Listo: me asomo sin cuenta atrás. Igual vas a ver el indicador y una notificación en "
+                            "cada foto, y queda en el registro.")
         elif id_accion == "companera_no":
             try:
-                config.guardar({"companera": False})
+                config.guardar(companera.APAGADO)
             except OSError:
                 pass
             self._poner_acciones([])

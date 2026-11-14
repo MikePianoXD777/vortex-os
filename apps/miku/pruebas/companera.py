@@ -175,6 +175,20 @@ def parte_modulo() -> None:
     probar("el cariñoso se alegra si salió con otros, sin pedir detalles",
            "te alegras por él" in companera.TONOS["carinosa"] and "sin pedir detalles" in companera.TONOS["carinosa"])
     probar("un tono raro cae en el de fábrica", companera.asomada("intensa") == companera.ASOMADA)
+    probar("la casilla sin cuenta atrás viene apagada", not config.cargar()["companera_sin_cuenta"]
+           and not config.cargar()["companera_mayor"] and not companera.sin_cuenta(config.cargar()))
+    probar("casilla marcada sin confirmar mayoría de edad: no cuenta", not companera.sin_cuenta(
+        cfg(**ACTIVO, companera_sin_cuenta=True)))
+    probar("casilla + mayoría con el modo apagado: no cuenta", not companera.sin_cuenta(
+        cfg(companera_sin_cuenta=True, companera_mayor=True)))
+    probar("casilla + mayoría + modo activo: sin cuenta atrás", companera.sin_cuenta(
+        cfg(**ACTIVO, companera_sin_cuenta=True, companera_mayor=True)))
+    probar("apagar el modo desmarca la casilla", companera.APAGADO["companera_sin_cuenta"] is False
+           and companera.APAGADO["companera_mayor"] is False and companera.APAGADO["companera"] is False)
+    t = companera.asomada("carinosa", sin_aviso=True)
+    probar("la asomada sin cuenta lleva la misma persona sana", companera.PERSONA in t and "sin cuenta atrás" in t)
+    probar("el texto de la casilla dice indicador, notificación y registro", all(
+        x in companera.TEXTO_SIN_CUENTA for x in ("sin cuenta atrás", "indicador", "notificación", "registro")))
     probar("el aviso dice que va a tomar una foto y cómo decir que no", "foto" in companera.FRASE_AVISO
            and "«no»" in companera.FRASE_AVISO)
 
@@ -250,6 +264,33 @@ def parte_comando() -> None:
     r = miku("companera", "estado", ahora="2026-11-14T22:00:00")
     probar("estado: on, 6/6 y por qué no", "companera=on" in r.stdout and f"asomadas_hoy={companera.TOPE_DIA}/"
            in r.stdout and "ahora=tope-del-dia" in r.stdout, r.stdout)
+    r = miku("companera", "sin-cuenta", "on")
+    c = config.cargar()
+    probar("casilla sin «--soy-mayor»: muestra el texto y no se marca", "sin_cuenta=off" in r.stdout
+           and companera.TEXTO_SIN_CUENTA in r.stdout and not c["companera_sin_cuenta"] and not c["companera_mayor"],
+           r.stdout + r.stderr)
+    r = miku("companera", "sin-cuenta", "on", "--ventana")
+    time.sleep(1.4)
+    probar("desde Ajustes abre a Miku en el paso de la mayoría de edad", abiertas()[-1:] == ["mayoria"]
+           and not config.cargar()["companera_sin_cuenta"], abiertas())
+    r = miku("companera", "sin-cuenta", "on", "--soy-mayor")
+    c = config.cargar()
+    probar("con «--soy-mayor» se marca", r.returncode == 0 and c["companera_sin_cuenta"] and c["companera_mayor"],
+           r.stdout + r.stderr)
+    probar("…queda en la bitácora", "mayor de 18" in companera.leer_bitacora()[-1])
+    probar("…y el estado lo dice", "sin_cuenta=on" in miku("companera", "estado").stdout)
+    LOG.write_text("")
+    probar("sin cuenta: sigue respetando el tope del día (6/6, no se asoma)", revisar("2026-11-14T22:00:00") == 0)
+    probar("…y las horas de silencio", revisar("2026-11-15T07:00:00") == 0)
+    VENTANA.write_text(json.dumps({"class": "steam_app_1", "title": "Juego", "fullscreen": 1}))
+    probar("…y el juego / pantalla completa", revisar("2026-11-15T12:00:00") == 0)
+    VENTANA.write_text("{}")
+    probar("al otro día se asoma, con notificación que dice «sin cuenta atrás»",
+           revisar("2026-11-15T12:00:00") == 1 and "sin cuenta atrás" in log(), log())
+    probar("…y respeta los 45 min", revisar("2026-11-15T12:30:00") == 0)
+    r = miku("companera", "sin-cuenta", "off")
+    probar("«sin-cuenta off» la desmarca", "sin_cuenta=off" in r.stdout and not config.cargar()["companera_sin_cuenta"])
+    miku("companera", "sin-cuenta", "on", "--soy-mayor")
     r = miku("companera", "tono", "intensa")
     probar("«tono intensa» no existe", r.returncode == 2 and config.cargar()["companera_tono"] == "carinosa")
     r = miku("companera", "tono", "suave")
@@ -262,7 +303,11 @@ def parte_comando() -> None:
     c = config.cargar()
     probar("«off» lo apaga y retira el permiso", "companera=off" in r.stdout and not c["companera"]
            and not c["companera_consentimiento"], r.stdout)
-    probar("…y ya no se asoma", revisar("2026-11-15T12:00:00") == 0)
+    probar("…y desmarca la casilla", not c["companera_sin_cuenta"] and not c["companera_mayor"])
+    probar("…y ya no se asoma", revisar("2026-11-16T12:00:00") == 0)
+    r = miku("companera", "sin-cuenta", "on", "--soy-mayor")
+    probar("con el modo apagado la casilla no se puede marcar", r.returncode == 1
+           and not config.cargar()["companera_sin_cuenta"], r.stdout + r.stderr)
     r = miku("companera", "borrar-bitacora")
     probar("«borrar-bitacora» la borra", r.returncode == 0 and companera.leer_bitacora() == [])
     probar("un valor raro da error de uso", miku("companera", "talvez").returncode == 2)
@@ -283,6 +328,8 @@ def parte_ventana() -> None:
     a.aviso.connect(avisos.append)
     a.respuesta.connect(lambda t, fin: respuestas.append(t) if fin else None)
     a.cerrar.connect(lambda: cerrar.append(1))
+    indicador, aprobadas = [], []
+    a.camara.connect(indicador.append)
     ruta = a.cerebro.autorizar
 
     def pedir_foto() -> dict:
@@ -299,14 +346,22 @@ def parte_ventana() -> None:
         QTimer.singleShot(800, app.quit)
         app.exec()
         h.join(2)
-        return resultado.get("r", {})
+        r = resultado.get("r", {})
+        if r.get("ok"):
+            aprobadas.append(1)
+        return r
 
     # Bienvenida
     a._companera = "consentimiento"
     a._companera_al_abrir()
     probar("la bienvenida explica qué hace, que no guarda la foto y cómo apagarlo",
            avisos[-1:] == [companera.CONSENTIMIENTO], avisos[-1:])
-    probar("…con «Sí» y «No»", [b[0] for b in botones[-1]] == ["companera_si", "companera_no"], botones[-1:])
+    probar("…con «Sí», la casilla «asomarse sin avisar» y «No»", [b[0] for b in botones[-1]] ==
+           ["companera_si", "companera_sin_cuenta", "companera_no"], botones[-1:])
+    a.accion("companera_sin_cuenta")
+    probar("la casilla primero enseña el texto y pide «Soy mayor de 18 años»", companera.TEXTO_SIN_CUENTA in avisos[-1]
+           and ["companera_mayor", companera.SOY_MAYOR] in botones[-1], botones[-1:])
+    probar("…sin marcar nada todavía", not config.cargar()["companera"] and not config.cargar()["companera_sin_cuenta"])
     a.accion("companera_no")
     probar("«No»: sigue apagado", config.cargar()["companera"] is False)
     a.accion("companera_si")
@@ -387,6 +442,50 @@ def parte_ventana() -> None:
            and "callada_hasta" in companera.leer_estado())
     companera.ruta_estado().unlink()
 
+    # Casilla marcada a mano en miku.json, sin la mayoría de edad → cuenta atrás como siempre
+    config.guardar({"companera_sin_cuenta": True, "companera_mayor": False})
+    asomada()
+    probar("casilla sin mayoría de edad: hay cuenta atrás", a._en_cuenta and enviados == [])
+    a.accion("companera_cancelar")
+
+    # El paso de la mayoría desde Ajustes («mayoria»), con el modo activo
+    a._companera = "mayoria"
+    a._companera_al_abrir()
+    probar("desde Ajustes: el texto y «Soy mayor de 18 años»", companera.TEXTO_SIN_CUENTA in avisos[-1]
+           and botones[-1][0][0] == "companera_mayor", botones[-1:])
+    a.accion("companera_mayor")
+    c = config.cargar()
+    probar("«Soy mayor de 18 años» marca la casilla", c["companera_sin_cuenta"] and c["companera_mayor"])
+    probar("…y lo anota", "mayor de 18" in companera.leer_bitacora()[-1])
+
+    # Con la casilla: sin cuenta atrás, pero con aviso, indicador y bitácora
+    antes = len(indicador)
+    asomada()
+    time.sleep(0.2)
+    probar("con la casilla no hay cuenta atrás: la asomada sale de una", not a._en_cuenta
+           and enviados == [companera.asomada("carinosa", sin_aviso=True)], enviados)
+    probar("…pero avisa en la ventana que va a tomar una foto", "sin cuenta atrás" in avisos[-1], avisos[-1:])
+    probar("…y queda en la bitácora", "sin cuenta atrás" in companera.leer_bitacora()[-1])
+    r = pedir_foto()
+    probar("…toma su foto", r.get("ok") is True, r)
+    probar("…con el indicador de la cámara", indicador[antes:antes + 1] == [True], indicador[antes:])
+    a._camara_socket = None
+    probar("…una sola foto por asomada", pedir_foto().get("ok") is False)
+    PAUSA.parent.mkdir(parents=True, exist_ok=True)
+    PAUSA.touch()
+    enviados.clear()
+    asomada()
+    probar("…y con la pausa de Claude ni se asoma", enviados == [] and not a._en_cuenta)
+    PAUSA.unlink()
+
+    # Sin mayoría desde «mayoria» y sin el modo activo: primero la bienvenida completa
+    config.guardar({"companera_consentimiento": False})
+    a._companera = "mayoria"
+    a._companera_al_abrir()
+    probar("sin el modo activo, el paso de la casilla empieza por la bienvenida", avisos[-1] == companera.CONSENTIMIENTO)
+    config.guardar({"companera_consentimiento": True})
+    a._poner_acciones([])
+
     # La asomada con el modo apagado en Ajustes justo antes → ni cuenta ni foto
     config.guardar({"companera": False})
     asomada()
@@ -405,6 +504,8 @@ def parte_ventana() -> None:
     # «Apaga el modo compañera» por voz
     a.enviar("Miku, apaga el modo compañera")
     c = config.cargar()
+    probar("«apaga el modo compañera» también desmarca la casilla", not c["companera_sin_cuenta"]
+           and not c["companera_mayor"])
     probar("«apaga el modo compañera»: se apaga y retira el permiso, sin IA", not c["companera"]
            and not c["companera_consentimiento"] and enviados == [], enviados)
     a.enviar("cállate un rato")
@@ -417,9 +518,54 @@ def parte_ventana() -> None:
     a.cerrar_todo()
     probar("Esc / cerrar a Miku durante la cuenta: no hay foto y queda anotado", enviados == []
            and "cerraste" in companera.leer_bitacora()[-1], companera.leer_bitacora()[-1:])
+    probar("ninguna foto aprobada sin su indicador", indicador.count(True) == len(aprobadas) and len(aprobadas) >= 2,
+           (indicador, aprobadas))
     texto = companera.ruta_bitacora().read_bytes()
     probar("la bitácora es solo texto (ni imágenes ni lo que se vio)", b"JPEG" not in texto and b"\xff\xd8" not in texto
            and all(" · " in l for l in texto.decode().splitlines()))
+
+
+# ---- 4. La foto de la asomada también notifica (acciones_mcp.py) -----------------------------------
+
+FFMPEG = r'''#!/bin/sh
+echo "ffmpeg $*" >> "$LOG"
+for a in "$@"; do out="$a"; done
+printf 'JPEG-de-mentira' > "$(dirname "$out")/cuadro1.jpg"
+'''
+
+
+def parte_notificacion() -> None:
+    print("== ver_camara de la asomada: siempre con notificación")
+    (TMP / "bin/ffmpeg").write_text(FFMPEG)
+    (TMP / "bin/ffmpeg").chmod(0o755)
+    ruta = TMP / "run/autorizar-falso.sock"
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(str(ruta))
+    srv.listen(2)
+    pedidos = []
+
+    def ventana():
+        c, _ = srv.accept()
+        with c:
+            pedidos.append(json.loads(c.makefile("r").readline()))
+            c.sendall(b'{"ok": true}\n')
+            c.recv(1)
+    threading.Thread(target=ventana, daemon=True).start()
+    env = dict(os.environ, VORTEX_MIKU_AUTORIZAR=str(ruta), VORTEX_MIKU_CAMARA="/dev/video-falsa")
+    entrada = "\n".join(json.dumps(m) for m in [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "ver_camara",
+                                                                     "arguments": {"motivo": "companera"}}},
+    ]) + "\n"
+    LOG.write_text("")
+    r = subprocess.run([sys.executable, "-I", str(RAIZ / "miku/acciones_mcp.py")], input=entrada, text=True,
+                       capture_output=True, env=env, timeout=60)
+    res = json.loads(r.stdout.splitlines()[-1]).get("result", {})
+    probar("pide la foto a la ventana como «camara», motivo «companera»", pedidos[-1:] and
+           pedidos[-1].get("tipo") == "camara" and pedidos[-1].get("motivo") == "companera", pedidos)
+    probar("devuelve la foto con la guía de la asomada", any(c.get("type") == "image" for c in res.get("content", []))
+           and "modo compañera" in json.dumps(res, ensure_ascii=False), res)
+    probar("y SIEMPRE avisa con una notificación", "notify-send" in log(), log())
 
 
 def main() -> int:
@@ -428,6 +574,7 @@ def main() -> int:
         parte_modulo()
         parte_comando()
         parte_ventana()
+        parte_notificacion()
     finally:
         import shutil
         shutil.rmtree(TMP, ignore_errors=True)
