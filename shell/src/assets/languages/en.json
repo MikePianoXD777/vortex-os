@@ -270,7 +270,9 @@
         "internet_title": "Miku with internet",
         "internet_desc": "She can search the web and read pages; each time she asks for your permission",
         "platicadora_title": "Miku chats while you play",
-        "platicadora_desc": "Every so often she pops up to talk to you while you play (without opening the microphone) and, when you finish, she opens and asks how it went. The fonder she is of you, the more often"
+        "platicadora_desc": "Every so often she pops up to talk to you while you play (without opening the microphone) and, when you finish, she opens and asks how it went. The fonder she is of you, the more often",
+        "camera_title": "Miku can use the camera",
+        "camera_desc": "When you ask (“Miku, look at my room”), she takes ONE photo. The photo is sent to the AI you use (Claude over the internet, or your local AI), it is not saved and she never records video. You will see a notice every time"
       },
       "fps": {
         "title": "FPS counter in games",

@@ -25,6 +25,8 @@ SettingsBlob {
     property bool internetOn: false
     // true = Miku platica mientras juegas y te pregunta cómo te fue al terminar (2.0.1); de fábrica, encendido.
     property bool platicadoraOn: true
+    // true = Miku puede tomar UNA foto con la cámara cuando se lo pides (2.2); de fábrica, apagada.
+    property bool camaraOn: false
     // false = no hay vortex-miku (el paquete no está instalado) o no contestó.
     property bool available: true
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
@@ -51,7 +53,7 @@ SettingsBlob {
     // código (127 si falta el comando, 124 si no contestó en 5 s) y «claude=si|no|?» (si Claude
     // está activado; «?» si no hay comando vortex). Así basta un evento (el fin del flujo) y no
     // hay que esperar a varias señales distintas.
-    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; timeout 5 vortex-miku ia estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
+    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; timeout 5 vortex-miku ia estado 2>/dev/null; timeout 5 vortex-miku camara estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
 
     function setAvatar(on) {
         section.run("avatar", on);
@@ -63,6 +65,10 @@ SettingsBlob {
 
     function setPlaticadora(on) {
         section.run("platicadora", on);
+    }
+
+    function setCamara(on) {
+        section.run("camara", on);
     }
 
     function run(option, on) {
@@ -79,6 +85,7 @@ SettingsBlob {
         let avatar = "";
         let internet = "";
         let platicadora = "";
+        let camara = "";
         let claude = "?";
         let ia = "claude";
         let lines = text.split("\n");
@@ -96,6 +103,8 @@ SettingsBlob {
                 ia = l.substring(3);
             else if (l.indexOf("platicadora=") === 0)
                 platicadora = l.substring(12);
+            else if (l.indexOf("camara=") === 0)
+                camara = l.substring(7);
         }
         section.ia = ia;
         section.available = (rc === 0);
@@ -110,6 +119,9 @@ SettingsBlob {
         if (rc === 0 && (platicadora === "on" || platicadora === "off"))
             section.platicadoraOn = (platicadora === "on");
         platicadoraToggle.checked = section.platicadoraOn;
+        if (rc === 0 && (camara === "on" || camara === "off"))
+            section.camaraOn = (camara === "on");
+        camaraToggle.checked = section.camaraOn;
     }
 
     Process {
@@ -220,6 +232,33 @@ SettingsBlob {
             handleOffColor: ThemeBackend.text
             onToggled: function (on) {
                 section.setPlaticadora(on);
+            }
+        }
+    }
+
+    // 2.2: la cámara. El aviso va en la descripción, a la vista junto al interruptor; Miku lo repite y pide un
+    // clic antes de la primera foto.
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_camara"
+        icon: "󰄀"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.camera_title") || "Miku can use the camera"
+        description: I18n.t("guide.general.assistant.camera_desc") || "When you ask (“Miku, look at my room”), she takes ONE photo. The photo is sent to the AI you use (Claude over the internet, or your local AI), it is not saved and she never records video. You will see a notice every time"
+        searchKeywords: "asistente miku camara cámara webcam foto cuarto ordenado privacidad camera photo room privacy"
+        visible: section.available
+
+        Toggle {
+            id: camaraToggle
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            enabled: !section.busy
+            checked: section.camaraOn
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function (on) {
+                section.setCamara(on);
             }
         }
     }

@@ -27,6 +27,9 @@
                                     sin nada, cómo está su corazón
   vortex-miku platicadora on|off    mientras juegas se asoma a hablarte (sin abrir el micrófono) y al terminar
                                     se abre y te pregunta cómo te fue; entre más cariño, más seguido
+  vortex-miku camara on|off|estado  que Miku pueda tomar UNA foto con la webcam cuando se lo pides («mira el
+                                    cuarto», «¿qué estoy haciendo?»); apagada de fábrica. La foto se manda a
+                                    la IA que uses, no se guarda y nunca graba video
   vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas, o que
                                     quiere decirte algo); nunca mientras juegas o estás en una llamada
 
@@ -1065,6 +1068,25 @@ def orden_sentimientos(args: list[str]) -> int:
     return 0
 
 
+def orden_camara(args: list[str]) -> int:
+    """2.2: que Miku pueda tomar UNA foto con la webcam cuando se lo pides (apagada de fábrica)."""
+    if not args or args[0] == "estado":
+        print(f"camara={'on' if config.cargar()['camara'] else 'off'}")
+        return 0
+    if len(args) != 1 or args[0].lower() not in _SI_NO:
+        return error("uso: vortex-miku camara on|off|estado", 2)
+    nuevo = _SI_NO[args[0].lower()]
+    try:
+        config.guardar({"camara": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print(f"camara={'on' if nuevo else 'off'}")
+    if nuevo:
+        from miku import camara
+        print(camara.AVISO_PRIMERA_VEZ)
+    return 0
+
+
 def orden_platicadora(args: list[str]) -> int:
     if not args or args[0] == "estado":
         print(f"platicadora={'on' if config.cargar()['platicadora'] else 'off'}")
@@ -1268,6 +1290,8 @@ def main(argv: list[str]) -> int:
         return orden_sentimientos(args)
     if orden == "platicadora":
         return orden_platicadora(args)
+    if orden in ("camara", "cámara"):
+        return orden_camara(args)
     if orden in ("habla-sola", "habla_sola"):
         return orden_habla_sola(args)
     if orden == "sentir":

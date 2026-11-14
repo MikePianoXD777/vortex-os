@@ -9,6 +9,7 @@ sin red lo dice y sigue funcionando por texto. Claude viene apagado en Vortexine
 no hay sesión, el globo lo dice y ofrece un botón (Activar Claude / Iniciar sesión).
 """
 
+import collections
 import json
 import os
 import re
@@ -16,13 +17,14 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 from PySide6.QtNetwork import QLocalServer
 
 from . import cerebro as modulo_cerebro
-from . import cerebro_abierto, config, corazon, descargas, elevenlabs, ia, oido, rutas, voces
+from . import camara, cerebro_abierto, config, corazon, descargas, elevenlabs, ia, oido, rutas, voces
 
 # Estados que la ventana muestra con su indicador.
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
@@ -107,6 +109,7 @@ class Asistente(QObject):
     cerrar = Signal()                   # pide a la ventana que se cierre (el panel se cierra solo)
     progreso = Signal(str, str, float)  # (título, detalle, 0..1) de la descarga de los modelos; fracción < 0 = ya no hay
     acciones = Signal(object)           # botones bajo la respuesta: [[id, texto], ...] (vacía = ninguno)
+    camara = Signal(bool)               # 2.2: la cámara está en uso (una foto) — para el indicador de la ventana
 
     # Hilos → hilo principal.
     _texto_oido = Signal(object)        # str, "" si no se entendió, None si nadie habló
@@ -173,6 +176,13 @@ class Asistente(QObject):
         self._permiso_reloj.setSingleShot(True)
         self._permiso_reloj.setInterval(PERMISO_SEG * 1000)
         self._permiso_reloj.timeout.connect(lambda: self._responder_permiso(False, "Se acabó el tiempo; no hice nada."))
+        # 2.2: la cámara. Una foto por pregunta, camara.TOPE_POR_MINUTO por minuto, y solo en una pregunta tuya.
+        self._ultimo_texto = ""                   # lo último que dijiste (las frases que Miku dice sola no cuentan)
+        self._pregunta_tuya = False               # ¿la pregunta en curso es tuya?
+        self._camara_pregunta = -1                # la pregunta que ya usó su foto
+        self._camara_fotos: collections.deque = collections.deque()
+        self._permiso_camara = False              # el permiso que espera es el de la cámara
+        self._camara_socket = None                # la foto en curso (mientras siga abierta, la cámara está en uso)
         self._servidor_permiso = QLocalServer(self)
         ruta_permiso = str(rutas.temporales() / "autorizar.sock")
         QLocalServer.removeServer(ruta_permiso)
@@ -634,6 +644,8 @@ class Asistente(QObject):
         self._filtro = corazon.FiltroMarca()
         self._cerebro_listo = False
         self._ultimo_turno_con_error = False
+        self._ultimo_texto = "" if oculto else texto
+        self._pregunta_tuya = not oculto
         self.usuario.emit("" if oculto else texto)
         self.respuesta.emit("", False)
         self._cambiar_estado(PENSANDO, "Pensando...")
@@ -738,7 +750,9 @@ class Asistente(QObject):
             if resto:
                 self._decir(resto)
             if tipo == "herramienta":
-                if str(datos.get("nombre", "")).startswith("mcp__miku__"):
+                if str(datos.get("nombre", "")).endswith("ver_camara"):
+                    self._cambiar_estado(VIENDO, "Por usar la cámara...")
+                elif str(datos.get("nombre", "")).startswith("mcp__miku__"):
                     self._cambiar_estado(PENSANDO, "Preparando...")
                 else:
                     self._cambiar_estado(VIENDO, "Mirando tu pantalla...")
@@ -801,7 +815,10 @@ class Asistente(QObject):
             m = json.loads(buf.split(b"\n", 1)[0])
             titulo, detalle = str(m.get("titulo", "")).strip(), str(m.get("detalle", "")).strip()
         except ValueError:
-            titulo = ""
+            m, titulo = {}, ""
+        if isinstance(m, dict) and m.get("tipo") == "camara":
+            self._pedir_camara(s)
+            return
         if not titulo or self._cerrado or self._permiso is not None:
             s.write(b'{"ok": false}\n')          # mal formado, o ya hay otra esperando: no
             s.flush()
@@ -821,9 +838,18 @@ class Asistente(QObject):
 
     def _responder_permiso(self, ok: bool, texto: str = "") -> None:
         s, self._permiso = self._permiso, None
+        es_camara, self._permiso_camara = self._permiso_camara, False
         self._permiso_reloj.stop()
         self._poner_acciones([])
         if s is None:
+            return
+        if es_camara:
+            if ok:
+                self._camara_aprobada(s)
+            else:
+                self._camara_no(s, "La persona no autorizó la foto. No la tomé; no insistas.")
+            if texto:
+                self.aviso.emit(texto)
             return
         s.write(b'{"ok": true}\n' if ok else b'{"ok": false}\n')
         s.flush()
@@ -832,10 +858,93 @@ class Asistente(QObject):
         if texto:
             self.aviso.emit(texto)
 
+    # ---- La cámara (2.2) -------------------------------------------------------------------------
+
+    def _camara_no(self, s, mensaje: str) -> None:
+        s.write((json.dumps({"ok": False, "mensaje": mensaje}, ensure_ascii=False) + "\n").encode())
+        s.flush()
+
+    def _pedir_camara(self, s) -> None:
+        """Una foto pedida por ver_camara. Aquí se decide; nada de «Autorizar todo» para la cámara."""
+        ahora = time.monotonic()
+        while self._camara_fotos and ahora - self._camara_fotos[0] > 60:
+            self._camara_fotos.popleft()
+        if self._cerrado or self._permiso is not None or self._camara_socket is not None:
+            return self._camara_no(s, "Ahora no puedo usar la cámara (hay otra cosa esperando). Pídemelo en un ratito.")
+        if camara.pausado():
+            return self._camara_no(s, "El acceso de Claude está en pausa, también la cámara: no tomé la foto. Se "
+                                      "reactiva con «vortex claude reanudar».")
+        try:                                 # se lee del disco: apagarla en Ajustes vale al instante, sin reabrir
+            disco = config.cargar()
+            self.cfg["camara"], self.cfg["camara_aviso"] = disco["camara"], disco["camara_aviso"]
+        except (OSError, ValueError, KeyError):
+            self.cfg["camara"] = False
+        if not self.cfg.get("camara", False):
+            self._poner_acciones([["activar_camara", "Activar la cámara"]])
+            return self._camara_no(s, "La cámara está APAGADA en los ajustes de Miku, así que no tomé ninguna foto. "
+                                      "Dile a la persona que puede activarla con el botón «Activar la cámara» o en "
+                                      "Ajustes → General → Asistente.")
+        if not self._pregunta_tuya or self._cerebro_listo:
+            return self._camara_no(s, "La cámara solo se usa cuando la persona te lo pide en ese momento: no tomé la foto.")
+        if self._camara_pregunta == self._pregunta_id:
+            return self._camara_no(s, "Ya tomé una foto para esta pregunta: con esa contesta.")
+        if len(self._camara_fotos) >= camara.TOPE_POR_MINUTO:
+            return self._camara_no(s, f"Ya tomé {camara.TOPE_POR_MINUTO} fotos en este minuto; espera un poco antes de "
+                                      "pedirme otra.")
+        visto = self.cfg.get("camara_aviso", False)
+        if visto and camara.pidio_camara(self._ultimo_texto):
+            return self._camara_aprobada(s)
+        # Lo que dijo no suena a pedir la cámara, o nunca vio el aviso: se pregunta con un clic.
+        self._permiso, self._permiso_camara = s, True
+        self.cerebro.ocupado.set()
+        self._reloj_ocioso.stop()
+        self._cambiar_estado(PENSANDO, "Esperando tu permiso...")
+        self.aviso.emit(("¿Tomo una foto con la cámara?" if visto else camara.AVISO_PRIMERA_VEZ + "\n\n¿Tomo la foto?"))
+        self._poner_acciones([["autorizar", "Tomar la foto"], ["cancelar", "No"]])
+        self._decir("¿Tomo una foto con la cámara?")
+        self._permiso_reloj.start()
+
+    def _camara_aprobada(self, s) -> None:
+        if not self.cfg.get("camara_aviso", False):
+            self.cfg["camara_aviso"] = True
+            try:
+                config.guardar({"camara_aviso": True})
+            except OSError:
+                pass
+        self._camara_fotos.append(time.monotonic())
+        self._camara_pregunta = self._pregunta_id
+        self._camara_socket = s
+        self.cerebro.ocupado.set()
+        self.camara.emit(True)
+        self._cambiar_estado(VIENDO, "📷 Usando la cámara: una foto")
+        self.aviso.emit("📷 Miku está usando la cámara: una sola foto, que no se guarda.")
+        s.write(b'{"ok": true}\n')
+        s.flush()
+
+    def _activar_camara(self, confirmado: bool) -> None:
+        if not confirmado:
+            self._poner_acciones([["camara_si", "Sí, activar la cámara"], ["camara_no", "No"]])
+            self.aviso.emit(camara.AVISO_PRIMERA_VEZ)
+            return
+        try:
+            config.guardar({"camara": True, "camara_aviso": True})
+        except OSError as e:
+            self.aviso.emit(f"No pude guardar el ajuste ({e.strerror or e}).")
+            return
+        self.cfg["camara"] = self.cfg["camara_aviso"] = True
+        self._poner_acciones([])
+        self.aviso.emit("Listo: la cámara está activada. Pídeme otra vez que mire («Miku, mira el cuarto»).")
+
     def _permiso_cerrado(self, s) -> None:
         """La acción terminó (o se cayó): Claude sigue solo."""
+        if s is self._camara_socket:        # la foto terminó: la cámara ya no está en uso
+            self._camara_socket = None
+            self.camara.emit(False)
+            if self.estado_actual == VIENDO:
+                self._cambiar_estado(PENSANDO, "Pensando...")
         if s is self._permiso:              # se fue sin esperar respuesta
             self._permiso = None
+            self._permiso_camara = False
             self._permiso_reloj.stop()
             self._poner_acciones([])
         if self._permiso is None:
@@ -850,10 +959,19 @@ class Asistente(QObject):
         """Un botón del globo. Activar Claude: lo instala y abre su terminal para entrar con tu cuenta. Iniciar sesión: abre esa terminal.
         Autorizar / Autorizar todo / Cancelar: la respuesta a una acción que pidió permiso («Autorizar todo» vale
         hasta cerrar a Miku)."""
+        if id_accion == "autorizar_todo" and self._permiso_camara:
+            id_accion = "autorizar"             # la cámara nunca entra en «Autorizar todo»: cada foto, su clic
         if id_accion == "autorizar_todo":
             # Hasta cerrar a Miku (Super+O): al volver a abrirla pregunta otra vez.
             self._autorizar_todo = True
             self._responder_permiso(True, "Autorizado todo hasta que me cierres: ya no te pregunto, pero te digo qué hago.")
+            return
+        if id_accion in ("activar_camara", "camara_si"):
+            self._activar_camara(id_accion == "camara_si")
+            return
+        if id_accion == "camara_no":
+            self._poner_acciones([])
+            self.aviso.emit("Va: la cámara sigue apagada.")
             return
         if id_accion in ("autorizar", "cancelar"):
             self._responder_permiso(id_accion == "autorizar", "" if id_accion == "autorizar" else "Cancelado: no hice nada.")

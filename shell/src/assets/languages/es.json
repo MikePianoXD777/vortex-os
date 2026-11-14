@@ -271,7 +271,9 @@
         "internet_title": "Miku con internet",
         "internet_desc": "Puede buscar en la web y leer páginas; cada vez te pide permiso",
         "platicadora_title": "Miku platica mientras juegas",
-        "platicadora_desc": "Cada rato se asoma a hablarte mientras juegas (sin abrir el micrófono) y, al terminar, se abre y te pregunta cómo te fue. Entre más cariño te tiene, más seguido"
+        "platicadora_desc": "Cada rato se asoma a hablarte mientras juegas (sin abrir el micrófono) y, al terminar, se abre y te pregunta cómo te fue. Entre más cariño te tiene, más seguido",
+        "camera_title": "Miku puede usar la cámara",
+        "camera_desc": "Cuando se lo pides («Miku, mira el cuarto»), toma UNA foto. La foto se manda a la IA que uses (Claude, por internet, o tu IA local), no se guarda y nunca graba video. Cada vez que la use verás un aviso"
       },
       "fps": {
         "title": "Contador de FPS en los juegos",
