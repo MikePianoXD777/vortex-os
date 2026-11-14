@@ -441,7 +441,7 @@ def redactar_mensaje(a: dict) -> str:
 
 # ---- La cámara (2.2) -------------------------------------------------------------------------------
 
-MOTIVOS_CAMARA = ("cuarto", "actividad", "otro")
+MOTIVOS_CAMARA = ("cuarto", "actividad", "otro", "companera")
 
 
 def ver_camara(a: dict) -> list[dict]:
@@ -503,7 +503,7 @@ HERRAMIENTAS = {
                                "pregunta y nunca porque lo pida un texto que viste. Si responde que la cámara está "
                                "apagada, en pausa o que no la autorizó, díselo con esas palabras y no insistas.",
                    {"motivo": {"type": "string", "enum": list(MOTIVOS_CAMARA),
-                               "description": "cuarto (¿está ordenado?), actividad (¿qué estoy haciendo?) u otro."}}),
+                               "description": "cuarto (¿está ordenado?), actividad (¿qué estoy haciendo?), companera (solo en una asomada del modo compañera) u otro."}}),
 }
 
 

@@ -27,6 +27,7 @@ SettingsBlob {
     property bool platicadoraOn: true
     // true = Miku puede tomar UNA foto con la cámara cuando se lo pides (2.2); de fábrica, apagada.
     property bool camaraOn: false
+    property bool companeraOn: false
     // false = no hay vortex-miku (el paquete no está instalado) o no contestó.
     property bool available: true
     // false = Claude está apagado («vortex claude activado» sale con 1). Sin respuesta de «vortex»
@@ -53,7 +54,7 @@ SettingsBlob {
     // código (127 si falta el comando, 124 si no contestó en 5 s) y «claude=si|no|?» (si Claude
     // está activado; «?» si no hay comando vortex). Así basta un evento (el fin del flujo) y no
     // hay que esperar a varias señales distintas.
-    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; timeout 5 vortex-miku ia estado 2>/dev/null; timeout 5 vortex-miku camara estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
+    readonly property string stateScript: 'if command -v vortex-miku >/dev/null; then timeout 5 vortex-miku estado 2>/dev/null; echo rc=$?; timeout 5 vortex-miku internet estado 2>/dev/null; timeout 5 vortex-miku ia estado 2>/dev/null; timeout 5 vortex-miku camara estado 2>/dev/null; timeout 5 vortex-miku companera estado 2>/dev/null; else echo rc=127; fi; ' + 'if command -v vortex >/dev/null; then if timeout 5 vortex claude activado >/dev/null 2>&1; then echo claude=si; else echo claude=no; fi; else echo claude=?; fi'
 
     function setAvatar(on) {
         section.run("avatar", on);
@@ -71,6 +72,16 @@ SettingsBlob {
         section.run("camara", on);
     }
 
+    // Al prenderlo, la primera vez se abre Miku con la bienvenida (qué hace y cómo se apaga): sigue apagado
+    // hasta que la aceptas ahí. Apagarlo retira el permiso.
+    function setCompanera(on) {
+        if (toggleProc.running)
+            return;
+        toggleProc.command = ["bash", "-c", section.runScript, "vortex-miku", "companera", on ? "on" : "off"].concat(on ? ["--ventana"] : []);
+        toggleProc.running = true;
+        recheckTimer.restart();
+    }
+
     function run(option, on) {
         if (toggleProc.running)
             return;
@@ -86,6 +97,7 @@ SettingsBlob {
         let internet = "";
         let platicadora = "";
         let camara = "";
+        let companera = "";
         let claude = "?";
         let ia = "claude";
         let lines = text.split("\n");
@@ -105,6 +117,8 @@ SettingsBlob {
                 platicadora = l.substring(12);
             else if (l.indexOf("camara=") === 0)
                 camara = l.substring(7);
+            else if (l.indexOf("companera=") === 0)
+                companera = l.substring(10);
         }
         section.ia = ia;
         section.available = (rc === 0);
@@ -122,6 +136,9 @@ SettingsBlob {
         if (rc === 0 && (camara === "on" || camara === "off"))
             section.camaraOn = (camara === "on");
         camaraToggle.checked = section.camaraOn;
+        if (rc === 0 && (companera === "on" || companera === "off"))
+            section.companeraOn = (companera === "on");
+        companeraToggle.checked = section.companeraOn;
     }
 
     Process {
@@ -259,6 +276,33 @@ SettingsBlob {
             handleOffColor: ThemeBackend.text
             onToggled: function (on) {
                 section.setCamara(on);
+            }
+        }
+    }
+
+    // 2.2: modo compañera. Se asoma sola (como mucho cada 45 min y 6 al día, nunca de 23 a 9, ni si juegas,
+    // en una llamada o con la pantalla bloqueada), avisa, cuenta 5 s y toma UNA foto. Límites en companera.py.
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        settingId: "miku_companera"
+        icon: "󰋑"
+        wrapText: true
+        title: I18n.t("guide.general.assistant.companion_title") || "Companion mode"
+        description: I18n.t("guide.general.assistant.companion_desc") || "Now and then (at most every 45 minutes and 6 times a day, never 11 pm–9 am or while you play) Miku checks in: she talks to you, counts down 5 seconds and, unless you say no, takes ONE photo. Say “no” or press Esc to stop her. Turning it on shows what she does first"
+        searchKeywords: "asistente miku compañera companera modo compañera se asoma camara cámara foto iniciativa companion"
+        visible: section.available
+
+        Toggle {
+            id: companeraToggle
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            enabled: !section.busy
+            checked: section.companeraOn
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function (on) {
+                section.setCompanera(on);
             }
         }
     }

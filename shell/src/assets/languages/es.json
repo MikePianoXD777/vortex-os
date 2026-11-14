@@ -273,7 +273,9 @@
         "platicadora_title": "Miku platica mientras juegas",
         "platicadora_desc": "Cada rato se asoma a hablarte mientras juegas (sin abrir el micrófono) y, al terminar, se abre y te pregunta cómo te fue. Entre más cariño te tiene, más seguido",
         "camera_title": "Miku puede usar la cámara",
-        "camera_desc": "Cuando se lo pides («Miku, mira el cuarto»), toma UNA foto. La foto se manda a la IA que uses (Claude, por internet, o tu IA local), no se guarda y nunca graba video. Cada vez que la use verás un aviso"
+        "camera_desc": "Cuando se lo pides («Miku, mira el cuarto»), toma UNA foto. La foto se manda a la IA que uses (Claude, por internet, o tu IA local), no se guarda y nunca graba video. Cada vez que la use verás un aviso",
+        "companion_title": "Modo compañera",
+        "companion_desc": "De vez en cuando (como mucho cada 45 minutos y 6 veces al día, nunca de 23:00 a 9:00 ni mientras juegas) Miku se asoma: te habla, cuenta 5 segundos y, si no le dices que no, toma UNA foto. Di «no» o pulsa Esc para que no. Al prenderlo primero te explica qué hace"
       },
       "fps": {
         "title": "Contador de FPS en los juegos",

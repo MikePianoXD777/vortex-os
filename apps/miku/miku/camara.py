@@ -54,6 +54,10 @@ GUIAS = {
         "Es la foto que la persona te pidió para que le digas qué está haciendo. Descríbelo en una o dos frases "
         "cortas y amables (por ejemplo: «estás en la compu con los audífonos puestos»)."),
     "otro": "Es la foto que la persona te pidió. Contesta lo que te preguntó, corto y amable.",
+    "companera": (
+        "Es la foto de tu asomada en el modo compañera (la persona lo activó y no dijo que no). Dile en una o dos "
+        "frases cálidas qué ves que está haciendo, sin juzgar; si parece llevar mucho en la compu, sugiérele una "
+        "pausa, agua o estirarse. No le reclames nada ni le preguntes con quién estaba."),
 }
 REGLAS = (
     " Reglas: no identifiques a nadie por su cara ni digas quién es; no adivines edad, estado de ánimo, salud ni "
