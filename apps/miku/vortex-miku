@@ -30,11 +30,12 @@
   vortex-miku camara on|off|estado  que Miku pueda tomar UNA foto con la webcam cuando se lo pides («mira el
                                     cuarto», «¿qué estoy haciendo?»); apagada de fábrica. La foto se manda a
                                     la IA que uses, no se guarda y nunca graba video
-  vortex-miku companera on|off|estado|acepto|tono|sin-cuenta|bitacora|borrar-bitacora
+  vortex-miku companera on|off|estado|tono|sin-cuenta|bitacora|borrar-bitacora
                                     modo compañera: se asoma sola (cada 45 min como mucho, 6 al día, nunca de
                                     23 a 9 ni si juegas), avisa, cuenta 5 s y toma UNA foto; apagado de fábrica.
                                     «tono carinosa|suave»: contenta de verte y juguetona (de fábrica) o tranquila;
-                                    «sin-cuenta on --soy-mayor|off»: se asoma sin la cuenta atrás (+18)
+                                    «sin-cuenta on|off»: se asoma sin la cuenta atrás (+18). «on» y «sin-cuenta
+                                    on» abren la ventana de Miku: el permiso solo se da ahí, con su botón
   vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas, o que
                                     quiere decirte algo); nunca mientras juegas o estás en una llamada
 
@@ -1073,11 +1074,21 @@ def orden_sentimientos(args: list[str]) -> int:
     return 0
 
 
+def _desde_ia() -> bool:
+    """¿Lo corrió la IA de Miku (correr_comando)? Entonces no puede cambiar la cámara ni el modo compañera."""
+    return os.environ.get("VORTEX_MIKU_DESDE_IA") == "1"
+
+
+NO_DESDE_IA = ("eso solo lo cambia la persona (en la ventana de Miku o en Ajustes), no un comando que corre la IA.")
+
+
 def orden_camara(args: list[str]) -> int:
     """2.2: que Miku pueda tomar UNA foto con la webcam cuando se lo pides (apagada de fábrica)."""
     if not args or args[0] == "estado":
         print(f"camara={'on' if config.cargar()['camara'] else 'off'}")
         return 0
+    if _desde_ia():
+        return error(NO_DESDE_IA)
     if len(args) != 1 or args[0].lower() not in _SI_NO:
         return error("uso: vortex-miku camara on|off|estado", 2)
     nuevo = _SI_NO[args[0].lower()]
@@ -1107,24 +1118,23 @@ def orden_companera(args: list[str]) -> int:
             motivo = companera.motivo_para_no(cfg, ocupado=corazon.ocupado)
             print(f"ahora={motivo or 'puede-asomarse'}")
         return 0
+    if sub not in ("bitacora", "bitácora") and _desde_ia():
+        return error(NO_DESDE_IA)
     try:
-        if sub in ("on", "si", "sí", "1", "true"):
+        if sub in ("on", "si", "sí", "1", "true", "acepto", "aceptar"):
             if not cfg["companera_consentimiento"]:
+                # El permiso SOLO se da en la ventana de Miku (con su botón): ningún comando lo da, para que nada
+                # lo active sin que la persona vea la bienvenida.
                 print(companera.CONSENTIMIENTO)
-                print("\nPara aceptarlo: vortex-miku companera acepto")
-                if "--ventana" in args[1:]:          # desde Ajustes: la bienvenida sale en la ventana de Miku
-                    with Candado():
-                        if pid_abierta():
-                            print("Miku ya está abierta: acéptalo con «vortex-miku companera acepto».")
-                        else:
-                            lanzar({"VORTEX_MIKU_COMPANERA": "consentimiento"})
+                print("\nSe acepta en la ventana de Miku, con el botón «Sí, activar el modo compañera».")
+                with Candado():
+                    if pid_abierta():
+                        print("Miku ya está abierta: ciérrala y vuelve a correr «vortex-miku companera on».")
+                    else:
+                        lanzar({"VORTEX_MIKU_COMPANERA": "consentimiento"})
                 print("companera=off")
                 return 0
             config.guardar({"companera": True, "camara": True, "camara_aviso": True})
-        elif sub in ("acepto", "aceptar"):
-            config.guardar({"companera": True, "companera_consentimiento": True, "camara": True,
-                            "camara_aviso": True})
-            companera.anotar("Modo compañera activado (aceptaste en la terminal)")
         elif sub in ("off", "no", "0", "false"):
             # Apagarlo también retira el permiso: para volver a prenderlo se acepta otra vez la bienvenida.
             config.guardar(companera.APAGADO)
@@ -1139,22 +1149,18 @@ def orden_companera(args: list[str]) -> int:
                 print("sin_cuenta=off")
                 return 0
             if valor not in ("on", "si", "sí", "1", "true"):
-                return error("uso: vortex-miku companera sin-cuenta on --soy-mayor | off", 2)
+                return error("uso: vortex-miku companera sin-cuenta on|off", 2)
             if not (cfg["companera"] and cfg["companera_consentimiento"]):
                 return error("primero activa el modo compañera (vortex-miku companera on).")
-            if "--soy-mayor" not in args[2:]:
-                print(companera.TEXTO_SIN_CUENTA)
-                print("\nPara marcarla confirma que eres mayor de 18 años: "
-                      "vortex-miku companera sin-cuenta on --soy-mayor")
-                if "--ventana" in args[2:]:          # desde Ajustes: el paso de la mayoría de edad, en la ventana
-                    with Candado():
-                        if not pid_abierta():
-                            lanzar({"VORTEX_MIKU_COMPANERA": "mayoria"})
-                print("sin_cuenta=off")
-                return 0
-            config.guardar({"companera_sin_cuenta": True, "companera_mayor": True})
-            companera.anotar("Casilla «asomarse sin avisar» marcada (confirmó ser mayor de 18)")
-            print("sin_cuenta=on")
+            # «Soy mayor de 18 años» SOLO se confirma con el botón de la ventana de Miku: ningún comando la marca.
+            print(companera.TEXTO_SIN_CUENTA)
+            print("\nSe marca en la ventana de Miku, con el botón «Soy mayor de 18 años».")
+            with Candado():
+                if pid_abierta():
+                    print("Miku ya está abierta: ciérrala y vuelve a correr «vortex-miku companera sin-cuenta on».")
+                else:
+                    lanzar({"VORTEX_MIKU_COMPANERA": "mayoria"})
+            print("sin_cuenta=off")
             return 0
         elif sub == "tono":
             elegido = (args[1].lower() if len(args) > 1 else "").replace("ñ", "n")
@@ -1172,7 +1178,7 @@ def orden_companera(args: list[str]) -> int:
             print("Bitácora borrada.")
             return 0
         else:
-            return error("uso: vortex-miku companera on|off|estado|acepto|tono|sin-cuenta|bitacora|borrar-bitacora", 2)
+            return error("uso: vortex-miku companera on|off|estado|tono|sin-cuenta|bitacora|borrar-bitacora", 2)
     except OSError as e:
         return error(f"no pude guardar {rutas.CONFIG}: {e}")
     print("companera=on")

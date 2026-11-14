@@ -171,6 +171,7 @@ class Asistente(QObject):
         self._titulo_descarga = ""
         self._bajando_ia = False
         self._claude_ok = False          # ¿Claude está activado, instalado y con sesión? (se comprueba al abrir)
+        self._botones_vigentes: set[str] = set()   # los ids de los botones que se ven ahora (accion() solo acepta esos)
         self.acciones_visibles = False   # hay un botón (Activar Claude / Iniciar sesión) esperando a la persona
         # Cierre automático del panel de solo voz
         self._reloj_ocioso = QTimer(self)
@@ -991,6 +992,7 @@ class Asistente(QObject):
         s.deleteLater()
 
     def _poner_acciones(self, botones: list) -> None:
+        self._botones_vigentes = {str(b[0]) for b in botones if b}
         self.acciones_visibles = bool(botones)
         self.acciones.emit(botones)
 
@@ -1000,6 +1002,8 @@ class Asistente(QObject):
         hasta cerrar a Miku)."""
         if id_accion == "autorizar_todo" and self._permiso_camara:
             id_accion = "autorizar"             # la cámara nunca entra en «Autorizar todo»: cada foto, su clic
+        if id_accion not in self._botones_vigentes:
+            return                              # solo vale el botón que la persona tiene enfrente
         if id_accion == "autorizar_todo":
             # Hasta cerrar a Miku (Super+O): al volver a abrirla pregunta otra vez.
             self._autorizar_todo = True

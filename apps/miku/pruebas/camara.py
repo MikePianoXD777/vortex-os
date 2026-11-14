@@ -87,9 +87,12 @@ def temporales_vivos() -> list:
 def parte_modulo() -> None:
     from miku import camara
     print("== camara.py con el ffmpeg falso")
-    for frase in ("Miku, mira el cuarto", "¿qué estoy haciendo?", "¿está ordenado mi cuarto?", "usa la cámara", "mírame"):
+    for frase in ("Miku, mira el cuarto", "¿qué estoy haciendo?", "¿está ordenado mi cuarto?", "usa la cámara", "mírame",
+                  "¿me ves por la cámara?", "échale un ojo al cuarto", "checa con la webcam si ya tendí la cama",
+                  "toma una foto con la cámara"):
         probar(f"«{frase}» suena a pedir la cámara", camara.pidio_camara(frase))
-    for frase in ("¿qué hora es?", "pon música", "abre el navegador", ""):
+    for frase in ("¿qué hora es?", "pon música", "abre el navegador", "", "mi cámara no sirve", "la webcam",
+                  "¿cuánto cuesta una cámara?", "compré una webcam nueva"):
         probar(f"«{frase}» no", not camara.pidio_camara(frase))
 
     foto = camara.tomar_foto()

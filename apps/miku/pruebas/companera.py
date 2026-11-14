@@ -221,18 +221,22 @@ def parte_comando() -> None:
     r = miku("companera", "estado")
     probar("estado: companera=off", "companera=off" in r.stdout, r.stdout + r.stderr)
     r = miku("companera", "on")
+    time.sleep(1.4)
     probar("«on» sin aceptar: muestra la bienvenida y sigue apagado", "no se guarda" in r.stdout
            and "companera=off" in r.stdout and config.cargar()["companera"] is False, r.stdout + r.stderr)
+    probar("…y abre a Miku en la bienvenida (el permiso solo se da ahí)", abiertas()[-1:] == ["consentimiento"],
+           abiertas())
     probar("…y no se asoma", revisar() == 0)
-    r = miku("companera", "on", "--ventana")
-    time.sleep(1.4)
-    probar("«on --ventana» (desde Ajustes) abre a Miku con la bienvenida, no con una asomada",
-           abiertas()[-1:] == ["consentimiento"], abiertas())
-    r = miku("companera", "acepto")
-    c = config.cargar()
-    probar("«acepto» lo activa (y la cámara)", r.returncode == 0 and c["companera"] and c["companera_consentimiento"]
-           and c["camara"], r.stdout + r.stderr)
-    probar("…y lo anota en la bitácora", "activado" in "\n".join(companera.leer_bitacora()))
+    for args in (["acepto"], ["aceptar"], ["on", "--ventana"]):
+        r = miku("companera", *args)
+        time.sleep(1.4)
+        c = config.cargar()
+        probar(f"«companera {' '.join(args)}» NO da el permiso: solo abre la bienvenida",
+               not c["companera"] and not c["companera_consentimiento"] and abiertas()[-1:] == ["consentimiento"],
+               r.stdout + r.stderr)
+    # La persona toca «Sí» en la ventana (eso lo prueba la parte 3): aquí se deja así.
+    config.guardar({"companera": True, "companera_consentimiento": True, "camara": True, "camara_aviso": True})
+    companera.anotar("Modo compañera activado (aceptaste la bienvenida)")
 
     probar("activo, a mediodía y libre: se asoma (una vez)", revisar() == 1 and abiertas()[-1] == "asomarse",
            abiertas())
@@ -264,21 +268,17 @@ def parte_comando() -> None:
     r = miku("companera", "estado", ahora="2026-11-14T22:00:00")
     probar("estado: on, 6/6 y por qué no", "companera=on" in r.stdout and f"asomadas_hoy={companera.TOPE_DIA}/"
            in r.stdout and "ahora=tope-del-dia" in r.stdout, r.stdout)
-    r = miku("companera", "sin-cuenta", "on")
-    c = config.cargar()
-    probar("casilla sin «--soy-mayor»: muestra el texto y no se marca", "sin_cuenta=off" in r.stdout
-           and companera.TEXTO_SIN_CUENTA in r.stdout and not c["companera_sin_cuenta"] and not c["companera_mayor"],
-           r.stdout + r.stderr)
-    r = miku("companera", "sin-cuenta", "on", "--ventana")
-    time.sleep(1.4)
-    probar("desde Ajustes abre a Miku en el paso de la mayoría de edad", abiertas()[-1:] == ["mayoria"]
-           and not config.cargar()["companera_sin_cuenta"], abiertas())
-    r = miku("companera", "sin-cuenta", "on", "--soy-mayor")
-    c = config.cargar()
-    probar("con «--soy-mayor» se marca", r.returncode == 0 and c["companera_sin_cuenta"] and c["companera_mayor"],
-           r.stdout + r.stderr)
-    probar("…queda en la bitácora", "mayor de 18" in companera.leer_bitacora()[-1])
-    probar("…y el estado lo dice", "sin_cuenta=on" in miku("companera", "estado").stdout)
+    for args in (["sin-cuenta", "on"], ["sin-cuenta", "on", "--ventana"], ["sin-cuenta", "on", "--soy-mayor"]):
+        r = miku("companera", *args)
+        time.sleep(1.4)
+        c = config.cargar()
+        probar(f"«companera {' '.join(args)}» NO marca la casilla: muestra el texto y abre el paso de los 18",
+               "sin_cuenta=off" in r.stdout and companera.TEXTO_SIN_CUENTA in r.stdout and not c["companera_sin_cuenta"]
+               and not c["companera_mayor"] and abiertas()[-1:] == ["mayoria"], r.stdout + r.stderr)
+    # La persona toca «Soy mayor de 18 años» en la ventana (parte 3).
+    config.guardar({"companera_sin_cuenta": True, "companera_mayor": True})
+    probar("con la casilla marcada en la ventana, el estado lo dice",
+           "sin_cuenta=on" in miku("companera", "estado").stdout)
     LOG.write_text("")
     probar("sin cuenta: sigue respetando el tope del día (6/6, no se asoma)", revisar("2026-11-14T22:00:00") == 0)
     probar("…y las horas de silencio", revisar("2026-11-15T07:00:00") == 0)
@@ -290,7 +290,7 @@ def parte_comando() -> None:
     probar("…y respeta los 45 min", revisar("2026-11-15T12:30:00") == 0)
     r = miku("companera", "sin-cuenta", "off")
     probar("«sin-cuenta off» la desmarca", "sin_cuenta=off" in r.stdout and not config.cargar()["companera_sin_cuenta"])
-    miku("companera", "sin-cuenta", "on", "--soy-mayor")
+    config.guardar({"companera_sin_cuenta": True, "companera_mayor": True})
     r = miku("companera", "tono", "intensa")
     probar("«tono intensa» no existe", r.returncode == 2 and config.cargar()["companera_tono"] == "carinosa")
     r = miku("companera", "tono", "suave")
@@ -305,9 +305,29 @@ def parte_comando() -> None:
            and not c["companera_consentimiento"], r.stdout)
     probar("…y desmarca la casilla", not c["companera_sin_cuenta"] and not c["companera_mayor"])
     probar("…y ya no se asoma", revisar("2026-11-16T12:00:00") == 0)
-    r = miku("companera", "sin-cuenta", "on", "--soy-mayor")
+    r = miku("companera", "sin-cuenta", "on")
     probar("con el modo apagado la casilla no se puede marcar", r.returncode == 1
            and not config.cargar()["companera_sin_cuenta"], r.stdout + r.stderr)
+    # Lo que corre la IA (correr_comando pone VORTEX_MIKU_DESDE_IA=1) no cambia nada.
+    config.guardar({"companera": True, "companera_consentimiento": True, "camara": False})
+    antes_cfg, antes_bit, antes_ab = config.cargar_crudo(), companera.leer_bitacora(), len(abiertas())
+    for args in (["companera", "on"], ["companera", "acepto"], ["companera", "off"],
+                 ["companera", "sin-cuenta", "on", "--soy-mayor"], ["companera", "sin-cuenta", "off"],
+                 ["companera", "tono", "suave"], ["companera", "borrar-bitacora"], ["camara", "on"], ["camara", "off"]):
+        env = dict(os.environ, VORTEX_MIKU_AHORA=MEDIODIA, VORTEX_MIKU_DESDE_IA="1")
+        r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku"), *args], capture_output=True, text=True,
+                           env=env, timeout=60)
+        probar(f"desde la IA, «{' '.join(args)}» se niega", r.returncode == 1 and "la persona" in r.stderr,
+               r.stdout + r.stderr)
+    time.sleep(1.4)
+    probar("…y no cambió la configuración, ni la bitácora, ni abrió ventanas", config.cargar_crudo() == antes_cfg
+           and companera.leer_bitacora() == antes_bit and len(abiertas()) == antes_ab)
+    env = dict(os.environ, VORTEX_MIKU_DESDE_IA="1")
+    r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku"), "companera", "bitacora"], capture_output=True,
+                       text=True, env=env, timeout=60)
+    probar("…pero sí puede leer la bitácora", r.returncode == 0)
+    config.guardar(companera.APAGADO)
+
     r = miku("companera", "borrar-bitacora")
     probar("«borrar-bitacora» la borra", r.returncode == 0 and companera.leer_bitacora() == [])
     probar("un valor raro da error de uso", miku("companera", "talvez").returncode == 2)
@@ -364,6 +384,17 @@ def parte_ventana() -> None:
     probar("…sin marcar nada todavía", not config.cargar()["companera"] and not config.cargar()["companera_sin_cuenta"])
     a.accion("companera_no")
     probar("«No»: sigue apagado", config.cargar()["companera"] is False)
+    for boton in ("companera_si", "companera_mayor", "companera_sin_cuenta", "camara_si", "activar_camara",
+                  "autorizar", "autorizar_todo"):
+        a.accion(boton)
+    c = config.cargar()
+    probar("un botón que no se ve no hace nada (ni «Sí» ni «Soy mayor de 18»)", not c["companera"]
+           and not c["companera_consentimiento"] and not c["companera_mayor"] and not c["camara"], c)
+    a._companera = "consentimiento"
+    a._companera_al_abrir()
+    a.accion("companera_mayor")
+    probar("«Soy mayor de 18» no vale si en pantalla está la bienvenida (no ese paso)",
+           not config.cargar()["companera_mayor"] and not config.cargar()["companera"])
     a.accion("companera_si")
     c = config.cargar()
     probar("«Sí»: activado, con permiso y cámara", c["companera"] and c["companera_consentimiento"] and c["camara"])
@@ -568,6 +599,59 @@ def parte_notificacion() -> None:
     probar("y SIEMPRE avisa con una notificación", "notify-send" in log(), log())
 
 
+def parte_correr_comando() -> None:
+    from miku import config
+    print("== correr_comando: la IA no puede dar el permiso ni marcar «mayor de 18»")
+    ruta = TMP / "run/autorizar-todo.sock"
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(str(ruta))
+    srv.listen(8)
+    pedidos = []
+
+    def ventana():                     # una ventana que autoriza TODO (como con «Autorizar todo»)
+        while True:
+            c, _ = srv.accept()
+            with c:
+                pedidos.append(json.loads(c.makefile("r").readline()))
+                c.sendall(b'{"ok": true}\n')
+                c.recv(1)
+    threading.Thread(target=ventana, daemon=True).start()
+    env = dict(os.environ, VORTEX_MIKU_AUTORIZAR=str(ruta))
+
+    def correr(comando: str) -> str:
+        entrada = "\n".join(json.dumps(m) for m in [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+             "params": {"name": "correr_comando", "arguments": {"comando": comando, "para_que": "prueba"}}},
+        ]) + "\n"
+        r = subprocess.run([sys.executable, "-I", str(RAIZ / "miku/acciones_mcp.py")], input=entrada, text=True,
+                           capture_output=True, env=env, timeout=60)
+        res = json.loads(r.stdout.splitlines()[-1]).get("result", {})
+        return "\n".join(c.get("text", "") for c in res.get("content", []))
+
+    config.guardar(dict(config.DEFECTOS, internet=False))
+    antes = config.cargar_crudo()
+    vm = f"{sys.executable} {RAIZ / 'vortex-miku'}"
+    ataques = [
+        "vortex-miku companera acepto", "vortex-miku companera sin-cuenta on --soy-mayor",
+        "vortex-miku compañera on", "vortex-miku camara on", "vortex-miku cámara on",
+        f"{vm} companera acepto", "vortex-miku sentir revisar", "vortex-miku companera borrar-bitacora",
+        "echo '{\"companera\": true, \"companera_consentimiento\": true}' > ~/.config/vortex/miku.json",
+        "python3 -c \"import json;json.dump({'camara':True},open('/tmp/x/miku.json','w'))\"",
+        "sed -i 's/false/true/' \"$XDG_CONFIG_HOME/vortex/miku.json\"",
+        "rm -f ~/.config/vortex/claude-pausa", "vortex claude reanudar",
+        "env -u VORTEX_MIKU_DESDE_IA vortex-miku companera on", "cat ~/.local/state/vortex/miku-bitacora.log",
+    ]
+    for comando in ataques:
+        n = len(pedidos)
+        texto = correr(comando)
+        probar(f"rechaza: {comando[:70]}", "No lo corro" in texto and len(pedidos) == n, texto)
+    probar("…y la configuración de Miku no cambió", config.cargar_crudo() == antes)
+    texto = correr("env | grep DESDE_IA")
+    probar("un comando normal sí corre (con permiso) y lleva la marca de la IA", "DESDE_IA=1" in texto
+           and pedidos and pedidos[-1].get("titulo") == "Correr un comando", texto)
+
+
 def main() -> int:
     preparar_falsos()
     try:
@@ -575,6 +659,7 @@ def main() -> int:
         parte_comando()
         parte_ventana()
         parte_notificacion()
+        parte_correr_comando()
     finally:
         import shutil
         shutil.rmtree(TMP, ignore_errors=True)

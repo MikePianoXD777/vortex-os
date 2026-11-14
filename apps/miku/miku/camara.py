@@ -35,13 +35,20 @@ AVISO_PRIMERA_VEZ = (
 )
 
 # Lo que suena a pedirle que mire con la cámara. Si la frase no coincide, la ventana pregunta antes.
+# Frases que ya traen el pedido (verbo + qué mirar). Las palabras «cámara» o «webcam» solas NO bastan
+# («mi cámara no sirve»): necesitan además un verbo de mirar o usarla (_VERBO).
 _INTENCION = re.compile(
-    r"\b(c[aá]mara|webcam|m[ií]rame|m[ií]ralo|mira(?:r)?\s+(?:el|mi|este|esta|la|como|cómo)\s+"
+    r"\b(m[ií]rame|m[ií]ralo|[eé]chale\s+un\s+ojo|mira(?:r)?\s+(?:el|mi|este|esta|la|como|cómo)\s+"
     r"(?:cuarto|recamara|recámara|habitaci[oó]n|escritorio|mesa|cama|alrededor|cosas|tiradero)|"
     r"(?:qu[eé]|que)\s+(?:estoy|ando)\s+haciendo|"
     r"c[oó]mo\s+(?:est[aá]|ves|qued[oó])\s+(?:el|mi)\s+(?:cuarto|recamara|recámara|habitaci[oó]n|escritorio)|"
     r"(?:est[aá]|qued[oó])\s+(?:ordenad[oa]|desordenad[oa]|limpi[oa]|recogid[oa])|"
     r"me\s+ves|puedes\s+verme|ve\s+(?:el|mi)\s+(?:cuarto|escritorio))",
+    re.IGNORECASE)
+_CAMARA = re.compile(r"\b(c[aá]mara|webcam)\b", re.IGNORECASE)
+_VERBO = re.compile(
+    r"\b(mira|m[ií]rame|mirar|ve|ves|ver|verme|veas|checa|checar|revisa|f[ií]jate|usa|usar|prende|enciende|"
+    r"toma|t[oó]mame|tomar|saca|s[aá]came|as[oó]mate|[eé]chale\s+un\s+ojo)\b",
     re.IGNORECASE)
 
 GUIAS = {
@@ -77,7 +84,9 @@ def guia(motivo: str) -> str:
 
 def pidio_camara(texto: str) -> bool:
     """¿La frase de la persona suena a pedirle que mire con la cámara?"""
-    return bool(texto and _INTENCION.search(texto))
+    if not texto:
+        return False
+    return bool(_INTENCION.search(texto) or (_CAMARA.search(texto) and _VERBO.search(texto)))
 
 
 def pausado() -> bool:
