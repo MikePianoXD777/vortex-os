@@ -270,7 +270,17 @@
         "internet_title": "Miku with internet",
         "internet_desc": "She can search the web and read pages; each time she asks for your permission",
         "platicadora_title": "Miku chats while you play",
-        "platicadora_desc": "Every so often she pops up to talk to you while you play (without opening the microphone) and, when you finish, she opens and asks how it went. The fonder she is of you, the more often"
+        "platicadora_desc": "Every so often she pops up to talk to you while you play (without opening the microphone) and, when you finish, she opens and asks how it went. The fonder she is of you, the more often",
+        "camera_title": "Miku can use the camera",
+        "camera_desc": "When you ask (“Miku, look at my room”), she takes ONE photo. The photo is sent to the AI you use (Claude over the internet, or your local AI), it is not saved and she never records video. You will see a notice every time",
+        "companion_title": "Companion mode",
+        "companion_desc": "Now and then (at most every 45 minutes and 6 times a day, never 11 pm–9 am or while you play) Miku checks in: she talks to you, counts down 5 seconds and, unless you say no, takes ONE photo. Say “no” or press Esc to stop her. Turning it on shows what she does first",
+        "companion_nocount_title": "Let Miku check in without warning me first",
+        "companion_nocount_desc": "Over 18 only. Miku will be able to take a photo of the room at any moment in companion mode, with no countdown. You will see the indicator and a notification for every photo, and it stays in the log",
+        "companion_tone_title": "Miku's tone",
+        "companion_tone_desc": "Affectionate: happy to see you and playful. Gentle: calm and brief",
+        "tone_affectionate": "Affectionate",
+        "tone_gentle": "Gentle"
       },
       "fps": {
         "title": "FPS counter in games",

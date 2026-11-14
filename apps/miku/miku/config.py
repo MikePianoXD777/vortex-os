@@ -25,6 +25,13 @@ DEFECTOS = {
     "voz_natural_auto": True,       # Miku instala sola la voz natural si la PC aguanta («natural quitar» lo apaga)
     "sentimientos": True,           # ánimo, cariño, recuerdos y sonrojo (corazon.py, en Documentos/Miku)
     "habla_sola": True,             # a veces te dice algo sola (tras una partida, si te desvelas); nunca mientras juegas
+    "camara": False,                # 2.2: Miku puede tomar UNA foto con la webcam cuando se lo pides (apagada de fábrica)
+    "camara_aviso": False,          # ya vio el aviso de qué pasa con la foto (se dice la primera vez)
+    "companera": False,             # 2.2: modo compañera, se asoma sola con cuenta atrás (companera.py); apagado de fábrica
+    "companera_tono": "carinosa",   # carinosa (contenta de verte, juguetona) o suave; nunca celos (companera.py)
+    "companera_consentimiento": False,
+    "companera_sin_cuenta": False,  # la casilla «asomarse sin avisarme antes» (solo quita la cuenta atrás)
+    "companera_mayor": False,       # confirmó «Soy mayor de 18 años» al marcar esa casilla  # aceptó la pantalla de bienvenida del modo compañera
     "platicadora": True,            # mientras juegas se asoma a hablarte (sin micrófono) y al terminar te pregunta
                                     # cómo te fue; entre más cariño, más seguido (Ajustes → General → Asistente)
 }
@@ -60,8 +67,17 @@ def cargar(ruta: Path | None = None) -> dict:
     cfg["sentimientos"] = _como_bool(crudo.get("sentimientos"), DEFECTOS["sentimientos"])
     cfg["habla_sola"] = _como_bool(crudo.get("habla_sola"), DEFECTOS["habla_sola"])
     cfg["platicadora"] = _como_bool(crudo.get("platicadora"), DEFECTOS["platicadora"])
+    cfg["camara"] = _como_bool(crudo.get("camara"), DEFECTOS["camara"])
+    cfg["camara_aviso"] = _como_bool(crudo.get("camara_aviso"), DEFECTOS["camara_aviso"])
+    cfg["companera"] = _como_bool(crudo.get("companera"), DEFECTOS["companera"])
+    cfg["companera_sin_cuenta"] = _como_bool(crudo.get("companera_sin_cuenta"), False)
+    cfg["companera_mayor"] = _como_bool(crudo.get("companera_mayor"), False)
+    cfg["companera_consentimiento"] = _como_bool(crudo.get("companera_consentimiento"),
+                                                 DEFECTOS["companera_consentimiento"])
     # Sin «internet» en miku.json manda la casilla del instalador (la marca de vortex-miku-internet).
     cfg["internet"] = _como_bool(crudo.get("internet"), rutas.MARCA_INTERNET.is_file())
+    if crudo.get("companera_tono") in ("carinosa", "suave"):
+        cfg["companera_tono"] = crudo["companera_tono"]
     if crudo.get("ia") in IAS:
         cfg["ia"] = crudo["ia"]
     for clave in ("voz", "modelo", "elevenlabs_voz", "elevenlabs_modelo", "ia_url", "ia_modelo"):

@@ -9,6 +9,7 @@ sin red lo dice y sigue funcionando por texto. Claude viene apagado en Vortexine
 no hay sesión, el globo lo dice y ofrece un botón (Activar Claude / Iniciar sesión).
 """
 
+import collections
 import json
 import os
 import re
@@ -16,13 +17,14 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 from PySide6.QtNetwork import QLocalServer
 
 from . import cerebro as modulo_cerebro
-from . import cerebro_abierto, config, corazon, descargas, elevenlabs, ia, oido, rutas, voces
+from . import camara, cerebro_abierto, companera, config, corazon, descargas, elevenlabs, ia, oido, rutas, voces
 
 # Estados que la ventana muestra con su indicador.
 REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
@@ -30,6 +32,7 @@ REPOSO, ESCUCHANDO, TRANSCRIBIENDO, PENSANDO, VIENDO, HABLANDO = (
 
 PERMISO_SEG = 120              # cuánto espera una acción tu Autorizar antes de cancelarse sola
 CIERRE_PANEL_SEG = 20          # el panel de solo voz se cierra solo tras tanto tiempo sin que lo toquen
+CUENTA_ESPERA_MAX = 30         # modo compañera: segundos que la cuenta atrás espera a que termine de hablar
 VISITA_SEG = 6                 # tras asomarse mientras juegas, cuánto se queda después de hablar
 ESPERA_SEGUIMIENTO = 8.0       # tras contestar, cuánto escucha por si sigues hablando
 ESPERA_PRIMERA = 10.0          # al abrir, cuánto espera a que empieces a hablar
@@ -107,6 +110,7 @@ class Asistente(QObject):
     cerrar = Signal()                   # pide a la ventana que se cierre (el panel se cierra solo)
     progreso = Signal(str, str, float)  # (título, detalle, 0..1) de la descarga de los modelos; fracción < 0 = ya no hay
     acciones = Signal(object)           # botones bajo la respuesta: [[id, texto], ...] (vacía = ninguno)
+    camara = Signal(bool)               # 2.2: la cámara está en uso (una foto) — para el indicador de la ventana
 
     # Hilos → hilo principal.
     _texto_oido = Signal(object)        # str, "" si no se entendió, None si nadie habló
@@ -134,6 +138,16 @@ class Asistente(QObject):
         self._visita = os.environ.pop("VORTEX_MIKU_VISITA", "")
         self._visita_dicha = False
         self._pregunta_inicial = os.environ.pop("VORTEX_MIKU_PREGUNTA", "")
+        # Modo compañera (2.2), lo pone «vortex-miku»: «asomarse» = aviso + cuenta atrás + una foto;
+        # «consentimiento» = la pantalla de bienvenida al activarlo.
+        self._companera = os.environ.pop("VORTEX_MIKU_COMPANERA", "")
+        self._en_cuenta = False                   # la cuenta atrás antes de la foto está corriendo
+        self._cuenta = 0
+        self._cuenta_espera = 0
+        self._cuenta_oyendo = False
+        self._turno_companera = -1                # la pregunta (oculta) de la asomada: la única que puede usar su foto
+        self._cerrar_luego = False                # tras decir «va, no miro» se cierra sola
+        self._vio_bienvenida = False              # vio la bienvenida en esta ventana (para la casilla)
         self._voz_forzada = os.environ.pop("VORTEX_MIKU_VOZ", "") or None   # la visita con GPU chica: la ligera
         self._cerebro_listo = True       # ¿terminó Claude el turno actual?
         self._turno = 0                  # sube cada vez que se calla a Miku; descarta el audio de un turno viejo
@@ -157,6 +171,7 @@ class Asistente(QObject):
         self._titulo_descarga = ""
         self._bajando_ia = False
         self._claude_ok = False          # ¿Claude está activado, instalado y con sesión? (se comprueba al abrir)
+        self._botones_vigentes: set[str] = set()   # los ids de los botones que se ven ahora (accion() solo acepta esos)
         self.acciones_visibles = False   # hay un botón (Activar Claude / Iniciar sesión) esperando a la persona
         # Cierre automático del panel de solo voz
         self._reloj_ocioso = QTimer(self)
@@ -173,6 +188,16 @@ class Asistente(QObject):
         self._permiso_reloj.setSingleShot(True)
         self._permiso_reloj.setInterval(PERMISO_SEG * 1000)
         self._permiso_reloj.timeout.connect(lambda: self._responder_permiso(False, "Se acabó el tiempo; no hice nada."))
+        # 2.2: la cámara. Una foto por pregunta, camara.TOPE_POR_MINUTO por minuto, y solo en una pregunta tuya.
+        self._ultimo_texto = ""                   # lo último que dijiste (las frases que Miku dice sola no cuentan)
+        self._pregunta_tuya = False               # ¿la pregunta en curso es tuya?
+        self._camara_pregunta = -1                # la pregunta que ya usó su foto
+        self._camara_fotos: collections.deque = collections.deque()
+        self._permiso_camara = False              # el permiso que espera es el de la cámara
+        self._camara_socket = None                # la foto en curso (mientras siga abierta, la cámara está en uso)
+        self._reloj_cuenta = QTimer(self)
+        self._reloj_cuenta.setInterval(1000)
+        self._reloj_cuenta.timeout.connect(self._tic_cuenta)
         self._servidor_permiso = QLocalServer(self)
         ruta_permiso = str(rutas.temporales() / "autorizar.sock")
         QLocalServer.removeServer(ruta_permiso)
@@ -211,6 +236,8 @@ class Asistente(QObject):
     def iniciar(self) -> None:
         """Al abrir: baja lo que falte (la primera vez), levanta la voz y se pone a escuchar enseguida."""
         self._emitir_afecto()
+        if self._companera == "consentimiento":
+            QTimer.singleShot(0, self._companera_al_abrir)
         if self._visita:                 # si la voz no carga a tiempo, la frase sale igual, solo en el globo
             QTimer.singleShot(40000, self._decir_visita)
         if descargas.pendientes():
@@ -318,6 +345,8 @@ class Asistente(QObject):
     def _escuchar_si_toca(self) -> None:
         """Se pone a escuchar si no está haciendo otra cosa ni hay un problema con Claude pendiente."""
         if self._visita:                 # mientras juegas no abre el micrófono (oiría el juego o tu Discord)
+            return
+        if self._companera or self._en_cuenta:   # la asomada abre el micrófono ella misma, tras el aviso
             return
         if self.estado_actual == REPOSO and self._cerebro_listo and not self.acciones_visibles and self._claude_ok:
             self.escuchar()
@@ -593,6 +622,9 @@ class Asistente(QObject):
             self._cambiar_estado(REPOSO, "")
             self._iniciar_reloj_ocioso()
             return
+        if not texto and self._en_cuenta:          # no dijo nada: la cuenta atrás sigue
+            self._cambiar_estado(REPOSO, self._texto_cuenta())
+            return
         if not texto:
             self._cambiar_estado(REPOSO, "No te escuché. Toca el micrófono o escríbeme." if texto is None else
                                  "No te entendí. Toca el micrófono o escríbeme.")
@@ -621,6 +653,13 @@ class Asistente(QObject):
         texto = texto.strip()
         if not texto or self._cerrado:
             return
+        if not oculto and self._en_cuenta:
+            self._terminar_cuenta()      # le hablaste durante la cuenta atrás: ya no hay foto
+            if companera.es_no(texto) and not companera.frase_de_control(texto):
+                self._cuenta_cancelada(texto)
+                return
+        if not oculto and self._controlar_companera(companera.frase_de_control(texto), texto):
+            return
         if self._hilo_oido is not None and self._hilo_oido.is_alive():
             self.oido.cancelar()
         self._reloj_ocioso.stop()
@@ -634,6 +673,8 @@ class Asistente(QObject):
         self._filtro = corazon.FiltroMarca()
         self._cerebro_listo = False
         self._ultimo_turno_con_error = False
+        self._ultimo_texto = "" if oculto else texto
+        self._pregunta_tuya = not oculto
         self.usuario.emit("" if oculto else texto)
         self.respuesta.emit("", False)
         self._cambiar_estado(PENSANDO, "Pensando...")
@@ -675,6 +716,9 @@ class Asistente(QObject):
     def _declararse_si_toca(self) -> bool:
         """Ella empieza a hablar (una vez por apertura): te avisó que quería decirte algo y abriste su ventana,
         o acabas de dejar de jugar y te pregunta cómo te fue. En una visita no (ahí no piensa: solo saluda)."""
+        if self._companera == "asomarse":
+            self._companera_al_abrir()
+            return True
         if getattr(self, "_ya_se_declaro_aqui", False) or not self.cfg.get("sentimientos", True) or self._visita:
             return self._visita != ""
         if self._pregunta_inicial:
@@ -738,7 +782,9 @@ class Asistente(QObject):
             if resto:
                 self._decir(resto)
             if tipo == "herramienta":
-                if str(datos.get("nombre", "")).startswith("mcp__miku__"):
+                if str(datos.get("nombre", "")).endswith("ver_camara"):
+                    self._cambiar_estado(VIENDO, "Por usar la cámara...")
+                elif str(datos.get("nombre", "")).startswith("mcp__miku__"):
                     self._cambiar_estado(PENSANDO, "Preparando...")
                 else:
                     self._cambiar_estado(VIENDO, "Mirando tu pantalla...")
@@ -801,7 +847,10 @@ class Asistente(QObject):
             m = json.loads(buf.split(b"\n", 1)[0])
             titulo, detalle = str(m.get("titulo", "")).strip(), str(m.get("detalle", "")).strip()
         except ValueError:
-            titulo = ""
+            m, titulo = {}, ""
+        if isinstance(m, dict) and m.get("tipo") == "camara":
+            self._pedir_camara(s)
+            return
         if not titulo or self._cerrado or self._permiso is not None:
             s.write(b'{"ok": false}\n')          # mal formado, o ya hay otra esperando: no
             s.flush()
@@ -821,9 +870,18 @@ class Asistente(QObject):
 
     def _responder_permiso(self, ok: bool, texto: str = "") -> None:
         s, self._permiso = self._permiso, None
+        es_camara, self._permiso_camara = self._permiso_camara, False
         self._permiso_reloj.stop()
         self._poner_acciones([])
         if s is None:
+            return
+        if es_camara:
+            if ok:
+                self._camara_aprobada(s)
+            else:
+                self._camara_no(s, "La persona no autorizó la foto. No la tomé; no insistas.")
+            if texto:
+                self.aviso.emit(texto)
             return
         s.write(b'{"ok": true}\n' if ok else b'{"ok": false}\n')
         s.flush()
@@ -832,10 +890,101 @@ class Asistente(QObject):
         if texto:
             self.aviso.emit(texto)
 
+    # ---- La cámara (2.2) -------------------------------------------------------------------------
+
+    def _camara_no(self, s, mensaje: str) -> None:
+        s.write((json.dumps({"ok": False, "mensaje": mensaje}, ensure_ascii=False) + "\n").encode())
+        s.flush()
+
+    def _pedir_camara(self, s) -> None:
+        """Una foto pedida por ver_camara. Aquí se decide; nada de «Autorizar todo» para la cámara."""
+        ahora = time.monotonic()
+        while self._camara_fotos and ahora - self._camara_fotos[0] > 60:
+            self._camara_fotos.popleft()
+        if self._cerrado or self._permiso is not None or self._camara_socket is not None:
+            return self._camara_no(s, "Ahora no puedo usar la cámara (hay otra cosa esperando). Pídemelo en un ratito.")
+        if camara.pausado():
+            return self._camara_no(s, "El acceso de Claude está en pausa, también la cámara: no tomé la foto. Se "
+                                      "reactiva con «vortex claude reanudar».")
+        disco = {}
+        try:                                 # se lee del disco: apagarla en Ajustes vale al instante, sin reabrir
+            disco = config.cargar()
+            self.cfg["camara"], self.cfg["camara_aviso"] = disco["camara"], disco["camara_aviso"]
+        except (OSError, ValueError, KeyError):
+            self.cfg["camara"] = False
+        if not self.cfg.get("camara", False):
+            self._poner_acciones([["activar_camara", "Activar la cámara"]])
+            return self._camara_no(s, "La cámara está APAGADA en los ajustes de Miku, así que no tomé ninguna foto. "
+                                      "Dile a la persona que puede activarla con el botón «Activar la cámara» o en "
+                                      "Ajustes → General → Asistente.")
+        asomada = self._turno_companera == self._pregunta_id and not self._pregunta_tuya
+        if asomada and not (disco.get("companera") and disco.get("companera_consentimiento")):
+            return self._camara_no(s, "El modo compañera está apagado: no tomé la foto.")
+        if not (self._pregunta_tuya or asomada) or self._cerebro_listo:
+            return self._camara_no(s, "La cámara solo se usa cuando la persona te lo pide en ese momento: no tomé la foto.")
+        if self._camara_pregunta == self._pregunta_id:
+            return self._camara_no(s, "Ya tomé una foto para esta pregunta: con esa contesta.")
+        if len(self._camara_fotos) >= camara.TOPE_POR_MINUTO:
+            return self._camara_no(s, f"Ya tomé {camara.TOPE_POR_MINUTO} fotos en este minuto; espera un poco antes de "
+                                      "pedirme otra.")
+        if asomada:                          # ya hubo aviso, cuenta atrás y el sí de la bienvenida
+            return self._camara_aprobada(s)
+        visto = self.cfg.get("camara_aviso", False)
+        if visto and camara.pidio_camara(self._ultimo_texto):
+            return self._camara_aprobada(s)
+        # Lo que dijo no suena a pedir la cámara, o nunca vio el aviso: se pregunta con un clic.
+        self._permiso, self._permiso_camara = s, True
+        self.cerebro.ocupado.set()
+        self._reloj_ocioso.stop()
+        self._cambiar_estado(PENSANDO, "Esperando tu permiso...")
+        self.aviso.emit(("¿Tomo una foto con la cámara?" if visto else camara.AVISO_PRIMERA_VEZ + "\n\n¿Tomo la foto?"))
+        self._poner_acciones([["autorizar", "Tomar la foto"], ["cancelar", "No"]])
+        self._decir("¿Tomo una foto con la cámara?")
+        self._permiso_reloj.start()
+
+    def _camara_aprobada(self, s) -> None:
+        if not self.cfg.get("camara_aviso", False):
+            self.cfg["camara_aviso"] = True
+            try:
+                config.guardar({"camara_aviso": True})
+            except OSError:
+                pass
+        self._camara_fotos.append(time.monotonic())
+        self._camara_pregunta = self._pregunta_id
+        companera.anotar("Foto con la cámara (" + ("asomada del modo compañera)" if not self._pregunta_tuya
+                                                   else "la pediste tú)"))
+        self._camara_socket = s
+        self.cerebro.ocupado.set()
+        self.camara.emit(True)
+        self._cambiar_estado(VIENDO, "📷 Usando la cámara: una foto")
+        self.aviso.emit("📷 Miku está usando la cámara: una sola foto, que no se guarda.")
+        s.write(b'{"ok": true}\n')
+        s.flush()
+
+    def _activar_camara(self, confirmado: bool) -> None:
+        if not confirmado:
+            self._poner_acciones([["camara_si", "Sí, activar la cámara"], ["camara_no", "No"]])
+            self.aviso.emit(camara.AVISO_PRIMERA_VEZ)
+            return
+        try:
+            config.guardar({"camara": True, "camara_aviso": True})
+        except OSError as e:
+            self.aviso.emit(f"No pude guardar el ajuste ({e.strerror or e}).")
+            return
+        self.cfg["camara"] = self.cfg["camara_aviso"] = True
+        self._poner_acciones([])
+        self.aviso.emit("Listo: la cámara está activada. Pídeme otra vez que mire («Miku, mira el cuarto»).")
+
     def _permiso_cerrado(self, s) -> None:
         """La acción terminó (o se cayó): Claude sigue solo."""
+        if s is self._camara_socket:        # la foto terminó: la cámara ya no está en uso
+            self._camara_socket = None
+            self.camara.emit(False)
+            if self.estado_actual == VIENDO:
+                self._cambiar_estado(PENSANDO, "Pensando...")
         if s is self._permiso:              # se fue sin esperar respuesta
             self._permiso = None
+            self._permiso_camara = False
             self._permiso_reloj.stop()
             self._poner_acciones([])
         if self._permiso is None:
@@ -843,6 +992,7 @@ class Asistente(QObject):
         s.deleteLater()
 
     def _poner_acciones(self, botones: list) -> None:
+        self._botones_vigentes = {str(b[0]) for b in botones if b}
         self.acciones_visibles = bool(botones)
         self.acciones.emit(botones)
 
@@ -850,10 +1000,24 @@ class Asistente(QObject):
         """Un botón del globo. Activar Claude: lo instala y abre su terminal para entrar con tu cuenta. Iniciar sesión: abre esa terminal.
         Autorizar / Autorizar todo / Cancelar: la respuesta a una acción que pidió permiso («Autorizar todo» vale
         hasta cerrar a Miku)."""
+        if id_accion == "autorizar_todo" and self._permiso_camara:
+            id_accion = "autorizar"             # la cámara nunca entra en «Autorizar todo»: cada foto, su clic
+        if id_accion not in self._botones_vigentes:
+            return                              # solo vale el botón que la persona tiene enfrente
         if id_accion == "autorizar_todo":
             # Hasta cerrar a Miku (Super+O): al volver a abrirla pregunta otra vez.
             self._autorizar_todo = True
             self._responder_permiso(True, "Autorizado todo hasta que me cierres: ya no te pregunto, pero te digo qué hago.")
+            return
+        if id_accion in ("activar_camara", "camara_si"):
+            self._activar_camara(id_accion == "camara_si")
+            return
+        if id_accion.startswith("companera_"):
+            self._accion_companera(id_accion)
+            return
+        if id_accion == "camara_no":
+            self._poner_acciones([])
+            self.aviso.emit("Va: la cámara sigue apagada.")
             return
         if id_accion in ("autorizar", "cancelar"):
             self._responder_permiso(id_accion == "autorizar", "" if id_accion == "autorizar" else "Cancelado: no hice nada.")
@@ -885,6 +1049,204 @@ class Asistente(QObject):
         self._poner_acciones([])
         self._ultimo_turno_con_error = False
         self.aviso.emit(texto)
+
+    # ---- Modo compañera (companera.py) -----------------------------------------------------------
+
+    def _companera_al_abrir(self) -> None:
+        """La abrió «vortex-miku»: la pantalla de bienvenida del modo compañera o una asomada."""
+        modo, self._companera = self._companera, ""
+        if self._cerrado:
+            return
+        if modo == "mayoria":                     # la casilla desde Ajustes, con el modo ya activo
+            try:
+                activo = bool(config.cargar().get("companera_consentimiento"))
+            except (OSError, ValueError):
+                activo = False
+            if activo:
+                self._vio_bienvenida = True
+                self.usuario.emit("")
+                self.respuesta.emit(companera.CASILLA_SIN_CUENTA + "?", True)
+                self._accion_companera("companera_sin_cuenta")
+                return
+            modo = "consentimiento"               # sin el modo activo, primero la bienvenida completa
+        if modo == "consentimiento":
+            self._vio_bienvenida = True
+            self.usuario.emit("")
+            self.respuesta.emit("¿Activo el modo compañera?", True)
+            self.aviso.emit(companera.CONSENTIMIENTO)
+            self._poner_acciones([["companera_si", "Sí, activar el modo compañera"],
+                                  ["companera_sin_cuenta", companera.CASILLA_SIN_CUENTA], ["companera_no", "No"]])
+            return
+        if modo != "asomarse":
+            return
+        try:                                      # lo pudiste apagar justo antes de que se abriera
+            disco = config.cargar()
+        except (OSError, ValueError):
+            disco = {}
+        if not (disco.get("companera") and disco.get("companera_consentimiento") and disco.get("camara")) \
+                or companera.pausado():
+            self.cerrar.emit()
+            return
+        self._en_cuenta, self._cuenta, self._cuenta_espera, self._cuenta_oyendo = True, companera.CUENTA_SEG, 0, False
+        self._tono = companera.tono(disco.get("companera_tono", ""))
+        if companera.sin_cuenta(disco):          # la casilla: sin cuenta atrás; el indicador y el aviso, igual
+            self._en_cuenta = False
+            self.enviar(companera.asomada(self._tono, sin_aviso=True), oculto=True)
+            self._turno_companera = self._pregunta_id
+            frase = companera.frase_aviso(self._tono, sin_aviso=True)
+            self.respuesta.emit(frase, False)
+            self.aviso.emit("📷 Miku se asoma sin cuenta atrás (lo marcaste en Ajustes): va a tomar una foto.")
+            self._decir(frase)
+            companera.anotar("Miku se asomó sin cuenta atrás (casilla marcada)")
+            return
+        aviso = companera.frase_aviso(self._tono)
+        self.usuario.emit("")
+        self.respuesta.emit(aviso, True)
+        self._acumulado = aviso
+        self._poner_acciones([["companera_cancelar", "No, ahora no"], ["companera_dia", "Ya no me molestes hoy"]])
+        self._cambiar_estado(REPOSO, self._texto_cuenta())
+        self._decir(aviso)
+        companera.anotar("Miku se asomó (modo compañera): aviso y cuenta atrás")
+        self._reloj_cuenta.start()
+
+    def _texto_cuenta(self) -> str:
+        return f"📷 Foto en {self._cuenta} s · di «no», toca «No» o pulsa Esc"
+
+    def _tic_cuenta(self) -> None:
+        """Cada segundo de la cuenta atrás. Primero termina de decir el aviso; luego escucha y cuenta."""
+        if self._cerrado or not self._en_cuenta:
+            self._reloj_cuenta.stop()
+            return
+        hablando = self._sonando is not None or bool(self._cola) or bool(self._pedidos)
+        if (hablando or self.estado_actual == TRANSCRIBIENDO) and self._cuenta_espera < CUENTA_ESPERA_MAX:
+            self._cuenta_espera += 1             # aún habla, o te está entendiendo: la cuenta no avanza
+            return
+        oyendo = self._hilo_oido is not None and self._hilo_oido.is_alive()
+        if not self._cuenta_oyendo and not oyendo and self.estado_actual == REPOSO and descargas.paquete_listo("oido"):
+            self._cuenta_oyendo = True
+            self._reloj_seguir.stop()
+            self.escuchar(seguimiento=True)      # para oír tu «no»
+        self._cuenta -= 1
+        if self._cuenta > 0:
+            self.estado.emit(self.estado_actual, self._texto_cuenta())
+            return
+        self._terminar_cuenta()
+        self.enviar(companera.asomada(getattr(self, "_tono", companera.TONO_DEFECTO)), oculto=True)
+        # Esta pregunta es la de la asomada (la IA no alcanza a pedir la foto antes: el permiso se atiende
+        # en este mismo hilo).
+        self._turno_companera = self._pregunta_id
+
+    def _terminar_cuenta(self) -> None:
+        self._en_cuenta = False
+        self._reloj_cuenta.stop()
+        self._poner_acciones([])
+
+    def _cuenta_cancelada(self, dijo: str = "") -> None:
+        companera.anotar("Asomada cancelada: no hubo foto")
+        self._cerrar_luego = True
+        self._responder_local(dijo, "Va, no miro. Aquí ando si me necesitas.")
+
+    def _controlar_companera(self, orden: str, dijo: str = "") -> bool:
+        """«Apaga el modo compañera», «ya no me molestes», «cállate un rato»: los resuelve el código, sin la IA."""
+        if not orden:
+            return False
+        try:
+            activo = bool(config.cargar().get("companera"))
+        except (OSError, ValueError):
+            activo = False
+        if orden == "apagar":
+            if activo:
+                try:
+                    config.guardar(companera.APAGADO)
+                except OSError as e:
+                    self._responder_local(dijo, f"No pude apagarlo ({e.strerror or e}). Prueba en Ajustes.")
+                    return True
+                companera.anotar("Modo compañera apagado (lo pediste)")
+            self.cfg["companera"] = False
+            self._responder_local(dijo, "Listo, apagué el modo compañera: ya no me asomo sola. Lo vuelves a "
+                                        "prender en Ajustes cuando quieras.")
+            return True
+        if not activo:
+            return False                          # sin modo compañera, «cállate un rato» es plática normal
+        hasta = companera.callar(orden)
+        companera.anotar(f"Callada hasta {hasta:%Y-%m-%d %H:%M} (lo pediste)")
+        self._cerrar_luego = True
+        self._responder_local(dijo, "Va, no te molesto hasta mañana." if orden == "dia" else
+                              "Va, me callo un rato. No me asomo en un par de horas.")
+        return True
+
+    def _responder_local(self, dijo: str, frase: str) -> None:
+        """Una respuesta fija (sin la IA): en el globo y con su voz."""
+        self._reloj_ocioso.stop()
+        self._reloj_seguir.stop()
+        self._responder_permiso(False)
+        self.parar_de_hablar()
+        self._cancelar_cerebro()
+        self._poner_acciones([])
+        self._pregunta_id += 1
+        self._cerebro_listo = True
+        self.usuario.emit(dijo)
+        self.respuesta.emit(frase, True)
+        self._acumulado = frase
+        self._cambiar_estado(REPOSO, "")
+        self._decir(frase)
+        if self._voz is None or self._voz_error or not self._voz_lista:
+            self._revisar_fin_de_turno()
+
+    def _cerrar_si_sigue(self, pid: int) -> None:
+        if not self._cerrado and pid == self._pregunta_id and self.estado_actual == REPOSO:
+            self.cerrar.emit()
+
+    def _accion_companera(self, id_accion: str) -> None:
+        if id_accion == "companera_cancelar":
+            self._terminar_cuenta()
+            self._cuenta_cancelada()
+        elif id_accion == "companera_dia":
+            self._terminar_cuenta()
+            self._controlar_companera("dia")
+        elif id_accion == "companera_si":
+            try:
+                config.guardar({"companera": True, "companera_consentimiento": True, "camara": True,
+                                "camara_aviso": True})
+            except OSError as e:
+                self.aviso.emit(f"No pude guardar el ajuste ({e.strerror or e}).")
+                return
+            self.cfg.update(companera=True, companera_consentimiento=True, camara=True, camara_aviso=True)
+            companera.anotar("Modo compañera activado (aceptaste la bienvenida)")
+            self._poner_acciones([])
+            self.aviso.emit("Listo: el modo compañera está activado. Me asomo de vez en cuando, siempre con aviso.")
+        elif id_accion == "companera_sin_cuenta":    # primer paso de la casilla: el texto y «Soy mayor de 18»
+            self.aviso.emit(companera.TEXTO_SIN_CUENTA + "\n\nPara marcarla confirma que eres mayor de 18 años. "
+                            "La desmarcas cuando quieras en Ajustes (y apagar el modo compañera también la desmarca).")
+            self._poner_acciones([["companera_mayor", companera.SOY_MAYOR],
+                                  ["companera_si", "Mejor con cuenta atrás"], ["companera_no", "No"]])
+        elif id_accion == "companera_mayor":
+            try:
+                disco = config.cargar()
+            except (OSError, ValueError):
+                disco = {}
+            if not (self._vio_bienvenida or disco.get("companera_consentimiento")):
+                self._companera = "consentimiento"
+                self._companera_al_abrir()
+                return
+            try:
+                config.guardar({"companera": True, "companera_consentimiento": True, "camara": True,
+                                "camara_aviso": True, "companera_sin_cuenta": True, "companera_mayor": True})
+            except OSError as e:
+                self.aviso.emit(f"No pude guardar el ajuste ({e.strerror or e}).")
+                return
+            self.cfg.update(companera=True, companera_consentimiento=True, camara=True, camara_aviso=True)
+            companera.anotar("Casilla «asomarse sin avisar» marcada (confirmó ser mayor de 18)")
+            self._poner_acciones([])
+            self.aviso.emit("Listo: me asomo sin cuenta atrás. Igual vas a ver el indicador y una notificación en "
+                            "cada foto, y queda en el registro.")
+        elif id_accion == "companera_no":
+            try:
+                config.guardar(companera.APAGADO)
+            except OSError:
+                pass
+            self._poner_acciones([])
+            self.aviso.emit("Va: el modo compañera sigue apagado.")
 
     # ---- IA local (Ollama): sin cuenta ni internet ----------------------------------------------
 
@@ -958,6 +1320,13 @@ class Asistente(QObject):
             if self._visita_dicha:
                 QTimer.singleShot(VISITA_SEG * 1000, self._cerrar_visita)
             return
+        if self._en_cuenta:                       # la cuenta atrás abre el micrófono ella misma
+            return
+        if self._cerrar_luego:                    # «va, no miro»: se va sola si no le dices nada
+            self._cerrar_luego = False
+            pid = self._pregunta_id
+            QTimer.singleShot(VISITA_SEG * 1000, lambda: self._cerrar_si_sigue(pid))
+            return
         if self.cfg.get("seguir_escuchando") and not self._ultimo_turno_con_error and self._acumulado:
             self._reloj_seguir.start(500)             # medio segundo, para no oírse a sí misma
         else:
@@ -989,6 +1358,9 @@ class Asistente(QObject):
         if self._cerrado:
             return
         self._responder_permiso(False)
+        if self._en_cuenta:                       # Esc o cerrar la ventana durante la cuenta atrás = no
+            self._terminar_cuenta()
+            companera.anotar("Asomada cancelada (cerraste a Miku): no hubo foto")
         self._cerrado = True
         self._servidor_permiso.close()
         self._cancelar_descarga.set()

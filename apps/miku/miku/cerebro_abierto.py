@@ -26,7 +26,7 @@ MENSAJES_MAXIMOS = 40               # historial que se le manda (los más viejos
 TIEMPO_LECTURA = {"local": 120.0}   # la primera vez Ollama carga el modelo en la GPU
 TIEMPO_LECTURA_DEFECTO = 60.0
 TIEMPO_HERRAMIENTA = 300.0          # una acción espera hasta 2 min tu permiso y luego corre
-SIN_IMAGENES = "(No puedo ver imágenes con este modelo: la captura no me llegó.)"
+SIN_IMAGENES = "(No puedo ver imágenes con este modelo: la imagen no me llegó. Dilo así y no inventes lo que hay.)"
 
 
 class ServidorMCP:
@@ -109,7 +109,7 @@ def _sin_imagenes(mensajes: list) -> list:
         if isinstance(m.get("content"), list):
             textos = [c.get("text", "") for c in m["content"] if c.get("type") == "text"]
             if any(c.get("type") == "image_url" for c in m["content"]):
-                textos.append("[captura de pantalla]")
+                textos.append("[imagen]")
             m = dict(m, content=" ".join(t for t in textos if t))
         limpios.append(m)
     return limpios
@@ -231,7 +231,7 @@ class CerebroAbierto:
                     nuevos.append({"role": "tool", "tool_call_id": ll["id"], "content": resultado})
                     imagenes += imgs
                 if imagenes:
-                    partes = [{"type": "text", "text": "La captura de pantalla que pediste:"}]
+                    partes = [{"type": "text", "text": "La imagen que pediste (captura o foto):"}]
                     partes += [{"type": "image_url", "image_url": {"url": f"data:{mime};base64,{datos}"}}
                                for mime, datos in imagenes]
                     nuevos.append({"role": "user", "content": partes if ve_imagenes else SIN_IMAGENES})

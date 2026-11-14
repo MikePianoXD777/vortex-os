@@ -27,6 +27,15 @@
                                     sin nada, cómo está su corazón
   vortex-miku platicadora on|off    mientras juegas se asoma a hablarte (sin abrir el micrófono) y al terminar
                                     se abre y te pregunta cómo te fue; entre más cariño, más seguido
+  vortex-miku camara on|off|estado  que Miku pueda tomar UNA foto con la webcam cuando se lo pides («mira el
+                                    cuarto», «¿qué estoy haciendo?»); apagada de fábrica. La foto se manda a
+                                    la IA que uses, no se guarda y nunca graba video
+  vortex-miku companera on|off|estado|tono|sin-cuenta|bitacora|borrar-bitacora
+                                    modo compañera: se asoma sola (cada 45 min como mucho, 6 al día, nunca de
+                                    23 a 9 ni si juegas), avisa, cuenta 5 s y toma UNA foto; apagado de fábrica.
+                                    «tono carinosa|suave»: contenta de verte y juguetona (de fábrica) o tranquila;
+                                    «sin-cuenta on|off»: se asoma sin la cuenta atrás (+18). «on» y «sin-cuenta
+                                    on» abren la ventana de Miku: el permiso solo se da ahí, con su botón
   vortex-miku habla-sola on|off     que a veces te diga algo sola (tras una partida, si te desvelas, o que
                                     quiere decirte algo); nunca mientras juegas o estás en una llamada
 
@@ -1065,6 +1074,136 @@ def orden_sentimientos(args: list[str]) -> int:
     return 0
 
 
+def _desde_ia() -> bool:
+    """¿Lo corrió la IA de Miku (correr_comando)? Entonces no puede cambiar la cámara ni el modo compañera."""
+    return os.environ.get("VORTEX_MIKU_DESDE_IA") == "1"
+
+
+NO_DESDE_IA = ("eso solo lo cambia la persona (en la ventana de Miku o en Ajustes), no un comando que corre la IA.")
+
+
+def orden_camara(args: list[str]) -> int:
+    """2.2: que Miku pueda tomar UNA foto con la webcam cuando se lo pides (apagada de fábrica)."""
+    if not args or args[0] == "estado":
+        print(f"camara={'on' if config.cargar()['camara'] else 'off'}")
+        return 0
+    if _desde_ia():
+        return error(NO_DESDE_IA)
+    if len(args) != 1 or args[0].lower() not in _SI_NO:
+        return error("uso: vortex-miku camara on|off|estado", 2)
+    nuevo = _SI_NO[args[0].lower()]
+    try:
+        config.guardar({"camara": nuevo})
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print(f"camara={'on' if nuevo else 'off'}")
+    if nuevo:
+        from miku import camara
+        print(camara.AVISO_PRIMERA_VEZ)
+    return 0
+
+
+def orden_companera(args: list[str]) -> int:
+    """2.2: el modo compañera (companera.py). Se activa solo después de aceptar la bienvenida."""
+    from miku import companera
+    sub = args[0].lower() if args else "estado"
+    cfg = config.cargar()
+    if sub == "estado":
+        activo = cfg["companera"] and cfg["companera_consentimiento"]
+        print(f"companera={'on' if activo else 'off'}")
+        print(f"tono={cfg['companera_tono']}")
+        print(f"sin_cuenta={'on' if companera.sin_cuenta(cfg) else 'off'}")
+        if activo:
+            print(f"asomadas_hoy={companera.veces_hoy()}/{companera.TOPE_DIA}")
+            motivo = companera.motivo_para_no(cfg, ocupado=corazon.ocupado)
+            print(f"ahora={motivo or 'puede-asomarse'}")
+        return 0
+    if sub not in ("bitacora", "bitácora") and _desde_ia():
+        return error(NO_DESDE_IA)
+    try:
+        if sub in ("on", "si", "sí", "1", "true", "acepto", "aceptar"):
+            if not cfg["companera_consentimiento"]:
+                # El permiso SOLO se da en la ventana de Miku (con su botón): ningún comando lo da, para que nada
+                # lo active sin que la persona vea la bienvenida.
+                print(companera.CONSENTIMIENTO)
+                print("\nSe acepta en la ventana de Miku, con el botón «Sí, activar el modo compañera».")
+                with Candado():
+                    if pid_abierta():
+                        print("Miku ya está abierta: ciérrala y vuelve a correr «vortex-miku companera on».")
+                    else:
+                        lanzar({"VORTEX_MIKU_COMPANERA": "consentimiento"})
+                print("companera=off")
+                return 0
+            config.guardar({"companera": True, "camara": True, "camara_aviso": True})
+        elif sub in ("off", "no", "0", "false"):
+            # Apagarlo también retira el permiso: para volver a prenderlo se acepta otra vez la bienvenida.
+            config.guardar(companera.APAGADO)
+            companera.anotar("Modo compañera apagado")
+            print("companera=off")
+            return 0
+        elif sub in ("sin-cuenta", "sin_cuenta"):
+            valor = args[1].lower() if len(args) > 1 else ""
+            if valor in ("off", "no", "0", "false"):
+                config.guardar({"companera_sin_cuenta": False, "companera_mayor": False})
+                companera.anotar("Casilla «asomarse sin avisar» desmarcada")
+                print("sin_cuenta=off")
+                return 0
+            if valor not in ("on", "si", "sí", "1", "true"):
+                return error("uso: vortex-miku companera sin-cuenta on|off", 2)
+            if not (cfg["companera"] and cfg["companera_consentimiento"]):
+                return error("primero activa el modo compañera (vortex-miku companera on).")
+            # «Soy mayor de 18 años» SOLO se confirma con el botón de la ventana de Miku: ningún comando la marca.
+            print(companera.TEXTO_SIN_CUENTA)
+            print("\nSe marca en la ventana de Miku, con el botón «Soy mayor de 18 años».")
+            with Candado():
+                if pid_abierta():
+                    print("Miku ya está abierta: ciérrala y vuelve a correr «vortex-miku companera sin-cuenta on».")
+                else:
+                    lanzar({"VORTEX_MIKU_COMPANERA": "mayoria"})
+            print("sin_cuenta=off")
+            return 0
+        elif sub == "tono":
+            elegido = (args[1].lower() if len(args) > 1 else "").replace("ñ", "n")
+            if elegido not in companera.TONOS:
+                return error("uso: vortex-miku companera tono carinosa|suave", 2)
+            config.guardar({"companera_tono": elegido})
+            print(f"tono={elegido}")
+            return 0
+        elif sub in ("bitacora", "bitácora"):
+            lineas = companera.leer_bitacora()
+            print("\n".join(lineas) if lineas else "La bitácora está vacía.")
+            return 0
+        elif sub in ("borrar-bitacora", "borrar-bitácora"):
+            companera.borrar_bitacora()
+            print("Bitácora borrada.")
+            return 0
+        else:
+            return error("uso: vortex-miku companera on|off|estado|tono|sin-cuenta|bitacora|borrar-bitacora", 2)
+    except OSError as e:
+        return error(f"no pude guardar {rutas.CONFIG}: {e}")
+    print("companera=on")
+    return 0
+
+
+def _asomarse_si_toca(cfg: dict) -> bool:
+    """Modo compañera: lo llama «sentir revisar» (el reloj de 15 min del escritorio). Los límites, en companera.py."""
+    from miku import companera
+    if companera.motivo_para_no(cfg, ocupado=corazon.ocupado):
+        return False
+    with Candado():
+        if pid_abierta():                     # ya la tienes abierta: no se asoma encima de lo que hacen
+            return False
+        companera.contar_asomada()
+        cuerpo = ("Va a tomar una foto ahora (sin cuenta atrás: lo marcaste en Ajustes)." if companera.sin_cuenta(cfg)
+                  else "Te va a hablar y, si no le dices que no, tomará una foto. Pulsa Esc para que no.")
+        if shutil.which("notify-send"):
+            subprocess.run(["notify-send", "-a", "Miku", "-i", "vortex-miku", "-t", "10000",
+                            "Miku se asoma (modo compañera)", cuerpo],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+        lanzar({"VORTEX_MIKU_COMPANERA": "asomarse"})
+    return True
+
+
 def orden_platicadora(args: list[str]) -> int:
     if not args or args[0] == "estado":
         print(f"platicadora={'on' if config.cargar()['platicadora'] else 'off'}")
@@ -1161,6 +1300,12 @@ def orden_sentir(args: list[str]) -> int:
       sentir decir FRASE [ESPERA]            el aviso en sí (tras ESPERA segundos)
     """
     cfg = config.cargar()
+    if args[:1] == ["revisar"]:
+        try:
+            if _asomarse_si_toca(cfg):
+                return 0
+        except (OSError, ValueError) as e:
+            return error(f"modo compañera: {e}")
     if not cfg["sentimientos"]:
         return 0
     numero = lambda s: int(s) if s.isdigit() else 0   # noqa: E731
@@ -1268,6 +1413,10 @@ def main(argv: list[str]) -> int:
         return orden_sentimientos(args)
     if orden == "platicadora":
         return orden_platicadora(args)
+    if orden in ("camara", "cámara"):
+        return orden_camara(args)
+    if orden in ("companera", "compañera"):
+        return orden_companera(args)
     if orden in ("habla-sola", "habla_sola"):
         return orden_habla_sola(args)
     if orden == "sentir":
