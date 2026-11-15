@@ -5,7 +5,7 @@
 #   cd packaging/vortex-shell && makepkg -si
 pkgname=vortex-shell
 pkgver=2.2.14
-pkgrel=43
+pkgrel=44
 pkgdesc="Shell de Vortexine's OS (Serpantinum con parches de Vortex)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -26,8 +26,7 @@ depends=(
 optdepends=(
     'wl-gammarelay-rs: luz nocturna'
     'easyeffects: ecualizador'
-    'calf: ecualizador'
-    'lsp-plugins-lv2: ecualizador'
+    'lsp-plugins-lv2: ecualizador (EasyEffects no ecualiza sin sus plugins)'
     'nautilus: abrir carpetas (SUPER+E, capturas)'
 )
 provides=('serpantinum')

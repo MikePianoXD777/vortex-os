@@ -28,6 +28,19 @@ Item {
                 wrapMode: Text.WordWrap
             }
         }
+        // 1.7.3: si al ecualizador le falta algo para sonar (EasyEffects o sus plugins), se dice aquí
+        RowLayout {
+            visible: vp.problemaEq !== ""
+            spacing: 8
+            Icono { Layout.preferredWidth: 17; Layout.preferredHeight: 17; nombre: "alerta"; color: Tema.peligro }
+            Text {
+                Layout.fillWidth: true
+                text: vp.problemaEq
+                color: Tema.peligro
+                font.pixelSize: 13
+                wrapMode: Text.WordWrap
+            }
+        }
 
         Flow {
             Layout.fillWidth: true

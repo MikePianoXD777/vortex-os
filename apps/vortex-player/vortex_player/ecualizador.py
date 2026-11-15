@@ -99,6 +99,24 @@ def texto_bandas(bandas: list[dict]) -> str:
     return ",".join(f"{n(round(b['f']))}:{n(round(max(-12.0, min(12.0, b['g'])), 1))}" for b in bandas)
 
 
+def problema() -> str:
+    """3.5.1 (player 1.7.3): qué le falta al ecualizador para cambiar el sonido de verdad («» si nada).
+
+    Sin lsp-plugins-lv2, EasyEffects carga el preset pero deja pasar el audio tal cual."""
+    s = script()
+    if en_mpv() or s is None:
+        return ""
+    try:
+        r = subprocess.run(["bash", str(s), "motor"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return {
+        "sin-easyeffects": "Falta EasyEffects: el ecualizador no puede cambiar el sonido. Corre «vortex actualizar».",
+        "sin-plugins": "A EasyEffects le faltan sus plugins (lsp-plugins-lv2): el ecualizador no cambia el sonido. "
+                       "Corre «vortex actualizar».",
+    }.get(r.stdout.strip(), "")
+
+
 def correr(*args: str) -> bool:
     s = script()
     if s is None:

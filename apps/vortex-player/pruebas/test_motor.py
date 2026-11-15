@@ -378,10 +378,11 @@ class Ecualizador(Temporal):
     def test_mismo_estado_que_el_panel(self) -> None:
         home = self.t / "home"
         bin_ = self.t / "bin"
-        for n in ("easyeffects", "systemctl"):
+        for n in ("easyeffects", "systemctl", "notify-send"):   # notify-send: nada llega al escritorio
             ejecutable(bin_ / n, "exit 0\n")
         ejecutable(bin_ / "pgrep", "exit 0\n")
-        os.environ.update({"HOME": str(home), "SERPANTINUM_DIR": str(REPO / "shell/src"),
+        (self.t / "lv2/lsp-plugins.lv2").mkdir(parents=True)   # los plugins de EasyEffects, de mentira
+        os.environ.update({"HOME": str(home), "SERPANTINUM_DIR": str(REPO / "shell/src"), "VORTEX_LV2_DIRS": str(self.t / "lv2"),
                            "PATH": f"{bin_}:{os.environ['PATH']}", "XDG_DATA_HOME": str(home / ".local/share"),
                            "XDG_RUNTIME_DIR": str(self.t / "run"), "VORTEX_PLAYER_EQ": str(home / ".local/state/serpantinum/music/eq_state.json")})
         self.assertIsNotNone(ecualizador.script())
@@ -394,6 +395,11 @@ class Ecualizador(Temporal):
         self.assertEqual(ecualizador.estado()["preset"], "Rock")
         self.assertEqual(len(ecualizador.estado()["bandas"]), 10)
         self.assertFalse(ecualizador.poner_preset("Inventado"))
+        # 1.7.3: con los plugins no hay nada que avisar; sin ellos, la página dice qué falta y que no sonó
+        self.assertEqual(ecualizador.problema(), "")
+        os.environ["VORTEX_LV2_DIRS"] = str(self.t / "no-hay")
+        self.assertIn("lsp-plugins-lv2", ecualizador.problema())
+        self.assertFalse(ecualizador.poner_bandas(bandas))
 
 
 class Perfiles(unittest.TestCase):

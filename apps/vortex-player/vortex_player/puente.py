@@ -89,6 +89,8 @@ class Puente(QObject):
         self._playlists: list[dict] = []
         self._descargas: list[dict] = []
         self._eq = ecualizador.estado()
+        self._eq_problema = ""   # 1.7.3: qué le falta al ecualizador para sonar (se revisa aparte)
+        threading.Thread(target=self._revisar_eq, daemon=True).start()
         self._eq_local = 0.0   # cuándo se movió una banda aquí (time.monotonic)
         self._salida: dict = {}
         self._escaneando = False
@@ -860,6 +862,12 @@ class Puente(QObject):
             self.cambioEq.emit()
         self._eq_a_mpv()
 
+    def _revisar_eq(self) -> None:
+        problema = ecualizador.problema()
+        if problema != self._eq_problema:
+            self._eq_problema = problema
+            self.cambioEq.emit()
+
     def _eq_a_mpv(self) -> None:
         """2.5: en Windows el ecualizador suena dentro de mpv."""
         if ecualizador.en_mpv():
@@ -884,7 +892,8 @@ class Puente(QObject):
         self._eq_a_mpv()
 
         def aplicar() -> None:
-            ecualizador.poner_bandas(bandas)
+            if not ecualizador.poner_bandas(bandas):
+                self._revisar_eq()   # 1.7.3: si no sonó, que la página diga por qué
             # EasyEffects puede tardar más que la espera de _eq_cambio: se cuenta desde que terminó
             self._eq_local = max(self._eq_local, time.monotonic() - 1.5)
 
@@ -1750,6 +1759,7 @@ class Puente(QObject):
     errorParaTi = Property(str, lambda s: s._para_ti_error, notify=cambioParaTi)
     perfiles = Property("QStringList", lambda s: list(ecualizador.PERFILES), constant=True)
     perfilEq = Property(str, lambda s: ecualizador.perfil_de(s._eq["bandas"]), notify=cambioEq)
+    problemaEq = Property(str, lambda s: s._eq_problema, notify=cambioEq)
     avance = Property(QObject, lambda s: s._avance, constant=True)
     meGusta = Property("QStringList", lambda s: s._me_gusta, notify=cambioPlaylists)
     descargasPendientes = Property(int, lambda s: sum(d["estado"] in ("bajando", "espera") for d in s._descargas),
