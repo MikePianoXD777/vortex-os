@@ -54,6 +54,7 @@ zram-generator
 paru
 pacman-contrib
 easyeffects
+lsp-plugins-lv2
 
 # --- Red, sonido, inicio de sesión ---
 networkmanager

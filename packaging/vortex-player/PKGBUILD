@@ -5,7 +5,7 @@
 #
 #   cd packaging/vortex-player && makepkg -si
 pkgname=vortex-player
-pkgver=1.7.2
+pkgver=1.7.3
 pkgrel=1
 pkgdesc="Vortex Player: tu música a la máxima calidad, y la de YouTube Music y Spotify"
 arch=('any')
@@ -17,6 +17,7 @@ license=('MIT')
 depends=('python' 'pyside6' 'qt6-declarative' 'qt6-svg' 'mpv' 'ffmpeg' 'yt-dlp' 'python-dbus'
          'python-gobject' 'libpulse' 'pipewire' 'wireplumber' 'xdg-user-dirs' 'xdg-utils' 'glib2')
 optdepends=('easyeffects: el ecualizador (el mismo del panel de música)'
+            'lsp-plugins-lv2: los plugins con los que EasyEffects ecualiza'
             'python-secretstorage: leer la sesión de YouTube Music Premium de Chrome/Chromium')
 
 package() {

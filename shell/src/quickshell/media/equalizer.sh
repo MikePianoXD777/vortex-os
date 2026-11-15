@@ -34,8 +34,53 @@ elif ! jq -e 'has("bandas") and has("balance") and has("mono") and has("swap") a
         echo "$updated" > "$STATE_FILE"
 fi
 
+# Vortex 3.5.1: EasyEffects ecualiza con los plugins LV2 de LSP (paquete lsp-plugins-lv2). Sin ellos carga el
+# preset pero deja pasar el audio tal cual (en su registro: «Could not find the plugin: …para_equalizer_x32_lr»):
+# las barras se movían y no sonaba nada distinto. Y si los plugins llegan con EasyEffects ya abierto, no los ve
+# hasta que se reinicia.
+plugins_lsp() {
+    local d p
+    # VORTEX_LV2_DIRS: solo para las pruebas (dónde buscar, en vez de los lugares de siempre)
+    # shellcheck disable=SC2086
+    for d in ${VORTEX_LV2_DIRS:-${LV2_PATH//:/ } $HOME/.lv2 /usr/lib/lv2 /usr/local/lib/lv2 /usr/lib64/lv2}; do
+        for p in "$d"/lsp-plugins*.lv2; do
+            [ -d "$p" ] && { echo "$p"; return 0; }
+        done
+    done
+    return 1
+}
+
+# ok | sin-easyeffects | sin-plugins (lo lee Vortex Player para decir qué falta)
+motor() {
+    command -v easyeffects >/dev/null 2>&1 || { echo sin-easyeffects; return 1; }
+    plugins_lsp >/dev/null || { echo sin-plugins; return 1; }
+    echo ok
+}
+
+# Un aviso cada 10 minutos como mucho, no uno por cada barra que se mueve
+avisar_sin_motor() {
+    local marca="$QS_RUN_MUSIC/aviso_sin_motor"
+    [ -n "$(find "$marca" -mmin -10 2>/dev/null)" ] && return 0
+    touch "$marca"
+    local que="lsp-plugins-lv2"
+    command -v easyeffects >/dev/null 2>&1 || que="easyeffects y lsp-plugins-lv2"
+    command -v notify-send >/dev/null 2>&1 &&
+        notify-send -a "Vortexine's OS" -i dialog-warning "El ecualizador no puede cambiar el sonido" \
+            "Le falta $que. Corre «vortex actualizar» (o: sudo pacman -S $que)." >/dev/null 2>&1 &
+}
+
 ensure_easyeffects() {
-    if pgrep -x easyeffects >/dev/null 2>&1; then
+    local pid lsp edad
+    pid=$(pgrep -xo easyeffects 2>/dev/null)
+    if [ -n "$pid" ] && lsp=$(plugins_lsp) && edad=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ') &&
+       [ -n "$edad" ] && [ "$(stat -c %Y "$lsp")" -gt "$(( $(date +%s) - edad ))" ]; then
+        # Los plugins se instalaron con EasyEffects ya abierto: se reinicia para que los cargue
+        easyeffects -q >/dev/null 2>&1
+        for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x easyeffects >/dev/null 2>&1 || break; sleep 0.3; done
+        pkill -x easyeffects >/dev/null 2>&1
+        pid=""
+    fi
+    if [ -n "$pid" ]; then
         return 0
     fi
 
@@ -73,6 +118,7 @@ ensure_easyeffects() {
 
 apply_eq() {
     vals=$(cat "$STATE_FILE")
+    motor >/dev/null || { SIN_MOTOR=1; avisar_sin_motor; }
 
     python3 -c "
 import sys, json, math
@@ -308,6 +354,7 @@ PY
 cmd=$1
 arg1=$2
 arg2=$3
+SIN_MOTOR=0
 
 case $cmd in
     "get")
@@ -317,7 +364,7 @@ case $cmd in
     # Vortex: al iniciar sesión (Shell.qml) se vuelve a aplicar el ecualizador guardado, si hay algo que
     # aplicar y EasyEffects está instalado; plano y sin efectos no arranca nada.
     "restaurar")
-        command -v easyeffects >/dev/null 2>&1 || exit 0
+        motor >/dev/null || exit 0
         jq -e '(.bandas | map(.g | tonumber) | any(. != 0))
                or (.balance | tonumber) != 0 or .mono or .swap or .dynamics != "off"' \
             "$STATE_FILE" >/dev/null 2>&1 || exit 0
@@ -331,6 +378,7 @@ case $cmd in
             then .bandas[$i - 1].g = ([-12, ([12, $val] | min)] | max) | .preset = "Custom" | .pending = true
             else error("no existe esa banda") end' "$STATE_FILE") || exit 1
         echo "$updated" > "$STATE_FILE"
+        apply_eq
         ;;
 
     # Vortex 1.10: la lista entera «f:g,f:g,…» (cambiar una frecuencia, agregar o quitar bandas). Con
@@ -346,6 +394,9 @@ case $cmd in
             | if $guardado == "guardado" then .pending = false else .preset = "Custom" | .pending = true end' \
             "$STATE_FILE") || exit 1
         echo "$updated" > "$STATE_FILE"
+        # Vortex 3.5.1: suena en cuanto mueves la banda (antes solo al tocar «Aplicar», y al cerrar el panel
+        # sin aplicar se deshacía: parecía que no hacía nada). «Aplicar» la guarda; «guardado» es el deshacer.
+        apply_eq
         ;;
 
     "apply")
@@ -402,6 +453,11 @@ case $cmd in
         play_test
         ;;
 
+    "motor")
+        motor
+        exit $?
+        ;;
+
     "stop_test")
         stop_test
         ;;
@@ -444,3 +500,7 @@ case $cmd in
         apply_eq
         ;;
 esac
+
+# Vortex 3.5.1: se guardó, pero sin EasyEffects o sin sus plugins no suena (el que llama puede avisar)
+[ "$SIN_MOTOR" = 1 ] && exit 3
+exit 0

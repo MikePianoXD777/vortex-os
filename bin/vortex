@@ -1261,6 +1261,7 @@ PAQUETES_NUEVOS=(
   kdeconnect zenity # 1.8: tu celular (Super+Shift+P); zenity elige los archivos que se le mandan
   pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
   easyeffects # 1.10: sin él el ecualizador del panel de música no hace nada
+  lsp-plugins-lv2 # 3.5.1: los plugins con los que EasyEffects ecualiza (sin ellos, las barras no cambian nada)
   gpu-screen-recorder # 1.10: vortex-clips (los últimos 30 s con Alt+F10)
   yt-dlp ffmpeg deno # 2.5: vortex-enlace (bajar con copiar el enlace; deno lo pide YouTube)
   imagemagick # 2.5: vortex-pdf (fotos de la tarea a PDF)
@@ -1275,6 +1276,18 @@ paquetes_nuevos() {
   ((${#faltan[@]})) || return 0
   sudo pacman -S --needed --noconfirm "${faltan[@]}" ||
     aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"
+  # 3.5.1: EasyEffects carga los plugins al abrir: con los de LSP recién instalados se reinicia y vuelve a
+  # poner el ecualizador guardado (equalizer.sh también lo hace solo la próxima vez que se mueva una banda).
+  if [[ " ${faltan[*]} " == *" lsp-plugins-lv2 "* ]] && pacman -Q lsp-plugins-lv2 >/dev/null 2>&1 &&
+     pgrep -x easyeffects >/dev/null 2>&1; then
+    easyeffects -q >/dev/null 2>&1 || true
+    sleep 2
+    pkill -x easyeffects 2>/dev/null || true
+    setsid easyeffects -w </dev/null >/dev/null 2>&1 &
+    local eq
+    eq=/usr/share/serpantinum/src/quickshell/media/equalizer.sh
+    [[ -f "$eq" ]] && { (sleep 3; bash "$eq" restaurar) </dev/null >/dev/null 2>&1 & }
+  fi
 }
 
 # 3.3.4: el Wi-Fi MediaTek (MT7921, MT7922, MT7902: ASUS Vivobook Go y muchas laptops) se cae o va lento

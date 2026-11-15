@@ -20,10 +20,15 @@ mkdir -p "$T/bin" "$H"
 # easyeffects falso: «-l PRESET» queda anotado; pgrep dice que ya corre
 printf '#!/bin/sh\necho "$@" >>"%s/easyeffects.log"\n' "$T" >"$T/bin/easyeffects"
 printf '#!/bin/sh\nexit 0\n' >"$T/bin/pgrep"
+# notify-send falso (3.5.1: avisa si faltan los plugins de EasyEffects): nada llega a tu escritorio
+printf '#!/bin/sh\necho "$@" >>"%s/avisos.log"\n' "$T" >"$T/bin/notify-send"
 chmod +x "$T/bin/"*
+# Los plugins LV2 de LSP (lsp-plugins-lv2), de mentira: con ellos EasyEffects sí ecualiza
+mkdir -p "$T/lv2/lsp-plugins.lv2" "$T/sin-lv2"
+LV2="$T/lv2"
 eq() {
   HOME="$H" XDG_STATE_HOME="$H/.local/state" XDG_CACHE_HOME="$H/.cache" XDG_DATA_HOME="$H/.local/share" \
-    XDG_RUNTIME_DIR="$T/run" PATH="$T/bin:$PATH" bash "$AQUI/shell/src/quickshell/media/equalizer.sh" "$@"
+    XDG_RUNTIME_DIR="$T/run" PATH="$T/bin:$PATH" VORTEX_LV2_DIRS="$LV2" bash "$AQUI/shell/src/quickshell/media/equalizer.sh" "$@"
 }
 ESTADO="$H/.local/state/serpantinum/music/eq_state.json"
 PRESET="$H/.local/share/easyeffects/output/live_eq.json"
@@ -70,6 +75,30 @@ eq preset Rock
 probar "un preset vuelve a las 10 bandas de siempre" \
   "jq -e '(.bandas | map(.f)) == [31,63,125,250,500,1000,2000,4000,8000,16000] and (.bandas | map(.g)) == [5,4,2,-1,-2,-1,2,4,5,6] and .preset == \"Rock\" and (.pending | not)' '$ESTADO' >/dev/null"
 probar "y el preset de EasyEffects también" "jq -e '.output.equalizer[\"num-bands\"] == 10' '$PRESET' >/dev/null"
+
+echo "== suena al moverla y avisa si falta el motor (3.5.1)"
+espera_log; rm -f "$T/easyeffects.log"
+eq set_bands "31:0,63:0,125:6,250:0,500:0,1000:0,2000:0,4000:0,8000:0,16000:0"
+probar "mover una banda se aplica al momento (sin «Aplicar»)" \
+  "espera_log && grep -q -- '-l live_eq' '$T/easyeffects.log' && jq -e '.output.equalizer.left.band2.gain == 6' '$PRESET' >/dev/null"
+probar "pero sigue pendiente de guardar" "jq -e '.pending' '$ESTADO' >/dev/null"
+espera_log; rm -f "$T/easyeffects.log"
+eq set_bands "31:0,63:0,125:0,250:0,500:0,1000:0,2000:0,4000:0,8000:0,16000:0" guardado
+probar "deshacer (cerrar sin aplicar) también suena" "espera_log && jq -e '.output.equalizer.left.band2.gain == 0' '$PRESET' >/dev/null"
+probar "con los plugins de LSP, el motor está bien" "[[ \"\$(eq motor)\" == ok ]]"
+LV2="$T/sin-lv2"
+probar "sin ellos, el motor dice qué falta" "[[ \"\$(eq motor)\" == sin-plugins ]]"
+eq set_band 3 4; rc=$?
+probar "y al mover una banda sale con 3 (se guarda pero no puede sonar)" "[[ $rc == 3 ]] && jq -e '.bandas[2].g == 4' '$ESTADO' >/dev/null"
+probar "avisa con una notificación qué falta" "sleep 0.3; grep -q 'lsp-plugins-lv2' '$T/avisos.log'"
+eq set_band 3 5
+probar "pero no avisa otra vez enseguida" "sleep 0.3; [[ \$(grep -c 'lsp-plugins-lv2' '$T/avisos.log') == 1 ]]"
+rm -f "$T/easyeffects.log"
+eq restaurar
+probar "sin el motor, restaurar al iniciar sesión no hace nada" "! espera_log"
+LV2="$T/lv2"
+eq preset Bass >/dev/null
+espera_log
 
 echo "== restaurar al iniciar sesión"
 rm -f "$T/easyeffects.log"
