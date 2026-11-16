@@ -16,7 +16,17 @@ name = "vortex-player-rs"
 path = "src/main.rs"
 
 [dependencies]
+rand = "0.9"
+regex = "1"
+rusqlite = { version = "0.34", features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
 vortex-core.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true
