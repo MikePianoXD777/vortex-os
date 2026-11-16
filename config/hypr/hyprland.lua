@@ -67,6 +67,15 @@ local function comando_shell()
     -- pide). Solo aquí: las apps no lo heredan.
     local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
         .. " QT_NO_XDG_DESKTOP_PORTAL=1"
+    -- 3.5.2: con NVIDIA, el driver pierde un poco de memoria por cada cuadro que el shell presenta con
+    -- «explicit sync» (libnvidia-eglcore; ~1 KB por cuadro): con el fondo animado y el visualizador
+    -- eran 2-10 MB por minuto que no se devolvían nunca (2,3 GB en 5 h). Con la sincronización
+    -- implícita no pasa. Solo para el shell: los juegos y las apps no lo heredan.
+    local nv = io.open("/proc/driver/nvidia/version")
+    if nv then
+        nv:close()
+        memoria = memoria .. " __NV_DISABLE_EXPLICIT_SYNC=1"
+    end
     -- 3.3: en el perfil bajo el shell dibuja a 60 Hz en un solo hilo: cuesta menos memoria que «threaded».
     local f_bajo = io.open(os.getenv("HOME") .. "/.config/vortex/rendimiento")
     if f_bajo then
