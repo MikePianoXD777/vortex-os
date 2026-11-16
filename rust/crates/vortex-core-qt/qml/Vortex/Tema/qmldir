@@ -1,0 +1,2 @@
+module Vortex.Tema
+singleton Tema 1.0 Tema.qml

@@ -1,0 +1,37 @@
+# Workspace de las apps de Vortexine en Rust (la reescritura: ver CONTRIBUIR.md).
+# Las apps de Python de ../apps siguen igual hasta que su versión Rust las iguale.
+[workspace]
+resolver = "3"
+members = [
+    "crates/vortex-core",
+    "apps/vortex-player",
+    "apps/vortex-local-ai",
+]
+# vortex-core-qt (el puente con QML, cxx-qt) entra a «members» en cuanto se bajen sus crates:
+# ver crates/vortex-core-qt/README.md.
+exclude = ["crates/vortex-core-qt"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.100"          # MSRV: el mismo de rust-toolchain.toml
+license = "MIT"
+repository = "https://github.com/MikePianoXD777/vortex-os"
+
+[workspace.dependencies]
+vortex-core = { path = "crates/vortex-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
+# Mientras vortex-core-qt esté fuera del workspace, sus versiones viven en su propio Cargo.toml; al
+# meterlo, pasan aquí:  cxx = "1", cxx-qt = "=0.10.0", cxx-qt-lib = "=0.10.0", cxx-qt-build = "=0.10.0".
+
+[workspace.lints.rust]
+unsafe_code = "deny"            # el único unsafe permitido es el que genera cxx-qt (en vortex-core-qt)
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+lto = "thin"
+strip = true
