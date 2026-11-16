@@ -6,10 +6,11 @@ members = [
     "crates/vortex-core",
     "apps/vortex-player",
     "apps/vortex-local-ai",
+    "apps/vortex-video",
 ]
 # vortex-core-qt (el puente con QML, cxx-qt) entra a «members» en cuanto se bajen sus crates:
 # ver crates/vortex-core-qt/README.md.
-exclude = ["crates/vortex-core-qt"]
+exclude = ["crates/vortex-core-qt", "apps/vortex-video/qt"]
 
 [workspace.package]
 version = "0.1.0"
