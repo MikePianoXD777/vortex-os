@@ -15,8 +15,8 @@ Item {
 
     property bool vertical: false
 
-    // Vortex: + el panel de rendimiento (abajo del clima, ~120) y la fila de accesos propios
-    // (horizontal: 48 + 16 de aire; vertical: 4 filas de 48 + 3 de 10 + 16).
+    // Vortex: + el panel de rendimiento (abajo del clima, ~120) y los accesos propios: en horizontal van
+    // alrededor del calendario (3 filas de 48) y las apps abiertas abajo del reloj; en vertical, apilados.
     implicitWidth: vertical ? window.s(380) : window.s(1080)
     implicitHeight: (vertical ? window.s(980) + window.s(238) : window.s(420) + window.s(64)) + window.s(120)
 
@@ -544,151 +544,593 @@ Item {
         GridLayout {
             anchors.fill: parent
             anchors.margins: window.vertical ? window.s(20) : window.s(28)
-            // Vortex: deja sitio abajo para los accesos propios (vortexAccesos)
-            anchors.bottomMargin: (window.vertical ? window.s(20) : window.s(22)) + vortexAccesos.implicitHeight + window.s(16)
+            anchors.bottomMargin: window.vertical ? window.s(20) : window.s(22)
             columns: window.vertical ? 1 : 3
             rowSpacing: window.s(16)
             columnSpacing: window.s(24)
 
-            Rectangle {
-                id: calendarRect
+            // Vortex (pedido de Mike, 17/11/2026): los accesos propios van alrededor del calendario, como
+            // en la 2.2: arriba la biblioteca de juegos con la nota y los mods; abajo el metrónomo y estudio.
+            ColumnLayout {
+                id: columnaCalendario
                 Layout.row: window.vertical ? 2 : 0
                 Layout.column: 0
+                Layout.rowSpan: window.vertical ? 1 : 2
                 Layout.fillWidth: window.vertical
                 Layout.preferredWidth: window.s(270)
-                Layout.preferredHeight: window.vertical ? window.s(290) : window.s(330)
-                Layout.alignment: Qt.AlignVCenter
-                color: calendarGlass.active ? "transparent" : Qt.alpha(ThemeBackend.surface0, 0.2)
-                radius: ThemeBackend.borderRadius
+                Layout.alignment: Qt.AlignTop
+                spacing: window.s(10)
 
-                opacity: window.introCalendar
-                transform: Translate { x: -window.s(40) * (1.0 - window.introCalendar) }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: window.s(10)
 
-                GlassFill {
-                    id: calendarGlass
-                    anchors.fill: parent
-                    radius: parent.radius
-                    tintColor: ThemeBackend.surface0
-                    tintAmount: 0.25
-                }
-
-                HoverHandler { id: calHover }
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.topMargin: window.s(12)
-                    anchors.bottomMargin: window.s(12)
-                    anchors.leftMargin: window.s(14)
-                    anchors.rightMargin: window.s(14)
-                    spacing: 0
-
-                    RowLayout {
+                    // Vortex 1.10 (pedido de Mike): arriba del calendario, la biblioteca de juegos (Super+Shift+G).
+                    Rectangle {
+                        id: accesoJuegos
+                        Layout.preferredWidth: window.s(150)
+                        Layout.preferredHeight: window.s(48)
                         Layout.fillWidth: true
-                        Layout.bottomMargin: window.s(12)
-                        layoutDirection: I18n.layoutDirection
+                        radius: ThemeBackend.borderRadius
+                        color: juegosMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
+                        border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
+                        border.width: 1
+                        z: 10
+                        opacity: introCalendar
+                        transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+                        Behavior on color { ColorAnimation { duration: 150 } }
 
-                        IconButton {
-                            Layout.preferredWidth: window.s(28)
-                            Layout.preferredHeight: window.s(28)
-                            size: window.s(28)
-                            cornerRadius: window.s(8)
-                            buttonIcon: "󰃭"
-                            iconFontSize: window.s(14)
-                            accentColor: ThemeBackend.surface0
-                            textColor: ThemeBackend.text
-                            opacity: window.targetMonthOffset !== 0 ? 1.0 : 0.0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 250 } }
-                            onClicked: { if (window.targetMonthOffset !== 0) window.setMonthOffset(0) }
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: window.s(8)
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "󰊴"
+                                font.family: ThemeBackend.iconFont
+                                font.pixelSize: window.s(18)
+                                color: ThemeBackend.text
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: I18n.t("widgets.juegos.short", "Game library")
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: window.s(13)
+                                color: ThemeBackend.text
+                            }
                         }
 
-                        IconButton {
-                            Layout.preferredWidth: window.s(28)
-                            Layout.preferredHeight: window.s(28)
-                            size: window.s(28)
-                            cornerRadius: window.s(8)
-                            buttonIcon: I18n.rtl ? "" : ""
-                            iconFontSize: window.s(14)
-                            accentColor: ThemeBackend.surface0
-                            textColor: ThemeBackend.text
-                            onClicked: window.setMonthOffset(window.targetMonthOffset - 1)
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: window.targetMonthName.toUpperCase()
-                            font.family: ThemeBackend.titleFont
-                            font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
-                            font.pixelSize: window.s(14)
-                            fontSizeMode: Text.Fit
-                            minimumPixelSize: window.s(8)
-                            color: ThemeBackend.text
-                            horizontalAlignment: Text.AlignHCenter
-
-                            opacity: window.calendarContentOpacity
-                            transform: Translate { x: window.calendarContentOffset }
-                        }
-
-                        IconButton {
-                            Layout.preferredWidth: window.s(28)
-                            Layout.preferredHeight: window.s(28)
-                            size: window.s(28)
-                            cornerRadius: window.s(8)
-                            buttonIcon: I18n.rtl ? "" : ""
-                            iconFontSize: window.s(14)
-                            accentColor: ThemeBackend.surface0
-                            textColor: ThemeBackend.text
-                            onClicked: window.setMonthOffset(window.targetMonthOffset + 1)
+                        MouseArea {
+                            id: juegosMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle juegos\")"])
                         }
                     }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.bottomMargin: window.s(4)
-                        spacing: 0
-                        layoutDirection: I18n.layoutDirection
+                    // Vortex 2.6.2 (pedido de Mike): al ladito de la biblioteca, la nota rápida (Super+Alt+N).
+                    Rectangle {
+                        id: accesoNota
+                        Layout.preferredWidth: window.s(48)
+                        Layout.preferredHeight: window.s(48)
+                        radius: ThemeBackend.borderRadius
+                        color: notaMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
+                        border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
+                        border.width: 1
+                        z: 10
+                        opacity: introCalendar
+                        transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+                        Behavior on color { ColorAnimation { duration: 150 } }
 
-                        Repeater {
-                            model: [I18n.t("calendar.days.mo"), I18n.t("calendar.days.tu"), I18n.t("calendar.days.we"), I18n.t("calendar.days.th"), I18n.t("calendar.days.fr"), I18n.t("calendar.days.sa"), I18n.t("calendar.days.su")]
-                            Text {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: 1
-                                text: modelData
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
-                                font.pixelSize: window.s(11.5)
-                                color: ThemeBackend.overlay0
-                                horizontalAlignment: Text.AlignHCenter
+                        Text {
+                            anchors.centerIn: parent
+                            text: "󰎞"
+                            font.family: ThemeBackend.iconFont
+                            font.pixelSize: window.s(20)
+                            color: ThemeBackend.text
+                        }
+
+                        MouseArea {
+                            id: notaMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle notas\")"])
+                        }
+                    }
+                }
+
+                // Vortex 1.10 (pedido de Mike): bajo la biblioteca, los mods de Minecraft. Los dos abren
+                // «Mods de Minecraft» (minecraft/), cada uno en su pestaña.
+                Row {
+                    id: accesosMods
+                    Layout.columnSpan: window.vertical ? 2 : 1
+                    Layout.fillWidth: window.vertical
+                    spacing: window.s(10)
+                    z: 10
+                    opacity: introCalendar
+                    transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+
+                    Repeater {
+                        model: [
+                            { id: "modrinth", texto: "Modrinth" },
+                            { id: "curseforge", texto: "CurseForge" }
+                        ]
+                        Rectangle {
+                            id: accesoMods
+                            required property var modelData
+                            width: window.vertical ? (accesosMods.parent.width - window.s(10)) / 2 : window.s(125)
+                            height: window.s(48)
+                            radius: ThemeBackend.borderRadius
+                            color: modsMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
+                            border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: window.s(8)
+                                Image {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    source: "file://" + Caching.serpantinumDir + "/assets/logos/" + accesoMods.modelData.id + ".svg"
+                                    sourceSize: Qt.size(window.s(18), window.s(18))
+                                    width: window.s(18)
+                                    height: window.s(18)
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: accesoMods.modelData.texto
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(13)
+                                    color: ThemeBackend.text
+                                }
+                            }
+
+                            MouseArea {
+                                id: modsMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + accesoMods.modelData.id + "\")"])
                             }
                         }
                     }
+                }
 
-                    GridLayout {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        columns: 7
-                        rowSpacing: window.s(2)
-                        columnSpacing: window.s(3)
-                        layoutDirection: I18n.layoutDirection
+                Rectangle {
+                    id: calendarRect
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: window.vertical ? window.s(290) : window.s(316)
+                    color: calendarGlass.active ? "transparent" : Qt.alpha(ThemeBackend.surface0, 0.2)
+                    radius: ThemeBackend.borderRadius
 
-                        opacity: window.calendarContentOpacity
-                        transform: Translate { x: window.calendarContentOffset }
+                    opacity: window.introCalendar
+                    transform: Translate { x: -window.s(40) * (1.0 - window.introCalendar) }
 
-                        Repeater {
-                            model: calendarModel
-                            ClickButton {
+                    GlassFill {
+                        id: calendarGlass
+                        anchors.fill: parent
+                        radius: parent.radius
+                        tintColor: ThemeBackend.surface0
+                        tintAmount: 0.25
+                    }
+
+                    HoverHandler { id: calHover }
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.topMargin: window.s(12)
+                        anchors.bottomMargin: window.s(12)
+                        anchors.leftMargin: window.s(14)
+                        anchors.rightMargin: window.s(14)
+                        spacing: 0
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.bottomMargin: window.s(12)
+                            layoutDirection: I18n.layoutDirection
+
+                            IconButton {
+                                Layout.preferredWidth: window.s(28)
+                                Layout.preferredHeight: window.s(28)
+                                size: window.s(28)
+                                cornerRadius: window.s(8)
+                                buttonIcon: "󰃭"
+                                iconFontSize: window.s(14)
+                                accentColor: ThemeBackend.surface0
+                                textColor: ThemeBackend.text
+                                opacity: window.targetMonthOffset !== 0 ? 1.0 : 0.0
+                                visible: opacity > 0
+                                Behavior on opacity { NumberAnimation { duration: 250 } }
+                                onClicked: { if (window.targetMonthOffset !== 0) window.setMonthOffset(0) }
+                            }
+
+                            IconButton {
+                                Layout.preferredWidth: window.s(28)
+                                Layout.preferredHeight: window.s(28)
+                                size: window.s(28)
+                                cornerRadius: window.s(8)
+                                buttonIcon: I18n.rtl ? "" : ""
+                                iconFontSize: window.s(14)
+                                accentColor: ThemeBackend.surface0
+                                textColor: ThemeBackend.text
+                                onClicked: window.setMonthOffset(window.targetMonthOffset - 1)
+                            }
+
+                            Text {
                                 Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                Layout.preferredWidth: 1
-                                Layout.preferredHeight: 1
-                                enabled: false
-                                buttonText: dayNum
-                                textFontSize: window.s(11.5)
-                                cornerRadius: window.s(5)
-                                horizontalPadding: 0
-                                accentColor: isToday ? window.textAccent : ((ThemeBackend.liquidGlass && !isCurrentMonth) ? ThemeBackend.surface0 : "transparent")
-                                glassTintScale: isToday ? 2.6 : 1.0
-                                textColor: ThemeBackend.liquidGlass ? (isCurrentMonth ? ThemeBackend.text : ThemeBackend.subtext0) : (isToday ? ThemeBackend.base : (isCurrentMonth ? ThemeBackend.text : ThemeBackend.surface0))
+                                text: window.targetMonthName.toUpperCase()
+                                font.family: ThemeBackend.titleFont
+                                font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
+                                font.pixelSize: window.s(14)
+                                fontSizeMode: Text.Fit
+                                minimumPixelSize: window.s(8)
+                                color: ThemeBackend.text
+                                horizontalAlignment: Text.AlignHCenter
+
+                                opacity: window.calendarContentOpacity
+                                transform: Translate { x: window.calendarContentOffset }
+                            }
+
+                            IconButton {
+                                Layout.preferredWidth: window.s(28)
+                                Layout.preferredHeight: window.s(28)
+                                size: window.s(28)
+                                cornerRadius: window.s(8)
+                                buttonIcon: I18n.rtl ? "" : ""
+                                iconFontSize: window.s(14)
+                                accentColor: ThemeBackend.surface0
+                                textColor: ThemeBackend.text
+                                onClicked: window.setMonthOffset(window.targetMonthOffset + 1)
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.bottomMargin: window.s(4)
+                            spacing: 0
+                            layoutDirection: I18n.layoutDirection
+
+                            Repeater {
+                                model: [I18n.t("calendar.days.mo"), I18n.t("calendar.days.tu"), I18n.t("calendar.days.we"), I18n.t("calendar.days.th"), I18n.t("calendar.days.fr"), I18n.t("calendar.days.sa"), I18n.t("calendar.days.su")]
+                                Text {
+                                    Layout.fillWidth: true
+                                    Layout.preferredWidth: 1
+                                    text: modelData
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(11.5)
+                                    color: ThemeBackend.overlay0
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                            }
+                        }
+
+                        GridLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            columns: 7
+                            rowSpacing: window.s(2)
+                            columnSpacing: window.s(3)
+                            layoutDirection: I18n.layoutDirection
+
+                            opacity: window.calendarContentOpacity
+                            transform: Translate { x: window.calendarContentOffset }
+
+                            Repeater {
+                                model: calendarModel
+                                ClickButton {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    Layout.preferredWidth: 1
+                                    Layout.preferredHeight: 1
+                                    enabled: false
+                                    buttonText: dayNum
+                                    textFontSize: window.s(11.5)
+                                    cornerRadius: window.s(5)
+                                    horizontalPadding: 0
+                                    accentColor: isToday ? window.textAccent : ((ThemeBackend.liquidGlass && !isCurrentMonth) ? ThemeBackend.surface0 : "transparent")
+                                    glassTintScale: isToday ? 2.6 : 1.0
+                                    textColor: ThemeBackend.liquidGlass ? (isCurrentMonth ? ThemeBackend.text : ThemeBackend.subtext0) : (isToday ? ThemeBackend.base : (isCurrentMonth ? ThemeBackend.text : ThemeBackend.surface0))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Vortex 1.10 (pedido de Mike): abajo del calendario, el metrónomo y el temporizador de
+                // estudio. El de estudio muestra la cuenta mientras corre.
+                Row {
+                    id: accesosEstudio
+                    Layout.columnSpan: window.vertical ? 2 : 1
+                    Layout.fillWidth: window.vertical
+                    spacing: window.s(10)
+                    z: 10
+                    opacity: introCalendar
+                    transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
+
+                    Repeater {
+                        model: [
+                            { id: "musica", icono: "󰝚", texto: I18n.t("widgets.musica.short", "Metronome") },
+                            { id: "estudio", icono: "󰔛", texto: I18n.t("widgets.estudio.short", "Study") }
+                        ]
+                        Rectangle {
+                            id: acceso
+                            required property var modelData
+                            readonly property bool corriendo: modelData.id === "estudio" && Estudio.activo
+                            width: window.vertical ? (accesosEstudio.parent.width - window.s(10)) / 2 : window.s(125)
+                            height: window.s(48)
+                            radius: ThemeBackend.borderRadius
+                            color: accesoMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
+                            border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 150 } }
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: window.s(8)
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: acceso.modelData.icono
+                                    font.family: ThemeBackend.iconFont
+                                    font.pixelSize: window.s(18)
+                                    color: acceso.corriendo ? (Estudio.fase === "descanso" ? ThemeBackend.green : window.textAccent) : ThemeBackend.text
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: acceso.corriendo ? Estudio.texto(Estudio.restante) : acceso.modelData.texto
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(13)
+                                    color: ThemeBackend.text
+                                }
+                            }
+
+                            MouseArea {
+                                id: accesoMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + acceso.modelData.id + "\")"])
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Vortex 3.1.1 (pedido de Mike): abajo, entre el calendario y el clima, las apps abiertas
+            // (de todos los escritorios). Clic: te lleva a esa ventana; la X la cierra (como su X).
+            Rectangle {
+                id: appsAbiertas
+                Layout.row: window.vertical ? 3 : 1
+                Layout.column: window.vertical ? 0 : 1
+                Layout.alignment: Qt.AlignBottom
+                Layout.fillWidth: true
+                Layout.minimumWidth: window.s(200)
+                Layout.preferredHeight: window.s(48)
+                radius: ThemeBackend.borderRadius
+                color: Qt.alpha(ThemeBackend.surface0, 0.2)
+                border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
+                border.width: 1
+                z: 10
+                opacity: introCalendar
+                transform: Translate { y: window.s(30) * (1.0 - introCalendar) }
+
+                // Una entrada por app (sus ventanas juntas), en el orden del dock
+                property var apps: []
+                function recalcular() {
+                    if (typeof WindowTracker === "undefined") { apps = []; return; }
+                    let lista = [];
+                    let orden = WindowTracker.groupOrder || [];
+                    for (let i = 0; i < orden.length; i++) {
+                        let g = WindowTracker.groups[orden[i]];
+                        if (!g || !g.activeWindow) continue;
+                        let e = (typeof AppMatcher !== "undefined") ? AppMatcher.entry(g.desktopId || g.appId) : null;
+                        let nombre = (e && e.name) ? e.name : (g.appId || g.activeWindow.title || "?");
+                        let icono = (e && e.icon) ? e.icon : (g.appId || "");
+                        lista.push({ clave: g.groupKey, nombre: nombre, icono: icono, cuantas: g.count,
+                                     titulo: g.activeWindow.title || nombre, enfocada: g.focused, grupo: g });
+                    }
+                    apps = lista;
+                }
+                Connections {
+                    target: (typeof WindowTracker !== "undefined") ? WindowTracker : null
+                    function onUpdated() { if (window.visible) appsAbiertas.recalcular(); }
+                }
+                Connections {
+                    target: window
+                    function onVisibleChanged() {
+                        if (typeof WindowTracker === "undefined") return;
+                        if (window.visible) { WindowTracker.subscribe(); appsAbiertas.recalcular(); }
+                        else WindowTracker.unsubscribe();
+                    }
+                }
+                Component.onCompleted: if (window.visible && typeof WindowTracker !== "undefined") { WindowTracker.subscribe(); recalcular(); }
+
+                Text {
+                    id: appsTitulo
+                    anchors.left: parent.left
+                    anchors.leftMargin: window.s(14)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "󰖯"
+                    font.family: ThemeBackend.iconFont
+                    font.pixelSize: window.s(18)
+                    color: window.textAccent
+                }
+
+                Text {
+                    id: appsNombre
+                    anchors.left: appsTitulo.right
+                    anchors.leftMargin: window.s(8)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("widgets.apps_abiertas.title", "Open apps")
+                    font.family: ThemeBackend.fontFamily
+                    font.weight: Font.Black
+                    font.pixelSize: window.s(13)
+                    color: ThemeBackend.text
+                }
+
+                Text {
+                    anchors.left: appsNombre.right
+                    anchors.leftMargin: window.s(12)
+                    // Vortex: en la 2.5 la fila es más angosta y el texto se salía; se corta con «…».
+                    anchors.right: parent.right
+                    anchors.rightMargin: window.s(10)
+                    elide: Text.ElideRight
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: appsAbiertas.apps.length === 0
+                    text: I18n.t("widgets.apps_abiertas.empty", "No open apps")
+                    font.family: ThemeBackend.fontFamily
+                    font.pixelSize: window.s(13)
+                    color: ThemeBackend.subtext0
+                }
+
+                ListView {
+                    id: listaApps
+                    anchors.left: appsNombre.right
+                    anchors.leftMargin: window.s(12)
+                    anchors.right: parent.right
+                    anchors.rightMargin: window.s(6)
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: window.s(36)
+                    orientation: ListView.Horizontal
+                    spacing: window.s(6)
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: appsAbiertas.apps
+
+                    // La rueda del mouse también la mueve de lado
+                    WheelHandler {
+                        onWheel: (ev) => {
+                            let d = ev.angleDelta.y !== 0 ? ev.angleDelta.y : ev.angleDelta.x;
+                            listaApps.contentX = Math.max(0, Math.min(listaApps.contentWidth - listaApps.width,
+                                listaApps.contentX - d));
+                        }
+                    }
+
+                    delegate: Rectangle {
+                        id: chipApp
+                        required property var modelData
+                        height: listaApps.height
+                        width: filaChip.implicitWidth + window.s(16)
+                        radius: height / 2
+                        color: chipMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.55)
+                             : (modelData.enfocada ? Qt.alpha(window.textAccent, 0.18) : Qt.alpha(ThemeBackend.surface1, 0.25))
+                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                        MouseArea {
+                            id: chipMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: (ev) => {
+                                let g = chipApp.modelData.grupo;
+                                if (ev.button === Qt.MiddleButton) {
+                                    WindowTracker.close(g.activeWindow);
+                                    return;
+                                }
+                                WindowTracker.focusWindow(g.activeWindow);
+                                Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"]);
+                            }
+                        }
+
+                        Row {
+                            id: filaChip
+                            anchors.left: parent.left
+                            anchors.leftMargin: window.s(8)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: window.s(6)
+
+                            Item {
+                                width: window.s(20)
+                                height: window.s(20)
+                                anchors.verticalCenter: parent.verticalCenter
+                                Image {
+                                    id: iconoApp
+                                    anchors.fill: parent
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    smooth: true
+                                    mipmap: true
+                                    sourceSize.width: window.s(40)
+                                    sourceSize.height: window.s(40)
+                                    property bool fallo: false
+                                    visible: source !== "" && status === Image.Ready && !fallo
+                                    source: {
+                                        let ic = chipApp.modelData.icono || "";
+                                        if (!ic) return "";
+                                        if (ic.startsWith("file://") || ic.startsWith("image://")) return ic;
+                                        return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
+                                    }
+                                    onStatusChanged: if (status === Image.Error) fallo = true
+                                }
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !iconoApp.visible
+                                    text: chipApp.modelData.nombre.charAt(0).toUpperCase()
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(13)
+                                    color: ThemeBackend.text
+                                }
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: chipApp.modelData.nombre
+                                width: Math.min(implicitWidth, window.s(150))
+                                elide: Text.ElideRight
+                                font.family: ThemeBackend.fontFamily
+                                font.weight: Font.Black
+                                font.pixelSize: window.s(12)
+                                color: ThemeBackend.text
+                            }
+
+                            // Cuántas ventanas tiene, si son varias
+                            Rectangle {
+                                visible: chipApp.modelData.cuantas > 1
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(height, cuantasTxt.implicitWidth + window.s(8))
+                                height: window.s(18)
+                                radius: height / 2
+                                color: Qt.alpha(window.textAccent, 0.3)
+                                Text {
+                                    id: cuantasTxt
+                                    anchors.centerIn: parent
+                                    text: chipApp.modelData.cuantas
+                                    font.family: ThemeBackend.fontFamily
+                                    font.weight: Font.Black
+                                    font.pixelSize: window.s(10)
+                                    color: ThemeBackend.text
+                                }
+                            }
+
+                            // La X: cierra la ventana (si tiene algo sin guardar, la app pregunta)
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: window.s(20)
+                                height: window.s(20)
+                                radius: width / 2
+                                color: cerrarMa.containsMouse ? Qt.alpha(ThemeBackend.red, 0.35) : "transparent"
+                                opacity: chipMa.containsMouse || cerrarMa.containsMouse ? 1 : 0.45
+                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰅖"
+                                    font.family: ThemeBackend.iconFont
+                                    font.pixelSize: window.s(13)
+                                    color: ThemeBackend.text
+                                }
+                                MouseArea {
+                                    id: cerrarMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: WindowTracker.close(chipApp.modelData.grupo.activeWindow)
+                                }
                             }
                         }
                     }
@@ -872,6 +1314,7 @@ Item {
                 id: weatherContainer
                 Layout.row: window.vertical ? 1 : 0
                 Layout.column: window.vertical ? 0 : 2
+                Layout.rowSpan: window.vertical ? 1 : 2
                 Layout.fillWidth: window.vertical
                 Layout.fillHeight: true
                 Layout.preferredWidth: window.s(260)
@@ -1147,450 +1590,6 @@ Item {
                     }
                 }
             }
-        }
-
-        // Vortex: los accesos propios (biblioteca de juegos, nota rápida, mods de Minecraft,
-        // metrónomo, estudio y apps abiertas). Antes iban alrededor del calendario; con el reloj
-        // nuevo de upstream (2.5) van en una fila debajo (o apiladas en vertical).
-        GridLayout {
-            id: vortexAccesos
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: window.vertical ? window.s(20) : window.s(28)
-            anchors.rightMargin: window.vertical ? window.s(20) : window.s(28)
-            anchors.bottomMargin: window.vertical ? window.s(20) : window.s(22)
-            columns: window.vertical ? 2 : 5
-            rowSpacing: window.s(10)
-            columnSpacing: window.s(10)
-
-            // Vortex 1.10 (pedido de Mike): arriba del calendario, la biblioteca de juegos (Super+Shift+G).
-            Rectangle {
-                id: accesoJuegos
-                Layout.preferredWidth: window.s(150)
-                Layout.preferredHeight: window.s(48)
-                Layout.fillWidth: window.vertical
-                radius: ThemeBackend.borderRadius
-                color: juegosMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
-                border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-                border.width: 1
-                z: 10
-                opacity: introCalendar
-                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                Row {
-                    anchors.centerIn: parent
-                    spacing: window.s(8)
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "󰊴"
-                        font.family: ThemeBackend.iconFont
-                        font.pixelSize: window.s(18)
-                        color: ThemeBackend.text
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: I18n.t("widgets.juegos.short", "Game library")
-                        font.family: ThemeBackend.fontFamily
-                        font.weight: Font.Black
-                        font.pixelSize: window.s(13)
-                        color: ThemeBackend.text
-                    }
-                }
-
-                MouseArea {
-                    id: juegosMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle juegos\")"])
-                }
-            }
-
-            // Vortex 2.6.2 (pedido de Mike): al ladito de la biblioteca, la nota rápida (Super+Alt+N).
-            Rectangle {
-                id: accesoNota
-                Layout.preferredWidth: window.s(48)
-                Layout.preferredHeight: window.s(48)
-                radius: ThemeBackend.borderRadius
-                color: notaMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
-                border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-                border.width: 1
-                z: 10
-                opacity: introCalendar
-                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "󰎞"
-                    font.family: ThemeBackend.iconFont
-                    font.pixelSize: window.s(20)
-                    color: ThemeBackend.text
-                }
-
-                MouseArea {
-                    id: notaMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle notas\")"])
-                }
-            }
-
-            // Vortex 1.10 (pedido de Mike): bajo la biblioteca, los mods de Minecraft. Los dos abren
-            // «Mods de Minecraft» (minecraft/), cada uno en su pestaña.
-            Row {
-                id: accesosMods
-                Layout.columnSpan: window.vertical ? 2 : 1
-                Layout.fillWidth: window.vertical
-                spacing: window.s(10)
-                z: 10
-                opacity: introCalendar
-                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
-
-                Repeater {
-                    model: [
-                        { id: "modrinth", texto: "Modrinth" },
-                        { id: "curseforge", texto: "CurseForge" }
-                    ]
-                    Rectangle {
-                        id: accesoMods
-                        required property var modelData
-                        width: window.vertical ? (accesosMods.parent.width - window.s(10)) / 2 : window.s(125)
-                        height: window.s(48)
-                        radius: ThemeBackend.borderRadius
-                        color: modsMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
-                        border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: window.s(8)
-                            Image {
-                                anchors.verticalCenter: parent.verticalCenter
-                                source: "file://" + Caching.serpantinumDir + "/assets/logos/" + accesoMods.modelData.id + ".svg"
-                                sourceSize: Qt.size(window.s(18), window.s(18))
-                                width: window.s(18)
-                                height: window.s(18)
-                            }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: accesoMods.modelData.texto
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
-                                font.pixelSize: window.s(13)
-                                color: ThemeBackend.text
-                            }
-                        }
-
-                        MouseArea {
-                            id: modsMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + accesoMods.modelData.id + "\")"])
-                        }
-                    }
-                }
-            }
-
-            // Vortex 1.10 (pedido de Mike): abajo del calendario, el metrónomo y el temporizador de
-            // estudio. El de estudio muestra la cuenta mientras corre.
-            Row {
-                id: accesosEstudio
-                Layout.columnSpan: window.vertical ? 2 : 1
-                Layout.fillWidth: window.vertical
-                spacing: window.s(10)
-                z: 10
-                opacity: introCalendar
-                transform: Translate { x: -window.s(40) * (1.0 - introCalendar) }
-
-                Repeater {
-                    model: [
-                        { id: "musica", icono: "󰝚", texto: I18n.t("widgets.musica.short", "Metronome") },
-                        { id: "estudio", icono: "󰔛", texto: I18n.t("widgets.estudio.short", "Study") }
-                    ]
-                    Rectangle {
-                        id: acceso
-                        required property var modelData
-                        readonly property bool corriendo: modelData.id === "estudio" && Estudio.activo
-                        width: window.vertical ? (accesosEstudio.parent.width - window.s(10)) / 2 : window.s(125)
-                        height: window.s(48)
-                        radius: ThemeBackend.borderRadius
-                        color: accesoMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.45) : Qt.alpha(ThemeBackend.surface0, 0.2)
-                        border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: window.s(8)
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: acceso.modelData.icono
-                                font.family: ThemeBackend.iconFont
-                                font.pixelSize: window.s(18)
-                                color: acceso.corriendo ? (Estudio.fase === "descanso" ? ThemeBackend.green : window.textAccent) : ThemeBackend.text
-                            }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: acceso.corriendo ? Estudio.texto(Estudio.restante) : acceso.modelData.texto
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
-                                font.pixelSize: window.s(13)
-                                color: ThemeBackend.text
-                            }
-                        }
-
-                        MouseArea {
-                            id: accesoMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:toggle " + acceso.modelData.id + "\")"])
-                        }
-                    }
-                }
-            }
-
-            // Vortex 3.1.1 (pedido de Mike): abajo, entre el calendario y el clima, las apps abiertas
-            // (de todos los escritorios). Clic: te lleva a esa ventana; la X la cierra (como su X).
-            Rectangle {
-                id: appsAbiertas
-                Layout.columnSpan: window.vertical ? 2 : 1
-                Layout.fillWidth: true
-                Layout.minimumWidth: window.s(200)
-                Layout.preferredHeight: window.s(48)
-                radius: ThemeBackend.borderRadius
-                color: Qt.alpha(ThemeBackend.surface0, 0.2)
-                border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-                border.width: 1
-                z: 10
-                opacity: introCalendar
-                transform: Translate { y: window.s(30) * (1.0 - introCalendar) }
-
-                // Una entrada por app (sus ventanas juntas), en el orden del dock
-                property var apps: []
-                function recalcular() {
-                    if (typeof WindowTracker === "undefined") { apps = []; return; }
-                    let lista = [];
-                    let orden = WindowTracker.groupOrder || [];
-                    for (let i = 0; i < orden.length; i++) {
-                        let g = WindowTracker.groups[orden[i]];
-                        if (!g || !g.activeWindow) continue;
-                        let e = (typeof AppMatcher !== "undefined") ? AppMatcher.entry(g.desktopId || g.appId) : null;
-                        let nombre = (e && e.name) ? e.name : (g.appId || g.activeWindow.title || "?");
-                        let icono = (e && e.icon) ? e.icon : (g.appId || "");
-                        lista.push({ clave: g.groupKey, nombre: nombre, icono: icono, cuantas: g.count,
-                                     titulo: g.activeWindow.title || nombre, enfocada: g.focused, grupo: g });
-                    }
-                    apps = lista;
-                }
-                Connections {
-                    target: (typeof WindowTracker !== "undefined") ? WindowTracker : null
-                    function onUpdated() { if (window.visible) appsAbiertas.recalcular(); }
-                }
-                Connections {
-                    target: window
-                    function onVisibleChanged() {
-                        if (typeof WindowTracker === "undefined") return;
-                        if (window.visible) { WindowTracker.subscribe(); appsAbiertas.recalcular(); }
-                        else WindowTracker.unsubscribe();
-                    }
-                }
-                Component.onCompleted: if (window.visible && typeof WindowTracker !== "undefined") { WindowTracker.subscribe(); recalcular(); }
-
-                Text {
-                    id: appsTitulo
-                    anchors.left: parent.left
-                    anchors.leftMargin: window.s(14)
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "󰖯"
-                    font.family: ThemeBackend.iconFont
-                    font.pixelSize: window.s(18)
-                    color: window.textAccent
-                }
-
-                Text {
-                    id: appsNombre
-                    anchors.left: appsTitulo.right
-                    anchors.leftMargin: window.s(8)
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: I18n.t("widgets.apps_abiertas.title", "Open apps")
-                    font.family: ThemeBackend.fontFamily
-                    font.weight: Font.Black
-                    font.pixelSize: window.s(13)
-                    color: ThemeBackend.text
-                }
-
-                Text {
-                    anchors.left: appsNombre.right
-                    anchors.leftMargin: window.s(12)
-                    // Vortex: en la 2.5 la fila es más angosta y el texto se salía; se corta con «…».
-                    anchors.right: parent.right
-                    anchors.rightMargin: window.s(10)
-                    elide: Text.ElideRight
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: appsAbiertas.apps.length === 0
-                    text: I18n.t("widgets.apps_abiertas.empty", "No open apps")
-                    font.family: ThemeBackend.fontFamily
-                    font.pixelSize: window.s(13)
-                    color: ThemeBackend.subtext0
-                }
-
-                ListView {
-                    id: listaApps
-                    anchors.left: appsNombre.right
-                    anchors.leftMargin: window.s(12)
-                    anchors.right: parent.right
-                    anchors.rightMargin: window.s(6)
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: window.s(36)
-                    orientation: ListView.Horizontal
-                    spacing: window.s(6)
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    model: appsAbiertas.apps
-
-                    // La rueda del mouse también la mueve de lado
-                    WheelHandler {
-                        onWheel: (ev) => {
-                            let d = ev.angleDelta.y !== 0 ? ev.angleDelta.y : ev.angleDelta.x;
-                            listaApps.contentX = Math.max(0, Math.min(listaApps.contentWidth - listaApps.width,
-                                listaApps.contentX - d));
-                        }
-                    }
-
-                    delegate: Rectangle {
-                        id: chipApp
-                        required property var modelData
-                        height: listaApps.height
-                        width: filaChip.implicitWidth + window.s(16)
-                        radius: height / 2
-                        color: chipMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.55)
-                             : (modelData.enfocada ? Qt.alpha(window.textAccent, 0.18) : Qt.alpha(ThemeBackend.surface1, 0.25))
-                        Behavior on color { ColorAnimation { duration: 150 } }
-
-                        MouseArea {
-                            id: chipMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                            onClicked: (ev) => {
-                                let g = chipApp.modelData.grupo;
-                                if (ev.button === Qt.MiddleButton) {
-                                    WindowTracker.close(g.activeWindow);
-                                    return;
-                                }
-                                WindowTracker.focusWindow(g.activeWindow);
-                                Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.event(\"serpantinum:close\")"]);
-                            }
-                        }
-
-                        Row {
-                            id: filaChip
-                            anchors.left: parent.left
-                            anchors.leftMargin: window.s(8)
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: window.s(6)
-
-                            Item {
-                                width: window.s(20)
-                                height: window.s(20)
-                                anchors.verticalCenter: parent.verticalCenter
-                                Image {
-                                    id: iconoApp
-                                    anchors.fill: parent
-                                    fillMode: Image.PreserveAspectFit
-                                    asynchronous: true
-                                    smooth: true
-                                    mipmap: true
-                                    sourceSize.width: window.s(40)
-                                    sourceSize.height: window.s(40)
-                                    property bool fallo: false
-                                    visible: source !== "" && status === Image.Ready && !fallo
-                                    source: {
-                                        let ic = chipApp.modelData.icono || "";
-                                        if (!ic) return "";
-                                        if (ic.startsWith("file://") || ic.startsWith("image://")) return ic;
-                                        return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
-                                    }
-                                    onStatusChanged: if (status === Image.Error) fallo = true
-                                }
-                                Text {
-                                    anchors.centerIn: parent
-                                    visible: !iconoApp.visible
-                                    text: chipApp.modelData.nombre.charAt(0).toUpperCase()
-                                    font.family: ThemeBackend.fontFamily
-                                    font.weight: Font.Black
-                                    font.pixelSize: window.s(13)
-                                    color: ThemeBackend.text
-                                }
-                            }
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: chipApp.modelData.nombre
-                                width: Math.min(implicitWidth, window.s(150))
-                                elide: Text.ElideRight
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
-                                font.pixelSize: window.s(12)
-                                color: ThemeBackend.text
-                            }
-
-                            // Cuántas ventanas tiene, si son varias
-                            Rectangle {
-                                visible: chipApp.modelData.cuantas > 1
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Math.max(height, cuantasTxt.implicitWidth + window.s(8))
-                                height: window.s(18)
-                                radius: height / 2
-                                color: Qt.alpha(window.textAccent, 0.3)
-                                Text {
-                                    id: cuantasTxt
-                                    anchors.centerIn: parent
-                                    text: chipApp.modelData.cuantas
-                                    font.family: ThemeBackend.fontFamily
-                                    font.weight: Font.Black
-                                    font.pixelSize: window.s(10)
-                                    color: ThemeBackend.text
-                                }
-                            }
-
-                            // La X: cierra la ventana (si tiene algo sin guardar, la app pregunta)
-                            Rectangle {
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: window.s(20)
-                                height: window.s(20)
-                                radius: width / 2
-                                color: cerrarMa.containsMouse ? Qt.alpha(ThemeBackend.red, 0.35) : "transparent"
-                                opacity: chipMa.containsMouse || cerrarMa.containsMouse ? 1 : 0.45
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "󰅖"
-                                    font.family: ThemeBackend.iconFont
-                                    font.pixelSize: window.s(13)
-                                    color: ThemeBackend.text
-                                }
-                                MouseArea {
-                                    id: cerrarMa
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: WindowTracker.close(chipApp.modelData.grupo.activeWindow)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
         }
     }
 }
