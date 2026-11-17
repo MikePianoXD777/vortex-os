@@ -162,13 +162,28 @@ end
 
 -- Vortex 2.8.5: en laptops, cursor dibujado por software. Con el automático, en algunas (sobre todo con
 -- dos gráficas) el cursor por hardware no se dibuja: existe y responde, pero no se ve.
-for _, bateria in ipairs({ "BAT0", "BAT1", "BAT2", "BATT", "BATC", "CMB0" }) do
-    local f = io.open("/sys/class/power_supply/" .. bateria .. "/type")
-    if f then
-        f:close()
-        hl.config({ cursor = { no_hardware_cursors = 1 } })
-        break
+-- Vortex 3.5.2: lo mismo con cualquier gráfica AMD (fabricante 0x1002), también en PCs de escritorio:
+-- un usuario con AMD reportó (TikTok, 17/11/2026) que el mouse no se veía.
+local function cursor_por_software()
+    for _, bateria in ipairs({ "BAT0", "BAT1", "BAT2", "BATT", "BATC", "CMB0" }) do
+        local f = io.open("/sys/class/power_supply/" .. bateria .. "/type")
+        if f then
+            f:close()
+            return true
+        end
     end
+    for i = 0, 9 do
+        local f = io.open("/sys/class/drm/card" .. i .. "/device/vendor")
+        if f then
+            local fabricante = f:read("*l")
+            f:close()
+            if fabricante == "0x1002" then return true end
+        end
+    end
+    return false
+end
+if cursor_por_software() then
+    hl.config({ cursor = { no_hardware_cursors = 1 } })
 end
 
 -- Juegos de Steam, Lutris y gamescope: sin vsync y sin que se bloquee la pantalla.
