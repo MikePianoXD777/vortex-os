@@ -382,7 +382,7 @@ BarFaceBase {
 
             height: s(root.isCompact ? 28 : 30)
             maxWidth: s(root.isCompact ? 156 : 160)
-            cornerRadius: Math.max(0, ThemeBackend.borderRadius - s(2))
+            cornerRadius: ThemeBackend.barIslas ? height / 2 : (Math.max(0, ThemeBackend.borderRadius - s(2)))
             horizontalPadding: s(root.isCompact ? 10 : 12)
             buttonIcon: root.showIcon ? root.effectiveIcon : ""
             iconFontSize: s(root.isCompact ? 14 : 15)
@@ -409,7 +409,7 @@ BarFaceBase {
         ClickButton {
             width: s(root.isCompact ? 28 : 30)
             height: (root.showIcon || root.showName) ? s(root.isCompact ? 28 : 30) : 0
-            cornerRadius: Math.max(0, ThemeBackend.borderRadius - s(2))
+            cornerRadius: ThemeBackend.barIslas ? height / 2 : (Math.max(0, ThemeBackend.borderRadius - s(2)))
             horizontalPadding: 0
             buttonIcon: root.showIcon ? root.effectiveIcon : ""
             iconFontSize: s(root.isCompact ? 14 : 15)
