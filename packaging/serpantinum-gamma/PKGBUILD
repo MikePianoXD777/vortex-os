@@ -1,0 +1,34 @@
+# serpantinum-gamma: el demonio en Rust que cambia la temperatura de color, el brillo y el gamma de la pantalla por
+# D-Bus en Wayland (lo usa la «luz azul» del shell Serpantinum 2.5; reemplaza a wl-gammarelay-rs). Se COMPILA desde
+# el código fuente en la etiqueta v0.7.0 (fijada por su commit); no se baja ningún binario ya hecho.
+#
+#   cd packaging/serpantinum-gamma && makepkg -si
+pkgname=serpantinum-gamma
+pkgver=0.7.0
+pkgrel=1
+pkgdesc="Temperatura de color, brillo y gamma de la pantalla por D-Bus en Wayland (luz azul de Serpantinum)"
+arch=('x86_64')
+url='https://github.com/ilyamiro/serpantinum-gamma'
+license=('AGPL-3.0-or-later')
+depends=('gcc-libs' 'glibc' 'dbus')
+makedepends=('cargo' 'git')
+source=("git+https://github.com/ilyamiro/serpantinum-gamma.git#commit=ef658f92895a467ceef1fe4a170544de3a5f029e")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$srcdir/serpantinum-gamma"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/serpantinum-gamma"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --release --frozen
+}
+
+package() {
+    cd "$srcdir/serpantinum-gamma"
+    sh packaging/stage.sh "$pkgdir"
+}
