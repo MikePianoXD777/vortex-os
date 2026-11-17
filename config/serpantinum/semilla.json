@@ -35,7 +35,8 @@
       "yellow": "#e9c46a",
       "maroon": "#e58f9a",
       "teal": "#b79dfb"
-    }
+    },
+    "titleFont": "Unbounded"
   },
   "bar": {
     "style": "modular"

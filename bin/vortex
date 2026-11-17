@@ -1221,7 +1221,8 @@ dock_ventanas() {
 }
 
 # Rediseño «Mezcla» (Vortex Shell sobre Serpantinum 2.5): una sola vez, la barra pasa a islas (estilo
-# modular), el tema a Obsidian (la paleta sólida de Vortex, sin matugen) y la letra a Inter. Lo que había
+# modular), el tema a Obsidian (la paleta sólida de Vortex, sin matugen) y la letra a Inter (Unbounded en
+# títulos y relojes). Lo que había
 # se guarda en ~/.config/vortex/ajustes-antes-mezcla.json y «vortex diseno anterior» lo regresa. Después
 # no se vuelve a tocar: lo que la persona cambie en Ajustes se queda.
 diseno_mezcla() {
@@ -1236,7 +1237,7 @@ diseno_mezcla() {
   tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || return 0
   # Las apps fijadas que trae Serpantinum 2.5 (Kitty y Ski) sacaban un dock en el mosaico: fuera, si son esas.
   jq --slurpfile o "$tema" '.bar = ((.bar // {}) + {style: "modular"})
-      | .theme = ((.theme // {}) + {activePreset: "Obsidian", matugen: false, colors: $o[0].colors, fontFamily: "Inter"})
+      | .theme = ((.theme // {}) + {activePreset: "Obsidian", matugen: false, colors: $o[0].colors, fontFamily: "Inter", titleFont: "Unbounded"})
       | if ((.dock.apps // []) | map(.desktop_id // "") | sort) == ["kitty", "ski"] then .dock.apps = [] else . end' \
     "$ajustes" >"$tmp" 2>/dev/null
   [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes" && touch "$marca"

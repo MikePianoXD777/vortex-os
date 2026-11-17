@@ -66,6 +66,24 @@ Item {
     property var bundledNames: []
     property string activeFontPath: ""
 
+    // Vortex (rediseño «Mezcla», 17/11/2026): la letra de títulos y relojes. theme.titleFont = "Unbounded"
+    // (la semilla y «vortex diseno mezcla» la ponen) carga assets/fonts/Unbounded-SemiBold.ttf; vacío o
+    // sin la fuente, se usa la letra normal (fontFamily). Es una instancia fija en peso 600 (fontTools,
+    // varLib.instancer wght=600) de la variable de Google Fonts: Qt no aplicaba el peso a la variable.
+    readonly property string titleFontSetting: {
+        let th = (typeof Config !== "undefined" && Config.rawSettings) ? Config.rawSettings.theme : null;
+        return (th && typeof th.titleFont === "string") ? th.titleFont : "";
+    }
+    FontLoader {
+        id: titleFontLoader
+        source: (root.titleFontSetting.toLowerCase() === "unbounded" && typeof Caching !== "undefined" && Caching.serpantinumDir)
+            ? ("file://" + Caching.serpantinumDir + "/assets/fonts/Unbounded-SemiBold.ttf") : ""
+    }
+    readonly property string titleFont: root.titleFontSetting === "" ? root.fontFamily
+        : (root.titleFontSetting.toLowerCase() === "unbounded"
+            ? ((titleFontLoader.status === FontLoader.Ready && titleFontLoader.name !== "") ? titleFontLoader.name : root.fontFamily)
+            : root.titleFontSetting)
+
     FontLoader {
         id: iconFontLoader
         source: (typeof Caching !== "undefined" && Caching.serpantinumDir && Caching.serpantinumDir !== "")

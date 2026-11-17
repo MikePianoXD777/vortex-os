@@ -617,8 +617,8 @@ Item {
                         Text {
                             Layout.fillWidth: true
                             text: window.targetMonthName.toUpperCase()
-                            font.family: ThemeBackend.fontFamily
-                            font.weight: Font.Black
+                            font.family: ThemeBackend.titleFont
+                            font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                             font.pixelSize: window.s(14)
                             fontSizeMode: Text.Fit
                             minimumPixelSize: window.s(8)
@@ -745,8 +745,8 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: DateTime.time
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
+                                font.family: ThemeBackend.titleFont
+                                font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                                 font.pixelSize: {
                                     let baseSize = window.s(70);
                                     let len = (DateTime.time || "").length;
@@ -905,8 +905,8 @@ Item {
                             Layout.fillWidth: true
                             horizontalAlignment: Text.AlignHCenter
                             text: window.dayData && window.dayData.day_full ? window.dayData.day_full.toUpperCase() : I18n.t("calendar.loading")
-                            font.family: ThemeBackend.fontFamily
-                            font.weight: Font.Black
+                            font.family: ThemeBackend.titleFont
+                            font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                             font.pixelSize: window.s(14)
                             fontSizeMode: Text.Fit
                             minimumPixelSize: window.s(8)
@@ -933,8 +933,8 @@ Item {
                         Text {
                             Layout.alignment: window.vertical ? Qt.AlignHCenter : Qt.AlignRight
                             text: (window.offline ? "--" : window.displayedTemp.toFixed(1)) + (Weather.unitSym || "°")
-                            font.family: ThemeBackend.fontFamily
-                            font.weight: Font.Black
+                            font.family: ThemeBackend.titleFont
+                            font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                             font.pixelSize: window.s(58)
                             color: window.tempGlowColor
                             style: Text.Outline

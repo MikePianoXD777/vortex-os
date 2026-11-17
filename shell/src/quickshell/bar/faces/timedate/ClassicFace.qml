@@ -69,9 +69,9 @@ Item {
                 id: timeText
                 anchors.left: parent.left
                 text: widget ? widget.timeStr : (typeof DateTime !== "undefined" ? DateTime.time : "12:00")
-                font.family: ThemeBackend.fontFamily
+                font.family: ThemeBackend.titleFont
                 font.pixelSize: widget ? widget.s(widget.isCompact ? 14 : 15) : 15
-                font.weight: Font.Black
+                font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                 color: (widget && widget.isCompact) ? Qt.lighter(ThemeBackend.blue, 1.1) : ThemeBackend.blue
             }
 
@@ -98,9 +98,9 @@ Item {
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: parsedTime.hours
-                font.family: ThemeBackend.fontFamily
+                font.family: ThemeBackend.titleFont
                 font.pixelSize: widget ? widget.s(widget.isCompact ? 13 : 14) : 14
-                font.weight: Font.Black
+                font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                 color: (widget && widget.isCompact) ? Qt.lighter(ThemeBackend.blue, 1.1) : ThemeBackend.blue
             }
 
@@ -108,9 +108,9 @@ Item {
                 visible: parsedTime.hasMinutes
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: parsedTime.minutes
-                font.family: ThemeBackend.fontFamily
+                font.family: ThemeBackend.titleFont
                 font.pixelSize: widget ? widget.s(widget.isCompact ? 13 : 14) : 14
-                font.weight: Font.Black
+                font.weight: (ThemeBackend.titleFont !== ThemeBackend.fontFamily ? Font.DemiBold : Font.Black)
                 color: (widget && widget.isCompact) ? Qt.lighter(ThemeBackend.sapphire, 1.1) : ThemeBackend.sapphire
             }
 
