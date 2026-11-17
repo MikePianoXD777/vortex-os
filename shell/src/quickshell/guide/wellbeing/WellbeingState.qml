@@ -53,16 +53,31 @@ GuideTab {
     property var topApps: []
     property var weekData: []
     property real maxWeekTotal: 1
+    property int weekTotalSeconds: 0
     property var monthData: []
     property real maxMonthTotal: 1
 
     property var weekAppsData: []
     property var weekHeatmapData: [[],[],[],[],[],[],[]]
     property real maxWeekHour: 1
+    property string peakHourToday: I18n.t("guide.wellbeing.not_available")
     property string peakUsageHours: I18n.t("guide.wellbeing.not_available")
 
     property var hourlyData: new Array(48).fill(0)
     property real maxHourlyTotal: 1
+
+    property bool hourlyCleared: false
+
+    property string lastLiveRaw: ""
+
+    function resetHourly() {
+        tabRoot.lastLiveRaw = "";
+        tabRoot.hourlyCleared = true;
+        tabRoot.hourlyData = new Array(48).fill(0);
+        tabRoot.maxHourlyTotal = 1;
+    }
+    onSelectedAppClassChanged: resetHourly()
+    onActiveDateChanged: resetHourly()
 
     property var allKnownApps: []
 
@@ -84,9 +99,9 @@ GuideTab {
     Behavior on settingsViewFocus { NumberAnimation { duration: 550; easing.type: Easing.OutExpo } }
 
     property bool isFirstLoad: true
-    readonly property bool isTodaySelected: getIsoDate(tabRoot.activeDate) === getIsoDate(new Date())
+    property string todayIso: getIsoDate(new Date())
+    readonly property bool isTodaySelected: getIsoDate(tabRoot.activeDate) === tabRoot.todayIso
 
-    readonly property string scriptsDir: rootObj.appPaths.qsDir + "/guide/wellbeing"
     readonly property string stateFilePath: rootObj.appPaths.getRunDir("focustime") + "/focustime_state.json"
 
     property real introHeader: 0.0
@@ -108,15 +123,15 @@ GuideTab {
             NumberAnimation { target: tabRoot; property: "introStats"; from: 0; to: 1.0; duration: 900; easing.type: Easing.OutBack; easing.overshoot: 1.2 }
         }
         SequentialAnimation {
-            PauseAnimation { duration: 350 }
+            PauseAnimation { duration: 400 }
             NumberAnimation { target: tabRoot; property: "introMidLeft"; from: 0; to: 1.0; duration: 850; easing.type: Easing.OutQuart }
         }
         SequentialAnimation {
-            PauseAnimation { duration: 300 }
+            PauseAnimation { duration: 250 }
             NumberAnimation { target: tabRoot; property: "introAppBars"; from: 0; to: 1.0; duration: 1300; easing.type: Easing.OutQuart }
         }
         SequentialAnimation {
-            PauseAnimation { duration: 450 }
+            PauseAnimation { duration: 400 }
             NumberAnimation { target: tabRoot; property: "introMidRight"; from: 0; to: 1.0; duration: 850; easing.type: Easing.OutQuart }
         }
         SequentialAnimation {
@@ -148,7 +163,49 @@ GuideTab {
         onTriggered: requestDataUpdate()
     }
 
+    function scheduleMidnight() {
+        let now = new Date();
+        let next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 500);
+        midnightTimer.interval = Math.max(1000, next - now);
+        midnightTimer.restart();
+    }
+
+    function rollDay() {
+        let now = new Date();
+        let cur = getIsoDate(now);
+        if (cur !== tabRoot.todayIso) {
+            let prev = tabRoot.todayIso;
+            let followGlobal = getIsoDate(tabRoot.globalDate) === prev;
+            let followApp = getIsoDate(tabRoot.appDate) === prev;
+            tabRoot.todayIso = cur;
+            if (followGlobal) tabRoot.globalDate = now;
+            if (followApp) tabRoot.appDate = now;
+            if ((tabRoot.selectedAppClass === "" && followGlobal) || (tabRoot.selectedAppClass !== "" && followApp)) {
+                tabRoot.isFirstLoad = true;
+                if (tabRoot.visible) tabRoot.requestDataUpdate();
+            }
+        }
+        scheduleMidnight();
+    }
+
+    Timer {
+        id: midnightTimer
+        repeat: false
+        onTriggered: tabRoot.rollDay()
+    }
+
+    Connections {
+        target: I18n
+        function onLanguageChanged() { tabRoot.lastLiveRaw = ""; }
+    }
+
+    Connections {
+        target: DesktopEntries.applications
+        function onValuesChanged() { tabRoot.lastLiveRaw = ""; }
+    }
+
     function activateTab() {
+        tabRoot.lastLiveRaw = "";
         dataUpdateDebounceTimer.restart();
         introHeader = 0.0; introStats = 0.0; introMidLeft = 0.0;
         introMidRight = 0.0; introBottom = 0.0; introAppBars = 0.0;
@@ -156,11 +213,23 @@ GuideTab {
     }
 
     onVisibleChanged: {
-        if (visible) activateTab();
+        if (visible) {
+            rollDay();
+            activateTab();
+        }
     }
 
     Component.onCompleted: {
+        scheduleMidnight();
         if (visible) activateTab();
+    }
+
+    function formatHour(hour) {
+        let h = ((hour % 24) + 24) % 24;
+        let ampm = h >= 12 ? I18n.t("guide.wellbeing.pm") : I18n.t("guide.wellbeing.am");
+        let h12 = h % 12;
+        h12 = h12 ? h12 : 12;
+        return h12 + ' ' + ampm;
     }
 
     function updateFromData(data) {
@@ -204,15 +273,8 @@ GuideTab {
             }
         }
 
-        function formatAMPM(hour) {
-            let ampm = hour >= 12 ? I18n.t("guide.wellbeing.pm") : I18n.t("guide.wellbeing.am");
-            let h12 = hour % 12;
-            h12 = h12 ? h12 : 12;
-            return h12 + ' ' + ampm;
-        }
-
         if (max2HourVal > 0) {
-            tabRoot.peakUsageHours = formatAMPM(peakStart) + " - " + formatAMPM(peakStart + 2);
+            tabRoot.peakUsageHours = tabRoot.formatHour(peakStart) + " - " + tabRoot.formatHour(peakStart + 2);
         } else {
             tabRoot.peakUsageHours = I18n.t("guide.wellbeing.not_available");
         }
@@ -229,19 +291,34 @@ GuideTab {
             syncMonthModel();
         }
 
+        tabRoot.hourlyCleared = false;
         tabRoot.hourlyData = data.hourly || new Array(48).fill(0);
         let currentMaxHour = 1;
         for(let i=0; i<48; i++) {
             if (tabRoot.hourlyData[i] > currentMaxHour) currentMaxHour = tabRoot.hourlyData[i];
         }
         tabRoot.maxHourlyTotal = currentMaxHour;
+
+        let bestHour = -1;
+        let bestVal = 0;
+        for (let h = 0; h < 24; h++) {
+            let v = (tabRoot.hourlyData[h * 2] || 0) + (tabRoot.hourlyData[h * 2 + 1] || 0);
+            if (v > bestVal) { bestVal = v; bestHour = h; }
+        }
+        tabRoot.peakHourToday = bestHour >= 0 ? (tabRoot.formatHour(bestHour) + " - " + tabRoot.formatHour(bestHour + 1)) : I18n.t("guide.wellbeing.not_available");
+
+        let wk = 0;
+        for (let i = 0; i < tabRoot.weekData.length; i++) wk += tabRoot.weekData[i].total || 0;
+        tabRoot.weekTotalSeconds = wk;
     }
 
     function requestDataUpdate() {
         if (tabRoot.selectedAppClass === "" && getIsoDate(tabRoot.activeDate) === getIsoDate(new Date())) {
-            liveFileReader.running = true;
+            tabRoot.liveReadPending = true;
+            liveFileReader.reload();
         } else {
-            let cmd = ["python3", tabRoot.scriptsDir + "/get_stats.py", getIsoDate(tabRoot.activeDate)];
+            tabRoot.lastLiveRaw = "";
+            let cmd = ["serpantinum-core", "screentime", "stats", getIsoDate(tabRoot.activeDate)];
             if (tabRoot.selectedAppClass !== "") {
                 cmd.push("--app");
                 cmd.push(tabRoot.selectedAppClass);
@@ -253,23 +330,30 @@ GuideTab {
         }
     }
 
-    Process {
+    property bool liveReadPending: false
+
+    FileView {
         id: liveFileReader
-        command: ["cat", tabRoot.stateFilePath]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let raw = this.text.trim();
-                if (raw === "") return;
-                try {
-                    let data = JSON.parse(raw);
-                    tabRoot.updateFromData(data);
-                } catch(e) {}
+        path: tabRoot.stateFilePath
+        onLoaded: {
+            if (!tabRoot.liveReadPending) return;
+            tabRoot.liveReadPending = false;
+            let raw = liveFileReader.text().trim();
+            if (raw === "") return;
+            if (!tabRoot.isFirstLoad && raw === tabRoot.lastLiveRaw) return;
+            try {
+                let data = JSON.parse(raw);
+                tabRoot.updateFromData(data);
+                tabRoot.lastLiveRaw = raw;
+            } catch(e) {
+                tabRoot.lastLiveRaw = "";
             }
         }
+        onLoadFailed: tabRoot.liveReadPending = false
     }
 
     Timer {
-        interval: 1000
+        interval: tabRoot.selectedAppClass === "" ? 1000 : 15000
         running: tabRoot.isTodaySelected && tabRoot.visible
         repeat: true
         onTriggered: tabRoot.requestDataUpdate()
@@ -279,6 +363,7 @@ GuideTab {
         id: statsPoller
         stdout: StdioCollector {
             onStreamFinished: {
+                tabRoot.lastLiveRaw = "";
                 let raw = this.text.trim();
                 if (raw === "") return;
                 try {
@@ -297,7 +382,7 @@ GuideTab {
     function getFancyDate(d) {
         let monthName = tabRoot.monthNames[d.getMonth()];
         let dateNum = d.getDate();
-        let isToday = getIsoDate(d) === getIsoDate(new Date());
+        let isToday = getIsoDate(d) === tabRoot.todayIso;
         return isToday ? I18n.t("guide.wellbeing.today") : `${monthName} ${dateNum}`;
     }
 
@@ -310,6 +395,21 @@ GuideTab {
             tabRoot.appDate = d;
         }
         tabRoot.isFirstLoad = true;
+        tabRoot.requestDataUpdate();
+    }
+
+    function goToToday() {
+        let d = new Date();
+        if (tabRoot.selectedAppClass === "") tabRoot.globalDate = d;
+        else tabRoot.appDate = d;
+        tabRoot.isFirstLoad = true;
+        tabRoot.requestDataUpdate();
+    }
+
+    function clearSelectedApp() {
+        tabRoot.selectedAppClass = "";
+        tabRoot.selectedAppName = "";
+        tabRoot.selectedAppIcon = "";
         tabRoot.requestDataUpdate();
     }
 
@@ -411,6 +511,96 @@ GuideTab {
             }
         }
         while (monthListModel.count > tabRoot.monthData.length) monthListModel.remove(monthListModel.count - 1);
+    }
+
+    readonly property var wellbeingSettings: {
+        let s = Config.rawSettings ? Config.rawSettings["wellbeing"] : undefined;
+        return s || {};
+    }
+    readonly property int overallLimitSeconds: Number(wellbeingSettings.overallDailyLimit) || 0
+    readonly property var appLimits: wellbeingSettings.appLimits || {}
+    readonly property var excludedApps: wellbeingSettings.excludedApps || []
+    readonly property int selectedAppLimitSeconds: selectedAppClass !== "" ? (Number(appLimits[selectedAppClass]) || 0) : 0
+    readonly property int activeLimitSeconds: selectedAppClass !== "" ? selectedAppLimitSeconds : overallLimitSeconds
+
+    function updateWellbeingSetting(key, value) {
+        let current = JSON.parse(JSON.stringify((Config.rawSettings && Config.rawSettings["wellbeing"]) || {}));
+        current[key] = value;
+        Config.setSetting("wellbeing", current);
+    }
+
+    function setOverallLimit(seconds) {
+        if (seconds === overallLimitSeconds) return;
+        updateWellbeingSetting("overallDailyLimit", seconds);
+    }
+
+    function setAppLimit(appClass, seconds) {
+        let limits = JSON.parse(JSON.stringify(appLimits));
+        if (seconds > 0) limits[appClass] = seconds;
+        else delete limits[appClass];
+        updateWellbeingSetting("appLimits", limits);
+    }
+
+    function setAppExcluded(appClass, excluded) {
+        let list = excludedApps.filter(function(c) { return c !== appClass; });
+        if (excluded) list.push(appClass);
+        updateWellbeingSetting("excludedApps", list);
+    }
+
+    property string appPickerMode: ""
+
+    function openAppPicker(mode) { appPickerMode = mode; }
+    function closeAppPicker() { appPickerMode = ""; }
+
+    function isAppTaken(appClass, mode) {
+        let key = String(appClass).toLowerCase();
+        if (mode === "limit") return Object.keys(appLimits).some(function(c) { return c.toLowerCase() === key; });
+        return excludedApps.some(function(c) { return String(c).toLowerCase() === key; });
+    }
+
+    function applyPickedApp(appClass) {
+        if (appPickerMode === "limit") setAppLimit(appClass, 3600);
+        else if (appPickerMode === "exclude") setAppExcluded(appClass, true);
+        closeAppPicker();
+    }
+
+    function installedAppList() {
+        let seen = {};
+        let list = [];
+        function add(cls, name, icon, comment) {
+            let key = String(cls).toLowerCase();
+            if (!cls || seen[key]) return;
+            seen[key] = true;
+            list.push({ class: cls, name: name || cls, icon: icon || "", comment: comment || "" });
+        }
+        for (let i = 0; i < allKnownApps.length; i++) {
+            let a = allKnownApps[i];
+            add(a.class, a.name, a.icon, a.class);
+        }
+        if (typeof DesktopEntries !== "undefined" && DesktopEntries.applications && DesktopEntries.applications.values) {
+            let entries = DesktopEntries.applications.values;
+            for (let i = 0; i < entries.length; i++) {
+                let e = entries[i];
+                if (e.noDisplay) continue;
+                let cls = e.startupClass || String(e.id || "").replace(/\.desktop$/, "");
+                add(cls, e.name, e.icon, e.comment);
+            }
+        }
+        list.sort(function(a, b) { return (a.name || "").localeCompare(b.name || ""); });
+        return list;
+    }
+
+    function iconSource(ic) {
+        if (!ic) return "";
+        if (ic.startsWith("file://") || ic.startsWith("image://") || ic.startsWith("http://") || ic.startsWith("https://")) return ic;
+        return ic.startsWith("/") ? "file://" + ic : "image://icon/" + ic;
+    }
+
+    function appInfo(appClass) {
+        for (let i = 0; i < allKnownApps.length; i++) {
+            if (allKnownApps[i].class === appClass) return allKnownApps[i];
+        }
+        return resolveApp(appClass, appClass);
     }
 
     function formatTimeLarge(secs) {

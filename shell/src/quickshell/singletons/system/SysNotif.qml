@@ -73,8 +73,12 @@ Item {
             "lastNotifTime": root.lastNotifTime,
             "lastNotifType": root.lastNotifType
         });
-        let dir = (typeof Caching !== "undefined" && Caching.runDir) ? Caching.runDir : "/tmp/serpantinum";
-        Quickshell.execDetached(["bash", "-c", 'mkdir -p "$1" && printf "%s\\n" "$2" > "$3"', "_", dir, payload, root.stateFilePath]);
+        stateFileWriter.setText(payload + "\n");
+    }
+
+    FileView {
+        id: stateFileWriter
+        path: root.stateFilePath
     }
 
     function sendNotification(type, summary, body, icon, urgency) {
@@ -94,10 +98,11 @@ Item {
         let appName = I18n.t("sysnotif.battery.app_name");
         if (appName === "sysnotif.battery.app_name") appName = "System";
         Quickshell.execDetached([
-            "notify-send",
-            "-a", appName,
-            "-u", u,
-            "-i", ic,
+            "serpantinum-core", "notify",
+            "--app", appName,
+            "--urgency", u,
+            "--icon", ic,
+            "--",
             summary,
             body
         ]);
@@ -148,7 +153,7 @@ Item {
                     "full",
                     title,
                     body,
-                    "battery-full-charged",
+                    "battery-kind-full",
                     "normal"
                 );
             }
@@ -164,8 +169,8 @@ Item {
                         "critical",
                         title,
                         body,
-                        "battery-level-0-symbolic",
-                        "critical"
+                        "battery-kind-critical",
+                        "normal"
                     );
                 }
             } else if (pct <= 20) {
@@ -178,8 +183,8 @@ Item {
                         "low",
                         title,
                         body,
-                        "battery-level-20-symbolic",
-                        "critical"
+                        "battery-kind-low",
+                        "normal"
                     );
                 }
             } else if (pct > 25) {

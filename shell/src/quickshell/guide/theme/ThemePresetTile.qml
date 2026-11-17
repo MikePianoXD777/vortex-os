@@ -21,8 +21,10 @@ Rectangle {
     property real flashOpacity: 0.0
     property real popScale: 1.0
 
-    property color baseC: delegateContainer.tab.getCardBase(modelData)
-    property color textC: delegateContainer.tab.getCardText(modelData)
+    readonly property bool onWallpaper: modelData.isMatugen === true && delegateContainer.tab.currentWallpaperPath !== ""
+
+    property color baseC: delegateContainer.onWallpaper ? "#0c0a09" : delegateContainer.tab.getCardBase(modelData)
+    property color textC: delegateContainer.onWallpaper ? "#ffffff" : delegateContainer.tab.getCardText(modelData)
 
     HoverHandler {
         id: delegateHover
@@ -32,12 +34,12 @@ Rectangle {
 
     Component.onCompleted: opacity = 1.0
 
-    Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutQuint } }
-    Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuint } }
+    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
+    Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
 
     Loader {
         anchors.fill: parent
-        active: modelData.isMatugen === true && delegateContainer.tab.currentWallpaperPath !== ""
+        active: delegateContainer.onWallpaper
         sourceComponent: Item {
             anchors.fill: parent
 
@@ -72,8 +74,8 @@ Rectangle {
                     anchors.fill: parent
                     source: matugenWall
                     blurEnabled: true
-                    blurMax: 4
-                    blur: 0.4
+                    blurMax: 12
+                    blur: 0.5
                     colorizationColor: delegateContainer.baseC
                     colorization: 0.35
                     opacity: 0.85
@@ -112,22 +114,19 @@ Rectangle {
         radius: ThemeBackend.borderRadius
         color: "#ffffff"
         opacity: delegateContainer.flashOpacity
-        PropertyAnimation on opacity { id: btnFlashAnim; to: 0; duration: 350; easing.type: Easing.OutExpo }
+        PropertyAnimation on opacity { id: btnFlashAnim; to: 0; duration: 400; easing.type: Easing.OutExpo }
     }
 
     Rectangle {
         anchors.fill: parent
         radius: ThemeBackend.borderRadius
         color: "transparent"
-        border.color: delegateContainer.isSelected ? delegateContainer.textC : "transparent"
-        border.width: delegateContainer.isSelected ? 2 : 0
-        Behavior on border.color { ColorAnimation { duration: 150 } }
     }
 
     SequentialAnimation {
         id: btnPopAnim
         NumberAnimation { target: delegateContainer; property: "popScale"; to: 1.04; duration: 100; easing.type: Easing.OutQuad }
-        NumberAnimation { target: delegateContainer; property: "popScale"; to: 1.0; duration: 350; easing.type: Easing.OutQuint }
+        NumberAnimation { target: delegateContainer; property: "popScale"; to: 1.0; duration: 400; easing.type: Easing.OutQuint }
     }
 
     MouseArea {

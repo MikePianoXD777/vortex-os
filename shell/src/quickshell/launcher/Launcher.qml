@@ -12,7 +12,7 @@ import "../reusables"
 import "../WindowRegistry.js" as WindowRegistry
 import "Calculadora.js" as Calculadora
 import "Recordatorios.js" as RecordatoriosJs
-import "./EmojiData.js" as EmojiData
+import "./SearchProviders.js" as SearchProviders
 
 PanelWindow {
     id: launcherWindow
@@ -53,9 +53,8 @@ PanelWindow {
     property string tabEmojisTitle: (typeof I18n !== "undefined") ? I18n.t("applauncher.tab_emojis", "Emojis") : "Emojis"
 
     function saveLastTab() {
-        let dir = (typeof Caching !== "undefined" && typeof Caching.getCacheDir === "function") ? Caching.getCacheDir("launcher") : "";
-        if (dir) {
-            Quickshell.execDetached(["bash", "-c", "mkdir -p '" + dir + "' && echo '" + currentTabIndex + "' > '" + dir + "/last_tab.txt'"]);
+        if (lastTabWatcher.path !== "") {
+            lastTabWatcher.setText(currentTabIndex + "\n");
         }
     }
 
@@ -210,7 +209,8 @@ PanelWindow {
         "width": 600,
         "itemCount": 6,
         "terminalCommand": "kitty -e",
-        "smartRanking": true
+        "smartRanking": true,
+        "searchProvider": "google"
     })
 
     property var rawLauncherSettings: {
@@ -228,6 +228,7 @@ PanelWindow {
     property real customWidth: (rawLauncherSettings && rawLauncherSettings.width !== undefined && !isNaN(rawLauncherSettings.width) && rawLauncherSettings.width > 0) ? rawLauncherSettings.width : 600
     property int customItemCount: (rawLauncherSettings && rawLauncherSettings.itemCount !== undefined && !isNaN(rawLauncherSettings.itemCount) && rawLauncherSettings.itemCount > 0) ? rawLauncherSettings.itemCount : 6
     property string terminalCommand: (rawLauncherSettings && rawLauncherSettings.terminalCommand !== undefined) ? rawLauncherSettings.terminalCommand : "kitty -e"
+    property string searchProvider: (rawLauncherSettings && rawLauncherSettings.searchProvider !== undefined) ? rawLauncherSettings.searchProvider : SearchProviders.DEFAULT_ID
     property bool smartRanking: (rawLauncherSettings && rawLauncherSettings.smartRanking !== undefined) ? rawLauncherSettings.smartRanking : true
 
     onSmartRankingChanged: {
@@ -298,8 +299,12 @@ PanelWindow {
 
     property real barHeight: {
         let dummy = configRevision;
-        return (typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar && Config.rawSettings.bar.height) ? s(Config.rawSettings.bar.height) : s(40);
+        let v = (typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar && Config.rawSettings.bar.height !== undefined) ? Number(Config.rawSettings.bar.height) : 40;
+        if (isNaN(v)) v = 40;
+        return Math.round(s(Math.max(28, Math.min(48, v))));
     }
+
+    property real barInset: barHeight + (barStyle === "solid" && !barAutohide ? Math.round(s(4)) : 0)
 
     property bool isBarAttachable: barStyle === "solid" || barStyle === "fill"
     property bool barMatchesLauncher: isBarAttachable && (attachEdge === barPosition) && !isBarEffectivelyHidden
@@ -345,12 +350,12 @@ PanelWindow {
     property real animatedLauncherHeight: targetLauncherHeight
     Behavior on animatedLauncherHeight {
         NumberAnimation {
-            duration: 300
+            duration: 250
             easing.type: Easing.OutCubic
         }
     }
 
-    visible: isVisible || container.animProgress > 0.001
+    visible: launcherReveal.active
 
     property var allApps: []
     property var usageRanks: ({ "focus": {}, "launch": {}, "context": {} })
@@ -367,7 +372,7 @@ PanelWindow {
     Process {
         id: rankFetcher
         running: false
-        command: Caching.qsDir ? ["python3", Caching.qsDir + "/launcher/app_rank.py", "--rank"] : []
+        command: ["serpantinum-core", "launcher", "rank"]
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -413,7 +418,6 @@ PanelWindow {
         }
     }
 
-    property string fileSearchScript: "import os, sys, json\nq = sys.argv[1] if len(sys.argv) > 1 else ''\nhome = os.path.expanduser('~')\nres = []\nif q.startswith('/') or q.startswith('~'):\n    p = os.path.expanduser(q)\n    d = p if (os.path.isdir(p) and (q.endswith('/') or q.endswith('\\\\'))) else (os.path.dirname(p) or home)\n    pref = '' if (os.path.isdir(p) and (q.endswith('/') or q.endswith('\\\\'))) else os.path.basename(p).lower()\n    if os.path.isdir(d):\n        try:\n            entries = sorted(os.listdir(d), key=lambda x: (not os.path.isdir(os.path.join(d, x)), x.lower()))\n            for item in entries:\n                if item.startswith('.') and not pref.startswith('.'):\n                    continue\n                if not pref or pref in item.lower():\n                    full = os.path.join(d, item)\n                    res.append({'name': item, 'path': full, 'isDir': os.path.isdir(full)})\n                    if len(res) >= 40: break\n        except Exception: pass\nelse:\n    s = q.lower().strip()\n    targets = [home, os.path.join(home, 'Desktop'), os.path.join(home, 'Documents'), os.path.join(home, 'Downloads'), os.path.join(home, 'Pictures'), os.path.join(home, 'Videos'), os.path.join(home, 'Music')]\n    seen = set()\n    for t in targets:\n        if not os.path.isdir(t): continue\n        try:\n            for root, dirs, files in os.walk(t):\n                rel = os.path.relpath(root, t)\n                if rel != '.' and rel.count(os.sep) >= 2:\n                    dirs.clear()\n                    continue\n                dirs[:] = [dr for dr in dirs if not dr.startswith('.') and dr not in ('node_modules', '.git', '.cache', 'target', 'build', '.local')]\n                if s:\n                    for dr in dirs:\n                        if s in dr.lower():\n                            full = os.path.join(root, dr)\n                            if full not in seen:\n                                seen.add(full)\n                                res.append({'name': dr, 'path': full, 'isDir': True})\n                                if len(res) >= 40: break\n                for fn in files:\n                    if fn.startswith('.'): continue\n                    if not s or s in fn.lower():\n                        full = os.path.join(root, fn)\n                        if full not in seen:\n                            seen.add(full)\n                            res.append({'name': fn, 'path': full, 'isDir': False})\n                            if len(res) >= 40: break\n                if len(res) >= 40: break\n        except Exception: pass\n        if len(res) >= 40: break\nprint(json.dumps(res[:40]))"
 
     Process {
         id: fileSearchProcess
@@ -438,6 +442,8 @@ PanelWindow {
                                 isCommand: false,
                                 command: "",
                                 isCalc: false,
+                                isSearch: false,
+                                searchUrl: "",
                                 calcResult: "",
                                 isWidget: false,
                                 widgetTarget: "",
@@ -669,7 +675,8 @@ PanelWindow {
                 let score = 0;
                 if (launcherWindow.smartRanking) {
                     let wmclassLower = (e.startupClass || "").toLowerCase();
-                    let baseName = e.id.toLowerCase().replace(".desktop", "");
+                    let idLower = e.id.toLowerCase();
+                    let baseName = idLower.endsWith(".desktop") ? idLower.slice(0, -8) : idLower;
                     let appNameLower = (e.name || "").toLowerCase();
 
                     let f_score = usageRanks.focus[wmclassLower] || 0;
@@ -688,6 +695,7 @@ PanelWindow {
                 arr.push({
                     name: e.name,
                     description: e.comment || "",
+                    searchTerms: [e.genericName || ""].concat(e.keywords || []).join(" ").toLowerCase(),
                     desktop_id: e.id,
                     icon: e.icon || "",
                     fontIcon: "",
@@ -695,6 +703,8 @@ PanelWindow {
                     isCommand: false,
                     command: "",
                     isCalc: false,
+                    isSearch: false,
+                    searchUrl: "",
                     calcResult: "",
                     isWidget: false,
                     widgetTarget: "",
@@ -725,6 +735,8 @@ PanelWindow {
                 isCommand: false,
                 command: "",
                 isCalc: false,
+                isSearch: false,
+                searchUrl: "",
                 calcResult: "",
                 isWidget: true,
                 widgetTarget: w.id,
@@ -776,11 +788,26 @@ PanelWindow {
         emojiDebounceTimer.restart();
     }
 
+    property var emojiSearch: null
+
+    function ensureEmojiSearch() {
+        if (!emojiSearch) {
+            let component = Qt.createComponent(Qt.resolvedUrl("EmojiSearch.qml"));
+            if (component.status === Component.Ready) {
+                emojiSearch = component.createObject(launcherWindow);
+            } else {
+                console.warn("Failed to load emoji search:", component.errorString());
+            }
+        }
+        return emojiSearch;
+    }
+
     function executeEmojiFilter(query) {
         launcherWindow.isKeyboardNav = false;
         if (keyboardNavTimer.running) keyboardNavTimer.stop();
 
-        let results = EmojiData.search(query ? query.trim() : "", 150);
+        let search = ensureEmojiSearch();
+        let results = search ? search.search(query ? query.trim() : "", 150) : [];
         applyEmojiModelItems(results);
     }
 
@@ -829,7 +856,7 @@ PanelWindow {
         if (fileSearchProcess.running) {
             fileSearchProcess.running = false;
         }
-        fileSearchProcess.command = ["python3", "-c", launcherWindow.fileSearchScript, query ? query.trim() : ""];
+        fileSearchProcess.command = ["serpantinum-core", "launcher", "files", query ? query.trim() : ""];
         fileSearchProcess.running = true;
     }
 
@@ -860,6 +887,8 @@ PanelWindow {
                 || cur.calcResult !== target.calcResult
                 || cur.isCommand !== target.isCommand
                 || cur.isCalc !== target.isCalc
+                || cur.isSearch !== target.isSearch
+                || cur.searchUrl !== target.searchUrl
                 || cur.isWidget !== target.isWidget
                 || cur.widgetTarget !== target.widgetTarget
                 || cur.isFile !== target.isFile
@@ -909,6 +938,8 @@ PanelWindow {
                     isCommand: true,
                     command: cmd,
                     isCalc: false,
+                    isSearch: false,
+                    searchUrl: "",
                     calcResult: "",
                     isWidget: false,
                     widgetTarget: "",
@@ -927,6 +958,8 @@ PanelWindow {
                     isCommand: false,
                     command: "",
                     isCalc: false,
+                    isSearch: false,
+                    searchUrl: "",
                     calcResult: "",
                     isWidget: false,
                     widgetTarget: "",
@@ -935,6 +968,34 @@ PanelWindow {
                     isDir: false
                 });
             }
+        }
+
+        if (rawTrimmed.startsWith("?")) {
+            let term = rawTrimmed.substring(1).trim();
+            let provider = SearchProviders.find(launcherWindow.searchProvider);
+            filtered.push({
+                name: term.length > 0 ? "? " + term : "? ...",
+                description: term.length > 0
+                    ? (typeof I18n !== "undefined" ? I18n.t("applauncher.search_run", { provider: provider.name }) : ("Search " + provider.name))
+                    : (typeof I18n !== "undefined" ? I18n.t("applauncher.search_hint", { provider: provider.name }) : "Type to search the web"),
+                desktop_id: "",
+                icon: "",
+                fontIcon: "󰖟",
+                score: 10000000,
+                isCommand: false,
+                command: "",
+                isCalc: false,
+                isSearch: term.length > 0,
+                searchUrl: term.length > 0 ? SearchProviders.urlFor(launcherWindow.searchProvider, term) : "",
+                calcResult: "",
+                isWidget: false,
+                widgetTarget: "",
+                isFile: false,
+                filePath: "",
+                isDir: false
+            });
+            applyModelItems(filtered);
+            return;
         }
 
         // Vortex 1.10: recordatorios («recuérdame en 20 min sacar la pizza»; Recordatorios.js y el
@@ -987,6 +1048,7 @@ PanelWindow {
             }
         }
 
+
         let mathResult = evaluateMath(rawTrimmed);
         if (mathResult !== null) {
             filtered.push({
@@ -999,6 +1061,8 @@ PanelWindow {
                 isCommand: false,
                 command: "",
                 isCalc: true,
+                isSearch: false,
+                searchUrl: "",
                 calcResult: mathResult,
                 isWidget: false,
                 widgetTarget: "",
@@ -1042,6 +1106,7 @@ PanelWindow {
             let app = allApps[i];
             let nameLower = app.name ? app.name.toLowerCase() : "";
             let descLower = app.description ? app.description.toLowerCase() : "";
+            let termsLower = app.searchTerms || "";
 
             let matchQuality = 0;
             let matches = false;
@@ -1061,6 +1126,9 @@ PanelWindow {
                 } else if (descLower.includes(q)) {
                     matchQuality = 5000;
                     matches = true;
+                } else if (termsLower.includes(q)) {
+                    matchQuality = 3000;
+                    matches = true;
                 } else if (isSubsequence(q, nameLower)) {
                     matchQuality = 1000;
                     matches = true;
@@ -1078,6 +1146,8 @@ PanelWindow {
                     isCommand: false,
                     command: "",
                     isCalc: false,
+                    isSearch: false,
+                    searchUrl: "",
                     calcResult: "",
                     isWidget: app.isWidget || false,
                     widgetTarget: app.widgetTarget || "",
@@ -1119,12 +1189,18 @@ PanelWindow {
                 + "if [ -n \"$handler\" ]; then\n"
                 + "  xdg-open \"$p\" 2>/dev/null && exit 0\n"
                 + "fi\n"
-                + "if command -v nautilus >/dev/null 2>&1; then\n"
-                + "  nautilus --select \"$p\" >/dev/null 2>&1 &\n"
+                + "if command -v ski >/dev/null 2>&1; then\n"
+                + "  ski \"$p\" >/dev/null 2>&1 &\n"
                 + "else\n"
                 + "  xdg-open \"$(dirname \"$p\")\" >/dev/null 2>&1 &\n"
                 + "fi";
             Quickshell.execDetached(["bash", "-c", script, "_", item.filePath]);
+            closeLauncher();
+            return;
+        }
+
+        if (item.isSearch) {
+            if (item.searchUrl) Quickshell.execDetached(["xdg-open", item.searchUrl]);
             closeLauncher();
             return;
         }
@@ -1193,7 +1269,7 @@ PanelWindow {
             entry.execute();
         }
         if (Caching.qsDir) {
-            Quickshell.execDetached(["python3", Caching.qsDir + "/launcher/app_rank.py", "--log-launch", "--name", appName]);
+            Quickshell.execDetached(["serpantinum-core", "launcher", "log", appName]);
         }
         closeLauncher();
     }
@@ -1201,7 +1277,7 @@ PanelWindow {
     Item {
         id: topBarHole
 
-        property int barThickness: launcherWindow.barHeight
+        property int barThickness: launcherWindow.barInset
         property string bp: launcherWindow.barPosition
         property bool activeBar: !launcherWindow.isBarEffectivelyHidden
 
@@ -1238,6 +1314,17 @@ PanelWindow {
         onClicked: closeLauncher()
     }
 
+    AttachedSurface {
+        kind: "launcher"
+        visible: container.animProgress > 0.001 && container.width > 0 && container.height > 0
+        opacity: container.opacity
+        rects: [{ x: container.x, y: container.y, w: container.width, h: container.height, r: [bgCard.topLeftRadius, bgCard.topRightRadius, bgCard.bottomRightRadius, bgCard.bottomLeftRadius] }]
+        filletRadius: launcherWindow.isCentered ? 0 : container.dynamicCornerRadius
+        attachTo: launcherWindow.barMatchesLauncher ? ["bar"] : []
+        publishShape: launcherWindow.barMatchesLauncher
+        edges: (launcherWindow.isCentered || launcherWindow.barMatchesLauncher) ? [] : [launcherWindow.attachEdge]
+    }
+
     Item {
         id: container
 
@@ -1245,23 +1332,23 @@ PanelWindow {
             anchors.fill: parent
         }
 
-        property real animProgress: launcherWindow.isVisible ? 1.0 : 0.0
-        Behavior on animProgress {
-            NumberAnimation {
-                duration: launcherWindow.isVisible ? (launcherWindow.isCentered ? 420 : 340) : (launcherWindow.isCentered ? 200 : 150)
-                easing.type: launcherWindow.isVisible ? Easing.OutBack : Easing.InQuad
-                easing.overshoot: launcherWindow.isVisible ? 1.28 : 1.0
-            }
+        SpringProgress {
+            id: launcherReveal
+            open: launcherWindow.isVisible
+            openDuration: 520
+            closeDuration: launcherWindow.isCentered ? 200 : 150
         }
+
+        readonly property real animProgress: launcherReveal.value
 
         property real dynamicCornerRadius: Math.round(Math.max(0, Math.min(launcherWindow.outerCornerRadius, (launcherWindow.isSideAttached ? width : height) * 0.5)))
 
         x: {
             if (launcherWindow.attachEdge === "left") {
-                return launcherWindow.barMatchesLauncher ? launcherWindow.barHeight : 0;
+                return launcherWindow.barMatchesLauncher ? launcherWindow.barInset : 0;
             }
             if (launcherWindow.attachEdge === "right") {
-                let offset = launcherWindow.barMatchesLauncher ? launcherWindow.barHeight : 0;
+                let offset = launcherWindow.barMatchesLauncher ? launcherWindow.barInset : 0;
                 return (launcherWindow.width - offset) - width;
             }
             return Math.floor((launcherWindow.width - width) / 2);
@@ -1269,10 +1356,10 @@ PanelWindow {
 
         y: {
             if (launcherWindow.attachEdge === "top") {
-                return launcherWindow.barMatchesLauncher ? launcherWindow.barHeight : 0;
+                return launcherWindow.barMatchesLauncher ? launcherWindow.barInset : 0;
             }
             if (launcherWindow.attachEdge === "bottom") {
-                let offset = launcherWindow.barMatchesLauncher ? launcherWindow.barHeight : 0;
+                let offset = launcherWindow.barMatchesLauncher ? launcherWindow.barInset : 0;
                 return (launcherWindow.height - offset) - height;
             }
             return Math.floor((launcherWindow.height - height) / 2);
@@ -1300,66 +1387,6 @@ PanelWindow {
 
         transformOrigin: Item.Center
 
-        GlassFillets {
-            id: launcherFillets
-            card: bgCard
-            filletRadius: launcherWindow.isCentered ? 0 : container.dynamicCornerRadius
-            filletDir: launcherWindow.attachEdge === "top" ? Qt.vector2d(0, -1)
-                     : launcherWindow.attachEdge === "bottom" ? Qt.vector2d(0, 1)
-                     : launcherWindow.attachEdge === "left" ? Qt.vector2d(-1, 0)
-                     : Qt.vector2d(1, 0)
-        }
-
-        ShaderEffect {
-            visible: !launcherWindow.isCentered && container.dynamicCornerRadius > 0.5
-            x: {
-                if (launcherWindow.attachEdge === "left") return 0;
-                if (launcherWindow.attachEdge === "right") return parent.width - container.dynamicCornerRadius;
-                return -container.dynamicCornerRadius;
-            }
-            y: {
-                if (launcherWindow.attachEdge === "bottom") return parent.height - container.dynamicCornerRadius;
-                if (launcherWindow.attachEdge === "left" || launcherWindow.attachEdge === "right") return -container.dynamicCornerRadius;
-                return 0;
-            }
-            width: container.dynamicCornerRadius
-            height: container.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (launcherWindow.attachEdge === "bottom") return 3.0;
-                if (launcherWindow.attachEdge === "left") return 2.0;
-                if (launcherWindow.attachEdge === "right") return 3.0;
-                return 1.0;
-            }
-            property color color: Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity)
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
-
-        ShaderEffect {
-            visible: !launcherWindow.isCentered && container.dynamicCornerRadius > 0.5
-            x: {
-                if (launcherWindow.attachEdge === "left") return 0;
-                if (launcherWindow.attachEdge === "right") return parent.width - container.dynamicCornerRadius;
-                return parent.width;
-            }
-            y: {
-                if (launcherWindow.attachEdge === "bottom") return parent.height - container.dynamicCornerRadius;
-                if (launcherWindow.attachEdge === "left" || launcherWindow.attachEdge === "right") return parent.height;
-                return 0;
-            }
-            width: container.dynamicCornerRadius
-            height: container.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (launcherWindow.attachEdge === "bottom") return 2.0;
-                if (launcherWindow.attachEdge === "left") return 0.0;
-                if (launcherWindow.attachEdge === "right") return 1.0;
-                return 0.0;
-            }
-            property color color: Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity)
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
-
         Rectangle {
             id: bgCard
             anchors.fill: parent
@@ -1369,21 +1396,8 @@ PanelWindow {
             topRightRadius: (flatCorners && (launcherWindow.attachEdge === "top" || launcherWindow.attachEdge === "right")) ? 0 : container.dynamicCornerRadius
             bottomLeftRadius: (flatCorners && (launcherWindow.attachEdge === "bottom" || launcherWindow.attachEdge === "left")) ? 0 : container.dynamicCornerRadius
             bottomRightRadius: (flatCorners && (launcherWindow.attachEdge === "bottom" || launcherWindow.attachEdge === "right")) ? 0 : container.dynamicCornerRadius
-            color: Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity)
-            border.width: 0
-            border.color: launcherWindow.isCentered ? Qt.alpha(ThemeBackend.surface2, 0.6) : "transparent"
+            color: "transparent"
             clip: true
-
-            WallpaperBlur {
-                z: -1
-                anchors.fill: parent
-                topLeftRadius: parent.topLeftRadius
-                topRightRadius: parent.topRightRadius
-                bottomLeftRadius: parent.bottomLeftRadius
-                bottomRightRadius: parent.bottomRightRadius
-                filletRadius: launcherFillets.filletRadius
-                filletDir: launcherFillets.filletDir
-            }
 
             Item {
                 id: contentContainer
@@ -1572,7 +1586,7 @@ PanelWindow {
                         id: scrollAnim
                         target: appList
                         property: "contentY"
-                        duration: 260
+                        duration: 250
                         easing.type: Easing.OutCubic
                     }
 
@@ -1587,7 +1601,7 @@ PanelWindow {
 
                         readonly property bool isMoving: Math.abs(morphHighlight.y - morphHighlight.targetY) > 0.5
                         property real lift: (highlightLayerGlass.active && isMoving) ? 1.0 : 0.0
-                        Behavior on lift { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                        Behavior on lift { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                         transform: Scale {
                             origin.x: highlightGlassLayer.width / 2
                             origin.y: highlightGlassLayer.height / 2
@@ -1774,7 +1788,7 @@ PanelWindow {
                             Behavior on y {
                                 enabled: launcherWindow.isKeyboardNav
                                 NumberAnimation {
-                                    duration: 260
+                                    duration: 250
                                     easing.type: Easing.OutCubic
                                 }
                             }
@@ -1803,7 +1817,7 @@ PanelWindow {
                                 anchors.fill: parent
 
                                 scale: ma.pressed ? 0.98 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
+                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack; easing.overshoot: 1.2 } }
 
                                 Rectangle {
                                     anchors.fill: parent
@@ -1832,10 +1846,10 @@ PanelWindow {
                                     spacing: launcherWindow.s(10)
 
                                     Behavior on anchors.leftMargin {
-                                        NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.15 }
+                                        NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.15 }
                                     }
                                     Behavior on anchors.rightMargin {
-                                        NumberAnimation { duration: 220; easing.type: Easing.OutBack; easing.overshoot: 1.15 }
+                                        NumberAnimation { duration: 250; easing.type: Easing.OutBack; easing.overshoot: 1.15 }
                                     }
 
                                     Item {
@@ -2093,7 +2107,7 @@ PanelWindow {
                             id: emojiScrollAnim
                             target: emojiGrid
                             property: "contentY"
-                            duration: 220
+                            duration: 250
                             easing.type: Easing.OutCubic
                         }
 
@@ -2128,7 +2142,6 @@ PanelWindow {
                                     color: (emojiGlass.active || emojiDelegateRoot.lensHandled) ? "transparent" : (emojiDelegateRoot.isSelected
                                            ? ThemeBackend.mauve
                                            : (emojiMa.containsMouse ? Qt.alpha(ThemeBackend.surface1, 0.7) : Qt.alpha(ThemeBackend.surface0, 0.45)))
-                                    border.width: (emojiDelegateRoot.isSelected || ThemeBackend.liquidGlass) ? 0 : 1
 
                                     GlassFill {
                                         id: emojiGlass
@@ -2141,10 +2154,9 @@ PanelWindow {
                                         tintAmount: emojiDelegateRoot.isSelected ? 0 : 0.25
                                         press: emojiMa.pressed ? 0.8 : (emojiDelegateRoot.isSelected ? 0.6 : (emojiMa.containsMouse ? 0.25 : 0))
                                     }
-                                    border.color: emojiDelegateRoot.isSelected ? "transparent" : Qt.alpha(ThemeBackend.surface2, 0.3)
 
                                     Behavior on color {
-                                        ColorAnimation { duration: 140; easing.type: Easing.OutCubic }
+                                        ColorAnimation { duration: 150; easing.type: Easing.OutCubic }
                                     }
                                 }
 
@@ -2174,7 +2186,7 @@ PanelWindow {
                                         maximumLineCount: 1
 
                                         Behavior on color {
-                                            ColorAnimation { duration: 140; easing.type: Easing.OutCubic }
+                                            ColorAnimation { duration: 150; easing.type: Easing.OutCubic }
                                         }
                                     }
                                 }

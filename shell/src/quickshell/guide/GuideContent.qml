@@ -8,16 +8,28 @@ import "../reusables/buttons"
 Item {
     id: contentArea
     required property var popup
+    property alias searchInput: searchField
+    property alias searchResults: resultsList
+
+    readonly property real searchHeaderHeight: popup.s(64)
+
     opacity: popup.introContent
     scale: 0.95 + (0.05 * popup.introContent)
     transform: Translate { y: popup.s(20) * (1.0 - popup.introContent) }
 
+    Item {
+        id: body
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
     Repeater {
         id: contentRepeater
         model: popup.tabsModel
         delegate: Item {
             id: tabContentWrapper
-            anchors.fill: parent
+            x: 0
+            y: 0
 
             property int parentTabIndex: index
             property int tabIndex: parentTabIndex
@@ -29,14 +41,23 @@ Item {
             property bool isCurrent: popup.currentTab === parentTabIndex
             visible: isCurrent || opacity > 0.001
             opacity: isCurrent ? 1.0 : 0.0
-            property real animY: isCurrent ? 0 : popup.s(10)
-            transform: Translate { y: tabContentWrapper.animY }
 
             Behavior on opacity {
-                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
-            Behavior on animY {
-                NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+
+            Binding {
+                target: tabContentWrapper
+                property: "width"
+                value: body.width
+                when: tabContentWrapper.visible
+            }
+
+            Binding {
+                target: tabContentWrapper
+                property: "height"
+                value: body.height
+                when: tabContentWrapper.visible
             }
 
             Loader {
@@ -45,8 +66,14 @@ Item {
                 asynchronous: false
                 active: !tabContentWrapper.hasSubtabs
                 visible: !tabContentWrapper.hasSubtabs && tabContentWrapper.visible
+                opacity: status === Loader.Ready ? 1.0 : 0.0
                 property int tabIndex: tabContentWrapper.parentTabIndex
                 property int subTabIndex: -1
+                readonly property int order: popup.tabLoadOrder(tabContentWrapper.parentTabIndex, -1)
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
 
                 function ensureLoaded() {
                     if (status === Loader.Null && tabData.file) {
@@ -57,41 +84,27 @@ Item {
                     }
                 }
 
+                function release() {
+                    if (status === Loader.Null) return;
+                    popup.setSlotLoaded(order, false);
+                    source = "";
+                }
+
                 onStatusChanged: {
+                    if (status === Loader.Ready) popup.setSlotLoaded(order, true);
                     if (status === Loader.Error) {
                         console.warn("Guide tab failed to load:", source);
                     }
                 }
 
-                onLoaded: {
-                    popup.registerTabSearchItems(item);
-                    Qt.callLater(function() {
-                        popup.registerTabSearchItems(singleTabLoader.item);
-                    });
-                }
-
-                Component.onCompleted: {
-                    if (popup.currentTab === tabContentWrapper.parentTabIndex) ensureLoaded();
-                }
-
                 Connections {
                     target: popup
-                    function onCurrentTabChanged() {
-                        if (popup.currentTab === tabContentWrapper.parentTabIndex && !tabContentWrapper.hasSubtabs) singleTabLoader.ensureLoaded();
-                    }
+                    enabled: !tabContentWrapper.hasSubtabs
                     function onRequestLoad(order) {
-                        if (order === popup.tabLoadOrder(tabContentWrapper.parentTabIndex, -1)) singleTabLoader.ensureLoaded();
+                        if (order === singleTabLoader.order) singleTabLoader.ensureLoaded();
                     }
-                }
-
-                Connections {
-                    target: singleTabLoader.item
-                    ignoreUnknownSignals: true
-                    function onSearchItemsChanged() {
-                        popup.registerTabSearchItems(singleTabLoader.item);
-                    }
-                    function onSearchEntriesChanged() {
-                        popup.registerTabSearchItems(singleTabLoader.item);
+                    function onReleaseTab(order) {
+                        if (order === singleTabLoader.order && order !== popup.currentSlot) singleTabLoader.release();
                     }
                 }
             }
@@ -108,18 +121,14 @@ Item {
                     property int tabIndex: tabContentWrapper.parentTabIndex
                     property int subTabIndex: subIndex
                     property var subData: modelData
+                    readonly property int order: popup.tabLoadOrder(tabContentWrapper.parentTabIndex, subIndex)
 
                     property bool isSubCurrent: popup.currentTab === tabContentWrapper.parentTabIndex && popup.currentSubTab === subIndex
                     visible: isSubCurrent || opacity > 0.001
-                    opacity: isSubCurrent ? 1.0 : 0.0
-                    property real subAnimY: isSubCurrent ? 0 : popup.s(10)
-                    transform: Translate { y: subTabLoader.subAnimY }
+                    opacity: isSubCurrent && status === Loader.Ready ? 1.0 : 0.0
 
                     Behavior on opacity {
-                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                    }
-                    Behavior on subAnimY {
-                        NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+                        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
                     }
 
                     function ensureLoaded() {
@@ -134,7 +143,14 @@ Item {
                         }
                     }
 
+                    function release() {
+                        if (status === Loader.Null) return;
+                        popup.setSlotLoaded(order, false);
+                        source = "";
+                    }
+
                     onStatusChanged: {
+                        if (status === Loader.Ready) popup.setSlotLoaded(order, true);
                         if (status === Loader.Error) {
                             console.warn("Guide tab failed to load:", source);
                         }
@@ -144,41 +160,100 @@ Item {
                         if (item && item.subTabIndex !== undefined) {
                             item.subTabIndex = subIndex;
                         }
-                        popup.registerTabSearchItems(item);
-                        Qt.callLater(function() {
-                            popup.registerTabSearchItems(subTabLoader.item);
-                        });
-                    }
-
-                    Component.onCompleted: {
-                        if (isSubCurrent) ensureLoaded();
                     }
 
                     Connections {
                         target: popup
-                        function onCurrentTabChanged() {
-                            if (popup.currentTab === tabContentWrapper.parentTabIndex && popup.currentSubTab === subIndex) subTabLoader.ensureLoaded();
-                        }
-                        function onCurrentSubTabChanged() {
-                            if (popup.currentTab === tabContentWrapper.parentTabIndex && popup.currentSubTab === subIndex) subTabLoader.ensureLoaded();
-                        }
                         function onRequestLoad(order) {
-                            if (order === popup.tabLoadOrder(tabContentWrapper.parentTabIndex, subIndex)) subTabLoader.ensureLoaded();
+                            if (order === subTabLoader.order) subTabLoader.ensureLoaded();
                         }
-                    }
-
-                    Connections {
-                        target: subTabLoader.item
-                        ignoreUnknownSignals: true
-                        function onSearchItemsChanged() {
-                            popup.registerTabSearchItems(subTabLoader.item);
-                        }
-                        function onSearchEntriesChanged() {
-                            popup.registerTabSearchItems(subTabLoader.item);
+                        function onReleaseTab(order) {
+                            if (order === subTabLoader.order && order !== popup.currentSlot) subTabLoader.release();
                         }
                     }
                 }
             }
+        }
+    }
+    }
+
+    Rectangle {
+        id: searchOverlay
+        anchors.fill: parent
+        color: ThemeBackend.base
+        topRightRadius: !I18n.rtl ? ThemeBackend.clampedBorderRadius : 0
+        bottomRightRadius: !I18n.rtl ? ThemeBackend.clampedBorderRadius : 0
+        topLeftRadius: I18n.rtl ? ThemeBackend.clampedBorderRadius : 0
+        bottomLeftRadius: I18n.rtl ? ThemeBackend.clampedBorderRadius : 0
+        property real reveal: popup.searchActive ? 1.0 : 0.0
+        Behavior on reveal { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
+        visible: popup.searchActive || reveal > 0.001
+        opacity: reveal
+        z: 10
+
+        Item {
+            id: header
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: contentArea.searchHeaderHeight
+            transform: Translate { y: popup.s(-10) * (1.0 - searchOverlay.reveal) }
+
+            Input {
+                id: searchField
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: popup.s(12)
+                anchors.rightMargin: popup.s(12)
+                implicitHeight: popup.s(40)
+                height: popup.s(40)
+                placeholderText: I18n.t("guide.search.placeholder", "Search settings...")
+                showClearButton: true
+                fontPixelSize: popup.s(12)
+                baseColor: Qt.alpha(ThemeBackend.surface0, 0.6)
+                accentColor: ThemeBackend.mauve
+                textColor: ThemeBackend.text
+                subTextColor: ThemeBackend.subtext0
+                borderColor: Qt.alpha(ThemeBackend.surface2, 0.4)
+                cornerRadius: ThemeBackend.borderRadius
+
+                onTextEdited: (txt) => {
+                    popup.searchQuery = txt;
+                    popup.searchSelectedIndex = 0;
+                }
+                onCleared: {
+                    popup.searchQuery = "";
+                    popup.searchSelectedIndex = 0;
+                }
+
+                Keys.onEscapePressed: (event) => {
+                    if (popup.searchQuery !== "") {
+                        searchField.text = "";
+                        popup.searchQuery = "";
+                    } else {
+                        popup.closeSearch();
+                    }
+                    event.accepted = true;
+                }
+                Keys.onDownPressed: (event) => { popup.navigateSearch(1); event.accepted = true; }
+                Keys.onUpPressed: (event) => { popup.navigateSearch(-1); event.accepted = true; }
+                Keys.onReturnPressed: (event) => { popup.activateSelectedSearch(); event.accepted = true; }
+                Keys.onEnterPressed: (event) => { popup.activateSelectedSearch(); event.accepted = true; }
+            }
+        }
+
+        GuideSearchResults {
+            id: resultsList
+            popup: contentArea.popup
+            anchors.top: header.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: popup.s(12)
+            anchors.rightMargin: popup.s(12)
+            anchors.bottomMargin: popup.s(8)
+            transform: Translate { y: popup.s(12) * (1.0 - searchOverlay.reveal) }
         }
     }
 }

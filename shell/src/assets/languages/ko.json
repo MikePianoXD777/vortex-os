@@ -43,7 +43,14 @@
       "bar_general": "일반",
       "bar_modules": "모듈",
       "bar_side_modules": "사이드 모듈",
-      "display_lockscreen": "잠금 화면"
+      "display_lockscreen": "잠금 화면",
+      "screenshot": "스크린샷",
+      "theme_appearance": "모양",
+      "theme_apps": "앱 테마",
+      "theme_wallpapers": "배경화면",
+      "general_main": "일반",
+      "general_presets": "프리셋",
+      "general_weather": "날씨"
     },
     "launcher": {
       "position": {
@@ -71,7 +78,11 @@
         "title": "런처 항목 스마트 정렬",
         "desc": "사용 빈도와 사용 시간을 기준으로 앱을 정렬합니다"
       },
-      "test": "런처 열기"
+      "test": "런처 열기",
+      "search": {
+        "title": "웹 검색 제공자",
+        "desc": "?로 시작하는 쿼리에 사용할 검색 엔진"
+      }
     },
     "notifications": {
       "dnd": {
@@ -139,7 +150,7 @@
       "warning_command": {
         "title": "경고 명령",
         "desc": "동작 실행 전 오프셋과 실행할 명령",
-        "placeholder": "예: notify-send 'warning'"
+        "placeholder": "예: serpantinum-core notify 'warning'"
       },
       "before_command": {
         "title": "사전 명령",
@@ -149,7 +160,7 @@
       "resume_command": {
         "title": "복귀 명령",
         "desc": "사용자 활동이 재개될 때 실행됩니다",
-        "placeholder": "예: notify-send 'resumed'"
+        "placeholder": "예: serpantinum-core notify 'resumed'"
       },
       "dim": {
         "title": "화면 어둡게",
@@ -242,10 +253,25 @@
       "screenshot_on_release": {
         "title": "마우스를 뗄 때 영역 캡처",
         "desc": "셔터를 누르지 않고 드래그가 끝나면 즉시 스크린샷을 찍습니다"
+      },
+      "presets": {
+        "save": {
+          "title": "현재 설정 저장",
+          "desc": "모든 설정, 위젯 및 배경화면을 프리셋으로 저장",
+          "button": "프리셋 저장"
+        },
+        "empty": "아직 프리셋이 없습니다. 현재 설정을 저장하여 만드세요",
+        "confirm": {
+          "title": "프리셋을 적용할까요?",
+          "desc": "현재 설정을 먼저 저장하지 않고 이 프리셋을 적용하시겠습니까? 기존 설정을 덮어쓰며 복구할 수 없습니다.",
+          "dont_show": "다시 표시하지 않기",
+          "apply": "적용",
+          "cancel": "취소"
+        }
       }
     },
     "display": {
-      "bluelight": {
+      "gamma": {
         "title": "블루라이트 필터",
         "desc": "따뜻한 화면 조명을 켜거나 끕니다"
       },
@@ -272,6 +298,10 @@
         "hide_bar": {
           "title": "편집기에서 바 숨기기",
           "desc": "편집기 모드에서 위젯을 수정할 때 자동으로 바를 숨깁니다"
+        },
+        "show_distances": {
+          "title": "거리 표시",
+          "desc": "편집기에서 위젯을 이동하거나 크기를 조정할 때 위젯 사이의 거리를 표시합니다"
         },
         "hide_presets": "프리셋 숨기기",
         "choose_preset": "프리셋 선택",
@@ -306,6 +336,12 @@
           "title": "지문 로그인 사용",
           "desc": "지문으로 잠금 화면을 해제할 수 있도록 허용합니다"
         },
+        "prompt_backdrop": {
+          "title": "비밀번호 입력창 배경",
+          "desc": "비밀번호 입력창 뒤에 데스크톱 또는 배경화면 표시",
+          "desktop": "데스크톱",
+          "wallpaper": "배경화면"
+        },
         "background": {
           "select": "배경 선택",
           "follow": "배경화면 따라가기",
@@ -317,7 +353,7 @@
     },
     "bar": {
       "modules": {
-        "vis": "비주얼라이저 (cava)",
+        "vis": "비주얼라이저",
         "actions": "동작",
         "workspaces": {
           "style": {
@@ -409,6 +445,7 @@
         "desc": "항목을 우클릭하면 그룹 만들기가 시작되고, 다른 항목을 우클릭하면 그룹에 추가됩니다. 그룹에 속한 항목을 우클릭하면 제거됩니다.",
         "reset": "초기화",
         "available": "사용 가능",
+        "shown": "표시됨",
         "left": "왼쪽",
         "center": "가운데",
         "right": "오른쪽"
@@ -455,21 +492,13 @@
           "wave": "웨이브",
           "circle": "원형"
         },
-        "cpu": {
-          "title": "CPU 사용량",
-          "desc": "프로세서 사용률 링 표시"
-        },
-        "ram": {
-          "title": "메모리 사용량",
-          "desc": "메모리(RAM) 사용률 링 표시"
-        },
-        "temp": {
-          "title": "온도",
-          "desc": "시스템 온도 링 표시"
-        },
-        "disk": {
-          "title": "디스크 사용량",
-          "desc": "스토리지 디스크 사용률 링 표시"
+        "items": {
+          "title": "통계",
+          "desc": "통계를 드래그하여 순서를 바꾸거나, 사용 가능으로 옮겨 숨깁니다",
+          "cpu": "CPU",
+          "ram": "메모리",
+          "temp": "온도",
+          "disk": "디스크"
         }
       },
       "bat": {
@@ -589,6 +618,10 @@
           "title": "컨트롤 표시",
           "desc": "이전, 재생, 다음 버튼을 표시합니다"
         },
+        "hide_when_idle": {
+          "title": "재생 중이 아닐 때 숨기기",
+          "desc": "활성 미디어가 없는 동안 바에서 위젯을 숨깁니다"
+        },
         "preview": {
           "title": "곡 제목",
           "author": "Song author"
@@ -599,13 +632,14 @@
         "desc": "바의 두께를 변경합니다. 모듈이 그에 맞게 조정됩니다"
       },
       "menu": {
-        "show_settings": {
-          "title": "설정 아이콘 표시",
-          "desc": "설정을 여는 버튼을 표시합니다"
-        },
-        "show_launcher": {
-          "title": "런처 아이콘 표시",
-          "desc": "런처를 여는 검색 버튼을 표시합니다"
+        "items": {
+          "title": "버튼",
+          "desc": "버튼을 드래그하여 순서를 바꾸거나, 사용 가능으로 옮겨 숨깁니다",
+          "settings": "설정",
+          "launcher": "런처",
+          "night_light": "야간 조명",
+          "caffeine": "카페인",
+          "shuffle": "배경화면 섞기"
         },
         "style": {
           "title": "스타일",
@@ -641,7 +675,62 @@
         "select_dir": "디렉터리 선택...",
         "select_wallpaper": "배경화면 선택",
         "no_wallpaper_selected": "선택된 배경화면 없음",
-        "select": "배경화면"
+        "select": "배경화면",
+        "transition": {
+          "mode": {
+            "title": "전환 효과",
+            "random": "무작위",
+            "custom": "사용자 지정",
+            "desc_random": "배경화면이 바뀔 때마다 무작위 전환 효과를 사용합니다",
+            "desc_custom": "선택한 전환 효과 중에서 무작위로 고릅니다. 미리보기를 클릭해 추가하거나 제거하세요"
+          },
+          "fade": {
+            "name": "페이드",
+            "desc": "새 배경화면으로 부드럽게 전환합니다"
+          },
+          "wipe": {
+            "name": "와이프",
+            "desc": "화면 가운데에서 열립니다"
+          },
+          "circle": {
+            "name": "원",
+            "desc": "화면을 덮을 때까지 원을 넓힙니다"
+          },
+          "swipe": {
+            "name": "스와이프",
+            "desc": "가장자리나 모서리에서 화면을 가로지릅니다"
+          },
+          "paint": {
+            "name": "페인트",
+            "desc": "화면에 퍼져 나가는 군집에서 새 배경화면을 칸칸이 칠합니다"
+          },
+          "orientation": {
+            "title": "방향 축",
+            "desc": "와이프가 열리는 축",
+            "random": "무작위",
+            "horizontal": "가로",
+            "vertical": "세로"
+          },
+          "origin": {
+            "title": "시작점",
+            "desc": "원이 시작되는 위치입니다. 데스크톱 메뉴에서는 항상 클릭한 위치에서 시작합니다",
+            "random": "무작위",
+            "center": "가운데"
+          },
+          "direction": {
+            "title": "방향",
+            "desc": "스와이프가 시작되는 가장자리나 모서리",
+            "random": "무작위",
+            "left": "왼쪽에서",
+            "right": "오른쪽에서",
+            "top": "위에서",
+            "bottom": "아래에서",
+            "top_left": "왼쪽 위에서",
+            "top_right": "오른쪽 위에서",
+            "bottom_left": "왼쪽 아래에서",
+            "bottom_right": "오른쪽 아래에서"
+          }
+        }
       },
       "element_opacity": {
         "title": "요소 불투명도",
@@ -654,6 +743,50 @@
           "blur": "흐림",
           "liquid": "리퀴드 글라스"
         }
+      },
+      "apps": {
+        "loading": "설치된 앱을 찾는 중...",
+        "status": {
+          "error": "적용하지 못함: {detail}"
+        },
+        "issue": {
+          "missing_config": "설정을 찾을 수 없습니다. {file}에 다음을 추가하세요: {line}",
+          "system_config": "설정 파일은 {file}입니다. 다음을 추가하세요: {line}",
+          "read_only": "{file}은(는) 읽기 전용입니다. 다음을 추가하세요: {line}",
+          "manual": "설정을 안전하게 수정할 수 없습니다. {file}에 다음을 추가하세요: {line}",
+          "no_theme": "GTK 3 앱도 팔레트를 따르도록 {line} 테마를 설치하세요",
+          "env": "세션 환경에 {line}을(를) 설정하세요",
+          "requires": "Qt 앱에 테마를 적용하려면 {line}을(를) 설치하세요",
+          "failed": "설정을 업데이트하지 못함: {line}"
+        },
+        "hint": {
+          "select_in_app": "앱 설정에서 Serpantinum 테마를 선택하세요",
+          "restart": "새 색상을 보려면 열린 창을 다시 시작하세요",
+          "neovim": ":colorscheme serpantinum을 실행해 사용하세요",
+          "helix": "새 색상을 보려면 열린 편집기에서 :config-reload를 실행하세요",
+          "fastfetch": "fastfetch -c serpantinum을 실행해 사용하세요",
+          "spicetify": "spicetify config current_theme Serpantinum을 실행한 뒤 spicetify apply를 실행하세요",
+          "discord": "클라이언트의 테마 설정에서 Serpantinum을 켜세요",
+          "emacs": "M-x load-theme serpantinum을 실행하면 사용할 수 있습니다",
+          "steam": "Millennium으로 Material-Theme을 설치한 다음 색상 설정에서 Matugen을 선택하세요",
+          "heroic": "Heroic의 사용자 테마 경로를 테마 폴더로 지정한 다음 serpantinum을 선택하세요",
+          "telegram": "Telegram 채팅 설정에서 테마 파일을 불러오세요"
+        },
+        "list": {
+          "title": "테마 적용 앱",
+          "desc": "셸 색상을 따르는 앱입니다. 목록에서 더 추가하세요"
+        },
+        "add": {
+          "title": "앱 추가"
+        },
+        "empty": "아직 테마가 적용된 앱이 없습니다. 목록에서 추가하세요"
+      },
+      "mode": {
+        "title": "색상 모드",
+        "desc": "셸, GTK, Qt 및 기타 테마 적용 앱을 라이트와 다크 사이에서 전환합니다",
+        "light": "라이트",
+        "dark": "다크",
+        "fixed": "선택한 색상 테마에 의해 고정됩니다. 모드를 전환하려면 Matugen을 선택하세요"
       }
     },
     "file_picker": {
@@ -768,7 +901,23 @@
         "app_limits": "앱 사용 한도",
         "app_limits_desc": "애플리케이션별 일일 최대 사용 시간을 설정합니다",
         "excluded_apps": "제외된 앱",
-        "excluded_apps_desc": "앞으로 전체 사용량 집계에서 제외할 앱을 지정합니다"
+        "excluded_apps_desc": "앞으로 전체 사용량 집계에서 제외할 앱을 지정합니다",
+        "overall_limit_desc": "총 화면 시간이 이 값에 도달하면 알림",
+        "no_limits": "설정된 앱 제한이 없습니다",
+        "no_excluded": "제외된 앱이 없습니다",
+        "picker_search": "앱 검색...",
+        "picker_empty": "일치하는 앱이 없습니다",
+        "picker_apply": "적용",
+        "picker_cancel": "취소"
+      },
+      "notify": {
+        "title": "디지털 웰빙",
+        "overall_reached": "전체 일일 한도에 도달했습니다",
+        "app_reached": "{app}의 일일 한도에 도달했습니다"
+      },
+      "limit_overlay": {
+        "title": "일일 한도 도달",
+        "hold": "길게 눌러 계속"
       }
     },
     "update_available": "업데이트 있음",
@@ -931,6 +1080,122 @@
       "placeholder": "설정 검색...",
       "prompt": "설정을 검색하려면 입력하세요...",
       "no_results": "설정을 찾을 수 없습니다"
+    },
+    "screenshot": {
+      "ocr": {
+        "title": "OCR 언어",
+        "desc": "텍스트 인식은 설치한 언어 중에서 언어를 자동으로 감지합니다",
+        "search": "언어 검색...",
+        "install": "설치",
+        "installing": "설치 중...",
+        "remove": "제거",
+        "removing": "제거 중...",
+        "installed": "설치됨",
+        "failed": "다운로드에 실패했습니다. 연결을 확인하세요.",
+        "offline": "언어 목록에 연결할 수 없습니다. 설치된 언어만 표시합니다.",
+        "loading": "언어 불러오는 중..."
+      },
+      "directory": {
+        "title": "스크린샷 폴더",
+        "desc": "스크린샷이 저장되는 폴더",
+        "select_dir": "디렉터리 선택..."
+      }
+    },
+    "weather": {
+      "enabled": {
+        "title": "날씨 알림",
+        "desc": "날씨가 바뀌거나 경보가 발령되면 알림을 보냅니다"
+      },
+      "daily": {
+        "title": "하루 두 번 예보",
+        "desc": "그날 날씨의 아침과 저녁 요약을 보냅니다"
+      },
+      "government": {
+        "title": "정부 기상 경보",
+        "desc": "내 위치에 대한 공식 기상 특보를 보냅니다",
+        "note": "위치 정보는 공식 경보 출처로 전송됩니다. 공식 긴급 재난 문자를 대체하지는 않습니다.",
+        "never": "없음",
+        "last_success": "마지막 성공",
+        "sources": "연결 가능한 출처",
+        "status": {
+          "title": "경보 출처 상태",
+          "ok": "연결됨",
+          "partial": "일부 연결됨",
+          "unavailable": "사용 불가",
+          "disabled": "사용 안 함",
+          "unknown": "알 수 없음"
+        }
+      },
+      "quiet": {
+        "title": "방해 금지 시간",
+        "desc": "이 시간에는 긴급하지 않은 알림을 보류합니다. 심각한 정부 경보, 뇌우, 결빙 알림은 계속 전달됩니다",
+        "start": {
+          "title": "방해 금지 시작",
+          "desc": "현지 시각, 0부터 23까지"
+        },
+        "end": {
+          "title": "방해 금지 종료",
+          "desc": "현지 시각, 0부터 23까지"
+        }
+      },
+      "kinds": {
+        "rain_soon": {
+          "title": "곧 비",
+          "desc": "앞으로 몇 시간 안에 비가 올 것으로 예상됩니다"
+        },
+        "snow_soon": {
+          "title": "곧 눈",
+          "desc": "앞으로 몇 시간 안에 눈이 올 것으로 예상됩니다"
+        },
+        "heavy_rain": {
+          "title": "폭우",
+          "desc": "폭우가 예보되어 있습니다"
+        },
+        "heavy_snow": {
+          "title": "폭설",
+          "desc": "폭설이 예보되어 있습니다"
+        },
+        "thunderstorm": {
+          "title": "천둥번개",
+          "desc": "천둥번개가 예보되어 있습니다"
+        },
+        "ice": {
+          "title": "결빙",
+          "desc": "결빙 상태가 예보되어 있습니다"
+        },
+        "fog": {
+          "title": "안개",
+          "desc": "안개가 예보되어 있습니다"
+        },
+        "temp_rise": {
+          "title": "기온 상승",
+          "desc": "기온이 급격히 오를 것으로 예상됩니다"
+        },
+        "temp_drop": {
+          "title": "기온 하락",
+          "desc": "기온이 급격히 떨어질 것으로 예상됩니다"
+        },
+        "hot": {
+          "title": "폭염",
+          "desc": "매우 높은 기온이 예보되어 있습니다"
+        },
+        "cold": {
+          "title": "한파",
+          "desc": "매우 낮은 기온이 예보되어 있습니다"
+        },
+        "wind": {
+          "title": "강풍",
+          "desc": "강풍이 예보되어 있습니다"
+        },
+        "uv": {
+          "title": "자외선 지수",
+          "desc": "자외선 지수가 높을 것으로 예상됩니다"
+        },
+        "air_quality": {
+          "title": "대기질",
+          "desc": "대기질이 나쁠 것으로 예보되어 있습니다"
+        }
+      }
     }
   },
   "sysnotif": {
@@ -966,7 +1231,9 @@
     "tab_files": "파일",
     "placeholder_files": "파일 검색 또는 경로 입력...",
     "tab_emojis": "이모지",
-    "placeholder_emojis": "이모지 검색 또는 키워드 입력..."
+    "placeholder_emojis": "이모지 검색 또는 키워드 입력...",
+    "search_run": "{provider}에서 검색",
+    "search_hint": "입력하여 {provider}에서 검색"
   },
   "calendar": {
     "loading": "불러오는 중...",
@@ -1061,6 +1328,9 @@
       },
       "setting": {
         "show_text": "텍스트 표시"
+      },
+      "category": {
+        "lockscreen": "잠금 화면"
       }
     }
   },
@@ -1075,7 +1345,9 @@
     "equalizer": "이퀄라이저",
     "eq": {
       "apply": "적용",
-      "saved": "저장됨"
+      "saved": "저장됨",
+      "dynamic": "다이내믹",
+      "dynamic_active": "사운드에 맞춰 조정하는 중"
     },
     "audio": {
       "title": "오디오",
@@ -1150,7 +1422,8 @@
       },
       "weather": {
         "fallback_summary": "날씨 정보",
-        "fallback_body": "상세 데이터가 없습니다."
+        "fallback_body": "상세 데이터가 없습니다.",
+        "title": "날씨"
       },
       "screenshot": {
         "badge": "스크린샷",
@@ -1246,7 +1519,8 @@
       "inv": "역",
       "mode": {
         "normal": "일반",
-        "advanced": "고급"
+        "advanced": "고급",
+        "converter": "변환기"
       },
       "clear": "AC",
       "error": {
@@ -1254,6 +1528,20 @@
         "div0": "0으로 나눌 수 없습니다",
         "domain": "잘못된 입력",
         "paste": "잘못된 붙여넣기"
+      },
+      "converter": {
+        "currency": "통화",
+        "length": "길이",
+        "mass": "질량",
+        "temperature": "온도",
+        "volume": "부피",
+        "area": "면적",
+        "speed": "속도",
+        "time": "시간",
+        "data": "데이터",
+        "updated": "환율 업데이트됨 {time}",
+        "updating": "환율 업데이트 중...",
+        "offline": "환율을 사용할 수 없음"
       }
     },
     "tabs": {
@@ -1285,7 +1573,15 @@
       "recording_started_title": "녹화 시작됨",
       "recording_started_body": "중지하려면 스크린샷 단축키를 다시 누르세요.",
       "screenshot_saved_title": "스크린샷 저장됨",
-      "screenshot_saved_body": "파일: {file}\n폴더: {folder}"
+      "screenshot_saved_body": "파일: {file}\n폴더: {folder}",
+      "ocr_copied_title": "텍스트를 복사했습니다",
+      "ocr_empty_title": "텍스트를 찾을 수 없음",
+      "ocr_empty_body": "선택한 영역에서 텍스트를 인식하지 못했습니다",
+      "ocr_missing_title": "OCR 언어 데이터 없음",
+      "ocr_missing_body": "스크린샷 설정을 열어 언어를 설치하세요.",
+      "ocr_uncertain_title": "텍스트를 복사했지만 부정확할 수 있습니다",
+      "ocr_language_hint": "텍스트가 설치되지 않은 언어일 수 있습니다. 스크린샷 설정에서 언어를 추가하세요.",
+      "ocr_open_settings": "설정 열기"
     }
   },
   "start": {
@@ -1350,7 +1646,9 @@
       "generating_thumbnails": "미리보기를 만드는 중...",
       "no_wallpapers_found": "배경화면을 찾을 수 없습니다",
       "videos": "동영상",
-      "history": "최근 적용됨"
+      "history": "최근 적용됨",
+      "favorites": "즐겨찾기",
+      "recently_added": "최근 추가됨"
     },
     "filters": {
       "all": "전체",
@@ -1444,11 +1742,21 @@
     },
     "redactor": {
       "no_widgets_active": "활성화된 위젯 없음",
-      "click_to_add": "아래 도구 모음에서 위젯 아이콘을 클릭해 추가하세요",
+      "click_to_add": "아래 도구 모음에서 카테고리를 선택하거나 검색해 위젯을 추가하세요",
       "done": "완료",
       "widget_singular": "개 위젯",
       "widgets_plural": "개 위젯",
-      "widgets_short": "개"
+      "widgets_short": "개",
+      "category": {
+        "time": "시간 및 텍스트",
+        "media": "미디어",
+        "system": "시스템",
+        "info": "정보",
+        "other": "기타"
+      },
+      "search": "위젯 검색",
+      "results": "결과",
+      "no_results": "찾을 수 없음"
     },
     "types": {
       "clock": "시계",
@@ -1460,7 +1768,9 @@
       "usage": "사용량",
       "battery": "배터리",
       "github": "Github",
-      "time": "시간"
+      "time": "시간",
+      "notes": "메모",
+      "text": "텍스트"
     },
     "variants": {
       "digital": "디지털",
@@ -1509,12 +1819,19 @@
     },
     "settings": {
       "lyricsLines": "줄 수",
-      "lyricsAlignment": "정렬"
+      "lyricsAlignment": "정렬",
+      "textContent": "텍스트"
     },
     "align": {
       "left": "왼쪽",
       "center": "가운데",
       "right": "오른쪽"
+    },
+    "notes": {
+      "empty": "아직 메모가 없습니다"
+    },
+    "text": {
+      "placeholder": "텍스트 입력"
     }
   },
   "cli": {
@@ -1522,29 +1839,30 @@
     "description": "wayland 컴포지터용 데스크톱 셸입니다.",
     "commands": "명령:",
     "script_commands": "스크립트 명령:",
-    "launch_desc": "독립 실행 컴포넌트를 실행합니다 (start, widgetredactor)",
+    "launch_desc": "독립 실행 컴포넌트를 실행합니다 (start)",
     "msg_desc": "UI 관리자에 명령이나 작업 공간 전환을 전달합니다",
     "ipc_desc": "IPC 호출을 셸로 바로 전달합니다",
     "kill_desc": "실행 중인 데몬을 정상적으로 종료합니다",
+    "restart_desc": "데몬을 다시 시작합니다",
     "options": "옵션:",
     "verbose_desc": "상세 로그 출력을 활성화합니다",
     "version_desc": "버전 정보를 표시하고 종료합니다",
     "help_desc": "이 도움말을 표시하고 종료합니다",
     "examples": "예시:",
     "daemon_stopped": "Serpantinum 데몬이 중지되었습니다.",
+    "daemon_restarted": "Serpantinum 데몬이 다시 시작되었습니다.",
     "starting_daemon": "데몬이 실행 중이 아닙니다. serpantinumd를 백그라운드에서 시작합니다...",
     "error_missing_qml": "오류: 실행할 대상이 지정되지 않았습니다.",
-    "launch_usage": "사용법: serpantinum launch <start|widgetredactor> [인자...]",
+    "launch_usage": "사용법: serpantinum launch <start> [인자...]",
     "error_qml_not_found": "오류: {DIR}에서 {NAME}.qml을 찾을 수 없습니다",
     "error_shell_qml_not_found": "오류: {DIR}에서 shell.qml 경로를 찾을 수 없습니다",
     "error_unknown_command": "오류: 알 수 없는 명령 '{CMD}'.",
     "error_unknown_target": "오류: 알 수 없는 대상 '{TARGET}'.",
     "launch_help": {
-      "usage": "사용법: serpantinum launch <start|widgetredactor> [인자...]",
+      "usage": "사용법: serpantinum launch <start> [인자...]",
       "description": "독립 실행 컴포넌트를 러너 모드로 바로 실행합니다.",
       "available_targets": "사용 가능한 대상:",
-      "target_start": "초기 설정 인터페이스를 실행합니다",
-      "target_widgetredactor": "데스크톱 위젯 편집기를 실행합니다"
+      "target_start": "초기 설정 인터페이스를 실행합니다"
     },
     "msg_help": {
       "usage": "사용법: serpantinum msg <명령|작업공간> [인자...]",
@@ -1568,12 +1886,31 @@
       "location": "지리 좌표를 조회하고 갱신합니다",
       "screenshot": "화면 캡처, 동영상 녹화, QR 코드 인식을 수행합니다",
       "brightness": "디스플레이 백라이트 밝기를 조절합니다",
-      "current_focus": "활성 창의 포커스 변화를 감시하고 기록합니다",
-      "monitors_detect": "활성 디스플레이 출력과 주사율을 조회합니다",
       "location_manual": "지리 좌표와 시간대를 직접 설정합니다",
-      "blue_light_filter": "색온도와 자동 주야간 일정을 조절합니다",
-      "translate": "즉시 텍스트 및 선택 영역 번역기"
-    }
+      "gamma": "색온도와 자동 주야간 일정을 조절합니다",
+      "translate": "즉시 텍스트 및 선택 영역 번역기",
+      "suspend": "화면을 잠그고 시스템을 절전 모드로 전환",
+      "hibernate": "시스템을 최대 절전 모드로 전환",
+      "reboot": "시스템 재부팅",
+      "poweroff": "시스템 종료",
+      "redactor": "데스크톱 위젯 레이아웃 편집기 열기 또는 전환",
+      "lock_redactor": "잠금 화면 레이아웃 편집기를 전환, 열기 또는 닫기"
+    },
+    "usage_label": "사용법:",
+    "config_desc": "설정 읽기 및 변경 (get, set, dump, path, edit)",
+    "error_unknown_language": "오류: 알 수 없는 언어 '{CODE}'.",
+    "update_available": "업데이트 가능: {LOCAL} -> {REMOTE}",
+    "up_to_date": "Serpantinum이 최신 버전입니다 ({VERSION}).",
+    "state_on": "켜짐",
+    "state_off": "꺼짐",
+    "error_unknown_theme": "오류: 알 수 없는 테마 '{NAME}'.",
+    "error_no_wallpapers": "오류: 배경화면 디렉터리에서 배경화면을 찾을 수 없습니다.",
+    "error_file_not_found": "오류: 파일을 찾을 수 없습니다: {PATH}",
+    "info_desc": "설정의 현재 상태 표시 (notifications, idle, dock, sfx, theme, lang, wallpaper, monitors, updates)",
+    "set_desc": "설정 변경 (notifications, idle, dock, sfx, theme, lang, wallpaper)",
+    "trigger_desc": "일회성 작업 실행 (idle, notifications, theme, firstlaunch)",
+    "settings_desc": "설정 창을 엽니다 (원하는 탭 지정 가능)",
+    "error_unknown_app": "오류: 알 수 없는 앱 '{ID}'."
   },
   "daemon": {
     "already_running": "데몬이 이미 실행 중입니다. 종료합니다...",
@@ -1594,6 +1931,11 @@
       "status_running": "Serpantinum 데몬이 실행 중입니다 (PID: {PID}).",
       "status_stopped": "Serpantinum 데몬이 실행 중이 아닙니다.",
       "unknown_arg": "알 수 없는 인자: {ARG}"
+    },
+    "app_name": "Serpantinum",
+    "easyeffects": {
+      "title": "EasyEffects가 아직 활성화되어 있습니다",
+      "body": "이제 Serpantinum에 자체 오디오 엔진이 있으며 EasyEffects가 이를 방해할 수 있습니다. EasyEffects를 Serpantinum 용도로만 사용했다면 로그인 시 자동으로 시작되지 않도록 하세요."
     }
   },
   "installer": {
@@ -1709,5 +2051,140 @@
   },
   "datetime": {
     "full_date": "MMMM d일 dddd"
+  },
+  "gov_alerts": {
+    "status": {
+      "ok": "모든 출처에 연결됨",
+      "partial": "일부 출처에 연결할 수 없음",
+      "unavailable": "경보 출처에 연결할 수 없음",
+      "disabled": "사용 안 함",
+      "unknown": "아직 확인하지 않음"
+    },
+    "coverage": {
+      "official": "공식 국가 출처",
+      "worldwide": "전 세계 경보 서버만 해당",
+      "none": "지원되지 않음"
+    },
+    "sources": {
+      "nws": "미국 국립기상청",
+      "eccc": "캐나다 환경부",
+      "dwd": "독일 기상청",
+      "metno": "MET Norway",
+      "kde": "KDE 경보 서버",
+      "meteoalarm": "MeteoAlarm",
+      "feeds": "공식 경보 피드"
+    },
+    "severity": {
+      "moderate": "보통",
+      "severe": "심각",
+      "extreme": "매우 심각"
+    },
+    "hazard": {
+      "generic": "기상 경보",
+      "rain": "폭우",
+      "flood": "홍수",
+      "snow": "눈",
+      "ice": "결빙",
+      "storm": "폭풍",
+      "wind": "바람",
+      "fog": "안개",
+      "heat": "폭염",
+      "cold": "한파",
+      "fire": "화재",
+      "dust": "먼지",
+      "marine": "해상"
+    },
+    "last_success": "마지막 성공적인 확인",
+    "sources_ok": "{total}개 중 {ok}개 출처에 연결됨",
+    "refresh": "지금 확인",
+    "no_alerts": "활성 경보 없음"
+  },
+  "weather_alerts": {
+    "rain_soon": {
+      "title": "비가 올 예정",
+      "body": "{time} 무렵 비가 올 것으로 예상됩니다."
+    },
+    "snow_soon": {
+      "title": "눈이 올 예정",
+      "body": "{time} 무렵 눈이 올 것으로 예상됩니다."
+    },
+    "heavy_rain": {
+      "title": "폭우",
+      "body": "{time} 무렵 폭우가 예상됩니다."
+    },
+    "heavy_snow": {
+      "title": "폭설",
+      "body": "{time} 무렵 폭설이 예상됩니다."
+    },
+    "thunderstorm": {
+      "title": "천둥번개",
+      "body": "{time} 무렵 천둥번개가 예상됩니다."
+    },
+    "ice": {
+      "title": "결빙 위험",
+      "body": "{time} 무렵 어는 비 또는 결빙이 예상됩니다."
+    },
+    "fog": {
+      "title": "안개",
+      "body": "{time} 무렵 시야가 나빠질 것으로 예상됩니다."
+    },
+    "temp_rise": {
+      "title": "오늘은 더 따뜻함",
+      "body": "오늘은 어제보다 {delta} 더 따뜻하며, 최고 기온은 {max}입니다."
+    },
+    "temp_drop": {
+      "title": "오늘은 더 추움",
+      "body": "오늘은 어제보다 {delta} 더 춥며, 최고 기온은 {max}입니다."
+    },
+    "hot": {
+      "title": "극심한 더위",
+      "body": "오늘 체감 온도는 {temp}입니다. 수분을 충분히 섭취하세요."
+    },
+    "cold": {
+      "title": "극심한 추위",
+      "body": "오늘 체감 온도는 {temp}입니다. 따뜻하게 입으세요."
+    },
+    "wind": {
+      "title": "강풍",
+      "body": "{time} 무렵 최대 {speed}의 돌풍이 예상됩니다."
+    },
+    "uv": {
+      "title": "자외선 지수 높음",
+      "body": "{time} 무렵 자외선 지수가 {value}까지 오를 것으로 예상됩니다. 자외선 차단제를 사용하세요."
+    },
+    "air_quality": {
+      "title": "대기질 나쁨",
+      "body": "대기질 지수는 {value}입니다. 외출을 자제하세요."
+    },
+    "daily_clear": {
+      "title": "맑음",
+      "today": "오늘은 맑음. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 맑음. 최고 {max}, 최저 {min}."
+    },
+    "daily_cloudy": {
+      "title": "흐림",
+      "today": "오늘은 흐림. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 흐림. 최고 {max}, 최저 {min}."
+    },
+    "daily_rain": {
+      "title": "비",
+      "today": "오늘은 비. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 비. 최고 {max}, 최저 {min}."
+    },
+    "daily_snow": {
+      "title": "눈",
+      "today": "오늘은 눈. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 눈. 최고 {max}, 최저 {min}."
+    },
+    "daily_storm": {
+      "title": "천둥번개",
+      "today": "오늘은 천둥번개. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 천둥번개. 최고 {max}, 최저 {min}."
+    },
+    "daily_fog": {
+      "title": "안개",
+      "today": "오늘은 안개. 최고 {max}, 최저 {min}.",
+      "tomorrow": "내일은 안개. 최고 {max}, 최저 {min}."
+    }
   }
 }

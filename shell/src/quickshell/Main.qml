@@ -90,20 +90,15 @@ PanelWindow {
         });
         // Vortex: se escribe directo, sin lanzar «bash -c echo» (un doble fork del shell
         // entero) cada vez que se abre o se cierra un panel.
-        widgetStateFile.setText(payload + "\n");
+        currentWidgetFile.setText(payload + "\n");
     }
 
     FileView {
-        id: widgetStateFile
-        path: Caching.runDir ? Caching.runDir + "/current_widget" : ""
+        id: currentWidgetFile
+        path: (typeof Caching !== "undefined" && Caching.runDir) ? (Caching.runDir + "/current_widget") : ""
+        blockWrites: true
         preload: false
         printErrors: false
-    }
-
-    Process {
-        id: startupResetProcess
-        command: ["bash", "-c", `[ -n "${Caching.runDir}" ] && echo '{"widget":"hidden","screen":""}' > "${Caching.runDir}/current_widget"`]
-        running: true
     }
 
     Connections {
@@ -126,6 +121,10 @@ PanelWindow {
                 // Vortex: los atajos de los paneles (keybinds.lua) llegan aquí sin lanzar procesos
                 let target = event.data.substring(19).trim();
                 if (target === "" || target === "wallpaper") return;
+                // Vortex (2.5.1): «autohide» ya no es un panel sino «bar autohide».
+                if (target === "autohide") { mainIpc.handleCommand("bar", "autohide", ""); return; }
+                // Vortex (2.5.1): «guide» pasó a llamarse «settings» en upstream; se acepta el nombre nuevo.
+                if (target === "settings") target = "guide";
                 mainIpc.handleCommand("toggle", target, "");
                 masterWindow.queueWidgetLaunchLog(target);
             }
@@ -155,8 +154,8 @@ PanelWindow {
             let names = masterWindow.pendingLaunchLogs;
             masterWindow.pendingLaunchLogs = [];
             if (!Caching.qsDir || names.length === 0) return;
-            let args = ["python3", Caching.qsDir + "/launcher/app_rank.py", "--log-launch", "--name"];
-            for (let i = 0; i < names.length; i++) Quickshell.execDetached(args.concat([names[i]]));
+            // Vortex (2.5.1): app_rank.py ya no existe; el conteo de usos lo lleva serpantinum-core.
+            for (let i = 0; i < names.length; i++) Quickshell.execDetached(["serpantinum-core", "launcher", "log", names[i]]);
         }
     }
 
@@ -172,6 +171,10 @@ PanelWindow {
             NotificationManager.clearNotifications();
         }
 
+        function embeddedSettings(action: string, tab: string): void {
+            masterWindow.handleEmbeddedSettings(action || "toggle", tab || "");
+        }
+
         function handleCommand(cmd: string, targetWidget: string, arg: string): void {
             cmd = cmd || "";
             targetWidget = targetWidget || "";
@@ -185,8 +188,23 @@ PanelWindow {
                 return;
             }
 
-            if (cmd === "clearNotifications" || cmd === "clear_notifications" || cmd === "clearNotifs") {
+            // Vortex: se aceptan también los nombres viejos (clearNotifications, clear_notifications...).
+            if ((cmd === "notifications" && targetWidget === "clear")
+                    || cmd === "clearNotifications" || cmd === "clear_notifications" || cmd === "clearNotifs") {
                 NotificationManager.clearNotifications();
+                return;
+            }
+
+            let isSettingsCmd = cmd === "settings" || targetWidget === "settings";
+            let isGuideCmd = cmd === "guide" || targetWidget === "guide";
+            if (isSettingsCmd || isGuideCmd) {
+                if (isGuideCmd) {
+                    console.warn("'guide' is deprecated, use 'settings' instead");
+                }
+                let settingsAction = cmd === "close" ? "close" : (cmd === "open" ? "open" : "toggle");
+                let settingsTab = (cmd === "settings" || cmd === "guide") ? targetWidget : arg;
+                if (settingsTab === "settings" || settingsTab === "guide") settingsTab = "";
+                masterWindow.handleEmbeddedSettings(settingsAction, settingsTab);
                 return;
             }
 
@@ -216,7 +234,23 @@ PanelWindow {
                 return;
             }
 
-            if (cmd === "airplane" || targetWidget === "airplane" || cmd === "flight" || targetWidget === "flight") {
+            if (cmd === "calendar" || targetWidget === "calendar") {
+                if (cmd === "close") {
+                    DashboardController.hide();
+                } else {
+                    LauncherController.hide();
+                    ClipboardController.hide();
+                    if (masterWindow.targetActive !== "hidden") switchWidget("hidden", "");
+                    if (cmd === "open") {
+                        DashboardController.show();
+                    } else {
+                        DashboardController.toggle();
+                    }
+                }
+                return;
+            }
+
+            if (cmd === "network" && targetWidget === "airplane") {
                 let isAirplane = !Networking.wifiEnabled && !(Bluetooth.defaultAdapter && Bluetooth.defaultAdapter.enabled);
                 if (isAirplane) {
                     Networking.wifiEnabled = true;
@@ -228,7 +262,7 @@ PanelWindow {
                 return;
             }
 
-            if (cmd === "autohide" || targetWidget === "autohide") {
+            if (cmd === "bar" && targetWidget === "autohide") {
                 let bar = Config.getSetting("bar", {});
                 bar.autohide = !bar.autohide;
                 Config.setSetting("bar", bar);
@@ -238,6 +272,7 @@ PanelWindow {
             let effectivelyActive = masterWindow.targetActive;
 
             if (cmd === "close") {
+                DashboardController.hide();
                 if (typeof DockAppMenuController !== "undefined") {
                     DockAppMenuController.hide();
                 }
@@ -299,6 +334,26 @@ PanelWindow {
     property string barPosition: (rawBarSettings && rawBarSettings.position !== undefined) ? rawBarSettings.position : "top"
     property bool barAutohide: (rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false
 
+    function handleEmbeddedSettings(action, tab) {
+        let isOpen = masterWindow.targetActive === "guide";
+        if (action === "close") {
+            if (isOpen) switchWidget("hidden", "");
+            return;
+        }
+        if (!isOpen) {
+            let t = getLayout("guide");
+            if (t) switchWidget("guide", tab);
+            return;
+        }
+        let item = widgetCache["guide"] || widgetStack.currentItem;
+        if (tab !== "" && (action === "open" || tab !== masterWindow.activeArg)) {
+            masterWindow.activeArg = tab;
+            if (item && item.gotoTab !== undefined) item.gotoTab(tab);
+        } else if (action === "toggle") {
+            switchWidget("hidden", "");
+        }
+    }
+
     // Vortex: la misma detección que bar/Bar.qml. hasFullscreen de Hyprland también
     // es true con una ventana maximizada (Super+D), y la barra ahí sigue visible:
     // los paneles se subían 46 px y la tapaban.
@@ -316,7 +371,7 @@ PanelWindow {
     readonly property bool screenReady: masterWindow.width >= 100 && masterWindow.height >= 100
     readonly property bool isCurrentDraggable: {
         let t = getLayout(masterWindow.currentActive);
-        return Boolean(t && t.draggable) || masterWindow.currentActive === "guide";
+        return Boolean(t && t.draggable);
     }
 
     Item {
@@ -440,7 +495,7 @@ PanelWindow {
 
     Component.onDestruction: {
         if (typeof Caching !== "undefined" && Caching.runDir) {
-            Quickshell.execDetached(["bash", "-c", "echo '{\"widget\":\"hidden\",\"screen\":\"\"}' > " + Caching.runDir + "/current_widget"]);
+            currentWidgetFile.setText("{\"widget\":\"hidden\",\"screen\":\"\"}\n");
         }
     }
 
@@ -655,9 +710,9 @@ PanelWindow {
                 adjusted.ry = Math.max(Math.round(6 * scale), result.ry - offsetAdjustment);
             } else if (bp === "bottom") {
                 adjusted.ry = Math.min(masterWindow.height - result.h - Math.round(6 * scale), result.ry + offsetAdjustment);
-            } else if (bp === "left" && name !== "calendar") {
+            } else if (bp === "left") {
                 adjusted.rx = Math.max(Math.round(6 * scale), result.rx - offsetAdjustment);
-            } else if (bp === "right" && name !== "calendar") {
+            } else if (bp === "right") {
                 adjusted.rx = Math.min(masterWindow.width - result.w - Math.round(6 * scale), result.rx + offsetAdjustment);
             }
 
@@ -827,6 +882,8 @@ PanelWindow {
     }
 
     function switchWidget(newWidget, arg) {
+        if (newWidget === "hidden" && masterWindow.isClosing) return;
+
         masterWindow.switchGeneration++;
         let gen = masterWindow.switchGeneration;
         masterWindow.targetActive = newWidget;
@@ -874,6 +931,7 @@ PanelWindow {
                 }
             }
         } else {
+            DashboardController.hide();
             masterWindow.isClosing = false;
             let targetScreen = resolveTargetScreen();
             if (targetScreen && masterWindow.screen !== targetScreen) {

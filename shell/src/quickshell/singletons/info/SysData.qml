@@ -24,9 +24,8 @@ Item {
     function subscribe() {
         subscribers++;
         if (subscribers === 1) {
+            root.netPrimed = false;
             streamProc.running = true;
-            root.resetNet();
-            netTimer.restart();
         }
     }
 
@@ -34,26 +33,35 @@ Item {
         subscribers = Math.max(0, subscribers - 1);
         if (subscribers === 0) {
             streamProc.running = false;
-            netTimer.stop();
         }
     }
 
-    function applyUsage(text) {
+    property bool netPrimed: false
+
+    function applyUsage(text, withNet) {
         text = text ? text.trim() : "";
         if (!text) return;
 
-        let p = text.split("|");
-        if (p.length >= 4) {
-            root.cpu = parseInt(p[0]);
-            root.ramPercent = parseInt(p[1]);
-            root.ramGb = parseFloat(p[2]);
-            root.temp = parseInt(p[3]);
+        let u;
+        try {
+            u = JSON.parse(text);
+        } catch (e) {
+            return;
         }
-        if (p.length >= 9) {
-            root.diskPercent = parseInt(p[6]);
-            root.diskGb = parseFloat(p[7]);
-            root.diskTotalGb = parseFloat(p[8]);
+        root.cpu = u.cpu;
+        root.ramPercent = u.ramPercent;
+        root.ramGb = u.ramGb;
+        root.temp = u.temp;
+        if (withNet) {
+            if (root.netPrimed) {
+                root.netRx = u.netRx || 0;
+                root.netTx = u.netTx || 0;
+            }
+            root.netPrimed = true;
         }
+        root.diskPercent = u.diskPercent;
+        root.diskGb = u.diskUsedGb;
+        root.diskTotalGb = u.diskTotalGb;
     }
 
     function prewarm() {
@@ -61,64 +69,6 @@ Item {
             fetchProc.running = true;
         }
     }
-
-    property real lastNetRxBytes: -1
-    property real lastNetTxBytes: -1
-    property real lastNetSampleMs: 0
-    property int netInterval: root.onBattery ? 6000 : 3000
-
-    function resetNet() {
-        lastNetRxBytes = -1;
-        lastNetTxBytes = -1;
-        lastNetSampleMs = 0;
-    }
-
-    function sampleNet() {
-        netDev.reload();
-        let text = netDev.text();
-        if (!text) return;
-
-        let rx = 0, tx = 0;
-        let lines = text.split("\n");
-        for (let i = 2; i < lines.length; i++) {
-            let line = lines[i];
-            let colon = line.indexOf(":");
-            if (colon < 0) continue;
-            let iface = line.substring(0, colon).trim();
-            if (!/^(e|w)/.test(iface)) continue;
-            let f = line.substring(colon + 1).trim().split(/\s+/);
-            rx += parseFloat(f[0]) || 0;
-            tx += parseFloat(f[8]) || 0;
-        }
-
-        let now = Date.now();
-        if (root.lastNetRxBytes >= 0 && now > root.lastNetSampleMs) {
-            let dt = (now - root.lastNetSampleMs) / 1000;
-            root.netRx = rx >= root.lastNetRxBytes ? (rx - root.lastNetRxBytes) / dt : 0;
-            root.netTx = tx >= root.lastNetTxBytes ? (tx - root.lastNetTxBytes) / dt : 0;
-        }
-        root.lastNetRxBytes = rx;
-        root.lastNetTxBytes = tx;
-        root.lastNetSampleMs = now;
-    }
-
-    FileView {
-        id: netDev
-        path: "/proc/net/dev"
-        blockLoading: true
-    }
-
-    Timer {
-        id: netTimer
-        interval: root.netInterval
-        repeat: true
-        running: false
-        triggeredOnStart: true
-        onTriggered: root.sampleNet()
-    }
-
-    // Samples are rewritten every tick, so they live on tmpfs rather than in ~/.cache.
-    readonly property string stateDir: Caching.getRunDir("sysdata")
 
     // One long-running fetcher while anything is subscribed, printing a line per tick.
     property int streamInterval: root.onBattery ? 4 : 2
@@ -132,18 +82,16 @@ Item {
     Process {
         id: streamProc
         running: false
-        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh", "--stream", String(root.streamInterval)]
-        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        command: ["serpantinum-core", "watch", "sysinfo", "--interval", String(root.streamInterval)]
         stdout: SplitParser {
-            onRead: data => root.applyUsage(data)
+            onRead: data => root.applyUsage(data, true)
         }
     }
 
     Process {
         id: fetchProc
         running: false
-        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh"]
-        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        command: ["serpantinum-core", "sysinfo"]
         stdout: StdioCollector {
             onStreamFinished: root.applyUsage(this.text)
         }

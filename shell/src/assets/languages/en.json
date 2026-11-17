@@ -43,7 +43,14 @@
       "bar_general": "General",
       "bar_modules": "Modules",
       "bar_side_modules": "Side modules",
-      "display_lockscreen": "Lock screen"
+      "display_lockscreen": "Lock screen",
+      "screenshot": "Screenshot",
+      "theme_appearance": "Appearance",
+      "theme_apps": "App theming",
+      "theme_wallpapers": "Wallpapers",
+      "general_main": "General",
+      "general_presets": "Presets",
+      "general_weather": "Weather"
     },
     "launcher": {
       "position": {
@@ -71,7 +78,11 @@
         "title": "Smart sorting of items in launcher",
         "desc": "Sort apps based on usage and amount of time spent in them"
       },
-      "test": "Open launcher"
+      "test": "Open launcher",
+      "search": {
+        "title": "Web search provider",
+        "desc": "Search engine used when a query starts with ?"
+      }
     },
     "notifications": {
       "dnd": {
@@ -98,6 +109,16 @@
         "title": "Sound effect",
         "desc": "Select the sound played for incoming alerts"
       },
+      "empty_graphic": {
+        "title": "Empty center animation",
+        "desc": "Display the sleeping cat graphic in the notification center when empty"
+      },
+      "right_click_close": {
+        "title": "Close with right click",
+        "desc": "Dismiss a notification by right-clicking it"
+      },
+      "test": "Test notification",
+      "test_desc": "This is a test notification",
       "sound_link": {
         "title": "Add from a link",
         "desc": "A myinstants.com button or a link to an mp3, wav or ogg",
@@ -110,17 +131,7 @@
         "desc": "Yours",
         "in_use": "In use",
         "use": "Use"
-      },
-      "empty_graphic": {
-        "title": "Empty center animation",
-        "desc": "Display the sleeping cat graphic in the notification center when empty"
-      },
-      "right_click_close": {
-        "title": "Close with right click",
-        "desc": "Dismiss a notification by right-clicking it"
-      },
-      "test": "Test notification",
-      "test_desc": "This is a test notification"
+      }
     },
     "idle": {
       "enabled": {
@@ -152,7 +163,7 @@
       "warning_command": {
         "title": "Warning command",
         "desc": "Offset and command to execute before action",
-        "placeholder": "e.g. notify-send 'warning'"
+        "placeholder": "e.g. serpantinum-core notify 'warning'"
       },
       "before_command": {
         "title": "Before command",
@@ -162,7 +173,7 @@
       "resume_command": {
         "title": "Resume command",
         "desc": "Executed when user activity resumes",
-        "placeholder": "e.g. notify-send 'resumed'"
+        "placeholder": "e.g. serpantinum-core notify 'resumed'"
       },
       "dim": {
         "title": "Dim screen",
@@ -256,6 +267,27 @@
         "title": "Capture region on mouse release",
         "desc": "Take the screenshot as soon as you finish dragging, without clicking the shutter"
       },
+      "presets": {
+        "save": {
+          "title": "Save current setup",
+          "desc": "Save all settings, widgets and wallpapers as a preset",
+          "button": "Save preset"
+        },
+        "empty": "No presets yet. Save your current setup to create one",
+        "confirm": {
+          "title": "Apply preset?",
+          "desc": "Are you sure you want to apply this preset without saving your own settings first? It will override your existing settings, and you won't be able to recover them.",
+          "dont_show": "Do not show me this again",
+          "apply": "Apply",
+          "cancel": "Cancel"
+        },
+        "import": {
+          "title": "Import preset",
+          "desc": "Add a preset from a JSON file",
+          "button": "Import",
+          "picker": "Select preset file"
+        }
+      },
       "claude": {
         "title": "Claude",
         "desc": "Off by default. Turn it on to use Claude with Super+A (talk to it with the microphone; it sees your screen only when you ask). Needs internet and your Claude account: the first time it asks you to sign in",
@@ -288,25 +320,7 @@
       }
     },
     "display": {
-      "performance": {
-        "title": "Performance",
-        "ultra": "Ultra",
-        "alto": "High",
-        "medio": "Medium",
-        "bajo": "Low",
-        "ultra_desc": "Everything on: effects, animations and video wallpaper.",
-        "alto_desc": "No blur. Everything else stays.",
-        "medio_desc": "No blur or window animations.",
-        "bajo_desc": "The minimum: also a still wallpaper, no quick actions or game clips, and the shell at 60 Hz."
-      },
-      "window_manager": {
-        "title": "Window manager",
-        "desc": "Tiling (like qtile): each window takes its own spot without overlapping. KDE: floating windows with a title bar, like KDE or Windows. Changing it restarts the shell",
-        "tiling": "Tiling",
-        "floating": "KDE",
-        "working": "Switching…"
-      },
-      "bluelight": {
+      "gamma": {
         "title": "Blue light filter",
         "desc": "Toggle warm screen lighting"
       },
@@ -334,7 +348,11 @@
           "title": "Hide the bar in the redactor",
           "desc": "Automatically hide the bar when editing widgets in redactor mode"
         },
-        "hide_presets": "Hide Presets",
+        "show_distances": {
+          "title": "Show distances",
+          "desc": "Show the distances between widgets while moving or resizing them in the redactor"
+        },
+        "hide_presets": "Hide presets",
         "choose_preset": "Choose a preset",
         "presets": {
           "title": "Widget Presets"
@@ -367,6 +385,12 @@
           "title": "Enable fingerprint login",
           "desc": "Allow unlocking the lock screen with a fingerprint"
         },
+        "prompt_backdrop": {
+          "title": "Prompt background",
+          "desc": "Show the desktop or wallpaper behind the password prompt",
+          "desktop": "Desktop",
+          "wallpaper": "Wallpaper"
+        },
         "background": {
           "select": "Select background",
           "follow": "Follow wallpaper",
@@ -375,6 +399,25 @@
           "none": "No background selected"
         }
       },
+      "performance": {
+        "title": "Performance",
+        "ultra": "Ultra",
+        "alto": "High",
+        "medio": "Medium",
+        "bajo": "Low",
+        "ultra_desc": "Everything on: effects, animations and video wallpaper.",
+        "alto_desc": "No blur. Everything else stays.",
+        "medio_desc": "No blur or window animations.",
+        "bajo_desc": "The minimum: also a still wallpaper, no quick actions or game clips, and the shell at 60 Hz."
+      },
+      "window_manager": {
+        "title": "Window manager",
+        "desc": "Tiling (like qtile): each window takes its own spot without overlapping. KDE: floating windows with a title bar, like KDE or Windows. Changing it restarts the shell",
+        "tiling": "Tiling",
+        "floating": "KDE",
+        "working": "Switching…"
+      },
+      "bluelight": {},
       "laptop": {
         "title": "Laptop mode",
         "desc": "When unplugged: power saving, no animations, dimmer screen and 60 Hz. Everything comes back when you plug it in"
@@ -382,7 +425,7 @@
     },
     "bar": {
       "modules": {
-        "vis": "Visualizer (cava)",
+        "vis": "Visualizer",
         "actions": "Actions",
         "workspaces": {
           "style": {
@@ -446,17 +489,25 @@
         "title": "Choose an amount of workspaces to display",
         "disc": "Note: this doesn't affect the actual amount of workspaces in the compositor",
         "desc": "Number of workspaces to display",
-        "app_icons": {
-          "title": "App icons",
-          "desc": "Show the icons of the apps open in each workspace (pills style)"
-        },
         "hide_empty": {
           "title": "Hide empty workspaces",
           "desc": "Show only occupied workspaces and the active one"
         },
+        "per_monitor": {
+          "title": "Per-monitor numbering",
+          "desc": "Hyprland only. Number workspaces from 1 on each monitor and set how many workspaces each monitor owns",
+          "unavailable": "Available only on Hyprland"
+        },
+        "monitor_count": {
+          "desc": "Workspaces this monitor owns"
+        },
         "style": {
           "title": "Style",
           "desc": "Choose the visual style for workspace indicators"
+        },
+        "app_icons": {
+          "title": "App icons",
+          "desc": "Show the icons of the apps open in each workspace (pills style)"
         }
       },
       "style": {
@@ -487,6 +538,7 @@
         "desc": "Right-click an item to start grouping, right-click another to add it. Right-click a grouped item to remove it.",
         "reset": "Reset",
         "available": "Available",
+        "shown": "Shown",
         "left": "Left",
         "center": "Center",
         "right": "Right"
@@ -533,22 +585,18 @@
           "wave": "Wave",
           "circle": "Circle"
         },
-        "cpu": {
-          "title": "CPU usage",
-          "desc": "Display processor utilization ring"
+        "items": {
+          "title": "Stats",
+          "desc": "Drag stats to reorder them, or move them to available to hide them",
+          "cpu": "CPU",
+          "ram": "Memory",
+          "temp": "Temperature",
+          "disk": "Disk"
         },
-        "ram": {
-          "title": "Memory usage",
-          "desc": "Display memory (RAM) utilization ring"
-        },
-        "temp": {
-          "title": "Temperature",
-          "desc": "Display system temperature ring"
-        },
-        "disk": {
-          "title": "Disk usage",
-          "desc": "Display storage disk utilization ring"
-        }
+        "cpu": {},
+        "ram": {},
+        "temp": {},
+        "disk": {}
       },
       "bat": {
         "show_percent": {
@@ -669,6 +717,10 @@
           "title": "Show controls",
           "desc": "Display the previous, play and next buttons"
         },
+        "hide_when_idle": {
+          "title": "Hide when nothing is playing",
+          "desc": "Hide the widget from the bar while no media is active"
+        },
         "preview": {
           "title": "Song title",
           "author": "Song author"
@@ -679,13 +731,14 @@
         "desc": "Change how thick the bar is, modules scale to fit"
       },
       "menu": {
-        "show_settings": {
-          "title": "Show settings icon",
-          "desc": "Display the button that opens settings"
-        },
-        "show_launcher": {
-          "title": "Show launcher icon",
-          "desc": "Display the search button that opens the launcher"
+        "items": {
+          "title": "Buttons",
+          "desc": "Drag buttons to reorder them, or move them to available to hide them",
+          "settings": "Settings",
+          "launcher": "Launcher",
+          "night_light": "Night light",
+          "caffeine": "Caffeine",
+          "shuffle": "Shuffle wallpaper"
         },
         "style": {
           "title": "Style",
@@ -696,7 +749,9 @@
           },
           "button": "Interactive icon buttons with background",
           "icon": "Clean icons without background"
-        }
+        },
+        "show_settings": {},
+        "show_launcher": {}
       },
       "height": {
         "title": "Bar height",
@@ -725,6 +780,119 @@
           "liquid": "Liquid glass"
         }
       },
+      "colors": {
+        "title": "Color themes",
+        "desc": "Select a predefined color palette preset or create your own custom theme.",
+        "search": "Search themes..."
+      },
+      "delete_theme": "Delete",
+      "wallpaper": {
+        "title": "Wallpaper directory",
+        "desc": "Directory to search for wallpapers",
+        "select_dir": "Select directory...",
+        "select_wallpaper": "Select wallpaper",
+        "no_wallpaper_selected": "No wallpaper selected",
+        "select": "Wallpaper",
+        "transition": {
+          "mode": {
+            "title": "Transition",
+            "random": "Random",
+            "custom": "Custom set",
+            "desc_random": "Use a random transition every time the wallpaper changes",
+            "desc_custom": "Pick randomly from the selected transitions. Click previews to add or remove them"
+          },
+          "fade": {
+            "name": "Fade",
+            "desc": "Cross-fade smoothly into the new wallpaper"
+          },
+          "wipe": {
+            "name": "Wipe",
+            "desc": "Split open from the middle of the screen"
+          },
+          "circle": {
+            "name": "Circle",
+            "desc": "Grow a circle outward until it covers the screen"
+          },
+          "swipe": {
+            "name": "Swipe",
+            "desc": "Sweep across the screen from an edge or a corner"
+          },
+          "paint": {
+            "name": "Paint",
+            "desc": "Paint the new wallpaper in, cell by cell, from colonies that grow across the screen"
+          },
+          "orientation": {
+            "title": "Orientation",
+            "desc": "Axis the wipe opens along",
+            "random": "Random",
+            "horizontal": "Horizontal",
+            "vertical": "Vertical"
+          },
+          "origin": {
+            "title": "Origin",
+            "desc": "Where the circle starts. The desktop menu always starts it where you clicked",
+            "random": "Random",
+            "center": "Center"
+          },
+          "direction": {
+            "title": "Direction",
+            "desc": "Edge or corner the swipe starts from",
+            "random": "Random",
+            "left": "From left",
+            "right": "From right",
+            "top": "From top",
+            "bottom": "From bottom",
+            "top_left": "From top left",
+            "top_right": "From top right",
+            "bottom_left": "From bottom left",
+            "bottom_right": "From bottom right"
+          }
+        }
+      },
+      "apps": {
+        "loading": "Looking for installed apps...",
+        "status": {
+          "error": "Couldn't apply: {detail}"
+        },
+        "issue": {
+          "missing_config": "Config not found. Add this to {file}: {line}",
+          "system_config": "Your config is {file}. Add this to it: {line}",
+          "read_only": "{file} is read-only. Add this to it: {line}",
+          "manual": "Couldn't edit the config safely. Add this to {file}: {line}",
+          "no_theme": "Install the {line} theme so GTK 3 apps follow the palette too",
+          "env": "Set {line} in your session environment",
+          "requires": "Install {line} to theme Qt apps",
+          "failed": "Couldn't update the config: {line}"
+        },
+        "hint": {
+          "select_in_app": "Pick the Serpantinum theme in the app's settings",
+          "restart": "Restart open windows to see new colors",
+          "neovim": "Run :colorscheme serpantinum to use it",
+          "helix": "Run :config-reload in open editors to see new colors",
+          "fastfetch": "Run fastfetch -c serpantinum to use it",
+          "spicetify": "Run spicetify config current_theme Serpantinum, then spicetify apply",
+          "discord": "Enable Serpantinum in the client's theme settings",
+          "emacs": "Run M-x load-theme serpantinum to use it",
+          "steam": "Install Material-Theme with Millennium, then pick Matugen in its color settings",
+          "heroic": "Set Heroic's custom themes path to its themes folder, then pick serpantinum",
+          "telegram": "Load the theme file from Telegram's chat settings"
+        },
+        "list": {
+          "title": "Themed apps",
+          "desc": "Apps that follow the shell colors. Add more from the list"
+        },
+        "add": {
+          "title": "Add app"
+        },
+        "empty": "No apps are themed yet. Add one from the list"
+      },
+      "mode": {
+        "title": "Color mode",
+        "desc": "Switch the shell, GTK, Qt and other themed apps between light and dark",
+        "light": "Light",
+        "dark": "Dark",
+        "fixed": "Fixed by the selected color theme. Choose Matugen to switch modes"
+      },
       "animated": {
         "title": "Animated wallpapers",
         "desc": "Play video wallpapers (mp4, webm…). Turned off, they stay still on one frame",
@@ -745,20 +913,6 @@
         "title": "Otaku mode",
         "desc": "Miku Nakano wallpaper, a different font and softer corners. Downloaded when enabled; turn it off and everything goes back as it was",
         "working": "Working…"
-      },
-      "colors": {
-        "title": "Color themes",
-        "desc": "Select a predefined color palette preset or create your own custom theme.",
-        "search": "Search themes..."
-      },
-      "delete_theme": "Delete",
-      "wallpaper": {
-        "title": "Wallpaper directory",
-        "desc": "Directory to search for wallpapers",
-        "select_dir": "Select directory...",
-        "select_wallpaper": "Select wallpaper",
-        "no_wallpaper_selected": "No wallpaper selected",
-        "select": "Wallpaper"
       },
       "auto_wallpaper": {
         "title": "Wallpapers that change on their own",
@@ -883,7 +1037,36 @@
         "app_limits": "App usage limits",
         "app_limits_desc": "Set maximum daily allowance per application",
         "excluded_apps": "Excluded apps",
-        "excluded_apps_desc": "Exclude apps from overall tracking going forward"
+        "excluded_apps_desc": "Exclude apps from overall tracking going forward",
+        "overall_limit_desc": "Notify me when total screen time reaches this amount",
+        "add_app": "Add app",
+        "no_limits": "No app limits set",
+        "no_excluded": "No excluded apps",
+        "picker_search": "Search apps...",
+        "picker_empty": "No matching applications",
+        "picker_apply": "Apply",
+        "picker_cancel": "Cancel"
+      },
+      "day": "Day",
+      "week": "Week",
+      "screen_time": "Screen time",
+      "less_than_prev": "{time} less than the day before",
+      "more_than_prev": "{time} more than the day before",
+      "same_as_prev": "Same as the day before",
+      "limit_progress": "{used} of {limit} daily limit",
+      "limit_reached": "Daily limit of {limit} reached",
+      "peak_hour": "Peak hour",
+      "week_total": "Week total",
+      "less": "Less",
+      "more": "More",
+      "notify": {
+        "title": "Digital wellbeing",
+        "overall_reached": "Your overall daily limit is reached",
+        "app_reached": "Your daily limit for {app} is reached"
+      },
+      "limit_overlay": {
+        "title": "Daily limit reached",
+        "hold": "Hold to continue"
       }
     },
     "update_available": "Update available",
@@ -1049,7 +1232,119 @@
     "search": {
       "placeholder": "Search settings...",
       "prompt": "Type to search settings...",
-      "no_results": "No settings found"
+      "no_results": "No settings found",
+      "results": "Search results"
+    },
+    "screenshot": {
+      "ocr": {
+        "title": "OCR languages",
+        "desc": "Text recognition detects the language automatically from the ones you install",
+        "search": "Search languages...",
+        "install": "Install",
+        "installing": "Installing...",
+        "remove": "Remove",
+        "removing": "Removing...",
+        "installed": "Installed",
+        "failed": "Download failed. Check your connection.",
+        "offline": "Can't reach the language list. Showing installed languages only.",
+        "loading": "Loading languages..."
+      },
+      "directory": {
+        "title": "Screenshot directory",
+        "desc": "Folder where screenshots are saved",
+        "select_dir": "Select directory..."
+      }
+    },
+    "weather": {
+      "enabled": {
+        "title": "Weather alerts",
+        "desc": "Send notifications when the weather changes or warnings are issued"
+      },
+      "daily": {
+        "title": "Twice-daily forecast",
+        "desc": "Send a morning and evening summary of the day's conditions"
+      },
+      "government": {
+        "title": "Government warnings",
+        "desc": "Send official severe weather warnings for your location",
+        "never": "Never",
+        "last_success": "Last success",
+        "sources": "Sources reachable",
+        "status": {
+          "title": "Warning source status",
+          "ok": "Connected",
+          "partial": "Partially connected",
+          "unavailable": "Unavailable",
+          "disabled": "Disabled",
+          "unknown": "Unknown"
+        }
+      },
+      "quiet": {
+        "title": "Quiet hours",
+        "desc": "Hold back non-urgent alerts during these hours. Severe government warnings, thunderstorms and ice still arrive",
+        "range": {
+          "title": "Quiet period",
+          "desc": "Drag the handles to choose when alerts are held back"
+        }
+      },
+      "kinds": {
+        "rain_soon": {
+          "title": "Rain soon",
+          "desc": "Rain is expected within the next few hours"
+        },
+        "snow_soon": {
+          "title": "Snow soon",
+          "desc": "Snow is expected within the next few hours"
+        },
+        "heavy_rain": {
+          "title": "Heavy rain",
+          "desc": "Heavy rainfall is forecast"
+        },
+        "heavy_snow": {
+          "title": "Heavy snow",
+          "desc": "Heavy snowfall is forecast"
+        },
+        "thunderstorm": {
+          "title": "Thunderstorms",
+          "desc": "Thunderstorms are forecast"
+        },
+        "ice": {
+          "title": "Ice",
+          "desc": "Icy conditions are forecast"
+        },
+        "fog": {
+          "title": "Fog",
+          "desc": "Fog is forecast"
+        },
+        "temp_rise": {
+          "title": "Temperature rise",
+          "desc": "The temperature is expected to rise sharply"
+        },
+        "temp_drop": {
+          "title": "Temperature drop",
+          "desc": "The temperature is expected to fall sharply"
+        },
+        "hot": {
+          "title": "Heat",
+          "desc": "Very high temperatures are forecast"
+        },
+        "cold": {
+          "title": "Cold",
+          "desc": "Very low temperatures are forecast"
+        },
+        "wind": {
+          "title": "Strong wind",
+          "desc": "Strong winds are forecast"
+        },
+        "uv": {
+          "title": "UV index",
+          "desc": "The UV index is expected to be high"
+        },
+        "air_quality": {
+          "title": "Air quality",
+          "desc": "Poor air quality is forecast"
+        }
+      }
     }
   },
   "sysnotif": {
@@ -1086,6 +1381,8 @@
     "placeholder_files": "Search files or enter path...",
     "tab_emojis": "Emojis",
     "placeholder_emojis": "Search emojis by name or keyword...",
+    "search_run": "Search {provider}",
+    "search_hint": "Type to search with {provider}",
     "calc_result": "Calculation result (Enter to copy)",
     "command_hint": "Type a command to execute",
     "command_run": "Execute command: {cmd}",
@@ -1105,13 +1402,6 @@
       "rain": "Rain",
       "feels": "Feels"
     },
-    "performance": {
-      "title": "Performance panel",
-      "cpu": "Processor",
-      "ram": "Memory",
-      "temp": "Temperature",
-      "disk": "Disk"
-    },
     "days": {
       "mo": "Mo",
       "tu": "Tu",
@@ -1120,6 +1410,13 @@
       "fr": "Fr",
       "sa": "Sa",
       "su": "Su"
+    },
+    "performance": {
+      "title": "Performance panel",
+      "cpu": "Processor",
+      "ram": "Memory",
+      "temp": "Temperature",
+      "disk": "Disk"
     }
   },
   "clipboard": {
@@ -1196,6 +1493,9 @@
       },
       "setting": {
         "show_text": "Show text"
+      },
+      "category": {
+        "lockscreen": "Lock screen"
       }
     }
   },
@@ -1211,6 +1511,8 @@
     "eq": {
       "apply": "Apply",
       "saved": "Saved",
+      "dynamic": "Dynamic",
+      "dynamic_active": "Adapting to your sound",
       "freq_hint": "Click: type the frequency · wheel: nudge it · right-click: remove the band",
       "add_band": "Add a band (up to 16)",
       "remove_band": "Remove this band"
@@ -1296,6 +1598,9 @@
         "badge": "Screenshot",
         "fallback_summary": "Captured screen",
         "click_to_open": "Click to open the screenshot folder"
+      },
+      "battery": {
+        "title": "Battery"
       }
     }
   },
@@ -1389,7 +1694,8 @@
       "inv": "Inv",
       "mode": {
         "normal": "Normal",
-        "advanced": "Advanced"
+        "advanced": "Advanced",
+        "converter": "Converter"
       },
       "clear": "AC",
       "error": {
@@ -1397,6 +1703,20 @@
         "div0": "Can't divide by zero",
         "domain": "Invalid input",
         "paste": "Invalid paste"
+      },
+      "converter": {
+        "currency": "Currency",
+        "length": "Length",
+        "mass": "Mass",
+        "temperature": "Temperature",
+        "volume": "Volume",
+        "area": "Area",
+        "speed": "Speed",
+        "time": "Time",
+        "data": "Data",
+        "updated": "Rates updated {time}",
+        "updating": "Updating rates...",
+        "offline": "Rates unavailable"
       }
     },
     "tabs": {
@@ -1428,7 +1748,15 @@
       "recording_started_title": "Recording started",
       "recording_started_body": "Press your screenshot shortcut again to stop.",
       "screenshot_saved_title": "Screenshot saved",
-      "screenshot_saved_body": "File: {file}\nFolder: {folder}"
+      "screenshot_saved_body": "File: {file}\nFolder: {folder}",
+      "ocr_copied_title": "Text copied",
+      "ocr_empty_title": "No text found",
+      "ocr_empty_body": "Couldn't recognize any text in the selected area",
+      "ocr_missing_title": "OCR language data missing",
+      "ocr_missing_body": "Open Screenshot settings to install a language.",
+      "ocr_uncertain_title": "Text copied, but it may be inaccurate",
+      "ocr_language_hint": "The text may be in a language that isn't installed. Add languages in Screenshot settings.",
+      "ocr_open_settings": "Open settings"
     }
   },
   "start": {
@@ -1493,7 +1821,9 @@
       "generating_thumbnails": "Generating thumbnails...",
       "no_wallpapers_found": "No wallpapers found",
       "videos": "Videos",
-      "history": "Recently applied"
+      "history": "Recently applied",
+      "favorites": "Favorites",
+      "recently_added": "Recently added"
     },
     "filters": {
       "all": "All",
@@ -1588,11 +1918,21 @@
     },
     "redactor": {
       "no_widgets_active": "No widgets active",
-      "click_to_add": "Click a widget icon in the bottom toolbar to add it",
+      "click_to_add": "Pick a category or search in the bottom toolbar to add a widget",
       "done": "Done",
       "widget_singular": "widget",
       "widgets_plural": "widgets",
-      "widgets_short": "w"
+      "widgets_short": "w",
+      "category": {
+        "time": "Time and text",
+        "media": "Media",
+        "system": "System",
+        "info": "Info",
+        "other": "Other"
+      },
+      "search": "Search widgets",
+      "results": "Results",
+      "no_results": "Nothing found"
     },
     "types": {
       "clock": "Clock",
@@ -1604,8 +1944,10 @@
       "usage": "Usage",
       "battery": "Battery",
       "github": "Github",
-      "html": "HTML",
-      "time": "Time"
+      "time": "Time",
+      "notes": "Notes",
+      "text": "Text",
+      "html": "HTML"
     },
     "variants": {
       "digital": "Digital",
@@ -1655,7 +1997,9 @@
       "lyricsAlignment": "Alignment",
       "usageStyle": "Style",
       "lineThickness": "Thickness",
-      "visualizerStyle": "Visualizer style"
+      "visualizerStyle": "Visualizer style",
+      "hideText": "Hide text",
+      "textContent": "Text"
     },
     "align": {
       "left": "Left",
@@ -1665,6 +2009,12 @@
     "style": {
       "wave": "Wave",
       "circle": "Circle"
+    },
+    "notes": {
+      "empty": "No notes yet"
+    },
+    "text": {
+      "placeholder": "Enter text"
     },
     "user": {
       "lock": "Lock"
@@ -1743,29 +2093,30 @@
     "description": "A desktop shell for wayland compositors.",
     "commands": "Commands:",
     "script_commands": "Script commands:",
-    "launch_desc": "Launch standalone components (start, widgetredactor)",
+    "launch_desc": "Launch standalone components (start)",
     "msg_desc": "Dispatch commands or workspace switches to the UI manager",
     "ipc_desc": "Forward IPC calls directly to the shell",
     "kill_desc": "Cleanly stop the running daemon",
+    "restart_desc": "Stop and start the daemon again",
     "options": "Options:",
     "verbose_desc": "Enable verbose logging output",
     "version_desc": "Display version information and exit",
     "help_desc": "Show this help message and exit",
     "examples": "Examples:",
     "daemon_stopped": "Serpantinum daemon stopped.",
+    "daemon_restarted": "Serpantinum daemon restarted.",
     "starting_daemon": "Daemon not running. Starting serpantinumd in the background...",
     "error_missing_qml": "Error: missing target to launch.",
-    "launch_usage": "Usage: serpantinum launch <start|widgetredactor> [args...]",
+    "launch_usage": "Usage: serpantinum launch <start> [args...]",
     "error_qml_not_found": "Error: could not resolve {NAME}.qml in {DIR}",
     "error_shell_qml_not_found": "Error: could not resolve path to shell.qml in {DIR}",
     "error_unknown_command": "Error: unknown command '{CMD}'.",
     "error_unknown_target": "Error: unknown target '{TARGET}'.",
     "launch_help": {
-      "usage": "Usage: serpantinum launch <start|widgetredactor> [arguments...]",
+      "usage": "Usage: serpantinum launch <start> [arguments...]",
       "description": "Launch standalone components directly in runner mode.",
       "available_targets": "Available targets:",
-      "target_start": "Launch the start setup interface",
-      "target_widgetredactor": "Launch the desktop widget editor interface"
+      "target_start": "Launch the start setup interface"
     },
     "msg_help": {
       "usage": "Usage: serpantinum msg <command|workspace> [arguments...]",
@@ -1789,12 +2140,31 @@
       "location": "Retrieve and update geographic coordinates",
       "screenshot": "Capture screen images, record video, or parse QR codes",
       "brightness": "Adjust backlight display brightness",
-      "current_focus": "Monitor and log active window focus changes",
-      "monitors_detect": "Query active display outputs and refresh rates",
       "location_manual": "Set geographic coordinates and timezone manually",
-      "blue_light_filter": "Adjust color temperature and automatic day/night schedule",
-      "translate": "Instant text and selection translator"
-    }
+      "gamma": "Adjust color temperature and automatic day/night schedule",
+      "translate": "Instant text and selection translator",
+      "suspend": "Lock the screen and suspend the system",
+      "hibernate": "Hibernate the system",
+      "reboot": "Reboot the system",
+      "poweroff": "Power off the system",
+      "redactor": "Open or toggle the desktop widget layout editor",
+      "lock_redactor": "Toggle, open or close the lock screen layout editor"
+    },
+    "usage_label": "Usage:",
+    "config_desc": "Read and change settings (get, set, dump, path, edit)",
+    "error_unknown_language": "Error: unknown language '{CODE}'.",
+    "update_available": "Update available: {LOCAL} -> {REMOTE}",
+    "up_to_date": "Serpantinum is up to date ({VERSION}).",
+    "state_on": "on",
+    "state_off": "off",
+    "error_unknown_theme": "Error: unknown theme '{NAME}'.",
+    "error_no_wallpapers": "Error: no wallpapers found in the wallpaper directory.",
+    "error_file_not_found": "Error: file not found: {PATH}",
+    "info_desc": "Show the current state of a setting (notifications, idle, dock, sfx, theme, lang, wallpaper, monitors, updates)",
+    "set_desc": "Change a setting (notifications, idle, dock, sfx, theme, lang, wallpaper)",
+    "trigger_desc": "Run a one-off action (idle, notifications, theme, firstlaunch)",
+    "settings_desc": "Open the settings window, optionally on a given tab",
+    "error_unknown_app": "Error: unknown app '{ID}'."
   },
   "daemon": {
     "already_running": "Daemon is already running. Exiting...",
@@ -1815,6 +2185,11 @@
       "status_running": "Serpantinum daemon is running (PID: {PID}).",
       "status_stopped": "Serpantinum daemon is not running.",
       "unknown_arg": "Unknown argument: {ARG}"
+    },
+    "app_name": "Serpantinum",
+    "easyeffects": {
+      "title": "EasyEffects is still enabled",
+      "body": "Serpantinum now has its own audio engine, and EasyEffects can interfere with it. If you only used EasyEffects for Serpantinum, stop it from starting at login."
     }
   },
   "installer": {
@@ -1893,12 +2268,33 @@
       "syncing": "Synchronizing and updating system packages (pacman -syyu)...",
       "enabling_copr": "Enabling COPR repository {repo}...",
       "enabling_terra": "Enabling the Terra repository...",
+      "enabling_repo": "Enabling repository {repo}...",
       "all_installed": "-> All packages are already installed! Skipping package download phase.",
       "missing_count": "-> Found {count} missing packages to install.",
       "installing_title": "Installing system packages and dependencies...",
       "installing_pkg": "Installing {pkg}...",
       "install_ok": "Successfully installed {pkg}",
-      "install_failed": "Failed to install {pkg}"
+      "install_failed": "Failed to install {pkg}",
+      "quickshell_outdated": "Quickshell {version} is too old, {minimum} or newer is required. Upgrading...",
+      "quickshell_still_old": "Quickshell is still older than {minimum}. Update it manually, otherwise settings will not open."
+    },
+    "ski": {
+      "installing": "Installing the Ski file manager...",
+      "up_to_date": "-> Ski {version} is already installed.",
+      "installed": "Installed Ski {version}",
+      "install_failed": "Failed to install Ski",
+      "download_failed": "Could not download Ski, skipping. You can install it later from github.com/ilyamiro/Ski.",
+      "checksum_failed": "Ski download failed its checksum check, skipping.",
+      "unsupported_arch": "Prebuilt Ski packages exist only for x86_64, skipping."
+    },
+    "audio": {
+      "installing": "Installing the Serpantinum audio engine...",
+      "up_to_date": "-> Serpantinum audio engine {version} is already installed.",
+      "installed": "Installed the Serpantinum audio engine {version}",
+      "building": "No prebuilt audio engine for this system, building it from source...",
+      "install_failed": "Failed to install the Serpantinum audio engine. The equalizer will not work until it is installed from github.com/ilyamiro/serpantinum-audio.",
+      "download_failed": "Could not download the Serpantinum audio engine, skipping. You can install it later from github.com/ilyamiro/serpantinum-audio.",
+      "checksum_failed": "The audio engine download failed its checksum check, skipping."
     },
     "deploy": {
       "configuring_sddm": "Configuring SDDM display manager...",
@@ -1908,6 +2304,24 @@
       "sddm_no_xorg": "Xorg not found, using {compositor} for SDDM.",
       "sddm_no_backend": "Neither Xorg nor a supported Wayland greeter compositor (kwin_wayland/weston) was found in /usr/local/bin, /usr/bin or /bin.",
       "sddm_skipped": "Skipping SDDM setup: no usable display server or greeter compositor found. The current display manager is left unchanged."
+    },
+    "gamma": {
+      "installing": "Installing the Serpantinum blue light filter...",
+      "up_to_date": "-> Serpantinum blue light filter {version} is already installed.",
+      "installed": "Installed the Serpantinum blue light filter {version}",
+      "install_failed": "Failed to install the Serpantinum blue light filter. It will not work until it is installed from github.com/ilyamiro/serpantinum-gamma.",
+      "download_failed": "Could not download the Serpantinum blue light filter, skipping. You can install it later from github.com/ilyamiro/serpantinum-gamma.",
+      "checksum_failed": "The blue light filter download failed its checksum check, skipping.",
+      "unsupported_arch": "Prebuilt blue light filter packages exist only for x86_64, skipping."
+    },
+    "core": {
+      "installing": "Installing the Serpantinum core services...",
+      "up_to_date": "-> Serpantinum core services {version} are already installed.",
+      "installed": "Installed the Serpantinum core services {version}",
+      "install_failed": "Failed to install the Serpantinum core services. System usage, keyboard lock indicators and the clipboard will not work until they are installed from github.com/ilyamiro/serpantinum-core.",
+      "download_failed": "Could not download the Serpantinum core services, skipping. You can install them later from github.com/ilyamiro/serpantinum-core.",
+      "checksum_failed": "The core services download failed its checksum check, skipping.",
+      "unsupported_arch": "Prebuilt core services packages exist only for x86_64, skipping."
     }
   },
   "translator": {
@@ -1932,9 +2346,147 @@
   },
   "datetime": {
     "full_date": "dddd, MMMM dd",
-    "yesterday": "Yesterday",
     "just_now": "Just now",
-    "minutes_ago": "{n} min ago"
+    "minutes_ago": "{mins} min ago",
+    "yesterday": "Yesterday {time}"
+  },
+  "common": {
+    "select": "Select..."
+  },
+  "gov_alerts": {
+    "status": {
+      "ok": "All sources reachable",
+      "partial": "Some sources unreachable",
+      "unavailable": "Warning sources unreachable",
+      "disabled": "Disabled",
+      "unknown": "Not checked yet"
+    },
+    "coverage": {
+      "official": "Official national sources",
+      "worldwide": "Worldwide alert server only",
+      "none": "No coverage"
+    },
+    "sources": {
+      "nws": "US National Weather Service",
+      "eccc": "Environment Canada",
+      "dwd": "German Weather Service",
+      "metno": "MET Norway",
+      "kde": "KDE alert server",
+      "meteoalarm": "MeteoAlarm",
+      "feeds": "Official alert feeds"
+    },
+    "severity": {
+      "moderate": "Moderate",
+      "severe": "Severe",
+      "extreme": "Extreme"
+    },
+    "hazard": {
+      "generic": "Weather warning",
+      "rain": "Heavy rain",
+      "flood": "Flood",
+      "snow": "Snow",
+      "ice": "Ice",
+      "storm": "Storm",
+      "wind": "Wind",
+      "fog": "Fog",
+      "heat": "Heat",
+      "cold": "Cold",
+      "fire": "Fire",
+      "dust": "Dust",
+      "marine": "Marine"
+    },
+    "last_success": "Last successful check",
+    "sources_ok": "{ok} of {total} sources reachable",
+    "refresh": "Check now",
+    "no_alerts": "No active warnings"
+  },
+  "weather_alerts": {
+    "rain_soon": {
+      "title": "Rain expected",
+      "body": "Rain is expected around {time}."
+    },
+    "snow_soon": {
+      "title": "Snow expected",
+      "body": "Snow is expected around {time}."
+    },
+    "heavy_rain": {
+      "title": "Heavy rain",
+      "body": "Heavy rain is expected around {time}."
+    },
+    "heavy_snow": {
+      "title": "Heavy snow",
+      "body": "Heavy snow is expected around {time}."
+    },
+    "thunderstorm": {
+      "title": "Thunderstorm",
+      "body": "Thunderstorms are expected around {time}."
+    },
+    "ice": {
+      "title": "Icy conditions",
+      "body": "Freezing rain or ice is expected around {time}."
+    },
+    "fog": {
+      "title": "Fog",
+      "body": "Low visibility is expected around {time}."
+    },
+    "temp_rise": {
+      "title": "Warmer today",
+      "body": "Today will be {delta} warmer than yesterday, with a high of {max}."
+    },
+    "temp_drop": {
+      "title": "Colder today",
+      "body": "Today will be {delta} colder than yesterday, with a high of {max}."
+    },
+    "hot": {
+      "title": "Extreme heat",
+      "body": "It will feel like {temp} today. Stay hydrated."
+    },
+    "cold": {
+      "title": "Extreme cold",
+      "body": "It will feel like {temp} today. Dress warmly."
+    },
+    "wind": {
+      "title": "Strong wind",
+      "body": "Gusts up to {speed} are expected around {time}."
+    },
+    "uv": {
+      "title": "High UV index",
+      "body": "The UV index will reach {value} around {time}. Use sun protection."
+    },
+    "air_quality": {
+      "title": "Poor air quality",
+      "body": "The air quality index is {value}. Limit time outdoors."
+    },
+    "daily_clear": {
+      "title": "Clear skies",
+      "today": "Clear skies today. High {max}, low {min}.",
+      "tomorrow": "Clear skies tomorrow. High {max}, low {min}."
+    },
+    "daily_cloudy": {
+      "title": "Cloudy",
+      "today": "Cloudy today. High {max}, low {min}.",
+      "tomorrow": "Cloudy tomorrow. High {max}, low {min}."
+    },
+    "daily_rain": {
+      "title": "Rain",
+      "today": "Rain today. High {max}, low {min}.",
+      "tomorrow": "Rain tomorrow. High {max}, low {min}."
+    },
+    "daily_snow": {
+      "title": "Snow",
+      "today": "Snow today. High {max}, low {min}.",
+      "tomorrow": "Snow tomorrow. High {max}, low {min}."
+    },
+    "daily_storm": {
+      "title": "Thunderstorms",
+      "today": "Thunderstorms today. High {max}, low {min}.",
+      "tomorrow": "Thunderstorms tomorrow. High {max}, low {min}."
+    },
+    "daily_fog": {
+      "title": "Fog",
+      "today": "Fog today. High {max}, low {min}.",
+      "tomorrow": "Fog tomorrow. High {max}, low {min}."
+    }
   },
   "celular": {
     "title": "Your phone",

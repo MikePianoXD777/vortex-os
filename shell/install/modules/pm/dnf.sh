@@ -6,33 +6,20 @@ PM_EXTRA_PKGS=(jetbrains-mono-fonts fontawesome-6-free-fonts xdg-user-dirs xwayl
 PM_SDDM_EXTRA_PKGS=(sddm-wayland-generic adwaita-cursor-theme)
 PM_SDDM_WAYLAND_DEFAULT=true
 PM_SDDM_CURSOR_FIX=true
+PM_AUDIO_BUILD_PKGS=(gcc-c++ make pkgconf-pkg-config pipewire-devel)
 
 declare -A PM_PKG_MAP=(
     [kitty]="kitty"
-    [cava]="cava"
     [zbar]="zbar"
-    [pavucontrol]="pavucontrol"
-    [alsa-utils]="alsa-utils"
+    [tesseract]="tesseract"
+    [tesseract-data-eng]="tesseract-langpack-eng"
     [wl-clipboard]="wl-clipboard"
-    [fd]="fd-find"
     [qt6-multimedia]="qt6-qtmultimedia"
-    [qt6-5compat]="qt6-qt5compat"
-    [ripgrep]="ripgrep"
     [cliphist]="cliphist"
     [jq]="jq"
-    [socat]="socat"
-    [inotify-tools]="inotify-tools"
-    [pamixer]="pamixer"
-    [brightnessctl]="brightnessctl"
     [ddcutil]="ddcutil"
-    [acpi]="acpi"
-    [iw]="iw"
     [bluez]="bluez"
-    [bluez-utils]="bluez"
-    [libnotify]="libnotify"
     [networkmanager]="NetworkManager"
-    [lm_sensors]="lm_sensors"
-    [bc]="bc"
     [matugen]="matugen"
     [pipewire]="pipewire"
     [wireplumber]="wireplumber"
@@ -41,40 +28,21 @@ declare -A PM_PKG_MAP=(
     [libpulse]="pulseaudio-libs"
     [python]="python3"
     [imagemagick]="ImageMagick"
-    [wget]="wget"
     [file]="file"
-    [git]="git"
-    [psmisc]="psmisc"
     [ffmpeg]="ffmpeg-free|ffmpeg"
     [fastfetch]="fastfetch"
     [quickshell]="quickshell"
-    [unzip]="unzip"
-    [python-websockets]="python3-websockets"
-    [python-jeepney]="python3-jeepney"
-    [qt6-websockets]="qt6-qtwebsockets"
     [grim]="grim"
     [playerctl]="playerctl"
     [satty]="satty"
     [xdg-desktop-portal-gtk]="xdg-desktop-portal-gtk"
-    [slurp]="slurp"
-    [wmctrl]="wmctrl"
     [power-profiles-daemon]="ppd-service"
-    [easyeffects]="easyeffects"
-    [calf]="calf"
-    [lsp-plugins-lv2]="lsp-plugins-lv2"
-    [nautilus]="nautilus"
-    [qt5-wayland]="qt5-qtwayland"
-    [qt5-quickcontrols]="qt5-qtquickcontrols"
-    [qt5-quickcontrols2]="qt5-qtquickcontrols2"
-    [qt5-graphicaleffects]="qt5-qtgraphicaleffects"
     [qt6-wayland]="qt6-qtwayland"
-    [qt5ct]="qt5ct"
     [qt6ct]="qt6ct"
     [adwaita-icon-theme]="adwaita-icon-theme"
     [gpu-screen-recorder]="gpu-screen-recorder"
     [wf-recorder]="wf-recorder"
     [adw-gtk-theme]="adw-gtk3-theme"
-    [wl-gammarelay-rs]="wl-gammarelay-rs"
     [hyprland]="hyprland"
     [niri]="niri"
     [sway]="sway"
@@ -88,8 +56,6 @@ declare -A PM_COPR_MAP=(
     [quickshell]="errornointernet/quickshell"
     [hyprland]="mineiro/hyprland"
     [cliphist]="mecattaf/duoRPM"
-    [matugen]="mecattaf/duoRPM"
-    [wl-gammarelay-rs]="mecattaf/duoRPM"
     [gpu-screen-recorder]="arabianq/gpu-screen-recorder"
 )
 
@@ -97,7 +63,11 @@ declare -A PM_TERRA_MAP=(
     [mangowm]=1
 )
 
+PM_MATUGEN_MIN_MAJOR=4
+PM_MATUGEN_REPO="InioX/matugen"
+
 declare -A PM_RELEASE_MAP=(
+    [matugen]="https://github.com/InioX/matugen/releases/download/v4.2.0/matugen-4.2.0-x86_64.tar.gz"
     [satty]="https://github.com/gabm/Satty/releases/latest/download/satty-x86_64-unknown-linux-gnu.tar.gz"
 )
 
@@ -136,9 +106,46 @@ pm_resolve_name() {
     echo "${PM_PKG_MAP[$1]:-$1}"
 }
 
+pm_matugen_major() {
+    local bin="$1" ver
+    [ -x "$bin" ] || return 1
+    ver="$("$bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n 1)"
+    [ -n "$ver" ] || return 1
+    echo "${ver%%.*}"
+}
+
+pm_matugen_ok() {
+    local bin major
+    for bin in "$HOME/.local/bin/matugen" "$(command -v matugen 2>/dev/null)"; do
+        [ -n "$bin" ] || continue
+        major="$(pm_matugen_major "$bin")" || continue
+        [ "$major" -ge "$PM_MATUGEN_MIN_MAJOR" ] && return 0
+    done
+    return 1
+}
+
+pm_matugen_release_url() {
+    local url
+    url="$(curl -fsSL --connect-timeout 15 --retry 3 "https://api.github.com/repos/$PM_MATUGEN_REPO/releases/latest" 2>/dev/null \
+        | jq -r '[.assets[] | select(.name | test("x86_64\\.tar\\.gz$"))][0].browser_download_url // empty' 2>/dev/null)"
+    echo "${url:-${PM_RELEASE_MAP[matugen]}}"
+}
+
+pm_install_matugen() {
+    pm_install_release_binary "$(pm_matugen_release_url)" matugen || return 1
+    pm_matugen_ok || return 1
+    if rpm -q matugen &>/dev/null; then
+        sudo dnf remove -y matugen || true
+    fi
+}
+
 pm_missing_pkgs() {
     local pkg spec alt satisfied
     for pkg in "$@"; do
+        if [ "$pkg" = "matugen" ]; then
+            pm_matugen_ok || echo "$pkg"
+            continue
+        fi
         if [ -n "${PM_RELEASE_MAP[$pkg]:-}" ]; then
             if ! command -v "$pkg" &>/dev/null && [ ! -x "$HOME/.local/bin/$pkg" ]; then
                 echo "$pkg"
@@ -223,6 +230,10 @@ pm_install_pkg() {
     local pkg="$1"
     local spec target
 
+    if [ "$pkg" = "matugen" ]; then
+        pm_install_matugen
+        return
+    fi
     if [ -n "${PM_RELEASE_MAP[$pkg]:-}" ]; then
         pm_install_release_binary "${PM_RELEASE_MAP[$pkg]}" "$pkg"
         return
@@ -261,21 +272,15 @@ pm_disable_display_manager() {
     fi
 }
 
-pm_configure_sddm_cursor() {
-    local conf="$1" theme=""
-    if [ -d /usr/share/icons/Adwaita/cursors ]; then
-        theme="Adwaita"
-    else
-        theme="$(find /usr/share/icons -mindepth 2 -maxdepth 2 -type d -name cursors 2>/dev/null | head -n 1 | xargs -r dirname | xargs -r basename)"
-    fi
-    [ -n "$theme" ] || return 0
-    sudo sed -i -e "/^ThemeDir=/a CursorTheme=$theme" -e "/^ThemeDir=/a CursorSize=24" "$conf"
-}
-
 pm_remove_pkg() {
     true
 }
 
 pm_remove_conflicting_pkg() {
     true
+}
+
+pm_upgrade_quickshell() {
+    pm_enable_copr "${PM_COPR_MAP[quickshell]}" || true
+    sudo dnf upgrade -y --refresh quickshell || true
 }

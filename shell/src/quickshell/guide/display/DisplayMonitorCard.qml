@@ -26,8 +26,6 @@ Rectangle {
 
     readonly property color cardTint: monitorPowered ? Qt.alpha(ThemeBackend.surface0, 0.4) : Qt.darker(Qt.alpha(ThemeBackend.surface0, 0.4), 1.1)
     color: monDelegateGlass.active ? "transparent" : cardTint
-    border.color: monitorPowered ? Qt.alpha(ThemeBackend.surface1, 0.4) : Qt.darker(Qt.alpha(ThemeBackend.surface1, 0.4), 1.1)
-    border.width: ThemeBackend.liquidGlass ? 0 : 1
 
     GlassFill {
         id: monDelegateGlass
@@ -38,15 +36,15 @@ Rectangle {
     }
 
     property real targetHeight: boxLayout.implicitHeight + rootObj.s(24)
-    property bool appeared: false
+    property bool appeared: !tab.animateCards
 
-    implicitHeight: appeared ? targetHeight : 0
+    property real appearProgress: appeared ? 1 : 0
+    implicitHeight: targetHeight * appearProgress
     opacity: appeared ? 1.0 : 0.0
 
-    Behavior on implicitHeight { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+    Behavior on appearProgress { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
     Behavior on color { ColorAnimation { duration: 250 } }
-    Behavior on border.color { ColorAnimation { duration: 250 } }
 
     Component.onCompleted: {
         appeared = true;
@@ -150,8 +148,8 @@ Rectangle {
         SettingsGroup {
             rootObj: monDelegate.rootObj
             icon: "󰖔"
-            title: I18n.t("guide.display.bluelight.title")
-            description: I18n.t("guide.display.bluelight.desc")
+            title: I18n.t("guide.display.gamma.title")
+            description: I18n.t("guide.display.gamma.desc")
             expanded: monDelegate.filterEnabled
 
             Toggle {
@@ -164,7 +162,7 @@ Rectangle {
                 handleOffColor: ThemeBackend.text
                 onToggled: function(c) {
                     monDelegate.filterEnabled = c;
-                    BlueLight.setEnabled(monDelegate.monName, c);
+                    Gamma.setEnabled(monDelegate.monName, c);
                     monDelegate.tab.refreshDisplaySettings();
                 }
 
@@ -193,7 +191,7 @@ Rectangle {
                         handleOffColor: ThemeBackend.text
                         onToggled: function(c) {
                             monDelegate.filterAuto = c;
-                            BlueLight.setAuto(monDelegate.monName, c);
+                            Gamma.setAuto(monDelegate.monName, c);
                             monDelegate.tab.refreshDisplaySettings();
                         }
 
@@ -212,10 +210,11 @@ Rectangle {
                     clip: true
                     visible: implicitHeight > 0
                     opacity: isOpen ? 1.0 : 0.0
-                    implicitHeight: isOpen ? tempInnerBox.implicitHeight : 0
+                    property real openProgress: isOpen ? 1 : 0
+                    implicitHeight: tempInnerBox.implicitHeight * openProgress
 
-                    Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                    Behavior on implicitHeight { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                    Behavior on openProgress { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
                     SettingsRow {
                         id: tempInnerBox

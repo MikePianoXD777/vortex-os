@@ -15,7 +15,7 @@ MusicPlayerState {
     property var savedEqData: ({
         "bandas": root.bandasBase([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         "preset": "Flat", "pending": false, "balance": 0,
-        "mono": false, "swap": false, "dynamics": "off"
+        "mono": false, "swap": false, "dynamics": "off", "dyneq": false
     })
 
     property bool audioTestRunning: false
@@ -245,7 +245,7 @@ MusicPlayerState {
     }
 
     function setAudioFlag(name, value) {
-        if (name !== "mono" && name !== "swap") return;
+        if (name !== "mono" && name !== "swap" && name !== "dyneq") return;
         var temp = Object.assign({}, root.eqData);
         temp[name] = value === true;
         root.eqData = temp;

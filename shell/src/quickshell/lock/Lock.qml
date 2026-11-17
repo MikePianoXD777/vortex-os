@@ -15,11 +15,8 @@ Scope {
     property bool staticLock: false
     property bool isUnlocking: false
     property int resumeRevision: 0
+    property int shownSurfaces: 0
 
-    property bool isNiri: false
-    property bool isSway: false
-    readonly property bool isMango: MangoState.isMango
-    property string kbLayout: "US"
     property int connectedScreenCount: 1
     property bool fingerprintAvailable: false
     property bool fpUnsupported: false
@@ -27,7 +24,9 @@ Scope {
     property bool fpGotInfo: false
     property bool fpAborting: false
     property bool pwAborting: false
+    property string pendingPassword: ""
     property bool fpBlocked: false
+    property int fpResumeRetries: 0
     property bool noFpPamReady: false
     property string defaultPamDir: ""
     property string defaultPamConfig: ""
@@ -53,19 +52,12 @@ Scope {
         return ThemeBackend.text;
     }
 
-    function updateDeInfo() {
-        let de = SystemInfo.desktopEnv ? SystemInfo.desktopEnv.toLowerCase() : "";
-        root.isNiri = de.indexOf("niri") !== -1;
-        root.isSway = de.indexOf("sway") !== -1;
-    }
-
     function updateScreenCount() {
         root.connectedScreenCount = Quickshell.screens ? Quickshell.screens.length : 1;
     }
 
     Component.onCompleted: {
         SystemInfo.fetch();
-        root.updateDeInfo();
         root.updateScreenCount();
         Quickshell.execDetached(["rm", "-f", Caching.getRunDir("lock") + "/locked"]);
         root.defaultPamDir = pam.configDirectory;
@@ -82,95 +74,6 @@ Scope {
         target: Quickshell
         function onScreensChanged() {
             root.updateScreenCount();
-        }
-    }
-
-    function switchKbLayout() {
-        root.updateDeInfo();
-        if (root.isNiri) {
-            Quickshell.execDetached(["niri", "msg", "action", "switch-layout", "next"]);
-        } else if (root.isSway) {
-            Quickshell.execDetached(["swaymsg", "input", "type:keyboard", "xkb_switch_layout", "next"]);
-        } else if (root.isMango) {
-            Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"]);
-        } else {
-            Quickshell.execDetached(["hyprctl", "switchxkblayout", "main", "next"]);
-        }
-    }
-
-    Timer {
-        id: kbPollerRestartTimer
-        interval: 400
-        repeat: false
-        onTriggered: {
-            kbWaiter.running = false;
-            kbPoller.running = false;
-            if (rootLock.locked) kbPoller.running = true;
-        }
-    }
-
-    Process {
-        id: kbPoller
-        running: rootLock.locked
-        command: [
-            "bash",
-            "-c",
-            root.isMango
-                ? "layout=$(mmsg get keyboardlayout 2>/dev/null | jq -r '.layout // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                : root.isNiri
-                ? "layout=$(niri msg -j keyboard-layouts 2>/dev/null | jq -r '.names[.current_idx] // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                : (root.isSway
-                    ? "layout=$(swaymsg -t get_inputs 2>/dev/null | jq -r '[.[] | select(.type == \"keyboard\" and .xkb_active_layout_name != null)] | .[0].xkb_active_layout_name // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                    : "layout=$(LC_ALL=C hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true) | .active_keymap) // .keyboards[0].active_keymap // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'")
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let txt = this.text.trim();
-                if (txt !== "" && root.kbLayout !== txt) root.kbLayout = txt;
-                // Vortex: antes se reiniciaba kbWaiter aquí aunque ya estuviera esperando; al
-                // matarlo, su onExited volvía a lanzar kbPoller, y este otra vez kbWaiter: un
-                // bucle de miles de procesos por segundo mientras la pantalla estaba bloqueada.
-                // Ahora solo se lanza si no está corriendo, y en Hyprland no hace falta.
-                if (rootLock.locked && !root.hyprEvents && !kbWaiter.running) kbWaiter.running = true;
-            }
-        }
-    }
-
-    // Vortex: en Hyprland el cambio de distribución («activelayout») llega por el socket de
-    // eventos que Quickshell ya tiene abierto (igual que en la barra, KbFace.qml): sin
-    // kb_wait.sh (bash + socat + grep) residente mientras la pantalla está bloqueada.
-    readonly property bool hyprEvents: !root.isNiri && !root.isSway && !root.isMango
-        && Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
-
-    Connections {
-        target: root.hyprEvents ? Hyprland : null
-        function onRawEvent(event) {
-            if (event.name !== "activelayout" || !rootLock.locked) return;
-            kbLayoutDelay.restart();
-        }
-    }
-
-    Timer {
-        id: kbLayoutDelay
-        // Los mismos 50 ms que esperaba kb_wait.sh antes de volver a leer
-        interval: 50
-        repeat: false
-        onTriggered: {
-            kbPoller.running = false;
-            if (rootLock.locked) kbPoller.running = true;
-        }
-    }
-
-    Process {
-        id: kbWaiter
-        command: [
-            "bash",
-            Caching.qsDir + "/watchers/kb_wait.sh",
-            root.isMango ? "mango" : (root.isNiri ? "niri" : (root.isSway ? "sway" : "hyprland"))
-        ]
-        onExited: {
-            kbPoller.running = false;
-            if (rootLock.locked) kbPoller.running = true;
         }
     }
 
@@ -293,6 +196,13 @@ Scope {
     }
 
     function markFingerprintUnsupported() {
+        if (root.fpResumeRetries > 0 && !root.fpGotInfo && root.fingerprintEnabled && !root.fpBlocked && rootLock.locked && !root.isUnlocking) {
+            root.fpResumeRetries--;
+            root.fpHolding = false;
+            root.fpUnsupported = false;
+            fingerprintRestartTimer.restart();
+            return;
+        }
         root.fpUnsupported = true;
         root.fpHolding = false;
         root.fingerprintAvailable = false;
@@ -313,8 +223,12 @@ Scope {
         fpPam.start();
     }
 
+    function usesNoFpPassword() {
+        return (!root.fingerprintEnabled || root.fpBlocked || root.fpResumeRetries > 0) && root.noFpPamReady;
+    }
+
     function applyPasswordConfig() {
-        if ((!root.fingerprintEnabled || root.fpBlocked) && root.noFpPamReady) {
+        if (root.usesNoFpPassword()) {
             pam.configDirectory = root.noFpPamDir;
             pam.config = "serpantinum-nofp";
         } else {
@@ -337,7 +251,24 @@ Scope {
     function beginAuth() {
         if (!rootLock.locked || root.isUnlocking) return;
         root.startFingerprint();
-        passwordStartTimer.restart();
+        if (root.usesNoFpPassword()) root.startPassword(true);
+        else passwordStartTimer.restart();
+    }
+
+    function submitPassword(text) {
+        if (text.length === 0 || lockUI.authenticating || lockUI.lockedOut || root.isUnlocking) return;
+        lockUI.authenticating = true;
+        lockUI.statusText = I18n.t("lock.status.authenticating");
+        lockUI.failed = false;
+        if (pam.responseRequired) pam.respond(text);
+        else root.pendingPassword = text;
+    }
+
+    function clearPendingPassword() {
+        if (root.pendingPassword === "") return;
+        root.pendingPassword = "";
+        lockUI.authenticating = false;
+        lockUI.statusText = I18n.t("lock.status.locked");
     }
 
     function stopAuth() {
@@ -345,6 +276,7 @@ Scope {
         fingerprintSettleTimer.stop();
         passwordStartTimer.stop();
         passwordRetryTimer.stop();
+        root.clearPendingPassword();
         root.fpAborting = true;
         root.fpHolding = false;
         if (fpPam.active) fpPam.abort();
@@ -357,6 +289,7 @@ Scope {
     function restartAuth() {
         root.stopAuth();
         root.fpUnsupported = root.fpBlocked;
+        root.fpResumeRetries = 5;
         root.fingerprintAvailable = root.fpBlocked;
         if (lockUI.fpState !== "success" && !root.fpBlocked) lockUI.fpState = "ready";
         pamActionTimer.restart();
@@ -381,6 +314,7 @@ Scope {
     }
 
     function startPasswordLockout() {
+        root.clearPendingPassword();
         lockUI.lockedOut = true;
         lockUI.statusText = I18n.t("lock.status.too_many_attempts", "Too many attempts");
         passwordLockoutTimer.restart();
@@ -407,6 +341,7 @@ Scope {
             return;
         }
         root.fpGotInfo = true;
+        root.fpResumeRetries = 0;
         root.fpHolding = true;
         root.fingerprintAvailable = true;
         root.startPassword(false);
@@ -457,7 +392,6 @@ Scope {
     function doLock() {
         grimTimeoutTimer.stop();
         SystemInfo.fetch();
-        root.updateDeInfo();
         root.updateScreenCount();
         root.isUnlocking = false;
         lockUI.failed = false;
@@ -467,15 +401,29 @@ Scope {
         lockUI.fpFailures = 0;
         lockUI.pwFailures = 0;
         lockUI.lockedOut = false;
+        lockUI.inputActive = false;
+        lockUI.passwordText = "";
         passwordLockoutTimer.stop();
         root.fpBlocked = false;
+        root.fpResumeRetries = 0;
         root.stopAuth();
         root.fpUnsupported = false;
         root.fingerprintAvailable = false;
         fingerprintUnlockTimer.stop();
+        root.shownSurfaces = 0;
         rootLock.locked = true;
         pamActionTimer.start();
-        kbPollerRestartTimer.restart();
+    }
+
+    function surfaceShown() {
+        root.shownSurfaces++;
+        root.markLockedWhenShown();
+    }
+
+    function markLockedWhenShown() {
+        if (rootLock.secure && root.shownSurfaces >= root.connectedScreenCount) {
+            Quickshell.execDetached(["touch", Caching.getRunDir("lock") + "/locked"]);
+        }
     }
 
     function finishUnlock() {
@@ -491,8 +439,6 @@ Scope {
         root.isUnlocking = false;
         passwordLockoutTimer.stop();
         root.stopAuth();
-        kbWaiter.running = false;
-        kbPoller.running = false;
         Quickshell.execDetached(["rm", "-f", Caching.getRunDir("lock") + "/locked"]);
         if (root.freezeTimestamp !== "") {
             Quickshell.execDetached(["bash", "-c", "rm -f " + Caching.getRunDir("screenshot") + "/lock_freeze_*_" + root.freezeTimestamp + ".png"]);
@@ -523,6 +469,11 @@ Scope {
         property int fpFailures: 0
         property int pwFailures: 0
         property bool lockedOut: false
+        property bool inputActive: false
+        property string passwordText: ""
+        function submitPassword(text) {
+            root.submitPassword(text);
+        }
         readonly property string fpLabel: {
             switch (fpState) {
             case "failed": return I18n.t("lock.fingerprint.not_recognized");
@@ -552,6 +503,13 @@ Scope {
     PamContext {
         id: pam
 
+        onResponseRequiredChanged: {
+            if (!responseRequired || root.pendingPassword === "") return;
+            let text = root.pendingPassword;
+            root.pendingPassword = "";
+            respond(text);
+        }
+
         onCompleted: (result) => {
             lockUI.authenticating = false;
             if (root.pwAborting) return;
@@ -575,8 +533,7 @@ Scope {
         command: ["bash", Caching.serpantinumDir + "/scripts/system/suspend.sh"]
         onExited: {
             SystemInfo.fetch();
-            root.updateDeInfo();
-            kbPollerRestartTimer.restart();
+            KeyboardLayout.refresh();
             root.resumeRevision++;
             if (rootLock.locked) root.restartAuth();
         }
@@ -595,13 +552,9 @@ Scope {
     WlSessionLock {
         id: rootLock
         locked: false
+        onSecureChanged: root.markLockedWhenShown()
         onLockedChanged: {
-            let lockFile = Caching.getRunDir("lock") + "/locked";
-            if (locked) {
-                Quickshell.execDetached(["touch", lockFile]);
-            } else {
-                Quickshell.execDetached(["rm", "-f", lockFile]);
-            }
+            if (!locked) Quickshell.execDetached(["rm", "-f", Caching.getRunDir("lock") + "/locked"]);
         }
 
         surface: Component {

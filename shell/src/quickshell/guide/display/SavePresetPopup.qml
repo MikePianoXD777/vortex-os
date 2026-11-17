@@ -187,8 +187,6 @@ Popup {
             tintColor: ThemeBackend.base
             tintAmount: 0.25
         }
-        border.color: ThemeBackend.surface0
-        border.width: 1
     }
 
     contentItem: ColumnLayout {
@@ -206,13 +204,10 @@ Popup {
                 Layout.fillWidth: true
             }
 
-            IconButton {
+            CloseButton {
                 size: rootObj ? rootObj.s(30) : 30
                 cornerRadius: rootObj ? rootObj.s(8) : 8
-                buttonIcon: "󰅖"
                 iconFontSize: rootObj ? rootObj.s(14) : 14
-                accentColor: ThemeBackend.surface0
-                textColor: ThemeBackend.text
                 onClicked: savePresetPopup.close()
             }
         }
@@ -244,8 +239,9 @@ Popup {
                     scale: (currentPreviewBox.width > 0 ? currentPreviewBox.width : 1) / currentPreviewBox.sWidth
                     enabled: false
 
-                    Image {
+                    BoundedImage {
                         anchors.fill: parent
+                        devicePixelRatio: ((Screen.devicePixelRatio && Screen.devicePixelRatio > 0) ? Screen.devicePixelRatio : 1) * parent.scale
                         source: (savePresetPopup.visible && savePresetPopup.targetMonitor) ? savePresetPopup.getWallpaperSource(savePresetPopup.targetMonitor) : ""
                         fillMode: Image.PreserveAspectCrop
                         smooth: true
@@ -286,15 +282,21 @@ Popup {
 
                                 readonly property var resolvedPos: savePresetPopup.resolvePosition(modelData, currentPreviewBox.sWidth, currentPreviewBox.sHeight, resolvedW, resolvedH)
 
+                                readonly property real rawRotation: parseFloat(modelData.wRotation !== undefined ? modelData.wRotation : (modelData.rotation !== undefined ? modelData.rotation : 0)) || 0
+                                readonly property int faceRotation: ((Math.round(rawRotation) % 360) + 360) % 360
+                                readonly property bool isQuarterTurn: faceRotation % 180 !== 0
+
                                 x: resolvedPos.x
                                 y: resolvedPos.y
-                                width: resolvedW
-                                height: resolvedH
-                                opacity: modelData.opacity !== undefined ? modelData.opacity : 1.0
-                                rotation: modelData.rotation !== undefined ? modelData.rotation : 0
+                                width: isQuarterTurn ? resolvedH : resolvedW
+                                height: isQuarterTurn ? resolvedW : resolvedH
+                                opacity: modelData.wOpacity !== undefined ? modelData.wOpacity : (modelData.opacity !== undefined ? modelData.opacity : 1.0)
 
                                 Loader {
-                                    anchors.fill: parent
+                                    anchors.centerIn: parent
+                                    width: curMiniContainer.resolvedW
+                                    height: curMiniContainer.resolvedH
+                                    rotation: curMiniContainer.faceRotation
                                     asynchronous: false
                                     source: savePresetPopup.getFaceUrl(curMiniContainer.typeStr, curMiniContainer.variantStr)
                                     onLoaded: {
@@ -303,8 +305,8 @@ Popup {
                                             if ("wVariant" in item) item.wVariant = curMiniContainer.variantStr;
                                             if ("type" in item) item.type = curMiniContainer.typeStr;
                                             if ("wType" in item) item.wType = curMiniContainer.typeStr;
-                                            if ("wWidth" in item) item.wWidth = curMiniContainer.width;
-                                            if ("wHeight" in item) item.wHeight = curMiniContainer.height;
+                                            if ("wWidth" in item) item.wWidth = curMiniContainer.resolvedW;
+                                            if ("wHeight" in item) item.wHeight = curMiniContainer.resolvedH;
                                             if ("imagePath" in item) item.imagePath = modelData.imagePath || modelData.wImagePath || "";
                                             if ("wImagePath" in item) item.wImagePath = modelData.imagePath || modelData.wImagePath || "";
                                             if ("previewMode" in item) item.previewMode = true;
@@ -321,8 +323,6 @@ Popup {
             Rectangle {
                 anchors.fill: parent
                 color: "transparent"
-                border.width: 1
-                border.color: Qt.alpha(ThemeBackend.surface2, 0.4)
                 radius: ThemeBackend.borderRadius
             }
         }

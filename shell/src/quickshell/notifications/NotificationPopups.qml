@@ -36,7 +36,6 @@ PanelWindow {
     }
 
     function removeNotif(uid) {
-        delete NotificationManager.liveNotifs[uid];
         NotificationManager.removePopup(uid);
     }
 
@@ -156,7 +155,7 @@ PanelWindow {
 
                 add: Transition {
                     ParallelAnimation {
-                        NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 220; easing.type: Easing.OutCubic }
+                        NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 250; easing.type: Easing.OutCubic }
                         NumberAnimation {
                             property: "x"
                             from: (popupWindow.isPreset ? (popupWindow.isCenter ? 0 : (popupWindow.isLeft ? -1 : 1)) : (popupWindow.horizontalPosition < 33 ? -1 : (popupWindow.horizontalPosition > 66 ? 1 : 0))) * popupWindow.s(350) * 0.35
@@ -176,28 +175,28 @@ PanelWindow {
 
                 remove: Transition {
                     ParallelAnimation {
-                        NumberAnimation { property: "opacity"; to: 0.0; duration: 180; easing.type: Easing.OutCubic }
+                        NumberAnimation { property: "opacity"; to: 0.0; duration: 150; easing.type: Easing.OutCubic }
                         NumberAnimation {
                             property: "x"
                             to: (popupWindow.isPreset ? (popupWindow.isCenter ? 0 : (popupWindow.isLeft ? -1 : 1)) : (popupWindow.horizontalPosition < 33 ? -1 : (popupWindow.horizontalPosition > 66 ? 1 : 0))) * popupWindow.s(350) * 0.35
-                            duration: 200
+                            duration: 250
                             easing.type: Easing.OutCubic
                         }
                         NumberAnimation {
                             property: "y"
                             to: (popupWindow.isPreset ? (popupWindow.isCenter ? (popupWindow.isBottom ? popupWindow.s(24) : -popupWindow.s(24)) : 0) : ((popupWindow.verticalPosition > 50) ? popupWindow.s(24) : -popupWindow.s(24)))
-                            duration: 200
+                            duration: 250
                             easing.type: Easing.OutCubic
                         }
                     }
                 }
 
                 displaced: Transition {
-                    NumberAnimation { property: "y"; duration: 220; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "y"; duration: 250; easing.type: Easing.OutCubic }
                 }
 
                 removeDisplaced: Transition {
-                    NumberAnimation { property: "y"; duration: 220; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "y"; duration: 250; easing.type: Easing.OutCubic }
                 }
 
                 delegate: Item {
@@ -229,11 +228,12 @@ PanelWindow {
                     property int effectiveTimeout: {
                         if (model.urgency === 2) return 0;
                         var n = delegateWrapper.realNotif;
-                        if (!n) return 5000;
+                        var fallback = /battery-kind-/.test(String(model.image)) ? 10000 : 5000;
+                        if (!n) return fallback;
                         var t = typeof n.expireTimeout === "number" ? n.expireTimeout : (typeof n.timeout === "number" ? n.timeout : -1);
                         if (t === 0) return 0;
                         if (t > 0) return t;
-                        return 5000;
+                        return fallback;
                     }
 
                     Connections {
@@ -260,7 +260,8 @@ PanelWindow {
                         width: parent.width
                         source: {
                             let app = (model.appName || "").toLowerCase();
-                            if (app === "weather") return "types/Weather.qml";
+                            if (app === "weather" || /weather-kind-/.test(String(model.image))) return "types/Weather.qml";
+                            if (/battery-kind-/.test(String(model.image))) return "types/Battery.qml";
                             if (app === "screenshot" || app === "screen recorder") return "types/Screenshot.qml";
                             return "types/Default.qml";
                         }

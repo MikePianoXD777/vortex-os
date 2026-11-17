@@ -2,8 +2,6 @@
 
 EXTRA_CONFIGS=(
     "kitty"
-    "cava"
-    "fastfetch"
 )
 
 render_wallpaper_progress() {
@@ -164,6 +162,17 @@ resolve_sddm_backend() {
     return 1
 }
 
+configure_sddm_cursor() {
+    local conf="$1" theme=""
+    if [ -d /usr/share/icons/Adwaita/cursors ]; then
+        theme="Adwaita"
+    else
+        theme="$(find /usr/share/icons -mindepth 2 -maxdepth 2 -type d -name cursors 2>/dev/null | head -n 1 | xargs -r dirname | xargs -r basename)"
+    fi
+    [ -n "$theme" ] || return 0
+    sudo sed -i -e "/^ThemeDir=/a CursorTheme=$theme" -e "/^ThemeDir=/a CursorSize=24" "$conf"
+}
+
 setup_sddm() {
     local project_root="$1"
     local install_state="${2:-$INSTALL_STATE}"
@@ -266,7 +275,11 @@ EOF
     fi
 
     if [ "$PM_SDDM_CURSOR_FIX" = true ]; then
-        pm_configure_sddm_cursor /etc/sddm.conf.d/10-material-you.conf
+        configure_sddm_cursor /etc/sddm.conf.d/10-material-you.conf
+    fi
+
+    if declare -f pm_configure_sddm_session >/dev/null; then
+        pm_configure_sddm_session /etc/sddm.conf.d/10-material-you.conf
     fi
 
     if declare -f pm_enable_display_manager >/dev/null; then
@@ -331,6 +344,26 @@ setup_pam_service() {
 
     printf '%s' "$content" | sudo tee "$target" >/dev/null 2>&1 || true
     sudo chmod 644 "$target" 2>/dev/null || true
+}
+
+remove_settings_desktop_entry() {
+    local data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    local apps_dir="$data_home/applications"
+    local icons_dir="$data_home/icons/hicolor"
+
+    if [ -f "$apps_dir/serpantinum-settings.desktop" ]; then
+        rm -f "$apps_dir/serpantinum-settings.desktop"
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$apps_dir" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if [ -f "$icons_dir/scalable/apps/serpantinum-settings.svg" ]; then
+        rm -f "$icons_dir/scalable/apps/serpantinum-settings.svg"
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -qf "$icons_dir" >/dev/null 2>&1 || true
+        fi
+    fi
 }
 
 deploy_package() {
@@ -525,6 +558,11 @@ deploy_package() {
         fi
     fi
 
+    if [ -f "$REPO_ROOT/version.txt" ]; then
+        rm -f "$TARGET_BASE/src/version.txt"
+        cp "$REPO_ROOT/version.txt" "$TARGET_BASE/src/version.txt"
+    fi
+
     if [ -f "$TARGET_BASE/bin/serpantinum" ]; then
         ln -sf "$TARGET_BASE/bin/serpantinum" "$BIN_DIR/serpantinum"
         sudo ln -sf "$TARGET_BASE/bin/serpantinum" /usr/local/bin/serpantinum 2>/dev/null || true
@@ -534,6 +572,8 @@ deploy_package() {
         ln -sf "$TARGET_BASE/bin/serpantinumd" "$BIN_DIR/serpantinumd"
         sudo ln -sf "$TARGET_BASE/bin/serpantinumd" /usr/local/bin/serpantinumd 2>/dev/null || true
     fi
+
+    remove_settings_desktop_entry
 
     setup_pam_service
 }

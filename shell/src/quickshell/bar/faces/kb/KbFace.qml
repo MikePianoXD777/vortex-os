@@ -9,35 +9,10 @@ import Quickshell.Hyprland
 import Quickshell.Services.SystemTray
 import "../../../reusables"
 import "../../../"
+import "../../"
 
-Item {
+BarFaceBase {
     id: root
-
-    property var module: null
-    property var widget: module
-
-    property string orientation: (activeTarget && activeTarget.orientation !== undefined) ? activeTarget.orientation : "horizontal"
-    readonly property bool isVertical: orientation === "vertical"
-
-    readonly property var activeTarget: widget || module
-    readonly property bool isCompact: activeTarget ? activeTarget.isCompact : false
-    readonly property var barWindow: activeTarget ? activeTarget.barWindow : null
-    readonly property bool isPreview: activeTarget ? Boolean(activeTarget.isPreview) : false
-
-    function s(val) {
-        if (barWindow && typeof barWindow.s === "function") return barWindow.cs(val);
-        if (activeTarget && typeof activeTarget.s === "function") return activeTarget.s(val);
-        if (typeof Scaler !== "undefined" && typeof Scaler.s === "function") return Math.round(Scaler.s(val));
-        return val;
-    }
-
-    property int configRevision: 0
-
-    Connections {
-        target: (typeof Config !== "undefined") ? Config : null
-        function onSettingsLoaded() { root.configRevision++; }
-        function onRawSettingsChanged() { root.configRevision++; }
-    }
 
     property string kbStyle: {
         if (widget && widget !== root && widget.kbStyle !== undefined) return widget.kbStyle;
@@ -66,137 +41,44 @@ Item {
     }
 
     readonly property bool lockLook: activeTarget ? activeTarget.lockLook === true : false
-    property string kbLayout: "US"
+    readonly property string kbLayout: KeyboardLayout.layout
     property bool showLayout: (!barWindow || isPreview) ? true : false
     readonly property var kbPill: pillLoader.item
-    readonly property bool isNiri: NiriState.isNiri
-    property bool isSway: false
-    readonly property bool isMango: MangoState.isMango
-    property bool niriSubscribed: false
+    readonly property bool wantsLayout: !root.isPreview && (!module || module.moduleActive)
+    property bool kbSubscribed: false
 
-    function syncNiriSubscription() {
-        let want = isNiri && !root.isPreview && (!module || module.moduleActive);
-        if (want === niriSubscribed) return;
-        niriSubscribed = want;
-        if (want) NiriState.subscribe();
-        else NiriState.unsubscribe();
+    function syncSubscription() {
+        if (wantsLayout === kbSubscribed) return;
+        kbSubscribed = wantsLayout;
+        if (wantsLayout) KeyboardLayout.subscribe();
+        else KeyboardLayout.unsubscribe();
     }
 
-    function applyNiriLayout() {
-        if (!NiriState.keyboardReady) return;
-        let txt = NiriState.shortKeyboardLayout;
-        if (txt !== "" && root.kbLayout !== txt) root.kbLayout = txt;
-        if (barWindow) barWindow.fastPollerLoaded = true;
+    function markLoaded() {
+        if (barWindow && KeyboardLayout.ready) barWindow.fastPollerLoaded = true;
     }
 
     function switchLayout() {
         if (root.isPreview) return;
-        if (root.isNiri) {
-            Quickshell.execDetached(["niri", "msg", "action", "switch-layout", "next"]);
-        } else if (root.isSway) {
-            Quickshell.execDetached(["swaymsg", "input", "type:keyboard", "xkb_switch_layout", "next"]);
-        } else if (root.isMango) {
-            Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"]);
-        } else {
-            Quickshell.execDetached(["hyprctl", "switchxkblayout", "main", "next"]);
-        }
+        KeyboardLayout.switchNext();
     }
 
+    onWantsLayoutChanged: syncSubscription()
+    onBarWindowChanged: markLoaded()
+
     Component.onCompleted: {
-        let de = SystemInfo.desktopEnv ? SystemInfo.desktopEnv.toLowerCase() : "";
-        root.isSway = de.indexOf("sway") !== -1;
-        syncNiriSubscription();
-        if (root.isNiri) applyNiriLayout();
+        syncSubscription();
+        markLoaded();
     }
 
     Component.onDestruction: {
-        if (niriSubscribed) NiriState.unsubscribe();
+        if (kbSubscribed) KeyboardLayout.unsubscribe();
     }
 
     Connections {
-        target: NiriState
-        enabled: root.isNiri
-        function onShortKeyboardLayoutChanged() { root.applyNiriLayout(); }
-        function onKeyboardReadyChanged() { root.applyNiriLayout(); }
-    }
-
-    Connections {
-        target: (!root.isPreview && module) ? module : null
-        function onModuleActiveChanged() {
-            root.syncNiriSubscription();
-            if (root.isNiri) return;
-            if (module && !module.moduleActive) {
-                kbPoller.running = false;
-                kbWaiter.running = false;
-            } else {
-                kbPoller.running = false;
-                kbPoller.running = true;
-            }
-        }
-    }
-
-    Process {
-        id: kbPoller
-        running: !root.isPreview && (!module || module.moduleActive) && !root.isNiri
-        command: [
-            "bash",
-            "-c",
-            root.isMango
-                ? "layout=$(mmsg get keyboardlayout 2>/dev/null | jq -r '.layout // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                : root.isSway
-                ? "layout=$(swaymsg -t get_inputs 2>/dev/null | jq -r '[.[] | select(.type == \"keyboard\" and .xkb_active_layout_name != null)] | .[0].xkb_active_layout_name // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-                : "layout=$(LC_ALL=C hyprctl devices -j 2>/dev/null | jq -r '(.keyboards[] | select(.main == true and (.name | startswith(\"hl-virtual-keyboard\") | not)) | .active_keymap) // .keyboards[0].active_keymap // empty' | head -n1); [[ -z \"$layout\" || \"$layout\" == \"null\" ]] && layout=\"US\"; echo \"${layout:0:2}\" | tr '[:lower:]' '[:upper:]'"
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let txt = this.text.trim();
-                if (txt !== "" && root.kbLayout !== txt) root.kbLayout = txt;
-                if (!root.hyprEvents && !root.isPreview && (!module || module.moduleActive) && !kbWaiter.running) kbWaiter.running = true;
-                if (barWindow) barWindow.fastPollerLoaded = true;
-            }
-        }
-    }
-
-    // Vortex: en Hyprland el aviso de cambio de distribución («activelayout») llega por
-    // el socket de eventos que Quickshell ya tiene abierto, así no queda residente
-    // kb_wait.sh (bash + socat + grep) esperándolo. Los demás compositores siguen igual.
-    readonly property bool hyprEvents: !root.isNiri && !root.isSway && !root.isMango
-        && Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
-
-    Connections {
-        target: (root.hyprEvents && !root.isPreview) ? Hyprland : null
-        function onRawEvent(event) {
-            if (event.name !== "activelayout") return;
-            // Vortex 2.7: el teclado virtual de wtype (vortex-dictar) avisa «error» y no vuelve a avisar
-            // al irse: no es tu distribución, y sin esto la barra se quedaba diciendo «ER».
-            if (event.data.indexOf("hl-virtual-keyboard") === 0) return;
-            if (module && !module.moduleActive) return;
-            kbLayoutDelay.restart();
-        }
-    }
-
-    Timer {
-        id: kbLayoutDelay
-        // Vortex: los mismos 50 ms que esperaba kb_wait.sh antes de volver a leer
-        interval: 50
-        repeat: false
-        onTriggered: {
-            kbPoller.running = false;
-            if (!root.isPreview && (!module || module.moduleActive) && !root.isNiri) kbPoller.running = true;
-        }
-    }
-
-    Process {
-        id: kbWaiter
-        command: [
-            "bash",
-            Caching.qsDir + "/watchers/kb_wait.sh",
-            root.isMango ? "mango" : (root.isSway ? "sway" : "hyprland")
-        ]
-        onExited: {
-            kbPoller.running = false;
-            if (!root.isPreview && (!module || module.moduleActive) && !root.isNiri) kbPoller.running = true;
-        }
+        target: KeyboardLayout
+        function onReadyChanged() { root.markLoaded(); }
+        function onLayoutChanged() { root.markLoaded(); }
     }
 
     readonly property real pillLength: pillLoader.item ? (isVertical ? pillLoader.item.height : pillLoader.item.width) : 0
@@ -245,17 +127,7 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         enabled: root.kbStyle === "text" && !root.isPreview
-        onClicked: {
-            if (root.isNiri) {
-                Quickshell.execDetached(["niri", "msg", "action", "switch-layout", "next"]);
-            } else if (root.isSway) {
-                Quickshell.execDetached(["swaymsg", "input", "type:keyboard", "xkb_switch_layout", "next"]);
-            } else if (root.isMango) {
-                Quickshell.execDetached(["mmsg", "dispatch", "switch_keyboard_layout"]);
-            } else {
-                Quickshell.execDetached(["hyprctl", "switchxkblayout", "main", "next"]);
-            }
-        }
+        onClicked: root.switchLayout()
     }
 
     AxisFlow {
@@ -267,7 +139,7 @@ Item {
         anchors.centerIn: parent
         spacing: s(root.isCompact ? 5 : 6)
         opacity: root.showLayout ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
 
         Item {
             visible: root.showIcon && !root.isVertical
@@ -331,7 +203,7 @@ Item {
             Timer { running: !root.isPreview && (!module || module.moduleActive) && root.showLayout && !kbPill.initAnimTrigger; interval: 70; onTriggered: kbPill.initAnimTrigger = true }
             opacity: initAnimTrigger ? 1.0 : 0.0
             transform: Translate { y: kbPill.initAnimTrigger ? 0 : s(15); Behavior on y { NumberAnimation { duration: 620; easing.type: Easing.OutQuint } } }
-            Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
 
             onClicked: root.switchLayout()
         }

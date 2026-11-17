@@ -2,7 +2,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Hyprland
 import Quickshell.Bluetooth
 import Quickshell.Networking
 import Quickshell.Services.Pipewire
@@ -42,6 +41,7 @@ Item {
     property int lastNumLock: -1
     property int lastBrightness: -1
     property bool brightnessInitialized: false
+    property string brightnessBackend: ""
     property bool kbInitialized: false
     property bool isInitialized: false
 
@@ -120,83 +120,33 @@ Item {
         }
     }
 
-    // Vortex: en Hyprland, Bloq Mayús y Bloq Num tienen un atajo que no consume la tecla
-    // (compositors/hyprland/config/keybinds.lua) y manda «custom>>serpantinum:locks» por el
-    // socket de eventos que Quickshell ya tiene abierto. Solo entonces se lee el estado
-    // (kb_locks.sh get). Antes quedaba residente un python (~9 MB) que, sin permiso para
-    // leer /dev/input, revisaba los LED 4 veces por segundo. Otros compositores, igual.
-    readonly property bool hyprLockEvents: Boolean(Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE"))
-    property bool kbFetchFromEvent: false
-
-    Connections {
-        target: controller.hyprLockEvents ? Hyprland : null
-        function onRawEvent(event) {
-            if (event.name === "custom" && event.data === "serpantinum:locks") kbLockDelay.restart();
-        }
-    }
-
-    Timer {
-        id: kbLockDelay
-        // El estado de la tecla cambia al soltarla en algunos teclados: se espera un poco
-        interval: 80
-        repeat: false
-        onTriggered: {
-            controller.kbFetchFromEvent = true;
-            kbFetcher.running = false;
-            kbFetcher.running = true;
-        }
-    }
-
     Process {
         id: kbWatcher
-        running: !controller.hyprLockEvents
-        command: ["bash", Caching.qsDir + "/watchers/kb_locks.sh", "watch"]
+        running: true
+        command: ["serpantinum-core", "watch", "locks"]
         stdout: SplitParser {
             onRead: data => {
-                let line = data.trim();
-                if (!line) return;
-
-                let parts = line.split(/\s+/);
-                if (parts.length >= 2) {
-                    let k = parts[0];
-                    let stateStr = parts[1];
-                    let stateNum = (stateStr === "1" || stateStr === "on") ? 1 : 0;
-                    if (k === "capslock") {
-                        controller.lastCapsLock = stateNum;
-                        controller.show("capslock", stateNum === 1 ? "on" : "off");
-                    } else if (k === "numlock") {
-                        controller.lastNumLock = stateNum;
-                        controller.show("numlock", stateNum === 1 ? "on" : "off");
-                    }
+                let locks;
+                try {
+                    locks = JSON.parse(data);
+                } catch (e) {
+                    return;
                 }
-            }
-        }
-    }
-
-    Process {
-        id: kbFetcher
-        running: true
-        command: ["bash", Caching.qsDir + "/watchers/kb_locks.sh", "get"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let out = this.text.trim().split(/\s+/);
-                if (out.length >= 2) {
-                    let caps = parseInt(out[0]);
-                    let num = parseInt(out[1]);
-                    // Vortex: lectura pedida por el atajo de Hyprland: avisa lo que cambió
-                    let fromEvent = controller.kbFetchFromEvent && controller.kbInitialized;
-                    controller.kbFetchFromEvent = false;
-                    if (fromEvent && !isNaN(caps) && caps !== controller.lastCapsLock) {
-                        controller.lastCapsLock = caps;
-                        controller.show("capslock", caps === 1 ? "on" : "off");
-                    }
-                    if (fromEvent && !isNaN(num) && num !== controller.lastNumLock) {
-                        controller.lastNumLock = num;
-                        controller.show("numlock", num === 1 ? "on" : "off");
-                    }
-                    if (!isNaN(caps)) controller.lastCapsLock = caps;
-                    if (!isNaN(num)) controller.lastNumLock = num;
+                let caps = locks.capsLock ? 1 : 0;
+                let num = locks.numLock ? 1 : 0;
+                if (!controller.kbInitialized) {
+                    controller.lastCapsLock = caps;
+                    controller.lastNumLock = num;
                     controller.kbInitialized = true;
+                    return;
+                }
+                if (caps !== controller.lastCapsLock) {
+                    controller.lastCapsLock = caps;
+                    controller.show("capslock", caps === 1 ? "on" : "off");
+                }
+                if (num !== controller.lastNumLock) {
+                    controller.lastNumLock = num;
+                    controller.show("numlock", num === 1 ? "on" : "off");
                 }
             }
         }
@@ -205,42 +155,24 @@ Item {
     Process {
         id: briWatcher
         running: true
-        command: ["bash", Caching.qsDir + "/../scripts/brightness.sh", "watch"]
+        command: ["serpantinum-core", "watch", "brightness"]
         stdout: SplitParser {
             onRead: data => {
-                briFetchDebounce.restart();
-            }
-        }
-    }
-
-    Timer {
-        id: briFetchDebounce
-        interval: 30
-        repeat: false
-        onTriggered: {
-            briFetcher.running = false;
-            briFetcher.running = true;
-        }
-    }
-
-    Process {
-        id: briFetcher
-        running: true
-        command: ["bash", Caching.qsDir + "/../scripts/brightness.sh", "get"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let out = this.text.trim();
-                if (out !== "") {
-                    let val = parseInt(out);
-                    if (!isNaN(val)) {
-                        if (!controller.brightnessInitialized) {
-                            controller.lastBrightness = val;
-                            controller.brightnessInitialized = true;
-                        }
-                        controller.sysBrightness = val;
-                        controller.briVal = val;
-                    }
+                let state;
+                try {
+                    state = JSON.parse(data);
+                } catch (e) {
+                    return;
                 }
+                controller.brightnessBackend = state.backend || "";
+                let val = state.percent;
+                if (typeof val !== "number" || val < 0) return;
+                if (!controller.brightnessInitialized) {
+                    controller.lastBrightness = val;
+                    controller.brightnessInitialized = true;
+                }
+                controller.sysBrightness = val;
+                controller.briVal = val;
             }
         }
     }
@@ -261,6 +193,18 @@ Item {
 
     function display(k, v, scr) {
         show(k, v, scr);
+    }
+
+    IpcHandler {
+        target: "osd"
+
+        function show(kind: string): void {
+            controller.show(kind);
+        }
+
+        function display(kind: string): void {
+            controller.show(kind);
+        }
     }
 
     function hide() {

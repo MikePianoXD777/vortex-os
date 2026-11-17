@@ -281,6 +281,87 @@ QtObject {
         }
     }
 
+    property Component hideTextComponent: Component {
+        Item {
+            id: settingRoot
+            property var typeData: null
+            property var settingData: null
+            property var redactor: null
+            property var widget: null
+            property var widgetData: null
+            property var item: null
+
+            readonly property var targetWidget: settingRoot.widget || settingRoot.widgetData || settingRoot.item || null
+
+            implicitWidth: hideTextRow.implicitWidth + Scaler.s(20)
+            implicitHeight: Scaler.s(34)
+
+            function syncValue() {
+                let w = settingRoot.targetWidget;
+                if (!w) return;
+                let cur = w.hideText === true;
+                if (hideTextToggle.checked !== cur) hideTextToggle.checked = cur;
+            }
+
+            Component.onCompleted: syncValue()
+            onTargetWidgetChanged: syncValue()
+
+            Connections {
+                target: settingRoot.targetWidget
+                ignoreUnknownSignals: true
+                function onHideTextChanged() {
+                    settingRoot.syncValue();
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: ThemeBackend.borderRadius
+                color: hideTextGlass.active ? "transparent" : ThemeBackend.surface0
+
+                GlassFill {
+                    id: hideTextGlass
+                    anchors.fill: parent
+                    radius: parent.radius
+                    tintColor: ThemeBackend.surface0
+                    tintAmount: 0.3
+                }
+            }
+
+            Row {
+                id: hideTextRow
+                anchors.centerIn: parent
+                spacing: Scaler.s(8)
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: I18n.t("widgets.settings.hideText", "Hide text")
+                    font.family: ThemeBackend.fontFamily
+                    font.pixelSize: Scaler.s(11)
+                    font.bold: true
+                    color: ThemeBackend.text
+                }
+
+                Toggle {
+                    id: hideTextToggle
+                    anchors.verticalCenter: parent.verticalCenter
+                    horizontalPadding: 0
+                    cornerRadius: ThemeBackend.borderRadius
+                    checked: settingRoot.targetWidget ? settingRoot.targetWidget.hideText === true : false
+                    accentColor: ThemeBackend.mauve
+                    baseColor: ThemeBackend.surface1
+                    handleColor: ThemeBackend.crust
+                    handleOffColor: ThemeBackend.text
+                    onToggled: function(c) {
+                        let w = settingRoot.targetWidget;
+                        if (w && w.hideText !== undefined) w.hideText = c;
+                        if (settingRoot.redactor) settingRoot.redactor.setWidgetProperty("hideText", c);
+                    }
+                }
+            }
+        }
+    }
+
     property Component usageStyleSwitchComponent: Component {
         Item {
             id: settingRoot
@@ -469,6 +550,61 @@ QtObject {
         }
     }
 
+    property Component textContentInputComponent: Component {
+        Item {
+            id: settingRoot
+            property var typeData: null
+            property var settingData: null
+            property var redactor: null
+            property var widget: null
+            property var widgetData: null
+            property var item: null
+
+            readonly property var targetWidget: settingRoot.widget || settingRoot.widgetData || settingRoot.item || null
+
+            implicitWidth: Scaler.s(240)
+            implicitHeight: Scaler.s(34)
+
+            function syncValue() {
+                let w = settingRoot.targetWidget;
+                if (!w || textInput.hasFocus) return;
+                let cur = w.textContent !== undefined ? String(w.textContent) : "";
+                if (textInput.text !== cur) textInput.text = cur;
+            }
+
+            Component.onCompleted: syncValue()
+            onTargetWidgetChanged: syncValue()
+
+            Connections {
+                target: settingRoot.targetWidget
+                ignoreUnknownSignals: true
+                function onTextContentChanged() {
+                    settingRoot.syncValue();
+                }
+            }
+
+            Input {
+                id: textInput
+                anchors.fill: parent
+                placeholderText: I18n.t("widgets.text.placeholder", "Enter text")
+                fontPixelSize: Scaler.s(12)
+                baseColor: ThemeBackend.surface0
+                accentColor: ThemeBackend.mauve
+                textColor: ThemeBackend.text
+                subTextColor: ThemeBackend.subtext0
+                borderColor: Qt.alpha(ThemeBackend.surface2, 0.6)
+                cornerRadius: ThemeBackend.borderRadius
+                horizontalPadding: Scaler.s(10)
+
+                onTextEdited: function(newText) {
+                    let w = settingRoot.targetWidget;
+                    if (w && w.textContent !== undefined) w.textContent = newText;
+                    if (settingRoot.redactor) settingRoot.redactor.setWidgetProperty("textContent", newText);
+                }
+            }
+        }
+    }
+
     readonly property var usageCircleSettings: [
         {
             id: "sineWave",
@@ -491,7 +627,7 @@ QtObject {
             iconFontSize: 16,
             action: "lineThickness",
             type: "custom",
-            row: "top",
+            row: "bottom",
             variants: ["circle"],
             property: "lineThickness",
             from: 3,
@@ -503,10 +639,18 @@ QtObject {
         }
     ]
 
+    readonly property var categories: [
+        { id: "time", icon: String.fromCodePoint(0xF0150), name: I18n.t("widgets.redactor.category.time", "Time and text") },
+        { id: "media", icon: String.fromCodePoint(0xF075A), name: I18n.t("widgets.redactor.category.media", "Media") },
+        { id: "system", icon: String.fromCodePoint(0xF061A), name: I18n.t("widgets.redactor.category.system", "System") },
+        { id: "info", icon: String.fromCodePoint(0xF02FD), name: I18n.t("widgets.redactor.category.info", "Info") }
+    ]
+
     property var types: ({
         "visualizer": {
             name: I18n.t("widgets.types.visualizer"),
             icon: String.fromCodePoint(0xF147D),
+            category: "media",
             defaultWidth: Math.round((Quickshell.screens && Quickshell.screens.length > 0 ? Quickshell.screens[0].width : 1920) / 2),
             defaultHeight: 180,
             defaultVariant: "bars",
@@ -529,6 +673,7 @@ QtObject {
         "time": {
             name: I18n.t("widgets.types.clock"),
             icon: String.fromCodePoint(0xF0954),
+            category: "time",
             defaultWidth: 250,
             defaultHeight: 120,
             defaultVariant: "digital",
@@ -546,6 +691,7 @@ QtObject {
         "music": {
             name: I18n.t("widgets.types.music"),
             icon: String.fromCodePoint(0xF0388),
+            category: "media",
             defaultWidth: 340,
             defaultHeight: 120,
             defaultVariant: "full",
@@ -589,6 +735,20 @@ QtObject {
                     component: registry.lyricsAlignmentSelectorComponent
                 },
                 {
+                    id: "hideText",
+                    name: typeof I18n !== "undefined" ? I18n.t("widgets.settings.hideText", "Hide text") : "Hide text",
+                    icon: String.fromCodePoint(0xF0388),
+                    iconFontSize: 16,
+                    action: "hideText",
+                    type: "custom",
+                    row: "bottom",
+                    variants: ["simpleLyrics"],
+                    property: "hideText",
+                    accentColor: "surface0",
+                    textColor: "mauve",
+                    component: registry.hideTextComponent
+                },
+                {
                     id: "continuous",
                     name: I18n.t("widgets.settings.visualizerStyle", "Visualizer"),
                     icon: String.fromCodePoint(0xF147D),
@@ -607,6 +767,7 @@ QtObject {
         "weather": {
             name: I18n.t("widgets.types.weather"),
             icon: String.fromCodePoint(0xF0590),
+            category: "info",
             defaultWidth: 250,
             defaultHeight: 120,
             defaultVariant: "compact",
@@ -619,6 +780,7 @@ QtObject {
         "image": {
             name: I18n.t("widgets.types.image"),
             icon: String.fromCodePoint(0xF02E9),
+            category: "media",
             defaultWidth: 300,
             defaultHeight: 200,
             defaultVariant: "rect",
@@ -643,6 +805,7 @@ QtObject {
         "user": {
             name: I18n.t("widgets.types.user"),
             icon: String.fromCodePoint(0xF0004),
+            category: "system",
             defaultWidth: 260,
             defaultHeight: 140,
             defaultVariant: "default",
@@ -653,6 +816,7 @@ QtObject {
         "cpu": {
             name: I18n.t("quickactions.systemusage.cpu"),
             icon: String.fromCodePoint(0xF035B),
+            category: "system",
             defaultWidth: 180,
             defaultHeight: 130,
             defaultVariant: "default",
@@ -665,6 +829,7 @@ QtObject {
         "ram": {
             name: I18n.t("quickactions.systemusage.ram"),
             icon: String.fromCodePoint(0xF035C),
+            category: "system",
             defaultWidth: 180,
             defaultHeight: 130,
             defaultVariant: "default",
@@ -677,6 +842,7 @@ QtObject {
         "temp": {
             name: I18n.t("quickactions.systemusage.temp"),
             icon: String.fromCodePoint(0xF050F),
+            category: "system",
             defaultWidth: 180,
             defaultHeight: 130,
             defaultVariant: "default",
@@ -689,6 +855,7 @@ QtObject {
         "disk": {
             name: I18n.t("quickactions.systemusage.disk"),
             icon: String.fromCodePoint(0xF02CA),
+            category: "system",
             defaultWidth: 180,
             defaultHeight: 130,
             defaultVariant: "default",
@@ -701,6 +868,7 @@ QtObject {
         "battery": {
             name: I18n.t("widgets.types.battery"),
             icon: String.fromCodePoint(0xF0079),
+            category: "system",
             defaultWidth: 260,
             defaultHeight: 90,
             defaultVariant: "default",
@@ -713,6 +881,7 @@ QtObject {
         "github": {
             name: typeof I18n !== "undefined" ? I18n.t("widgets.types.github", "GitHub") : "GitHub",
             icon: String.fromCodePoint(0xF02A4),
+            category: "info",
             defaultWidth: 540,
             defaultHeight: 180,
             defaultVariant: "default",
@@ -731,6 +900,56 @@ QtObject {
             variants: {
                 "default": { file: "faces/html/HtmlFace.qml", icon: "1", label: typeof I18n !== "undefined" ? I18n.t("widgets.variants.default", "Default") : "Default" }
             }
+        },
+        "notes": {
+            name: typeof I18n !== "undefined" ? I18n.t("widgets.types.notes", "Notes") : "Notes",
+            icon: String.fromCodePoint(0xF039E),
+            category: "time",
+            defaultWidth: 300,
+            defaultHeight: 280,
+            defaultVariant: "default",
+            variants: {
+                "default": { file: "faces/notes/NotesFace.qml", icon: "1", label: typeof I18n !== "undefined" ? I18n.t("widgets.variants.default", "Default") : "Default" }
+            }
+        },
+        "timer": {
+            name: I18n.t("quickactions.tabs.timer", "Timer"),
+            icon: String.fromCodePoint(0xF051B),
+            category: "time",
+            defaultWidth: 360,
+            defaultHeight: 280,
+            defaultVariant: "timer",
+            variants: {
+                "timer":     { file: "faces/timer/TimerFaceTimer.qml",     icon: "1", label: I18n.t("quickactions.timer.tabs.timer", "Timer") },
+                "stopwatch": { file: "faces/timer/TimerFaceStopwatch.qml", icon: "2", label: I18n.t("quickactions.timer.tabs.stopwatch", "Stopwatch") },
+                "pomodoro":  { file: "faces/timer/TimerFacePomodoro.qml",  icon: "3", label: I18n.t("quickactions.timer.tabs.pomodoro", "Pomodoro") }
+            }
+        },
+        "text": {
+            name: I18n.t("widgets.types.text", "Text"),
+            icon: String.fromCodePoint(0xF0284),
+            category: "time",
+            defaultWidth: 320,
+            defaultHeight: 90,
+            defaultVariant: "default",
+            variants: {
+                "default": { file: "faces/text/TextFace.qml", icon: "1", label: I18n.t("widgets.variants.default", "Default") }
+            },
+            additionalSettings: [
+                {
+                    id: "textContent",
+                    name: I18n.t("widgets.settings.textContent", "Text"),
+                    icon: String.fromCodePoint(0xF0284),
+                    iconFontSize: 16,
+                    action: "textContent",
+                    type: "custom",
+                    row: "bottom",
+                    property: "textContent",
+                    accentColor: "surface0",
+                    textColor: "mauve",
+                    component: registry.textContentInputComponent
+                }
+            ]
         }
     })
 

@@ -48,6 +48,7 @@ Rectangle {
     readonly property bool canExpand: fullBody.length > 50 || fullBody.indexOf("\n") !== -1 || (typeRoot.botones.length > 0)
 
     property alias bgContent: bgContainer.data
+    property bool iconFullBleed: false
     property alias iconArea: iconContainer.data
     property alias headerArea: headerContentContainer.data
     default property alias faceContent: innerLayout.data
@@ -111,13 +112,13 @@ Rectangle {
         }
 
         if (diffSec < 60) {
-            timeText = vortexTr("datetime.just_now", "Just now");
+            timeText = I18n.t("datetime.just_now");
             return;
         }
 
         let diffMin = Math.floor(diffSec / 60);
         if (diffMin < 60) {
-            timeText = vortexTr("datetime.minutes_ago", diffMin + " min ago", { "n": diffMin });
+            timeText = I18n.t("datetime.minutes_ago", { mins: diffMin });
             return;
         }
 
@@ -136,7 +137,7 @@ Rectangle {
         if (isSameDay) {
             timeText = timePart;
         } else if (isYesterday) {
-            timeText = vortexTr("datetime.yesterday", "Yesterday") + " " + timePart;
+            timeText = I18n.t("datetime.yesterday", { time: timePart });
         } else if (diffDays < 7) {
             // Vortex: el día en el idioma del shell (Qt.formatDateTime siempre sale en inglés)
             let dayName = notifDate.toLocaleDateString(Qt.locale((typeof I18n !== "undefined" && I18n.currentLang) ? I18n.currentLang : "en"), "dddd");
@@ -153,8 +154,9 @@ Rectangle {
 
     Timer {
         interval: 10000
-        running: true
+        running: typeRoot.visible && (!typeRoot.Window.window || typeRoot.Window.window.visible)
         repeat: true
+        triggeredOnStart: true
         onTriggered: updateTimeText()
     }
 
@@ -216,7 +218,7 @@ Rectangle {
         property: "dragX"
         from: typeRoot.dragX
         to: 0
-        duration: 200
+        duration: 250
         easing.type: Easing.OutCubic
     }
 
@@ -226,7 +228,7 @@ Rectangle {
         property: "dragY"
         from: typeRoot.dragY
         to: 0
-        duration: 200
+        duration: 250
         easing.type: Easing.OutCubic
     }
 
@@ -235,7 +237,7 @@ Rectangle {
         target: typeRoot
         property: "dragX"
         from: typeRoot.dragX
-        duration: 200
+        duration: 250
         easing.type: Easing.OutQuad
         onFinished: {
             doClose();
@@ -606,7 +608,7 @@ Rectangle {
                         radius: parent.boxRadius
                         color: iconBoxGlass.active ? "transparent" : ThemeBackend.faded(typeRoot.urgency === 2 ? Qt.tint(ThemeBackend.surface2, Qt.rgba(urgencyGlow.deepRed.r, urgencyGlow.deepRed.g, urgencyGlow.deepRed.b, 0.12)) : ThemeBackend.surface2)
 
-                        Behavior on color { ColorAnimation { duration: 200 } }
+                        Behavior on color { ColorAnimation { duration: 250 } }
 
                         GlassFill {
                             id: iconBoxGlass
@@ -622,8 +624,8 @@ Rectangle {
                     Rectangle {
                         id: iconContainer
                         anchors.fill: parent
-                        anchors.margins: parent.boxPadding
-                        radius: Math.max(0, parent.boxRadius - parent.boxPadding)
+                        anchors.margins: typeRoot.iconFullBleed ? 0 : parent.boxPadding
+                        radius: typeRoot.iconFullBleed ? parent.boxRadius : Math.max(0, parent.boxRadius - parent.boxPadding)
                         color: "transparent"
                         clip: true
                     }

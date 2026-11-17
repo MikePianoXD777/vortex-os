@@ -64,7 +64,7 @@ Item {
                 }
             }
         }
-        Quickshell.execDetached(["serpantinum", "ipc", "call", "main", "clearNotifications"]);
+        NotificationManager.clearNotifications();
     }
 
     Timer {
@@ -134,8 +134,6 @@ Item {
         anchors.fill: parent
         radius: root.cornerRadius
         color: bgGlass.active ? "transparent" : root.baseColor
-        border.color: root.borderColor
-        border.width: root.borderWidth
         clip: true
 
         GlassFill {
@@ -155,6 +153,13 @@ Item {
             screenOverride: root.blurScreen
             useSnapshot: root.blurScreen !== null
         }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: root.cornerRadius
+        color: "transparent"
+        visible: root.borderWidth > 0
     }
 
     ColumnLayout {
@@ -258,7 +263,7 @@ Item {
                         anchors.centerIn: parent
                         visible: !root.showEmptyGraphic
                         text: "󰂚"
-                        font.family: "Iosevka Nerd Font"
+                        font.family: ThemeBackend.iconFont
                         font.pixelSize: root.s(40)
                         color: ThemeBackend.surface2
                     }
@@ -292,10 +297,10 @@ Item {
 
                 add: Transition {
                     NumberAnimation { property: "scale"; from: 0.96; to: 1.0; duration: 250; easing.type: Easing.OutQuint }
-                    NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 200; easing.type: Easing.OutQuint }
+                    NumberAnimation { property: "opacity"; from: 0.0; to: 1.0; duration: 250; easing.type: Easing.OutQuint }
                 }
                 remove: Transition {
-                    NumberAnimation { property: "opacity"; to: 0.0; duration: 200; easing.type: Easing.OutQuint }
+                    NumberAnimation { property: "opacity"; to: 0.0; duration: 250; easing.type: Easing.OutQuint }
                 }
 
                 delegate: Item {
@@ -316,6 +321,7 @@ Item {
                         }
                         let app = (appn || "").toLowerCase().trim();
                         if (app === "weather") return "weather";
+                        if (app === I18n.t("sysnotif.battery.app_name", "System").toLowerCase().trim() || (memberList && memberList.length > 0 && memberList[0] && /battery-kind-/.test(String(memberList[0].image)))) return "system";
                         if (app === "screenshot" || app === "screen recorder") return "screenshot";
                         if (app === "update" || app === "updater" || app === "serpantinum updater") return "update";
                         return "default";
@@ -373,7 +379,7 @@ Item {
                         target: groupWrapper
                         property: "dragX"
                         to: notifList.width * 1.2
-                        duration: 220
+                        duration: 250
                         easing.type: Easing.OutQuad
                     }
                     Timer {
@@ -398,7 +404,7 @@ Item {
                         property: "dragX"
                         from: groupWrapper.dragX
                         to: 0
-                        duration: 200
+                        duration: 250
                         easing.type: Easing.OutCubic
                     }
 
@@ -408,7 +414,7 @@ Item {
                         property: "dragY"
                         from: groupWrapper.dragY
                         to: 0
-                        duration: 200
+                        duration: 250
                         easing.type: Easing.OutCubic
                     }
 
@@ -418,7 +424,7 @@ Item {
                         property: "dragX"
                         from: groupWrapper.dragX
                         to: 0
-                        duration: 200
+                        duration: 250
                         easing.type: Easing.OutQuad
                         onFinished: NotificationManager.dismissGroup(groupKey)
                     }
@@ -455,7 +461,8 @@ Item {
                             let nData = memberList.length > 0 ? memberList[0] : null;
                             let appn = nData ? (nData.appName || "") : (displayName || "");
                             let app = appn.toLowerCase().trim();
-                            if (app === "weather") return "../../notifications/types/Weather.qml";
+                            if (app === "weather" || /weather-kind-/.test(String(nData ? nData.image : ""))) return "../../notifications/types/Weather.qml";
+                            if (/battery-kind-/.test(String(nData ? nData.image : ""))) return "../../notifications/types/Battery.qml";
                             if (app === "screenshot" || app === "screen recorder") return "../../notifications/types/Screenshot.qml";
                             if (app === "update" || app === "updater" || app === "serpantinum updater") return "../../notifications/types/Update.qml";
                             return "../../notifications/types/Default.qml";
@@ -563,7 +570,7 @@ Item {
                                         tintColor: parent.baseColor
                                         tintAmount: 0.3
                                         press: groupHeaderMa.pressed ? 0.8 : (groupHeaderMa.containsMouse ? 0.2 : 0)
-                                        Behavior on press { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                        Behavior on press { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                                     }
 
                                     MouseArea {
@@ -704,7 +711,7 @@ Item {
                                                     anchors.centerIn: parent
                                                     visible: groupWrapper.customType === "screenshot"
                                                     text: "󰄀"
-                                                    font.family: "Iosevka Nerd Font"
+                                                    font.family: ThemeBackend.iconFont
                                                     font.pixelSize: root.s(22)
                                                     color: ThemeBackend.mauve
                                                 }
@@ -713,9 +720,18 @@ Item {
                                                     anchors.centerIn: parent
                                                     visible: groupWrapper.customType === "weather"
                                                     text: "󰖕"
-                                                    font.family: "Iosevka Nerd Font"
+                                                    font.family: ThemeBackend.iconFont
                                                     font.pixelSize: root.s(22)
                                                     color: ThemeBackend.peach
+                                                }
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    visible: groupWrapper.customType === "system"
+                                                    text: "󰒓"
+                                                    font.family: ThemeBackend.iconFont
+                                                    font.pixelSize: root.s(22)
+                                                    color: ThemeBackend.liquidGlass ? ThemeBackend.text : ThemeBackend.subtext0
                                                 }
 
                                                 Text {
@@ -980,7 +996,8 @@ Item {
                                                     if (!memberData) return "";
                                                     let appn = memberData.appName || displayName || "";
                                                     let app = appn.toLowerCase().trim();
-                                                    if (app === "weather") return "../../notifications/types/Weather.qml";
+                                                    if (app === "weather" || /weather-kind-/.test(String(memberData.image))) return "../../notifications/types/Weather.qml";
+                                                    if (/battery-kind-/.test(String(memberData.image))) return "../../notifications/types/Battery.qml";
                                                     if (app === "screenshot" || app === "screen recorder") return "../../notifications/types/Screenshot.qml";
                                                     if (app === "update" || app === "updater" || app === "serpantinum updater") return "../../notifications/types/Update.qml";
                                                     return "../../notifications/types/Default.qml";

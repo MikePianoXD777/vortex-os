@@ -1,119 +1,80 @@
 { lib
 , stdenv
+, callPackage
 , makeWrapper
 , python3
-, qt5
 , qt6
-, acpi
 , adw-gtk3
-, alsa-utils
-, bc
 , bluez
-, brightnessctl
 , ddcutil
-, cava
-, calf
 , cliphist
-, easyeffects
 , fastfetch
-, fd
 , ffmpeg
 , file
 , gpu-screen-recorder
 , grim
 , imagemagick
-, inotify-tools
-, iw
 , jq
 , kitty
-, libnotify
-, lm_sensors
 , matugen
-, nautilus
 , networkmanager
-, pamixer
-, pavucontrol
 , pciutils
 , playerctl
 , power-profiles-daemon
-, psmisc
-, ripgrep
 , satty
-, slurp
-, socat
 , util-linux
 , wf-recorder
-, wget
 , wireplumber
 , wl-clipboard
-, wl-gammarelay-rs
-, wmctrl
 , xdg-desktop-portal-gtk
+, tesseract
 , zbar
 , quickshell
 , libpulseaudio
 , pipewire
+, serpantinum-audio ? callPackage ./audio.nix { }
+, serpantinum-gamma ? callPackage ./gamma.nix { }
+, serpantinum-core ? callPackage ./core.nix { }
 , ...
 }:
 let
   pname = "serpantinum";
   version = lib.strings.trim (builtins.readFile ../version.txt);
-  pythonEnv = python3.withPackages (ps: [ ps.websockets ps.jeepney ]);
   pathDeps = [
-    acpi
-    alsa-utils
-    bc
     bluez
-    brightnessctl
     ddcutil
-    cava
-    calf
     cliphist
-    easyeffects
     fastfetch
-    fd
     ffmpeg
     file
     gpu-screen-recorder
     grim
     imagemagick
-    inotify-tools
-    iw
     jq
     kitty
-    libnotify
-    lm_sensors
     matugen
-    nautilus
     networkmanager
-    pamixer
-    pavucontrol
     pciutils
     playerctl
     power-profiles-daemon
-    psmisc
-    pythonEnv
-    ripgrep
+    python3
     satty
-    slurp
-    socat
     util-linux
     wf-recorder
-    wget
     wireplumber
     wl-clipboard
-    wl-gammarelay-rs
-    wmctrl
     xdg-desktop-portal-gtk
+    tesseract
     zbar
     quickshell
+    serpantinum-audio
+    serpantinum-gamma
+    serpantinum-core
   ];
   qtDeps = [
     quickshell
     qt6.qtwayland
     qt6.qtmultimedia
-    qt6.qt5compat
-    qt6.qtwebsockets
   ];
   qmlImportPath = lib.concatMapStringsSep ":" (pkg: "${pkg}/lib/qt-6/qml") qtDeps;
   qtPluginPath = lib.concatMapStringsSep ":" (pkg: "${pkg}/lib/qt-6/plugins") qtDeps;
@@ -141,6 +102,9 @@ stdenv.mkDerivation (finalAttrs: {
     find "$out/share/${finalAttrs.pname}" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} +
     install -Dm755 bin/serpantinum  "$out/bin/.serpantinum-wrapped"
     install -Dm755 bin/serpantinumd "$out/bin/.serpantinumd-wrapped"
+    ln -s "${lib.getExe serpantinum-audio}" "$out/bin/serpantinum-audio"
+    ln -s "${lib.getExe serpantinum-gamma}" "$out/bin/serpantinum-gamma"
+    ln -s "${lib.getExe serpantinum-core}" "$out/bin/serpantinum-core"
     runHook postInstall
   '';
   postFixup = ''
@@ -154,7 +118,7 @@ stdenv.mkDerivation (finalAttrs: {
         --prefix PATH : "${lib.makeBinPath pathDeps}"
     done
   '';
-  passthru = { inherit pathDeps qtDeps pythonEnv; };
+  passthru = { inherit pathDeps qtDeps serpantinum-audio serpantinum-gamma serpantinum-core; };
   meta = with lib; {
     description = "A desktop shell built for YOU";
     homepage = "https://github.com/ilyamiro/serpantinum";

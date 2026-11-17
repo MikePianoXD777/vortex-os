@@ -219,7 +219,7 @@ FocusScope {
     }
 
     property bool powerMenuOpen: false
-    property bool inputActive: false
+    property bool inputActive: lockUI.inputActive
     property bool isPlayingIntro: !root.staticLock
 
     property real centerReveal: 0.0
@@ -249,6 +249,12 @@ FocusScope {
     }
 
     Keys.onPressed: (event) => {
+        // A stalled compositor can hold back the key release (e.g. on resume from suspend),
+        // and the client-side repeat would then fill the password field. Only Backspace repeats.
+        if (event.isAutoRepeat && event.key !== Qt.Key_Backspace) {
+            event.accepted = true;
+            return;
+        }
         if (!lockScreenRoot.isPlayingIntro && !lockScreenRoot.isUnlocking) {
             if (!lockScreenRoot.inputActive) {
                 if (event.key !== Qt.Key_Escape) {
@@ -270,12 +276,7 @@ FocusScope {
                     passwordInput.clear();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    if (passwordInput.text.length > 0 && pam.responseRequired && !lockUI.authenticating) {
-                        lockUI.authenticating = true;
-                        lockUI.statusText = I18n.t("lock.status.authenticating");
-                        lockUI.failed = false;
-                        pam.respond(passwordInput.text);
-                    }
+                    lockUI.submitPassword(passwordInput.text);
                     event.accepted = true;
                 } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
                     event.accepted = true;
@@ -294,7 +295,7 @@ FocusScope {
             target: lockScreenRoot
             property: "centerReveal"
             to: 1.0
-            duration: 180
+            duration: 150
             easing.type: Easing.OutBack
             easing.overshoot: 1.2
         }
@@ -302,7 +303,7 @@ FocusScope {
             target: lockScreenRoot
             property: "wingsReveal"
             to: 1.0
-            duration: 220
+            duration: 250
             easing.type: Easing.OutBack
             easing.overshoot: 1.12
         }
@@ -352,7 +353,7 @@ FocusScope {
                 target: lockScreenRoot
                 property: "foldScaleX"
                 to: 0.0
-                duration: 220
+                duration: 250
                 easing.type: Easing.InBack
                 easing.overshoot: 1.3
             }
@@ -360,7 +361,7 @@ FocusScope {
                 target: lockScreenRoot
                 property: "foldScaleY"
                 to: 0.0
-                duration: 220
+                duration: 250
                 easing.type: Easing.InBack
                 easing.overshoot: 1.3
             }
@@ -368,14 +369,14 @@ FocusScope {
                 target: lockScreenRoot
                 property: "centerReveal"
                 to: 0.0
-                duration: 200
+                duration: 250
                 easing.type: Easing.InQuad
             }
             NumberAnimation {
                 target: lockScreenRoot
                 property: "contentReveal"
                 to: 0.0
-                duration: 220
+                duration: 250
                 easing.type: Easing.InQuad
             }
             NumberAnimation {
@@ -401,7 +402,15 @@ FocusScope {
         }
     }
 
+    Connections {
+        target: lockUI
+        function onInputActiveChanged() {
+            lockScreenRoot.inputActive = lockUI.inputActive;
+        }
+    }
+
     onInputActiveChanged: {
+        lockUI.inputActive = inputActive;
         if (lockScreenRoot.isUnlocking) return;
         if (inputActive) {
             closeDashboardAnim.stop();
@@ -420,7 +429,7 @@ FocusScope {
     property real mainOpacity: 1.0
 
     property bool isSysSubscribed: false
-    property bool isCavaSubscribed: false
+    property bool isSpectrumSubscribed: false
     function updateSysSubscription() {
         if (lockScreenRoot.wingsReveal > 0.98 && !isSysSubscribed) {
             SysData.subscribe();
@@ -431,21 +440,21 @@ FocusScope {
         }
     }
 
-    function updateCavaConsumer() {
+    function updateSpectrumConsumer() {
         let shouldSubscribe = lockScreenRoot.wingsReveal > 0.98;
-        if (shouldSubscribe && !lockScreenRoot.isCavaSubscribed) {
-            Cava.registerConsumer();
-            lockScreenRoot.isCavaSubscribed = true;
-        } else if (!shouldSubscribe && lockScreenRoot.isCavaSubscribed) {
-            Cava.unregisterConsumer();
-            lockScreenRoot.isCavaSubscribed = false;
+        if (shouldSubscribe && !lockScreenRoot.isSpectrumSubscribed) {
+            Spectrum.registerConsumer();
+            lockScreenRoot.isSpectrumSubscribed = true;
+        } else if (!shouldSubscribe && lockScreenRoot.isSpectrumSubscribed) {
+            Spectrum.unregisterConsumer();
+            lockScreenRoot.isSpectrumSubscribed = false;
         }
     }
 
     onWingsRevealChanged: {
         if (wingsReveal > 0 && !wingsEverNeeded) wingsEverNeeded = true;
         updateSysSubscription();
-        updateCavaConsumer();
+        updateSpectrumConsumer();
     }
 
 
@@ -507,9 +516,9 @@ FocusScope {
     }
 
     Component.onDestruction: {
-        if (lockScreenRoot.isCavaSubscribed) {
-            Cava.unregisterConsumer();
-            lockScreenRoot.isCavaSubscribed = false;
+        if (lockScreenRoot.isSpectrumSubscribed) {
+            Spectrum.unregisterConsumer();
+            lockScreenRoot.isSpectrumSubscribed = false;
         }
         if (isSysSubscribed) {
             SysData.unsubscribe();
@@ -558,6 +567,8 @@ FocusScope {
         }
     }
 
+    readonly property bool backdropSettled: backdrop.wallpaperSettled
+
     LockBackdrop {
         id: backdrop
         screenRoot: lockScreenRoot
@@ -572,18 +583,18 @@ FocusScope {
                 property: "panelReveal"
                 from: 0.0
                 to: 1.0
-                duration: 750
-                easing.type: Easing.OutCubic
+                duration: 600
+                easing.type: Easing.Linear
             }
 
             SequentialAnimation {
-                PauseAnimation { duration: 200 }
+                PauseAnimation { duration: 460 }
                 NumberAnimation {
                     target: lockScreenRoot
                     property: "contentReveal"
                     from: 0.0
                     to: 1.0
-                    duration: 200
+                    duration: 140
                     easing.type: Easing.OutCubic
                 }
             }

@@ -65,11 +65,11 @@ Item {
             color: ThemeBackend.surface0
         }
 
-        Image {
+        BoundedImage {
             anchors.fill: parent
             visible: opacity > 0 && source !== ""
             opacity: preview.tab.customBackgroundActive ? 0.0 : 1.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on opacity { NumberAnimation { duration: 250 } }
             source: preview.wallpaperPath !== "" && !preview.wallpaperIsVideo ? "file://" + preview.wallpaperPath : ""
             fillMode: Image.PreserveAspectCrop
             // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
@@ -77,15 +77,14 @@ Item {
             sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
             asynchronous: true
             smooth: true
-            mipmap: true
             cache: false
         }
 
-        Image {
+        BoundedImage {
             anchors.fill: parent
             visible: opacity > 0 && source !== ""
             opacity: preview.tab.customBackgroundActive && !preview.customVideo ? 1.0 : 0.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on opacity { NumberAnimation { duration: 250 } }
             source: preview.customPath !== "" && !preview.tab.isVideoPath(preview.customPath) ? "file://" + preview.customPath : ""
             fillMode: Image.PreserveAspectCrop
             // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
@@ -93,7 +92,6 @@ Item {
             sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
             asynchronous: true
             smooth: true
-            mipmap: true
             cache: false
         }
 
@@ -102,6 +100,7 @@ Item {
             active: preview.wallpaperIsVideo && !preview.tab.customBackgroundActive
             sourceComponent: VideoLock {
                 wallpaperPath: preview.wallpaperPath
+                paused: !preview.visible
             }
         }
 
@@ -110,6 +109,7 @@ Item {
             active: preview.customVideo
             sourceComponent: VideoLock {
                 wallpaperPath: preview.customPath
+                paused: !preview.visible
             }
         }
 
@@ -129,7 +129,7 @@ Item {
             anchors.fill: parent
             color: Qt.rgba(ThemeBackend.crust.r, ThemeBackend.crust.g, ThemeBackend.crust.b, 0.6)
             opacity: preview.following ? 1.0 : 0.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on opacity { NumberAnimation { duration: 250 } }
         }
     }
 
@@ -138,7 +138,7 @@ Item {
         spacing: rootObj.s(6)
         opacity: preview.following ? 1.0 : 0.0
         visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on opacity { NumberAnimation { duration: 250 } }
 
         Text {
             Layout.alignment: Qt.AlignHCenter
@@ -178,7 +178,7 @@ Item {
             contentAlignment: Qt.AlignHCenter
             enabled: !preview.following
             opacity: preview.following ? 0.45 : 1.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on opacity { NumberAnimation { duration: 250 } }
             onClicked: backgroundPicker.openPicker(preview.tab.currentCustomBackground, false)
         }
 

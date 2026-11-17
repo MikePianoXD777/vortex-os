@@ -22,15 +22,12 @@ Rectangle {
         tintColor: Qt.alpha(ThemeBackend.surface0, 0.4)
         tintAmount: 0.25
     }
-    border.color: Qt.alpha(ThemeBackend.surface1, 0.4)
-    border.width: ThemeBackend.liquidGlass ? 0 : 1
 
     property string monName: modelData.name
     property var widgetsList: (monWidgetCard.tab.monitorWidgetsMap && monWidgetCard.tab.monitorWidgetsMap[monName]) ? monWidgetCard.tab.monitorWidgetsMap[monName] : []
     property bool showPresets: false
 
     implicitHeight: cardLayout.implicitHeight + rootObj.s(12)
-    Behavior on implicitHeight { NumberAnimation { duration: 250; easing.type: Easing.OutQuart } }
 
     ColumnLayout {
         id: cardLayout
@@ -81,7 +78,7 @@ Rectangle {
                 maxWidth: rootObj.s(200)
                 implicitHeight: rootObj.s(32)
                 cornerRadius: ThemeBackend.borderRadius
-                buttonText: monWidgetCard.showPresets ? I18n.t("guide.display.widgets.hide_presets", "Hide Presets") : I18n.t("guide.display.widgets.choose_preset", "Choose a preset")
+                buttonText: monWidgetCard.showPresets ? I18n.t("guide.display.widgets.hide_presets", "Hide presets") : I18n.t("guide.display.widgets.choose_preset", "Choose a preset")
                 buttonIcon: "󰄛"
                 iconFontSize: rootObj.s(14)
                 textFontSize: rootObj.s(12)

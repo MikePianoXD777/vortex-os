@@ -20,12 +20,10 @@ Item {
     readonly property bool isCompact: module ? module.isCompact : false
     readonly property var barWindow: module ? module.barWindow : null
 
-    property bool isCleaningUp: false
-    property bool isRecording: false
-    property int recSeconds: 0
-    property real recStartEpoch: 0
-    property string recTimeFormatted: String(Math.floor(recSeconds / 60)).padStart(2, "0") + ":" + String(recSeconds % 60).padStart(2, "0")
-    readonly property string recCacheDir: Caching.cacheDir ? Caching.getCacheDir("recording") : ""
+    readonly property bool isRecording: RecordingState.isRecording
+    readonly property string recTimeFormatted: RecordingState.recTimeFormatted
+    readonly property bool wantsRecording: !module || module.moduleActive
+    property bool recSubscribed: false
 
     // Vortex 1.10: primero el temporizador de estudio (Estudio), con clic abre su panel.
     // Vortex 2.5: luego las tareas de hoy y mañana (Tareas), con clic abre las suyas.
@@ -40,92 +38,14 @@ Item {
     property alias timerRow: timerLayout
     property alias timerCol: timerLayout
 
-    function checkRecording() {
-        if (root.isCleaningUp || (module && !module.moduleActive) || root.recCacheDir === "") return;
-        recCheckProc.running = false;
-        recCheckProc.running = true;
+    function syncRecordingSubscription() {
+        if (wantsRecording === recSubscribed) return;
+        recSubscribed = wantsRecording;
+        if (wantsRecording) RecordingState.subscribe();
+        else RecordingState.unsubscribe();
     }
 
-    onIsRecordingChanged: {
-        if (!isRecording) {
-            recSeconds = 0;
-            recStartEpoch = 0;
-        }
-    }
-
-    onRecCacheDirChanged: {
-        if (recCacheDir !== "") {
-            root.checkRecording();
-        }
-    }
-
-    Process {
-        id: recCheckProc
-        command: root.recCacheDir ? [
-            "bash", "-c",
-            "d='" + root.recCacheDir + "'; if [ -f \"$d/rec_pid\" ] && [ -f \"$d/rec_start_epoch\" ]; then p=$(cat \"$d/rec_pid\" 2>/dev/null); if [ -n \"$p\" ] && kill -0 \"$p\" 2>/dev/null; then cat \"$d/rec_start_epoch\" 2>/dev/null; else echo 'NONE'; fi; else echo 'NONE'; fi"
-        ] : []
-        stdout: StdioCollector {
-            id: recCheckOut
-            onStreamFinished: {
-                let txt = recCheckOut.text.trim();
-                let epoch = parseInt(txt);
-                if (!isNaN(epoch) && epoch > 0) {
-                    root.recStartEpoch = epoch;
-                    root.recSeconds = Math.max(0, Math.floor(Date.now() / 1000 - epoch));
-                    root.isRecording = true;
-                } else {
-                    root.isRecording = false;
-                }
-            }
-        }
-    }
-
-    // Vortex: la carpeta de grabación se vigila con FileView (inotify dentro del shell)
-    // en vez de un «inotifywait -m» residente. checkRecording() solo lee rec_pid y
-    // rec_start_epoch, que screenshot.sh crea al empezar y borra al terminar; FileView
-    // avisa cuando se crean, cambian o se borran (vigila también la carpeta).
-    readonly property bool recWatchWanted: !root.isCleaningUp && (!module || module.moduleActive) && root.recCacheDir !== ""
-    property bool recDirReady: false
-
-    // La carpeta tiene que existir para poder vigilarla (antes lo hacía el mkdir del watcher)
-    Process {
-        id: recDirMaker
-        running: root.recWatchWanted && !root.recDirReady
-        command: root.recCacheDir ? ["mkdir", "-p", root.recCacheDir] : []
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode === 0) root.recDirReady = true;
-        }
-    }
-
-    FileView {
-        printErrors: false
-        preload: false
-        watchChanges: true
-        path: (root.recWatchWanted && root.recDirReady) ? root.recCacheDir + "/rec_pid" : ""
-        onFileChanged: root.checkRecording()
-    }
-
-    FileView {
-        printErrors: false
-        preload: false
-        watchChanges: true
-        path: (root.recWatchWanted && root.recDirReady) ? root.recCacheDir + "/rec_start_epoch" : ""
-        onFileChanged: root.checkRecording()
-    }
-
-    Timer {
-        id: recElapsedTimer
-        interval: 1000
-        running: !root.isCleaningUp && (!module || module.moduleActive) && root.isRecording
-        repeat: true
-        onTriggered: {
-            root.recSeconds = Math.max(0, Math.floor(Date.now() / 1000 - root.recStartEpoch));
-            if (root.recSeconds % 5 === 0) {
-                root.checkRecording();
-            }
-        }
-    }
+    onWantsRecordingChanged: syncRecordingSubscription()
 
     property real lengthPadding: barWindow ? barWindow.cs(isCompact ? 10 : 12) : (isCompact ? 10 : 12)
     property real innerSpacing: isVertical ? (barWindow ? barWindow.cs(isCompact ? 8 : 10) : (isCompact ? 8 : 10)) : (barWindow ? barWindow.cs(isCompact ? 10 : 12) : (isCompact ? 10 : 12))
@@ -167,7 +87,7 @@ Item {
                 opacity: root.isRecording ? 1.0 : 0.0
                 Behavior on opacity {
                     enabled: barWindow ? !barWindow.positionChanging : true
-                    NumberAnimation { duration: 300 }
+                    NumberAnimation { duration: 250 }
                 }
 
                 Rectangle {
@@ -216,7 +136,7 @@ Item {
 
                         Text {
                             text: timerItem.modelData.icon
-                            font.family: "Font Awesome 6 Free Solid"
+                            font.family: ThemeBackend.iconFont
                             font.pixelSize: root.isVertical ? (barWindow ? barWindow.cs(root.isCompact ? 10 : 11) : (root.isCompact ? 10 : 11)) : (barWindow ? barWindow.cs(root.isCompact ? 11 : 12) : (root.isCompact ? 11 : 12))
                             color: root.isCompact ? Qt.lighter(timerItem.entryColor, 1.08) : timerItem.entryColor
                             Behavior on color { ColorAnimation { duration: 250 } }
@@ -245,13 +165,9 @@ Item {
         }
     }
 
-    Component.onCompleted: {
-        root.checkRecording();
-    }
+    Component.onCompleted: syncRecordingSubscription()
 
     Component.onDestruction: {
-        root.isCleaningUp = true;
-        recDirMaker.running = false;
-        recCheckProc.running = false;
+        if (recSubscribed) RecordingState.unsubscribe();
     }
 }

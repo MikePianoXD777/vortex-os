@@ -3,6 +3,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 import "widgets"
+import "notifications/weather"
+import "notifications/battery"
 
 ShellRoot {
     readonly property bool performanceMode: !!(Config.getSetting("general", {}).performance)
@@ -80,8 +82,10 @@ ShellRoot {
 
     Launcher {}
     Clipboard {}    
+    Dashboard {}
 
     Polkit {}
+    WellbeingLimitOverlay {}
     PopoutManager {}
 
     Loader {
@@ -89,10 +93,7 @@ ShellRoot {
         sourceComponent: Dock {}
     }
 
-    Loader {
-        active: !performanceMode
-        sourceComponent: Idle {}
-    }
+    Idle {}
     Variants {
         model: performanceMode ? [] : Quickshell.screens
         delegate: WidgetLoader {
@@ -137,5 +138,7 @@ ShellRoot {
         Tareas.iniciar();
         // Vortex 2.0.2: los clips (Alt+F10) ya no se arrancan aquí: graban solo durante el modo juego
         // (bin/vortex, cmd_modo_juego), porque grabar el escritorio todo el día ocupaba 250-400 MB.
+        WeatherAlerts.isQuietNow();
+        GovAlerts.refresh();
     }
 }

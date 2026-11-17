@@ -46,7 +46,7 @@ hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("serpantinum volume lower"), { r
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("serpantinum volume raise"), { repeating = true, locked = true })
 
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("firefox"))
-hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("nautilus"))
+hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("ski"))
 hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("serpantinum reload"))
@@ -74,14 +74,6 @@ hl.bind(mainMod .. " + A", panel("autohide"))
 -- (para cerrar los popups). Ahora el evento «custom>>serpantinum:close» le pide al
 -- shell que cierre sus popups (Main.qml), igual que hacía qs_manager.sh.
 local close_popups = hl.dsp.event("serpantinum:close")
--- Vortex: Bloq Mayús y Bloq Num avisan al shell para su OSD (singletons/widgetcontrols/
--- OsdController.qml). El atajo no se queda con la tecla (non_consuming) y funciona con
--- cualquier modificador y con la pantalla bloqueada; así el shell no tiene que vigilar
--- los LED del teclado con un proceso residente.
-local avisar_bloqueos = hl.dsp.event("serpantinum:locks")
-for _, tecla in ipairs({ "Caps_Lock", "Num_Lock" }) do
-  hl.bind(tecla, avisar_bloqueos, { non_consuming = true, locked = true, ignore_mods = true })
-end
 
 for i = 1, 10 do
   local ws = tostring(i)
