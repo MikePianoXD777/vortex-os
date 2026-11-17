@@ -150,7 +150,7 @@ Item {
     // estilo «pills»). Ajustes > Barra > Escritorios lo apaga (bar.workspaceIcons).
     property bool showAppIcons: {
         let dummy = configRevision;
-        if (isNiri || isSway || isMango) return false;
+        if (Compositor.name !== "hyprland") return false;
         let bs = (typeof Config !== "undefined" && Config.rawSettings) ? Config.rawSettings.bar : null;
         return !(bs && bs.workspaceIcons === false);
     }
