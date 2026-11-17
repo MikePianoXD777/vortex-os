@@ -45,9 +45,10 @@ Item {
         }
     }
 
+    // Vortex (rediseño «Mezcla»): el reloj del bloqueo en la letra de títulos (Unbounded).
     component ShadowText: Text {
-        font.family: ThemeBackend.fontFamily
-        font.weight: Font.Bold
+        font.family: ThemeBackend.titleFont
+        font.weight: ThemeBackend.pesoTitulo(Font.Bold)
 
         Text {
             anchors.fill: parent
@@ -85,6 +86,7 @@ Item {
         }
 
         ShadowText {
+            font.family: ThemeBackend.fontFamily // la fecha, en la letra normal
             Layout.alignment: Qt.AlignHCenter
             text: root.stackedDateText
             color: root.dateColor
@@ -124,6 +126,7 @@ Item {
             }
 
             ShadowText {
+                font.family: ThemeBackend.fontFamily // la fecha, en la letra normal
                 visible: text !== ""
                 Layout.alignment: Qt.AlignBottom
                 Layout.bottomMargin: Scaler.s(24)
@@ -134,6 +137,7 @@ Item {
         }
 
         ShadowText {
+            font.family: ThemeBackend.fontFamily // la fecha, en la letra normal
             Layout.alignment: Qt.AlignHCenter
             text: root.dateText
             color: root.dateColor

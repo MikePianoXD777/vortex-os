@@ -69,8 +69,8 @@ FocusPanel {
 
                 Text {
                     text: FocusTimer.formatTime(FocusTimer.timerRemainingMs, false)
-                    font.family: ThemeBackend.fontFamily
-                    font.weight: Font.Black
+                    font.family: ThemeBackend.titleFont
+                    font.weight: ThemeBackend.pesoTitulo(Font.Black)
                     font.pixelSize: root.s(68)
                     color: FocusTimer.timerRemainingMs === 0 && !root.isTimerRunning ? ThemeBackend.mauve : ThemeBackend.text
                 }

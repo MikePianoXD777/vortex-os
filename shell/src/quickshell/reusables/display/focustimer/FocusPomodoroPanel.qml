@@ -63,7 +63,7 @@ FocusPanel {
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: FocusTimer.formatTime(FocusTimer.pomoRemainingMs, false)
-                        font.family: ThemeBackend.fontFamily; font.weight: Font.Black; font.pixelSize: root.s(68)
+                        font.family: ThemeBackend.titleFont; font.weight: ThemeBackend.pesoTitulo(Font.Black); font.pixelSize: root.s(68)
                         color: ThemeBackend.text
                     }
                 }

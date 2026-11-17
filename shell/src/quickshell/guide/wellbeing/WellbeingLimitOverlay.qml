@@ -171,7 +171,7 @@ Scope {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: I18n.t("guide.wellbeing.limit_overlay.title", "Daily limit reached")
-                        font.family: ThemeBackend.fontFamily
+                        font.family: ThemeBackend.titleFont
                         font.pixelSize: 22
                         font.bold: true
                         color: ThemeBackend.text

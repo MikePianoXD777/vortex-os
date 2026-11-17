@@ -107,8 +107,8 @@ GuideTab {
 
                             Text {
                                 text: I18n.t("guide.about.title")
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Bold
+                                font.family: ThemeBackend.titleFont
+                                font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                                 font.pixelSize: rootObj.s(22)
                                 color: ThemeBackend.text
                                 Layout.alignment: Qt.AlignHCenter

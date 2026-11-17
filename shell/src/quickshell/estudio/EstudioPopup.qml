@@ -184,9 +184,9 @@ Item {
                     spacing: window.s(2)
                     Text {
                         text: window.t("title", "Study timer")
-                        font.family: ThemeBackend.fontFamily
+                        font.family: ThemeBackend.titleFont
                         font.pixelSize: window.s(18)
-                        font.weight: Font.Bold
+                        font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                         color: ThemeBackend.text
                     }
                     Text {
@@ -240,9 +240,9 @@ Item {
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         text: Estudio.activo ? Estudio.texto(Estudio.restante) : Estudio.minutosEstudio + ":00"
-                        font.family: ThemeBackend.fontFamily
+                        font.family: ThemeBackend.titleFont
                         font.pixelSize: window.s(52)
-                        font.weight: Font.Bold
+                        font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                         color: ThemeBackend.text
                     }
                     Text {

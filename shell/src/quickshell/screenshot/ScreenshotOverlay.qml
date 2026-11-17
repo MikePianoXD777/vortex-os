@@ -590,7 +590,7 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     text: root.isVideoMode ? I18n.t("screenshot.video_mode") : I18n.t("screenshot.select_region")
-                    font.family: ThemeBackend.fontFamily; font.weight: Font.DemiBold; font.pixelSize: s(24); color: ThemeBackend.text
+                    font.family: ThemeBackend.titleFont; font.weight: ThemeBackend.pesoTitulo(Font.DemiBold); font.pixelSize: s(24); color: ThemeBackend.text
                 }
             }
             Item {

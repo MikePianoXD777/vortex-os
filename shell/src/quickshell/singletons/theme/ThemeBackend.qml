@@ -98,6 +98,8 @@ Item {
         : (root.titleFontSetting.toLowerCase() === "unbounded"
             ? ((titleFontLoader.status === FontLoader.Ready && titleFontLoader.name !== "") ? titleFontLoader.name : root.fontFamily)
             : root.titleFontSetting)
+    // Vortex: Unbounded viene en una sola instancia (SemiBold); con ella, los títulos van en DemiBold.
+    function pesoTitulo(w) { return root.titleFont !== root.fontFamily ? Font.DemiBold : w; }
 
     FontLoader {
         id: iconFontLoader

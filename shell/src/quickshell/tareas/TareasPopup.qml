@@ -184,9 +184,9 @@ Item {
                     spacing: window.s(2)
                     Text {
                         text: window.t("title", "Tasks")
-                        font.family: ThemeBackend.fontFamily
+                        font.family: ThemeBackend.titleFont
                         font.pixelSize: window.s(18)
-                        font.weight: Font.Bold
+                        font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                         color: ThemeBackend.text
                     }
                     Text {

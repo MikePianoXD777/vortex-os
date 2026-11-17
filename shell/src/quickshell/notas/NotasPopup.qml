@@ -187,9 +187,9 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: window.t("title", "Quick note")
-                    font.family: ThemeBackend.fontFamily
+                    font.family: ThemeBackend.titleFont
                     font.pixelSize: window.s(18)
-                    font.weight: Font.Bold
+                    font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                     color: ThemeBackend.text
                 }
                 Text {

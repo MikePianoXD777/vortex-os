@@ -347,8 +347,8 @@ Item {
                                 verticalAlignment: Text.AlignVCenter
                                 fontSizeMode: Text.Fit
                                 minimumPixelSize: window.s(8)
-                                font.family: ThemeBackend.fontFamily
-                                font.weight: Font.Black
+                                font.family: ThemeBackend.titleFont
+                                font.weight: ThemeBackend.pesoTitulo(Font.Black)
                                 font.pixelSize: window.s(26)
                                 color: window.activeMute ? ThemeBackend.red : ThemeBackend.text
                                 text: window.activeMute ? I18n.t("volumepopup.mute") : window.activeVol + "%"
@@ -379,8 +379,8 @@ Item {
                                     verticalAlignment: Text.AlignVCenter
                                     fontSizeMode: Text.Fit
                                     minimumPixelSize: window.s(8)
-                                    font.family: ThemeBackend.fontFamily
-                                    font.weight: Font.Black
+                                    font.family: ThemeBackend.titleFont
+                                    font.weight: ThemeBackend.pesoTitulo(Font.Black)
                                     font.pixelSize: window.s(26)
                                     color: coreGlass.active ? ThemeBackend.text : ThemeBackend.crust
                                     text: window.activeMute ? I18n.t("volumepopup.mute") : window.activeVol + "%"

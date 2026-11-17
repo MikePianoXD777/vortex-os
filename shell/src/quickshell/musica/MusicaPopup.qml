@@ -335,9 +335,9 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: window.t("title", "Metronome and tuner")
-                    font.family: ThemeBackend.fontFamily
+                    font.family: ThemeBackend.titleFont
                     font.pixelSize: window.s(18)
-                    font.weight: Font.Bold
+                    font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                     color: ThemeBackend.text
                     elide: Text.ElideRight
                 }
@@ -413,9 +413,9 @@ Item {
                             Layout.minimumWidth: window.s(130)
                             horizontalAlignment: Text.AlignHCenter
                             text: window.bpm
-                            font.family: ThemeBackend.fontFamily
+                            font.family: ThemeBackend.titleFont
                             font.pixelSize: window.s(64)
-                            font.weight: Font.Bold
+                            font.weight: ThemeBackend.pesoTitulo(Font.Bold)
                             color: ThemeBackend.text
                         }
                         Boton {
