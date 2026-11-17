@@ -15,6 +15,9 @@ url='https://github.com/ilyamiro/serpantinum-core'
 license=('AGPL-3.0-or-later')
 depends=('gcc-libs' 'glibc' 'dbus')
 makedepends=('cargo' 'git')
+# Sin LTO: la sqlite que trae rusqlite (bundled) sale como bitcode de GCC y lld no la puede enlazar
+# («undefined symbol: sqlite3_…»). Pasó en la VM el 17/11/2026.
+options=('!lto')
 source=("git+https://github.com/ilyamiro/serpantinum-core.git#commit=9297f166f626a7043ce1d586bc0b7dbaacc4ec7a"
         'vortex-ram-como-htop.patch')
 sha256sums=('SKIP'
