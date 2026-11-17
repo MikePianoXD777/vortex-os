@@ -647,7 +647,8 @@ Item {
             visible: metrics.v && (barWindow ? !barWindow.positionChanging : true) && width > 0 && (!contentWrapper.isSolid || contentWrapper.distinctPills)
             opacity: visible ? 1.0 : 0.0
 
-            color: contentWrapper.islas ? Qt.alpha(ThemeBackend.surface0, (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0)
+            // Vortex: las islas son de color sólido, salvo que la persona active el liquid glass o el desenfoque en Ajustes (se respeta).
+            color: (contentWrapper.islas && !(ThemeBackend.liquidGlass && groupBlur.active)) ? Qt.alpha(ThemeBackend.surface0, (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0)
                 : (groupGlass.active || (ThemeBackend.liquidGlass && groupBlur.active)) ? "transparent" : ((contentWrapper.isSolid && contentWrapper.distinctPills)
                 ? Qt.alpha(Qt.darker(ThemeBackend.surface0, 1.15), (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0)
                 : Qt.alpha(ThemeBackend.base, (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0))
@@ -661,7 +662,7 @@ Item {
                 z: -1
                 anchors.fill: parent
                 radius: parent.radius
-                surfaceEnabled: !contentWrapper || (!contentWrapper.isSolid && !contentWrapper.islas)
+                surfaceEnabled: !contentWrapper || !contentWrapper.isSolid
                 standalone: true
             }
 
