@@ -5,7 +5,7 @@
 #   cd packaging/vortex-shell && makepkg -si
 pkgname=vortex-shell
 pkgver=2.5.1
-pkgrel=6
+pkgrel=7
 pkgdesc="Shell de Vortexine's OS (Serpantinum con parches de Vortex)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -17,7 +17,7 @@ depends=(
     'quickshell' 'qt6-multimedia' 'qt6-5compat' 'qt6-wayland'
     'matugen' 'cava' 'jq' 'socat' 'inotify-tools' 'imagemagick' 'ffmpeg' 'file' 'curl'
     'wl-clipboard' 'cliphist' 'grim' 'satty' 'zbar' 'brightnessctl' 'ddcutil' 'iw'
-    'networkmanager' 'bluez' 'bluez-utils' 'libnotify'
+    'networkmanager' 'bluez' 'bluez-utils' 'libnotify' 'inter-font'
     'pipewire' 'pipewire-pulse' 'pipewire-alsa' 'wireplumber' 'libpulse' 'pavucontrol' 'alsa-utils'
     'lm_sensors' 'python' 'python-jeepney' 'psmisc' 'pciutils' 'util-linux'
     'gpu-screen-recorder' 'wf-recorder' 'power-profiles-daemon' 'pambase'

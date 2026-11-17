@@ -29,6 +29,11 @@ Item {
     }
     property bool isFill: barStyle === "fill"
     property bool isSolid: barStyle === "solid" || barStyle === "fill"
+    // Vortex (rediseño «Mezcla», 17/11/2026): en el estilo modular cada grupo es una isla sólida (color de
+    // tarjeta, borde fino y esquinas redondas), sin desenfoque ni cristal detrás. bar.islands = false
+    // regresa a las píldoras de Serpantinum.
+    readonly property bool islas: !isSolid && !(typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar
+        && Config.rawSettings.bar.islands === false)
     property bool distinctPills: barWindow ? (barWindow.distinctPills !== undefined ? barWindow.distinctPills : false) : false
     property real cornerRadius: barWindow ? barWindow.cornerRadius : 12
     property bool barAtBottom: !!barWindow && barWindow.barPosition === "bottom"
@@ -643,10 +648,13 @@ Item {
             visible: metrics.v && (barWindow ? !barWindow.positionChanging : true) && width > 0 && (!contentWrapper.isSolid || contentWrapper.distinctPills)
             opacity: visible ? 1.0 : 0.0
 
-            color: (groupGlass.active || (ThemeBackend.liquidGlass && groupBlur.active)) ? "transparent" : ((contentWrapper.isSolid && contentWrapper.distinctPills)
+            color: contentWrapper.islas ? Qt.alpha(ThemeBackend.surface0, (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0)
+                : (groupGlass.active || (ThemeBackend.liquidGlass && groupBlur.active)) ? "transparent" : ((contentWrapper.isSolid && contentWrapper.distinctPills)
                 ? Qt.alpha(Qt.darker(ThemeBackend.surface0, 1.15), (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0)
                 : Qt.alpha(ThemeBackend.base, (barWindow && barWindow.barOpacity !== undefined) ? barWindow.barOpacity : 1.0))
-            radius: ThemeBackend.borderRadius
+            radius: contentWrapper.islas ? height / 2 : ThemeBackend.borderRadius
+            border.width: contentWrapper.islas && barWindow ? barWindow.s(1) : 0
+            border.color: ThemeBackend.surface2
             property Item blurSurface: groupBlur
 
             WallpaperBlur {
@@ -654,7 +662,7 @@ Item {
                 z: -1
                 anchors.fill: parent
                 radius: parent.radius
-                surfaceEnabled: !contentWrapper || !contentWrapper.isSolid
+                surfaceEnabled: !contentWrapper || (!contentWrapper.isSolid && !contentWrapper.islas)
                 standalone: true
             }
 
@@ -663,7 +671,7 @@ Item {
                 anchors.fill: parent
                 z: -1
                 radius: parent.radius
-                allowed: !!contentWrapper && contentWrapper.isSolid && contentWrapper.distinctPills
+                allowed: !!contentWrapper && contentWrapper.isSolid && contentWrapper.distinctPills && !contentWrapper.islas
                 tintColor: ThemeBackend.surface0
                 tintAmount: 0.3
             }

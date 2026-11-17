@@ -89,6 +89,7 @@ Uso: vortex <comando>
   rendimiento [estado|ultra|alto|medio|bajo]
                                        perfil de rendimiento: menos efectos y memoria para PCs modestas
                                        (también en Ajustes → Pantalla; de fábrica, ultra)
+  diseno [estado|mezcla|anterior]      el diseño nuevo (islas, Obsidian, Inter) o el de antes
   ventanas [estado|mosaico|kde]        gestor de ventanas: mosaico (como qtile, de fábrica) o kde
                                        (flotantes con barra de título, como KDE o Windows). También
                                        desde Ajustes → Pantalla
@@ -1219,6 +1220,51 @@ dock_ventanas() {
   rm -f "$tmp"
 }
 
+# Rediseño «Mezcla» (Vortex Shell sobre Serpantinum 2.5): una sola vez, la barra pasa a islas (estilo
+# modular), el tema a Obsidian (la paleta sólida de Vortex, sin matugen) y la letra a Inter. Lo que había
+# se guarda en ~/.config/vortex/ajustes-antes-mezcla.json y «vortex diseno anterior» lo regresa. Después
+# no se vuelve a tocar: lo que la persona cambie en Ajustes se queda.
+diseno_mezcla() {
+  local ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" marca="$CONF/diseno-mezcla"
+  local tema="$VORTEX_DIR/shell/src/assets/themes/Obsidian.json" tmp
+  [[ -f "$ajustes" && -f "$tema" && ! -e "$marca" ]] || return 0
+  mkdir -p "$CONF"
+  # Si ya está puesto (se corrió «vortex diseno mezcla» dos veces), el respaldo de antes no se pisa.
+  if [[ "$(diseno_actual)" != mezcla ]]; then
+    jq '{bar: (.bar // null), theme: (.theme // null), dock: (.dock // null)}' "$ajustes" >"$CONF/ajustes-antes-mezcla.json" 2>/dev/null || return 0
+  fi
+  tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || return 0
+  # Las apps fijadas que trae Serpantinum 2.5 (Kitty y Ski) sacaban un dock en el mosaico: fuera, si son esas.
+  jq --slurpfile o "$tema" '.bar = ((.bar // {}) + {style: "modular"})
+      | .theme = ((.theme // {}) + {activePreset: "Obsidian", matugen: false, colors: $o[0].colors, fontFamily: "Inter"})
+      | if ((.dock.apps // []) | map(.desktop_id // "") | sort) == ["kitty", "ski"] then .dock.apps = [] else . end' \
+    "$ajustes" >"$tmp" 2>/dev/null
+  [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes" && touch "$marca"
+  rm -f "$tmp"
+}
+
+diseno_actual() {
+  local ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json"
+  [[ "$(jq -r '(.theme.activePreset == "Obsidian") and ((.bar.style // "modular") == "modular")' "$ajustes" 2>/dev/null)" == true ]] \
+    && echo mezcla || echo anterior
+}
+
+cmd_diseno() {
+  local ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" previo="$CONF/ajustes-antes-mezcla.json" tmp
+  case "${1:-estado}" in
+    estado) diseno_actual ;;
+    mezcla) rm -f "$CONF/diseno-mezcla"; diseno_mezcla; bien "Diseño nuevo puesto (islas, Obsidian, Inter)" ;;
+    anterior)
+      [[ -f "$previo" && -f "$ajustes" ]] || { aviso "no hay un diseño anterior guardado"; exit 1; }
+      tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || exit 1
+      jq --slurpfile p "$previo" 'reduce ("bar", "theme", "dock") as $k (.; if $p[0][$k] == null then del(.[$k]) else .[$k] = $p[0][$k] end)' \
+        "$ajustes" >"$tmp" && [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes"
+      rm -f "$tmp"
+      bien "Regresé la barra, el tema y el dock de antes del diseño nuevo" ;;
+    *) aviso "usa: vortex diseno [estado|mezcla|anterior]"; exit 1 ;;
+  esac
+}
+
 cmd_ventanas() {
   case "${1:-estado}" in
     estado) modo_ventanas ;;
@@ -1476,6 +1522,7 @@ cmd_actualizar() {
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
   [[ "$(modo_ventanas)" == kde ]] && { barras_titulo || true; dock_ventanas kde; }
+  diseno_mezcla
   paquetes_nuevos
   # La primera vez cachyos-rate-mirrors llega en paquetes_nuevos: se miden aquí y ya sirven la próxima.
   espejos_cercanos
@@ -2018,6 +2065,7 @@ case "${1:-ayuda}" in
     ;;
   java) shift; cmd_java "$@" ;;
   ventanas) shift; cmd_ventanas "$@" ;;
+  diseno | diseño) shift; cmd_diseno "$@" ;;
   rendimiento) shift; cmd_rendimiento "$@" ;;
   primer-inicio) cmd_primer_inicio ;;
   # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
