@@ -137,6 +137,8 @@ zed
 neovim
 
 # --- Repo [vortex] (paquetes propios, iso/paquetes.sh) ---
+serpantinum-core
+serpantinum-gamma
 vortex-shell
 # Vortexine's Shop: la tienda de apps. Las apps de Flathub NO vienen en la ISO: se descargan desde la
 # tienda cuando la persona las elige (para su usuario, sin contraseña).
@@ -144,7 +146,6 @@ vortex-shop
 # La interfaz de la tienda (Qt Quick en Python). Ya la pide vortex-shop; va explícito para que
 # no se pierda de la ISO si algún día cambian sus dependencias.
 pyside6
-wl-gammarelay-rs
 # Miku, el asistente de voz (Super+O): viene instalada y encendida. Trae la app, su voz (Supertonic 3) y
 # su oído (whisper.cpp), pero los MODELOS de voz y de oído NO van en la ISO: la app los baja la primera
 # vez que se usan (el modelo 3D lo pone iso/construir.sh desde VORTEX_MIKU_MODELO). Ya los pide el

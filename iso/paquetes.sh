@@ -10,7 +10,7 @@
 #
 # Todo se compila para un x86-64 cualquiera, no para la CPU de quien construye: la ISO tiene que
 # arrancar también en equipos sin AVX2. Lo que trae binarios (arch=x86_64: Calamares,
-# wl-gammarelay-rs, Vortex Studio) se compila en un chroot limpio de Arch (devtools, ver
+# serpantinum-core, serpantinum-gamma, Vortex Studio) se compila en un chroot limpio de Arch (devtools, ver
 # compilar_en_chroot); lo que es «any», con makepkg_generico. Al final se revisa que ningún ELF del
 # repo pida más que x86-64 básico (revisar_isa); si alguno lo pide, falla.
 #
@@ -22,17 +22,17 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(dirname "$AQUI")"
 
 # Los PKGBUILD de este repo (siempre se vuelven a armar: su código puede cambiar sin cambiar la
-# versión) y los paquetes del AUR. La luz nocturna la pide el shell. vortex-shop es la tienda de
+# versión) y los paquetes del AUR. El shell pide serpantinum-core y serpantinum-gamma (luz nocturna). vortex-shop es la tienda de
 # apps (Flathub): en la ISO solo viene ella, las apps se bajan después. Calamares (el instalador
 # gráfico) se compila aquí porque los de CachyOS están enlazados a un boost viejo (no arrancan
 # con el de Arch).
-PROPIOS=(vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku vortex-miku-internet)
-AUR=(wl-gammarelay-rs calamares shim-signed)
+PROPIOS=(serpantinum-core serpantinum-gamma vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku vortex-miku-internet)
+AUR=(calamares shim-signed)
 AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 
 # La ISO tiene que arrancar en cualquier x86-64 (construir.sh usa el [cachyos] genérico), pero el
 # makepkg.conf de quien la construye no es genérico: el de CachyOS trae -march=native y su
-# makepkg.conf.d/rust.conf, -C target-cpu=native. Un Calamares o un wl-gammarelay-rs compilados así
+# makepkg.conf.d/rust.conf, -C target-cpu=native. Un Calamares o un serpantinum-core compilados así
 # mueren con «Illegal instruction» en una CPU sin AVX2 (Intel anteriores a Haswell, muchos
 # Celeron/Pentium/Atom, AMD A8/A10 viejos): el instalador ni abre. Por eso todo se compila con una
 # copia de esa config sin la CPU de quien construye (makepkg_generico).

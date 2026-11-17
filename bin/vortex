@@ -1498,7 +1498,7 @@ cmd_actualizar() {
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
+  for pkg in serpantinum-core serpantinum-gamma vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     # Vortex Studio (1.10) y Vortexine's Local AI (3.1) llegan una sola vez: si los quitas, no vuelven.
@@ -1783,7 +1783,7 @@ avisos_pendientes() {
     [[ "$remoto" == "$local_" ]] || echo "vortex $remoto"
   fi
   # El código ya está al día pero falta reconstruir algún paquete propio (shell, tienda, Miku, Studio).
-  for pkg in vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
+  for pkg in serpantinum-core serpantinum-gamma vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     [[ -z "$instalado" || "$instalado" == "$(version_pkgbuild "$pkg")" ]] || echo "vortex $pkg $(version_pkgbuild "$pkg")"

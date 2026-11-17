@@ -4,8 +4,8 @@
 #
 #   cd packaging/vortex-shell && makepkg -si
 pkgname=vortex-shell
-pkgver=2.2.14
-pkgrel=44
+pkgver=2.5.1
+pkgrel=1
 pkgdesc="Shell de Vortexine's OS (Serpantinum con parches de Vortex)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -22,9 +22,11 @@ depends=(
     'lm_sensors' 'python' 'python-jeepney' 'psmisc' 'pciutils' 'util-linux'
     'gpu-screen-recorder' 'wf-recorder' 'power-profiles-daemon' 'pambase'
     'adwaita-icon-theme' 'kitty' 'playerctl'
+    # 2.5: casi todo lo que eran scripts lo hace serpantinum-core, y la luz azul, serpantinum-gamma (los dos se
+    # compilan desde su fuente en packaging/); tesseract es el OCR de la captura.
+    'serpantinum-core' 'serpantinum-gamma' 'tesseract' 'tesseract-data-eng'
 )
 optdepends=(
-    'wl-gammarelay-rs: luz nocturna'
     'easyeffects: ecualizador'
     'lsp-plugins-lv2: ecualizador (EasyEffects no ecualiza sin sus plugins)'
     'nautilus: abrir carpetas (SUPER+E, capturas)'

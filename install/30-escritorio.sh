@@ -55,14 +55,18 @@ mapfile -t pkgs < <(leer_paquetes "$VORTEX_DIR/packages/escritorio.txt")
 instalar_pacman "${pkgs[@]}"
 
 # El shell: Serpantinum con los parches de Vortex, empaquetado desde shell/ de este repo.
+# Antes van serpantinum-core (el demonio y la CLI en Rust que el shell 2.5 necesita para casi todo) y
+# serpantinum-gamma (la luz azul): se COMPILAN desde su código fuente, sin binarios ya hechos.
 # makepkg instala solo las dependencias (todas de los repos oficiales).
-if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
-  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-shell)"
-else
-  (cd "$VORTEX_DIR/packaging/vortex-shell" && con_reintentos makepkg -sif --noconfirm) \
-    || error "No se pudo construir el shell de Vortex (packaging/vortex-shell)"
-  rm -rf "$VORTEX_DIR/packaging/vortex-shell/"{pkg,src} "$VORTEX_DIR/packaging/vortex-shell/"*.pkg.tar.*
-fi
+for paquete in serpantinum-core serpantinum-gamma vortex-shell; do
+  if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+    run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/$paquete)"
+  else
+    (cd "$VORTEX_DIR/packaging/$paquete" && con_reintentos makepkg -sif --noconfirm) \
+      || error "No se pudo construir $paquete (packaging/$paquete)"
+    rm -rf "$VORTEX_DIR/packaging/$paquete/"{pkg,src} "$VORTEX_DIR/packaging/$paquete/"*.pkg.tar.*
+  fi
+done
 bien "Shell de Vortex instalado"
 
 # Vortexine's Shop: la tienda de apps (Flathub, se instalan para tu usuario sin contraseña).
@@ -144,8 +148,7 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-connect/"{pkg,src} "$VORTEX_DIR/packaging/vortex-connect/"*.pkg.tar.*
 fi
-# Luz nocturna (el único paquete del AUR que pide el shell).
-instalar_aur wl-gammarelay-rs || aviso "No se pudo instalar wl-gammarelay-rs: la luz nocturna no funcionará"
+# La luz nocturna ya no pide nada del AUR: la hace serpantinum-gamma (arriba, compilado desde su fuente).
 
 # Lo de tu usuario (Hyprland, teclado, fondos, ajustes del shell, kitty, gestor): va en
 # usuario.sh porque la ISO lo corre aparte, en el primer inicio de cada usuario nuevo.
