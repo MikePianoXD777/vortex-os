@@ -1429,6 +1429,10 @@ Item {
                 Text {
                     anchors.left: appsNombre.right
                     anchors.leftMargin: window.s(12)
+                    // Vortex: en la 2.5 la fila es más angosta y el texto se salía; se corta con «…».
+                    anchors.right: parent.right
+                    anchors.rightMargin: window.s(10)
+                    elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                     visible: appsAbiertas.apps.length === 0
                     text: I18n.t("widgets.apps_abiertas.empty", "No open apps")

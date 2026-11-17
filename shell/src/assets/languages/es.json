@@ -2121,7 +2121,7 @@
     },
     "apps_abiertas": {
       "title": "Apps abiertas",
-      "empty": "No hay apps abiertas",
+      "empty": "Ninguna",
       "close": "Cerrar",
       "go": "Ir a"
     },
