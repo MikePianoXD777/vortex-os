@@ -1,6 +1,10 @@
 //! `pruebas/test_interfaz.py`, portada: la ventana offscreen, haciendo de cuenta que no hay cámara (nunca
 //! abre la tuya). Carga sin errores de QML, dice que falta la cámara, muestra la última captura y guarda.
 
+// El script de compilación del crate mete el C++ de cxx-qt también aquí: hay que enlazar sus crates.
+extern crate cxx_qt;
+extern crate cxx_qt_lib;
+
 use std::fs;
 use std::process::Command;
 

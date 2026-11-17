@@ -1,3 +1,6 @@
+> **16/11/2026:** ya compila (cxx-qt 0.10.0 bajado de crates.io) y está en el workspace. Para que el módulo QML
+> se registre, el binario debe enlazar la crate: `extern crate vortex_core_qt;` + `cxx_qt::init_crate!(vortex_core_qt);`.
+
 # vortex-core-qt (todavía sin compilar)
 
 El puente de `vortex-core` con QML usando **cxx-qt 0.10.0** (versión fija):

@@ -5,12 +5,14 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QFile>
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
 #include <QtGui/QFont>
 #include <QtGui/QGuiApplication>
 #include <QtQml/QQmlApplicationEngine>
 #include <QtQml/QQmlContext>
+#include <QtQuick/QQuickWindow>
 #include <QtQuickControls2/QQuickStyle>
 #include <cstdio>
 
@@ -41,8 +43,10 @@ int vortex_video_correr(rust::Str qml, bool prueba)
         for (const auto &w : ws)
             errores << w.toString();
     });
-    auto *vv = new Puente(&app);
-    auto *colores = new Colores(&app);
+    auto *vv = new Puente();
+    vv->setParent(&app);
+    auto *colores = new Colores();
+    colores->setParent(&app);
     motor.rootContext()->setContextProperty(QStringLiteral("vv"), vv);
     motor.rootContext()->setContextProperty(QStringLiteral("colores"), colores);
     motor.load(QUrl::fromLocalFile(QString::fromUtf8(qml.data(), static_cast<qsizetype>(qml.size()))));
@@ -61,6 +65,15 @@ int vortex_video_correr(rust::Str qml, bool prueba)
             datos[QStringLiteral("ultima")] = vv->property("ultima").toString();
             datos[QStringLiteral("miniatura")] = vv->property("miniatura").toString();
             datos[QStringLiteral("errores")] = QJsonArray::fromStringList(errores);
+            // El pico de memoria (para comparar con la de Python) y, si se pide, una captura de la ventana.
+            QFile estado(QStringLiteral("/proc/self/status"));
+            if (estado.open(QIODevice::ReadOnly))
+                for (const auto &l : QString::fromUtf8(estado.readAll()).split(u'\n'))
+                    if (l.startsWith(QStringLiteral("VmHWM:")))
+                        datos[QStringLiteral("vmhwm")] = l.mid(6).trimmed();
+            const QString captura = qEnvironmentVariable("VORTEX_VIDEO_CAPTURA");
+            if (auto *w = qobject_cast<QQuickWindow *>(ventana); w && !captura.isEmpty())
+                w->grabWindow().save(captura);
             QMetaObject::invokeMethod(vv, "guardar", Q_ARG(QString, QStringLiteral("modo")),
                                       Q_ARG(QVariant, QVariant(QStringLiteral("video"))));
             std::printf("DATOS%s\n", QJsonDocument(datos).toJson(QJsonDocument::Compact).constData());

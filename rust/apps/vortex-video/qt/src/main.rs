@@ -24,6 +24,7 @@ fn carpeta_qml() -> Option<PathBuf> {
 }
 
 fn main() {
+    cxx_qt::init_crate!(vortex_video_qt);
     if std::env::args().any(|a| a == "--version") {
         println!("{} {} (Rust)", vortex_video::NOMBRE, vortex_video::VERSION);
         return;

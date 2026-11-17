@@ -96,23 +96,23 @@ fn url_de(ruta: &Path) -> QString {
     QUrl::from_local_file(&QString::from(ruta.to_string_lossy().as_ref())).to_qstring()
 }
 
-/// De QVariant (lo que manda QML) a JSON, solo con los tipos que usan los ajustes.
-fn a_json(v: &QVariant) -> Option<Value> {
-    if let Some(b) = v.value::<bool>() {
-        return Some(Value::Bool(b));
+/// De QVariant (lo que manda QML) a JSON, con el tipo que ya tiene esa clave: QVariant convierte de más
+/// (el texto «video» también «es» `true`), así que se pide justo el tipo esperado.
+fn a_json(v: &QVariant, como: &Value) -> Option<Value> {
+    match como {
+        Value::Bool(_) => v.value::<bool>().map(Value::Bool),
+        Value::Number(_) => {
+            let f = v.value::<f64>().or_else(|| v.value::<i32>().map(f64::from))?;
+            // QML manda los números como double: 5.0 es el temporizador 5.
+            if f.fract() == 0.0 {
+                Some(Value::from(f as i64))
+            } else {
+                serde_json::Number::from_f64(f).map(Value::Number)
+            }
+        }
+        Value::String(_) => v.value::<QString>().map(|s| Value::String(s.to_string())),
+        _ => None,
     }
-    if let Some(n) = v.value::<i32>() {
-        return Some(Value::from(n));
-    }
-    if let Some(f) = v.value::<f64>() {
-        // QML manda los números como double: 5.0 es el temporizador 5.
-        return if f.fract() == 0.0 {
-            Some(Value::from(f as i64))
-        } else {
-            serde_json::Number::from_f64(f).map(Value::Number)
-        };
-    }
-    v.value::<QString>().map(|s| Value::String(s.to_string()))
 }
 
 fn a_qvariant(v: &Value) -> QVariant {
@@ -167,8 +167,12 @@ impl qobject::Puente {
     }
 
     fn guardar(mut self: Pin<&mut Self>, clave: &QString, valor: &QVariant) {
-        if let Some(v) = a_json(valor) {
-            self.as_mut().rust_mut().estado.guardar(&clave.to_string(), v);
+        let clave = clave.to_string();
+        let Some(actual) = self.rust().estado.ajuste(&clave) else {
+            return;
+        };
+        if let Some(v) = a_json(valor, &actual) {
+            self.as_mut().rust_mut().estado.guardar(&clave, v);
         }
     }
 
