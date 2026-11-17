@@ -24,7 +24,7 @@ depends=(
     'adwaita-icon-theme' 'kitty' 'playerctl'
     # 2.5: casi todo lo que eran scripts lo hace serpantinum-core, y la luz azul, serpantinum-gamma (los dos se
     # compilan desde su fuente en packaging/); tesseract es el OCR de la captura.
-    'serpantinum-core' 'serpantinum-gamma' 'tesseract' 'tesseract-data-eng'
+    'serpantinum-core' 'serpantinum-gamma' 'tesseract' 'tesseract-data-spa' 'tesseract-data-eng'
 )
 optdepends=(
     'easyeffects: ecualizador'

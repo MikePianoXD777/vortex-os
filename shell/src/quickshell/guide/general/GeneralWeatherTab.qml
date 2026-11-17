@@ -30,7 +30,7 @@ GuideTab {
     readonly property var weatherAlertsDefaults: ({
         "enabled": true,
         "dailyForecast": false,
-        "governmentWarnings": true,
+        "governmentWarnings": false,
         "quietHours": true,
         "quietStart": 22,
         "quietEnd": 5,

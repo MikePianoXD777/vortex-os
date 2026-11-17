@@ -82,7 +82,7 @@ Item {
     function _syncEnabled() {
         if (typeof Config === "undefined" || !Config.dataReady) return;
         let s = Config.getSetting("weatherAlerts", {}) || {};
-        let on = s.enabled !== false && s.governmentWarnings !== false;
+        let on = s.enabled !== false && s.governmentWarnings === true; // Vortex: alertas de gobierno apagadas de fábrica (Mike, 17/11/2026)
         if (on === root._enabled && (on || root._status === "disabled")) return;
         root._enabled = on;
         if (on) {

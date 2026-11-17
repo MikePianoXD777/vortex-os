@@ -1,7 +1,7 @@
 .pragma library
 
 var DEFAULTS = {
-    enabled: true, dailyForecast: false, governmentWarnings: true, quietHours: true,
+    enabled: true, dailyForecast: false, governmentWarnings: false, quietHours: true,
     quietStart: 22, quietEnd: 5,
     rain_soon: true, snow_soon: true, heavy_rain: true, heavy_snow: true, thunderstorm: true,
     ice: true, fog: true, temp_rise: true, temp_drop: true, hot: true, cold: true,
