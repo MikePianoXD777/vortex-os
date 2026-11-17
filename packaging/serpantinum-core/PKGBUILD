@@ -1,0 +1,47 @@
+# serpantinum-core: el demonio y la CLI en Rust que usa el shell Serpantinum (v2.5) para lo que antes eran scripts
+# sueltos (monitores, brillo, red, portapapeles, tiempo de pantalla, búsqueda, etc.). Se COMPILA desde el código
+# fuente en la etiqueta v0.6.0 (fijada por su commit); no se baja ningún binario ya hecho.
+#
+# Lleva un parche de Vortexine's (vortex-ram-como-htop.patch): la RAM «usada» se calcula como htop y como
+# «vortex bench», no como total - disponible (que sale ~1 GB más).
+#
+#   cd packaging/serpantinum-core && makepkg -si
+pkgname=serpantinum-core
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Demonio y CLI en Rust del shell Serpantinum (monitores, brillo, red, portapapeles, tiempo de pantalla)"
+arch=('x86_64')
+url='https://github.com/ilyamiro/serpantinum-core'
+license=('AGPL-3.0-or-later')
+depends=('gcc-libs' 'glibc' 'dbus')
+makedepends=('cargo' 'git')
+source=("git+https://github.com/ilyamiro/serpantinum-core.git#commit=9297f166f626a7043ce1d586bc0b7dbaacc4ec7a"
+        'vortex-ram-como-htop.patch')
+sha256sums=('SKIP'
+            '723cd1a6c4d6602f36727c2f39ad47517891cfcd7c342453127f29d3c651c933')
+
+prepare() {
+    cd "$srcdir/serpantinum-core"
+    patch -Np1 -i "$srcdir/vortex-ram-como-htop.patch"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/serpantinum-core"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo build --release --frozen
+}
+
+check() {
+    cd "$srcdir/serpantinum-core"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    cargo test --release --frozen
+}
+
+package() {
+    cd "$srcdir/serpantinum-core"
+    sh packaging/stage.sh "$pkgdir"
+}

@@ -1,0 +1,41 @@
+--- a/src/sysinfo.rs
++++ b/src/sysinfo.rs
+@@ -58,11 +58,18 @@
+             .and_then(|v| v.split_whitespace().next()?.parse().ok())
+             .unwrap_or(0)
+     };
+-    let (total, available) = (kib("MemTotal"), kib("MemAvailable"));
++    let total = kib("MemTotal");
+     if total == 0 {
+         return (0, 0.0);
+     }
+-    let used = total.saturating_sub(available);
++    // Vortex 1.7.5: «usada» como htop y «vortex bench»: total - libre - búferes - caché recuperable
++    // (Cached sin Shmem, más SReclaimable). Con total - disponible salía ~1 GB más que en htop, porque
++    // MemAvailable descuenta el colchón libre que el kernel reserva (vm.watermark_scale_factor).
++    let used = total
++        .saturating_sub(kib("MemFree"))
++        .saturating_sub(kib("Buffers"))
++        .saturating_sub(kib("Cached").saturating_sub(kib("Shmem")))
++        .saturating_sub(kib("SReclaimable"));
+     ((100 * used / total) as u32, (used / 1048576) as f64 + ((used % 1048576) * 10 / 1048576) as f64 / 10.0)
+ }
+ 
+@@ -266,7 +273,7 @@
+ 
+     #[test]
+     fn memory_percent_and_used_gigabytes() {
+-        let text = "MemTotal:       16384000 kB\nMemFree: 100 kB\nMemAvailable:    8192000 kB\n";
++        let text = "MemTotal:       16384000 kB\nMemFree: 8192000 kB\nMemAvailable:    100 kB\n";
+         let (percent, gb) = parse_memory(text);
+         assert_eq!(percent, 50);
+         assert!((gb - 7.8).abs() < 1e-9, "{gb}");
+@@ -321,7 +328,7 @@
+             std::fs::write(dir.path().join("net/dev"), format!("h\nh\neth0: {rx} 0 0 0 0 0 0 0 {tx} 0 0 0 0 0 0 0\n"))
+                 .unwrap();
+         };
+-        std::fs::write(dir.path().join("meminfo"), "MemTotal: 1000 kB\nMemAvailable: 500 kB\n").unwrap();
++        std::fs::write(dir.path().join("meminfo"), "MemTotal: 1000 kB\nMemFree: 500 kB\nMemAvailable: 100 kB\n").unwrap();
+         std::fs::write(dir.path().join("self/mounts"), "").unwrap();
+         let mut sampler = Sampler::new(dir.path(), &dir.path().join("none"), &dir.path().join("none"));
+         let start = Instant::now();
