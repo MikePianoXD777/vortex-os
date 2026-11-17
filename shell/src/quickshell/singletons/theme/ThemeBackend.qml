@@ -54,6 +54,11 @@ Item {
     property color maroon: "#eba0ac"
     property color teal: "#94e2d5"
 
+    // Vortex (rediseño «Mezcla», 17/11/2026): si la paleta usa un solo acento (Obsidian: negro, blanco y un
+    // morado), los tonos aclarados del acento se quedan en ese morado; con otros temas se aclaran como siempre.
+    readonly property bool acentoUnico: Qt.colorEqual(blue, mauve) && Qt.colorEqual(blue, sapphire) && Qt.colorEqual(blue, teal)
+    function aclara(c, f) { return acentoUnico ? c : Qt.lighter(c, f); }
+
     property string configPath: Quickshell.env("QS_COLORS_JSON") ?? "~/.local/state/serpantinum/qs_colors.json"
     property string matugenConfigPath: (typeof Caching !== "undefined" && Caching.stateDir ? Caching.stateDir : ((Quickshell.env("HOME") ?? "") + "/.local/state/serpantinum")) + "/qs_matugen_colors.json"
 

@@ -466,7 +466,7 @@ GuideTab {
                                                         text: "󰕾"
                                                         font.family: ThemeBackend.iconFont
                                                         font.pixelSize: rootObj.s(18)
-                                                        color: Qt.lighter(ThemeBackend.sapphire, 1.5)
+                                                        color: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
                                                     }
                                                 }
 
@@ -478,7 +478,7 @@ GuideTab {
                                                     alwaysShowHandle: true
                                                     value: 65
                                                     backgroundColor: ThemeBackend.surface1
-                                                    accentColor: Qt.lighter(ThemeBackend.sapphire, 1.5)
+                                                    accentColor: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
                                                     gradColor1: accentColor
                                                     gradColor2: Qt.lighter(accentColor, 1.05)
                                                     gradColor3: Qt.lighter(accentColor, 1.10)
@@ -515,7 +515,7 @@ GuideTab {
                                                         text: "󰕾"
                                                         font.family: ThemeBackend.iconFont
                                                         font.pixelSize: rootObj.s(18)
-                                                        color: Qt.lighter(ThemeBackend.sapphire, 1.5)
+                                                        color: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
                                                     }
                                                 }
 
@@ -528,7 +528,7 @@ GuideTab {
                                                     alwaysShowHandle: true
                                                     value: 65
                                                     backgroundColor: ThemeBackend.surface1
-                                                    accentColor: Qt.lighter(ThemeBackend.sapphire, 1.5)
+                                                    accentColor: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
                                                     gradColor1: accentColor
                                                     gradColor2: Qt.lighter(accentColor, 1.05)
                                                     gradColor3: Qt.lighter(accentColor, 1.10)

@@ -1126,8 +1126,8 @@ PanelWindow {
                             cornerRadius: s(6)
                             handleSize: s(22)
                             handleColor: audioCtrl.mutedValue ? ThemeBackend.overlay0 : Qt.lighter(ThemeBackend.mauve, 1.15)
-                            handleHoverColor: audioCtrl.mutedValue ? ThemeBackend.subtext0 : Qt.lighter(ThemeBackend.mauve, 1.3)
-                            handleDragColor: audioCtrl.mutedValue ? ThemeBackend.text : Qt.lighter(ThemeBackend.mauve, 1.45)
+                            handleHoverColor: audioCtrl.mutedValue ? ThemeBackend.subtext0 : ThemeBackend.aclara(ThemeBackend.mauve, 1.3)
+                            handleDragColor: audioCtrl.mutedValue ? ThemeBackend.text : ThemeBackend.aclara(ThemeBackend.mauve, 1.45)
                             handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
 
                             Connections {

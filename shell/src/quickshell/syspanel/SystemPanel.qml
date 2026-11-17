@@ -39,8 +39,8 @@ Item {
     readonly property real cardRadius: Math.min(ThemeBackend.borderRadius, root.s(14))
 
     readonly property color briColor: Qt.lighter(ThemeBackend.mauve, 1.1)
-    readonly property color volColor: Qt.lighter(ThemeBackend.sapphire, 1.5)
-    readonly property color profileColor: Qt.lighter(ThemeBackend.blue, 1.55)
+    readonly property color volColor: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
+    readonly property color profileColor: ThemeBackend.aclara(ThemeBackend.blue, 1.55)
     readonly property int batCapacity: UPower.displayDevice.ready ? Math.round(UPower.displayDevice.percentage * 100) : 0
 
     readonly property bool isCharging: UPower.displayDevice.ready && (UPower.displayDevice.state === UPowerDeviceState.Charging || UPower.displayDevice.state === UPowerDeviceState.FullyCharged)

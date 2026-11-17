@@ -36,10 +36,10 @@ PanelWindow {
     function s(val) { return (typeof Scaler !== "undefined") ? Scaler.s(val) : val; }
 
     readonly property color briColor: Qt.lighter(ThemeBackend.mauve, 1.1)
-    readonly property color volColor: Qt.lighter(ThemeBackend.sapphire, 1.5)
-    readonly property color micColor: Qt.lighter(ThemeBackend.mauve, 1.3)
-    readonly property color capsColor: Qt.lighter(ThemeBackend.peach, 1.2)
-    readonly property color numColor: Qt.lighter(ThemeBackend.sapphire, 1.4)
+    readonly property color volColor: ThemeBackend.aclara(ThemeBackend.sapphire, 1.5)
+    readonly property color micColor: ThemeBackend.aclara(ThemeBackend.mauve, 1.3)
+    readonly property color capsColor: ThemeBackend.aclara(ThemeBackend.peach, 1.2)
+    readonly property color numColor: ThemeBackend.aclara(ThemeBackend.sapphire, 1.4)
     readonly property color airColor: Qt.lighter(ThemeBackend.red, 1.2)
 
     property string kind: OsdController.kind

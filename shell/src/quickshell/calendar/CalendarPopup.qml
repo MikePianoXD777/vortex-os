@@ -74,7 +74,7 @@ Item {
         return ThemeBackend.mauve;
     }
 
-    readonly property color textAccent: Qt.tint(window.timeAccent, Qt.alpha(ThemeBackend.text, 0.35))
+    readonly property color textAccent: ThemeBackend.acentoUnico ? window.timeAccent : Qt.tint(window.timeAccent, Qt.alpha(ThemeBackend.text, 0.35))
 
     property bool startupComplete: false
     property real introAmbient: 0

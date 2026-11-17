@@ -588,8 +588,8 @@ Scope {
                                         cornerRadius: ThemeBackend.borderRadius
                                         handleSize: Scaler.s(16)
                                         handleColor: Qt.lighter(ThemeBackend.mauve, 1.15)
-                                        handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.3)
-                                        handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.45)
+                                        handleHoverColor: ThemeBackend.aclara(ThemeBackend.mauve, 1.3)
+                                        handleDragColor: ThemeBackend.aclara(ThemeBackend.mauve, 1.45)
                                         handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
                                         showValueBubble: false
 
