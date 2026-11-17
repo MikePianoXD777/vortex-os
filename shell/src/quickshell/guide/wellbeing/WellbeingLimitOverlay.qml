@@ -12,6 +12,11 @@ Scope {
     id: overlayScope
 
     property bool shown: false
+    // Vortex: las ventanas del aviso solo existen mientras se ve (y 1 s más, para que se desvanezca);
+    // creadas siempre costaban ~6 MB de shell (meta de 900 MB en Ultra).
+    readonly property bool vortexVivo: shown || vortexCierre.running
+    onShownChanged: if (!shown) vortexCierre.restart()
+    Timer { id: vortexCierre; interval: 1000 }
     property string appClass: ""
     property string appName: ""
     property int usedSeconds: 0
@@ -72,7 +77,7 @@ Scope {
     }
 
     Variants {
-        model: Quickshell.screens
+        model: overlayScope.vortexVivo ? Quickshell.screens : []
 
         PanelWindow {
             id: win

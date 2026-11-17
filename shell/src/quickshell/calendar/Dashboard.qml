@@ -32,6 +32,9 @@ PanelWindow {
     }
 
     property bool isOpen: DashboardController.isVisible
+    // Vortex: el contenido (CalendarPopup) solo existe mientras el Dashboard se ve, como en la 2.2;
+    // tenerlo creado siempre costaba ~10 MB de shell (meta de 900 MB en Ultra).
+    readonly property var content: contentLoader.item
     property int configRevision: 0
 
     SpringProgress {
@@ -39,7 +42,7 @@ PanelWindow {
         open: dashboardWindow.isOpen
         openDuration: dashboardWindow.barSmaller ? 750 : 700
         onActiveChanged: {
-            if (!active) content.visible = false;
+            if (!active && content) content.visible = false;
         }
     }
 
@@ -52,13 +55,15 @@ PanelWindow {
     }
 
     function grabInputFocus() {
-        content.forceActiveFocus();
+        if (content) content.forceActiveFocus();
     }
 
     onIsOpenChanged: {
         if (isOpen) {
-            if (content.visible) content.visible = false;
-            content.visible = true;
+            if (content) {
+                if (content.visible) content.visible = false;
+                content.visible = true;
+            }
             grabInputFocus();
             focusRetries = 0;
             focusTimer.restart();
@@ -248,8 +253,8 @@ PanelWindow {
     Item {
         id: panel
 
-        readonly property real fullWidth: content.implicitWidth
-        readonly property real fullHeight: content.implicitHeight
+        readonly property real fullWidth: dashboardWindow.content ? dashboardWindow.content.implicitWidth : 0
+        readonly property real fullHeight: dashboardWindow.content ? dashboardWindow.content.implicitHeight : 0
 
         readonly property real alongLength: dashboardWindow.isSideBar ? fullHeight : fullWidth
         readonly property real alongExtent: dashboardWindow.isSideBar ? dashboardWindow.height : dashboardWindow.width
@@ -291,18 +296,27 @@ PanelWindow {
             anchors.fill: parent
             clip: true
 
-            CalendarPopup {
-                id: content
-                width: Math.max(panel.fullWidth, panel.width)
-                height: Math.max(panel.fullHeight, panel.height)
-                x: dashboardWindow.isSideBar ? (dashboardWindow.barPosition === "right" ? panel.width - width : 0) : panel.alongFinalStart - panel.x
-                y: dashboardWindow.isSideBar ? panel.alongFinalStart - panel.y : (dashboardWindow.barPosition === "bottom" ? panel.height - height : 0)
-                vertical: dashboardWindow.isSideBar
-                cornerTopLeft: panelCard.topLeftRadius
-                cornerTopRight: panelCard.topRightRadius
-                cornerBottomLeft: panelCard.bottomLeftRadius
-                cornerBottomRight: panelCard.bottomRightRadius
-                backgroundColor: "transparent"
+            Loader {
+                id: contentLoader
+                active: dashboardWindow.isOpen || reveal.active
+                onLoaded: {
+                    if (!dashboardWindow.isOpen) return;
+                    item.visible = false;
+                    item.visible = true;
+                    dashboardWindow.grabInputFocus();
+                }
+                sourceComponent: CalendarPopup {
+                    width: Math.max(panel.fullWidth, panel.width)
+                    height: Math.max(panel.fullHeight, panel.height)
+                    x: dashboardWindow.isSideBar ? (dashboardWindow.barPosition === "right" ? panel.width - width : 0) : panel.alongFinalStart - panel.x
+                    y: dashboardWindow.isSideBar ? panel.alongFinalStart - panel.y : (dashboardWindow.barPosition === "bottom" ? panel.height - height : 0)
+                    vertical: dashboardWindow.isSideBar
+                    cornerTopLeft: panelCard.topLeftRadius
+                    cornerTopRight: panelCard.topRightRadius
+                    cornerBottomLeft: panelCard.bottomLeftRadius
+                    cornerBottomRight: panelCard.bottomRightRadius
+                    backgroundColor: "transparent"
+                }
             }
         }
     }

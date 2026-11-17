@@ -36,10 +36,9 @@ PanelWindow {
         "smartAutohide": true,
         "autohideTimeout": 1000,
         "editing": false,
-        "apps": [
-            { "name": "Kitty", "comment": "Fast, feature-rich, GPU based terminal", "desktop_id": "kitty.desktop", "icon": "kitty" },
-            { "name": "Files", "comment": "Access and organize files", "desktop_id": "ski.desktop", "icon": "ski" }
-        ],
+        // Vortex: sin apps fijadas de fábrica, como en la 2.2 (el dock no sale en el mosaico). Las de la 2.5
+        // (Kitty y Ski, que Vortex no instala) sacaban un dock a pantalla completa que costaba ~60 MB.
+        "apps": [],
         "overrideBoundsCorrection": false,
         "enableScrolling": false,
         "visibleElements": 7,
