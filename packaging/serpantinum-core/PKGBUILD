@@ -3,12 +3,13 @@
 # fuente en la etiqueta v0.6.0 (fijada por su commit); no se baja ningún binario ya hecho.
 #
 # Lleva un parche de Vortexine's (vortex-ram-como-htop.patch): la RAM «usada» se calcula como htop y como
-# «vortex bench», no como total - disponible (que sale ~1 GB más).
+# «vortex bench», no como total - disponible (que sale ~1 GB más). Y otro (vortex-videos-de-fondo.patch): el
+# selector de fondos también lista m4v, avi, wmv, flv, ogv, mpg, mpeg y 3gp, como el indexador viejo de Vortex.
 #
 #   cd packaging/serpantinum-core && makepkg -si
 pkgname=serpantinum-core
 pkgver=0.6.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Demonio y CLI en Rust del shell Serpantinum (monitores, brillo, red, portapapeles, tiempo de pantalla)"
 arch=('x86_64')
 url='https://github.com/ilyamiro/serpantinum-core'
@@ -19,13 +20,16 @@ makedepends=('cargo' 'git')
 # («undefined symbol: sqlite3_…»). Pasó en la VM el 17/11/2026.
 options=('!lto')
 source=("git+https://github.com/ilyamiro/serpantinum-core.git#commit=9297f166f626a7043ce1d586bc0b7dbaacc4ec7a"
-        'vortex-ram-como-htop.patch')
+        'vortex-ram-como-htop.patch'
+        'vortex-videos-de-fondo.patch')
 sha256sums=('SKIP'
-            '723cd1a6c4d6602f36727c2f39ad47517891cfcd7c342453127f29d3c651c933')
+            '723cd1a6c4d6602f36727c2f39ad47517891cfcd7c342453127f29d3c651c933'
+            'bbe0bd5985ba8a03e8df8fcbdc617ed6e7917140f37f653233bf6420ce3e3be4')
 
 prepare() {
     cd "$srcdir/serpantinum-core"
     patch -Np1 -i "$srcdir/vortex-ram-como-htop.patch"
+    patch -Np1 -i "$srcdir/vortex-videos-de-fondo.patch"
     export RUSTUP_TOOLCHAIN=stable
     cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }

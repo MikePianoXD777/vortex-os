@@ -464,7 +464,10 @@
           }
         },
         "info": "Grabación/temporizador",
-        "weather": "Clima"
+        "weather": "Clima",
+        "notifications": "Notificaciones",
+        "usage": "Uso del sistema",
+        "clock": "Reloj"
       },
       "position": {
         "title": "Posición de la barra",
@@ -1042,7 +1045,8 @@
         "picker_search": "Buscar aplicaciones...",
         "picker_empty": "No hay aplicaciones coincidentes",
         "picker_apply": "Aplicar",
-        "picker_cancel": "Cancelar"
+        "picker_cancel": "Cancelar",
+        "add_app": "Agregar app"
       },
       "notify": {
         "title": "Bienestar digital",
@@ -1063,7 +1067,8 @@
       "peak_hour": "Hora pico",
       "same_as_prev": "Igual que el día anterior",
       "week": "Semana",
-      "week_total": "Total de la semana"
+      "week_total": "Total de la semana",
+      "screen_time": "Tiempo de pantalla"
     },
     "update_available": "Actualización disponible",
     "autostart": {
@@ -1271,7 +1276,8 @@
     "search": {
       "placeholder": "Buscar ajustes...",
       "prompt": "Escribe para buscar ajustes...",
-      "no_results": "No se encontraron ajustes"
+      "no_results": "No se encontraron ajustes",
+      "results": "Resultados de búsqueda"
     },
     "screenshot": {
       "ocr": {
