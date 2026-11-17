@@ -91,6 +91,10 @@ Variants {
             }
             property bool isFill: barStyle === "fill"
             property bool isSolid: barStyle === "solid" || barStyle === "fill"
+            // Vortex (rediseño «Mezcla»): en islas (modular, ver TopBar.qml) la barra flota a 10 px del borde,
+            // como en la maqueta, en vez de 4.
+            readonly property bool islas: !isSolid && ThemeBackend.barIslas
+            readonly property real margenFlotante: islas ? s(10) : s(4)
             property bool distinctPills: {
                 let dummy = configRevision;
                 return (typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar && Config.rawSettings.bar.distinctPills !== undefined) ? Config.rawSettings.bar.distinctPills : false;
@@ -276,10 +280,10 @@ Variants {
             implicitWidth: barWindowRoot.isVertical ? (barHeight + (isFill ? cornerRadius : edgePadding)) : 0
 
             margins {
-                top: isFill ? 0 : (barPosition === "bottom" ? 0 : (autohide ? 0 : s(4)))
-                bottom: isFill ? 0 : (barPosition === "top" ? 0 : (autohide ? 0 : s(4)))
-                left: isFill ? 0 : (barPosition === "right" ? 0 : (autohide ? 0 : s(4)))
-                right: isFill ? 0 : (barPosition === "left" ? 0 : (autohide ? 0 : s(4)))
+                top: isFill ? 0 : (barPosition === "bottom" ? 0 : (autohide ? 0 : margenFlotante))
+                bottom: isFill ? 0 : (barPosition === "top" ? 0 : (autohide ? 0 : margenFlotante))
+                left: isFill ? 0 : (barPosition === "right" ? 0 : (autohide ? 0 : margenFlotante))
+                right: isFill ? 0 : (barPosition === "left" ? 0 : (autohide ? 0 : margenFlotante))
             }
 
             exclusiveZone: (!barConfigReady || autohide || shouldHideForRedact) ? 0 : barHeight

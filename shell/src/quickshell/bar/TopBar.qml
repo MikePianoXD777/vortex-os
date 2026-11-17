@@ -32,8 +32,7 @@ Item {
     // Vortex (rediseño «Mezcla», 17/11/2026): en el estilo modular cada grupo es una isla sólida (color de
     // tarjeta, borde fino y esquinas redondas), sin desenfoque ni cristal detrás. bar.islands = false
     // regresa a las píldoras de Serpantinum.
-    readonly property bool islas: !isSolid && !(typeof Config !== "undefined" && Config.rawSettings && Config.rawSettings.bar
-        && Config.rawSettings.bar.islands === false)
+    readonly property bool islas: !isSolid && ThemeBackend.barIslas
     property bool distinctPills: barWindow ? (barWindow.distinctPills !== undefined ? barWindow.distinctPills : false) : false
     property real cornerRadius: barWindow ? barWindow.cornerRadius : 12
     property bool barAtBottom: !!barWindow && barWindow.barPosition === "bottom"

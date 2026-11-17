@@ -70,6 +70,16 @@ Item {
     // (la semilla y «vortex diseno mezcla» la ponen) carga assets/fonts/Unbounded-SemiBold.ttf; vacío o
     // sin la fuente, se usa la letra normal (fontFamily). Es una instancia fija en peso 600 (fontTools,
     // varLib.instancer wght=600) de la variable de Google Fonts: Qt no aplicaba el peso a la variable.
+    // Vortex (rediseño «Mezcla»): la barra en islas (estilo modular, sin bar.islands = false). La usan
+    // Bar.qml (margen de 10 px), TopBar.qml (grupos sólidos con borde) y los botones redondos de las caras.
+    readonly property bool barIslas: {
+        let b = (typeof Config !== "undefined" && Config.rawSettings) ? Config.rawSettings.bar : null;
+        let st = b ? b.style : undefined;
+        if (typeof st === "object" && st) st = (st.fill || st.mode === "fill") ? "fill" : ((st.solid || st.mode === "solid") ? "solid" : "modular");
+        if (st === "fill" || st === "solid") return false;
+        return !(b && b.islands === false);
+    }
+
     readonly property string titleFontSetting: {
         let th = (typeof Config !== "undefined" && Config.rawSettings) ? Config.rawSettings.theme : null;
         return (th && typeof th.titleFont === "string") ? th.titleFont : "";

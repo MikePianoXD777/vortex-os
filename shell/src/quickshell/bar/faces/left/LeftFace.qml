@@ -155,8 +155,12 @@ Item {
         property int glyphYOffset: 0
         signal clicked()
 
-        width: root.isVertical ? root.s(root.isCompact ? 28 : 30) : root.s(root.isCompact ? 30 : 32)
-        height: root.s(root.isCompact ? 28 : 30)
+        // Vortex (islas): botones redondos de 32 px; el del lanzador, con fondo oscuro e ícono de acento.
+        readonly property bool redondo: ThemeBackend.barIslas
+        readonly property bool destacado: redondo && menuBtn.esLanzador
+        property bool esLanzador: false
+        width: redondo ? root.s(root.isCompact ? 28 : 32) : (root.isVertical ? root.s(root.isCompact ? 28 : 30) : root.s(root.isCompact ? 30 : 32))
+        height: redondo ? width : root.s(root.isCompact ? 28 : 30)
 
         opacity: (root.isVertical || root.showLayout) ? 1.0 : 0.0
         transform: Translate {
@@ -168,13 +172,15 @@ Item {
         IconButton {
             anchors.fill: parent
             visible: !root.iconOnly
-            cornerRadius: Math.max(0, ThemeBackend.borderRadius - root.s(2))
+            cornerRadius: menuBtn.redondo ? height / 2 : Math.max(0, ThemeBackend.borderRadius - root.s(2))
             buttonIcon: menuBtn.glyph
             iconOffsetY: menuBtn.glyphYOffset
             iconFontSize: root.s(root.isCompact ? 14 : 15)
-            accentColor: menuBtn.active ? menuBtn.activeColor : (root.isCompact ? Qt.lighter(ThemeBackend.surface0, 1.18) : ThemeBackend.surface0)
+            accentColor: menuBtn.active ? menuBtn.activeColor : (menuBtn.redondo ? (menuBtn.destacado ? ThemeBackend.base : ThemeBackend.surface1)
+                : (root.isCompact ? Qt.lighter(ThemeBackend.surface0, 1.18) : ThemeBackend.surface0))
             bgOpacity: menuBtn.active ? 1.0 : root.barOpacity
-            textColor: menuBtn.active ? ThemeBackend.crust : (isHoveredOrHighlighted ? ThemeBackend.text : (root.isCompact ? ThemeBackend.subtext0 : ThemeBackend.overlay2))
+            textColor: menuBtn.active ? ThemeBackend.crust : (isHoveredOrHighlighted ? ThemeBackend.text
+                : (menuBtn.destacado ? ThemeBackend.sapphire : (menuBtn.redondo ? ThemeBackend.subtext0 : (root.isCompact ? ThemeBackend.subtext0 : ThemeBackend.overlay2))))
             onClicked: menuBtn.clicked()
         }
 
@@ -222,6 +228,7 @@ Item {
                 readonly property string itemId: modelData
                 glyph: BarModuleRegistry.menuItemIcon(itemId)
                 glyphYOffset: itemId === "nightlight" ? -1 : 0
+                esLanzador: itemId === "launcher"
                 active: itemId === "nightlight" ? root.nightLightActive : (itemId === "caffeine" ? root.caffeineActive : false)
                 activeColor: itemId === "caffeine" ? Qt.tint(ThemeBackend.peach, "#5c3016") : ThemeBackend.peach
                 onClicked: {
