@@ -3,6 +3,8 @@
 
 use std::env;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -66,17 +68,50 @@ pub struct EstadoEq {
     pub pending: bool,
 }
 
-/// Ruta al script `quickshell/media/equalizer.sh` de Serpantinum si existe.
-pub fn script() -> Option<PathBuf> {
-    let env_dir = env::var("SERPANTINUM_DIR").unwrap_or_default();
-    for base in [env_dir.as_str(), "/usr/share/serpantinum/src"] {
-        if base.is_empty() {
-            continue;
+/// Ruta fija del script `equalizer.sh` que proviene de Serpantinum (el shell de escritorio de Vortexine's OS).
+const SCRIPT_FIJO: &str = "/usr/share/serpantinum/src/quickshell/media/equalizer.sh";
+
+fn es_archivo_solo_propio(ruta: &Path) -> bool {
+    if !ruta.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        let Ok(meta) = fs::metadata(ruta) else {
+            return false;
+        };
+        // Nadie más (ni grupo ni otros) puede escribir en el script o su carpeta padre.
+        if (meta.mode() & 0o022) != 0 {
+            return false;
         }
-        let candidato = Path::new(base).join("quickshell/media/equalizer.sh");
-        if candidato.is_file() {
+        let home_uid = fs::metadata(vortex_core::rutas::home()).ok().map(|m| m.uid());
+        if meta.uid() != 0 && Some(meta.uid()) != home_uid {
+            return false;
+        }
+        if let Some(padre) = ruta.parent()
+            && let Ok(meta_dir) = fs::metadata(padre)
+            && (meta_dir.mode() & 0o022) != 0
+        {
+            return false;
+        }
+    }
+    true
+}
+
+/// Ruta al script `quickshell/media/equalizer.sh` de Serpantinum (el shell de Vortexine's OS).
+/// Solo acepta la ruta fija del sistema o una ruta bajo `SERPANTINUM_DIR` en la que nadie más pueda escribir.
+pub fn script() -> Option<PathBuf> {
+    if let Ok(env_dir) = env::var("SERPANTINUM_DIR")
+        && !env_dir.is_empty()
+    {
+        let candidato = Path::new(&env_dir).join("quickshell/media/equalizer.sh");
+        if es_archivo_solo_propio(&candidato) {
             return Some(candidato);
         }
+    }
+    let fijo = Path::new(SCRIPT_FIJO);
+    if es_archivo_solo_propio(fijo) {
+        return Some(fijo.to_path_buf());
     }
     None
 }

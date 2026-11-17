@@ -31,6 +31,8 @@ pub enum ErrorMpv {
     Ipc(#[from] std::io::Error),
     #[error("Error serializando comando JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Ruta o esquema no permitido para reproducir: {0}")]
+    RutaNoPermitida(String),
 }
 
 /// Evento recibido por el socket JSON IPC de `mpv`.
@@ -84,7 +86,27 @@ pub fn construir_filtros(eq: &str, velocidad: f64, entra_fade: Option<f64>) -> S
 
 /// Indica si una ruta es un stream remoto HTTP/HTTPS.
 pub fn es_stream(ruta: &str) -> bool {
-    ruta.starts_with("http://") || ruta.starts_with("https://")
+    let lower = ruta.to_ascii_lowercase();
+    lower.starts_with("http://") || lower.starts_with("https://")
+}
+
+/// Valida que `ruta` sea únicamente una ruta local absoluta o una URL `http://` / `https://`.
+/// Rechaza explícitamente `file://`, `ftp://`, `smb://`, `edl://`, rutas relativas o vacías.
+pub fn validar_ruta_carga(ruta: &str) -> Result<(), ErrorMpv> {
+    if ruta.trim().is_empty() {
+        return Err(ErrorMpv::RutaNoPermitida(ruta.to_string()));
+    }
+    if ruta.contains("://") {
+        if es_stream(ruta) {
+            return Ok(());
+        }
+        return Err(ErrorMpv::RutaNoPermitida(ruta.to_string()));
+    }
+    if Path::new(ruta).is_absolute() {
+        Ok(())
+    } else {
+        Err(ErrorMpv::RutaNoPermitida(ruta.to_string()))
+    }
 }
 
 /// Opciones para cargar una pista en `MpvIpc::cargar`.
@@ -252,6 +274,7 @@ impl MpvIpc {
 
     /// Carga un archivo o stream en el `mpv` principal.
     pub fn cargar(&mut self, ruta: &str, opts: OpcionesCarga<'_>) -> Result<(), ErrorMpv> {
+        validar_ruta_carga(ruta)?;
         let mut opciones: HashMap<String, String> = HashMap::new();
         if opts.desde > 0.0 {
             opciones.insert("start".into(), format!("{:.2}", opts.desde));
@@ -282,6 +305,7 @@ impl MpvIpc {
         volumen: i64,
         eq: &str,
     ) -> Result<(), ErrorMpv> {
+        validar_ruta_carga(ruta)?;
         let mpv_bin = env::var("VORTEX_PLAYER_MPV")
             .ok()
             .filter(|v| !v.is_empty())

@@ -14,13 +14,14 @@ use tempfile::TempDir;
 use vortex_player::biblioteca::{Ajustes, Biblioteca, ME_GUSTA, Orden};
 use vortex_player::calidad;
 use vortex_player::cola::{AccionAnterior, Cola, Pista, Repetir};
-use vortex_player::mpv::{EventoMpv, MpvIpc, OpcionesCarga, construir_filtros};
+use vortex_player::mpv::{ErrorMpv, EventoMpv, MpvIpc, OpcionesCarga, construir_filtros, validar_ruta_carga};
 
-fn hay_binario(nombre: &str) -> bool {
-    Command::new("which")
+fn exigir_binario(nombre: &str) {
+    let ok = Command::new("which")
         .arg(nombre)
         .output()
-        .is_ok_and(|o| o.status.success())
+        .is_ok_and(|o| o.status.success());
+    assert!(ok, "falta el binario requerido `{nombre}` en PATH");
 }
 
 fn generar_tono(ruta: &Path, opciones: &[&str], titulo: &str, artista: &str) {
@@ -108,9 +109,8 @@ fn calidad_desde_json_ffprobe() {
 
 #[test]
 fn calidad_archivos_de_verdad() {
-    if !hay_binario("ffmpeg") || !hay_binario("ffprobe") {
-        return;
-    }
+    exigir_binario("ffmpeg");
+    exigir_binario("ffprobe");
     let tmp = TempDir::new().unwrap();
     let flac = tmp.path().join("a.flac");
     let wav = tmp.path().join("b.wav");
@@ -138,9 +138,8 @@ fn calidad_archivos_de_verdad() {
 
 #[test]
 fn biblioteca_escanear_y_playlists() {
-    if !hay_binario("ffmpeg") || !hay_binario("ffprobe") {
-        return;
-    }
+    exigir_binario("ffmpeg");
+    exigir_binario("ffprobe");
     let tmp = TempDir::new().unwrap();
     let m = tmp.path().join("Música");
     let db_path = tmp.path().join("datos").join("biblioteca.db");
@@ -242,9 +241,8 @@ fn biblioteca_escanear_y_playlists() {
 
 #[test]
 fn biblioteca_ajustes_y_otras_carpetas() {
-    if !hay_binario("ffmpeg") || !hay_binario("ffprobe") {
-        return;
-    }
+    exigir_binario("ffmpeg");
+    exigir_binario("ffprobe");
     let tmp = TempDir::new().unwrap();
     let cfg = tmp.path().join("config");
     let db_path = tmp.path().join("datos").join("biblioteca.db");
@@ -275,15 +273,17 @@ fn biblioteca_ajustes_y_otras_carpetas() {
 
 #[test]
 fn biblioteca_hecha_por_python() {
-    if !hay_binario("python3") || !hay_binario("ffmpeg") || !hay_binario("ffprobe") {
-        return;
-    }
+    exigir_binario("python3");
+    exigir_binario("ffmpeg");
+    exigir_binario("ffprobe");
     let raiz_player = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .join("apps/vortex-player");
-    if !raiz_player.is_dir() {
-        return;
-    }
+    assert!(
+        raiz_player.is_dir(),
+        "no se encontró apps/vortex-player en {}",
+        raiz_player.display()
+    );
 
     let tmp = TempDir::new().unwrap();
     let musica = tmp.path().join("Música");
@@ -401,6 +401,27 @@ fn cola_orden_despues_y_repeticion() {
 }
 
 #[test]
+fn mpv_rechaza_esquemas_peligrosos() {
+    assert!(validar_ruta_carga("/musica/cancion.flac").is_ok());
+    assert!(validar_ruta_carga("https://music.youtube.com/watch?v=dQw4w9WgXcQ").is_ok());
+    assert!(validar_ruta_carga("http://localhost:8080/stream.opus").is_ok());
+
+    for mala in [
+        "file:///etc/passwd",
+        "ftp://servidor/cancion.mp3",
+        "smb://servidor/compartida/a.flac",
+        "edl://%0%no",
+        "relativa/cancion.mp3",
+        "",
+    ] {
+        assert!(
+            matches!(validar_ruta_carga(mala), Err(ErrorMpv::RutaNoPermitida(_))),
+            "debió rechazar {mala}"
+        );
+    }
+}
+
+#[test]
 fn mpv_filtros_carpeta_privada_e_ipc_sin_sonido() {
     assert_eq!(construir_filtros("", 1.0, None), "");
     assert_eq!(
@@ -408,14 +429,18 @@ fn mpv_filtros_carpeta_privada_e_ipc_sin_sonido() {
         "lavfi=[equalizer=f=63:t=o:w=1:g=5],scaletempo2,lavfi=[afade=t=in:d=3.0]"
     );
 
-    if !hay_binario("mpv") || !hay_binario("ffmpeg") {
-        return;
-    }
+    exigir_binario("mpv");
+    exigir_binario("ffmpeg");
     let tmp = TempDir::new().unwrap();
     let pista = tmp.path().join("prueba.wav");
     generar_tono(&pista, &["-ar", "44100", "-c:a", "pcm_s16le"], "Tono", "");
 
     let mut mpv = MpvIpc::iniciar_con(80, Some("null")).expect("mpv debería iniciar con --ao=null");
+
+    assert!(matches!(
+        mpv.cargar("file:///etc/passwd", OpcionesCarga::default()),
+        Err(ErrorMpv::RutaNoPermitida(_))
+    ));
 
     #[cfg(unix)]
     {

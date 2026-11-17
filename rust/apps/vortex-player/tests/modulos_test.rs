@@ -16,11 +16,12 @@ use vortex_player::ecualizador::{self, Banda};
 use vortex_player::nube::{CancionNube, Local, PlaylistNube};
 use vortex_player::{audio, descargas, discord, letras, nube};
 
-fn hay_binario(nombre: &str) -> bool {
-    Command::new("which")
+fn exigir_binario(nombre: &str) {
+    let ok = Command::new("which")
         .arg(nombre)
         .output()
-        .is_ok_and(|o| o.status.success())
+        .is_ok_and(|o| o.status.success());
+    assert!(ok, "falta el binario requerido `{nombre}` en PATH");
 }
 
 #[test]
@@ -404,9 +405,8 @@ fn discord_marcos_y_actividad() {
 
 #[test]
 fn biblioteca_me_gusta_y_titulos_limpios() {
-    if !hay_binario("ffmpeg") || !hay_binario("ffprobe") {
-        return;
-    }
+    exigir_binario("ffmpeg");
+    exigir_binario("ffprobe");
     let tmp = TempDir::new().unwrap();
     let m = tmp.path().join("Música");
     let db_path = tmp.path().join("datos").join("biblioteca.db");
