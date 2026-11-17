@@ -86,17 +86,7 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰏊"
         },
         {
-            // Vortex 2.5: tus tareas (tareas/TareasPopup.qml), al centro.
-        "tareas": {
-            w: 540, h: 680, comp: "tareas/TareasPopup.qml", draggable: true,
-            pos: {
-                "top": { anchor: "center" },
-                "bottom": { anchor: "center" },
-                "left": { anchor: "center" },
-                "right": { anchor: "center" }
-            }
-        },
-        // Vortex 1.10: metrónomo y afinador (musica/musica.py). La descripción lleva las palabras
+            // Vortex 1.10: metrónomo y afinador (musica/musica.py). La descripción lleva las palabras
             // con las que se buscaría: tempo, compás, afinar, guitarra, solfeo.
             id: "musica",
             name: tr("widgets.musica.name", "Metronome and tuner"),
@@ -288,6 +278,16 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
         // Vortex 1.8: biblioteca de juegos (juegos/JuegosPopup.qml), al centro como la hoja de atajos.
         "juegos": {
             w: 1180, h: 780, comp: "juegos/JuegosPopup.qml", draggable: true,
+            pos: {
+                "top": { anchor: "center" },
+                "bottom": { anchor: "center" },
+                "left": { anchor: "center" },
+                "right": { anchor: "center" }
+            }
+        },
+        // Vortex 2.5: tus tareas (tareas/TareasPopup.qml), al centro.
+        "tareas": {
+            w: 540, h: 680, comp: "tareas/TareasPopup.qml", draggable: true,
             pos: {
                 "top": { anchor: "center" },
                 "bottom": { anchor: "center" },

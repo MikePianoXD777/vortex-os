@@ -195,6 +195,10 @@ PanelWindow {
                 return;
             }
 
+            // Vortex: en Serpantinum 2.5 el centro de notificaciones quedó «reservado» (vacío) y las
+            // notificaciones viven en el panel de sistema; Super+N y lo demás que abra «notifications» va ahí.
+            if (targetWidget === "notifications") targetWidget = "system";
+
             let isSettingsCmd = cmd === "settings" || targetWidget === "settings";
             let isGuideCmd = cmd === "guide" || targetWidget === "guide";
             if (isSettingsCmd || isGuideCmd) {
