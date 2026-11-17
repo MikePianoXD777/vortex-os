@@ -70,26 +70,10 @@ Item {
     property bool isSysVisible: (!activeTarget || activeTarget.moduleActive) && showLayout
     property color basePrimary: (ThemeBackend.primary !== undefined && ThemeBackend.primary !== "") ? ThemeBackend.primary : ThemeBackend.mauve
 
-    property bool isSubscribed: false
-
-    function updateSubscription() {
-        if (isSysVisible && !isSubscribed) {
-            isSubscribed = true;
-            SysData.subscribe();
-        } else if (!isSysVisible && isSubscribed) {
-            isSubscribed = false;
-            SysData.unsubscribe();
-        }
+    SubscriptionGate {
+        target: SysData
+        wanted: root.isSysVisible
     }
-
-    Component.onCompleted: updateSubscription()
-    Component.onDestruction: {
-        if (isSubscribed) {
-            isSubscribed = false;
-            SysData.unsubscribe();
-        }
-    }
-    onIsSysVisibleChanged: updateSubscription()
 
     readonly property real layoutLength: isVertical ? sysLayout.implicitHeight : sysLayout.implicitWidth
     property real targetLength: ((!activeTarget || activeTarget.moduleActive) && layoutLength > 0) ? (layoutLength + (barWindow ? barWindow.cs(isCompact ? 8 : 10) : (isCompact ? 8 : 10))) : 0
@@ -146,7 +130,6 @@ Item {
         height: implicitHeight
         radius: width / 2
         color: "transparent"
-        border.width: 0
 
         Timer {
             running: (!activeTarget || activeTarget.moduleActive) && root.showLayout && !initAnimTrigger
@@ -161,7 +144,7 @@ Item {
             Behavior on x { NumberAnimation { duration: 620; easing.type: Easing.OutQuint } }
             Behavior on y { NumberAnimation { duration: 620; easing.type: Easing.OutQuint } }
         }
-        Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
 
         ShaderEffect {
             id: circleGauge

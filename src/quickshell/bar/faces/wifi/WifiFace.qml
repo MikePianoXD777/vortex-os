@@ -3,41 +3,15 @@ import QtQuick.Layouts
 import QtQuick.Window
 import QtQuick.Controls
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Quickshell.Networking
 import "../../../reusables"
 import "../../../"
+import "../../"
 
-Item {
+BarFaceBase {
     id: root
-
-    property var module: null
-    property var widget: module
-
-    property string orientation: (activeTarget && activeTarget.orientation !== undefined) ? activeTarget.orientation : "horizontal"
-    readonly property bool isVertical: orientation === "vertical"
-
-    readonly property var activeTarget: widget || module
-    readonly property bool isCompact: activeTarget ? activeTarget.isCompact : false
-    readonly property var barWindow: activeTarget ? activeTarget.barWindow : null
-    readonly property bool isPreview: activeTarget ? Boolean(activeTarget.isPreview) : false
-
-    function s(val) {
-        if (barWindow && typeof barWindow.s === "function") return barWindow.cs(val);
-        if (activeTarget && typeof activeTarget.s === "function") return activeTarget.s(val);
-        if (typeof Scaler !== "undefined" && typeof Scaler.s === "function") return Math.round(Scaler.s(val));
-        return val;
-    }
-
-    property int configRevision: 0
-
-    Connections {
-        target: (typeof Config !== "undefined") ? Config : null
-        function onSettingsLoaded() { root.configRevision++; }
-        function onRawSettingsChanged() { root.configRevision++; }
-    }
 
     property string wifiStyle: {
         if (widget && widget !== root && widget.wifiStyle !== undefined) return widget.wifiStyle;
@@ -79,7 +53,7 @@ Item {
         return true;
     }
 
-    property bool isDesktop: false
+    readonly property bool isDesktop: !SystemInfo.hasBatSupply
     property string ethStatus: "Ethernet"
     property string wifiStatus: isPreview ? "Enabled" : "Off"
     property string wifiIcon: isPreview ? "󰤨" : "󰤮"
@@ -100,23 +74,9 @@ Item {
     Connections {
         target: module || null
         function onModuleActiveChanged() {
-            if (module && !module.moduleActive) {
-                chassisDetector.running = false;
-            } else {
-                chassisDetector.running = true;
+            if (!module || module.moduleActive) {
                 root.findDevices();
                 root.updateNetworkData();
-            }
-        }
-    }
-
-    Process {
-        id: chassisDetector
-        running: !module || module.moduleActive
-        command: ["bash", "-c", "if ls /sys/class/power_supply/BAT* 1> /dev/null 2>&1; then echo 'laptop'; else echo 'desktop'; fi"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.isDesktop = (this.text.trim() === "desktop");
             }
         }
     }
@@ -133,15 +93,24 @@ Item {
         if (!Networking || !Networking.devices) return;
         let devs = Networking.devices.values || Networking.devices;
         let count = devs.length !== undefined ? devs.length : (devs.count !== undefined ? devs.count : 0);
+        let bestEth = null;
+        let bestRank = -1;
+        let wifi = null;
         for (let i = 0; i < count; i++) {
             let d = devs[i] !== undefined ? devs[i] : (devs.get ? devs.get(i) : null);
             if (!d) continue;
-            if (!root.ethDevice && isEthDevice(d)) {
-                root.ethDevice = d;
-            } else if (!root.wifiDevice && isWifiDevice(d)) {
-                root.wifiDevice = d;
+            if (isEthDevice(d)) {
+                let rank = d.connected ? 2 : (d.hasLink ? 1 : 0);
+                if (rank > bestRank) {
+                    bestEth = d;
+                    bestRank = rank;
+                }
+            } else if (!wifi && isWifiDevice(d)) {
+                wifi = d;
             }
         }
+        if (root.wifiDevice !== wifi) root.wifiDevice = wifi;
+        if (root.ethDevice !== bestEth) root.ethDevice = bestEth;
     }
 
     function getWifiNetworksList() {
@@ -265,7 +234,7 @@ Item {
                 property var device: modelData
                 Component.onCompleted: {
                     if (device && device.type === DeviceType.Wired) {
-                        root.ethDevice = device;
+                        root.findDevices();
                     } else if (device && device.type === DeviceType.Wifi) {
                         root.wifiDevice = device;
                     }
@@ -356,7 +325,7 @@ Item {
         anchors.centerIn: parent
         spacing: root.isVertical ? s(root.isCompact ? 2 : 3) : s(root.isCompact ? 5 : 6)
         opacity: root.showLayout ? 1.0 : 0.0
-        Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
 
         Item {
             visible: root.showIcon
@@ -419,7 +388,7 @@ Item {
 
             opacity: initAnimTrigger ? 1.0 : 0.0
             transform: Translate { y: wifiPill.initAnimTrigger ? 0 : s(15); Behavior on y { NumberAnimation { duration: 620; easing.type: Easing.OutQuint } } }
-            Behavior on opacity { NumberAnimation { duration: 450; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
 
             onClicked: if (!root.isPreview) Quickshell.execDetached(["bash", "-c", Caching.serpantinumDir + "/scripts/qs_manager.sh toggle network wifi"])
         }

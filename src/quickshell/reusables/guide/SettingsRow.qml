@@ -30,6 +30,17 @@ Rectangle {
     property string searchTab: ""
     property string searchSubTab: ""
     property string searchKeywords: ""
+    property string section: ""
+
+    readonly property string effectiveSection: {
+        if (section !== "") return section;
+        let p = root.parent;
+        while (p) {
+            if (p.searchSection !== undefined && p.searchSection !== "") return p.searchSection;
+            p = p.parent;
+        }
+        return "";
+    }
     property bool searchable: true
 
     property bool hiddenByConfig: false
@@ -49,7 +60,7 @@ Rectangle {
     readonly property string effectiveSettingId: {
         if (settingId && settingId !== "") return settingId;
         if (title && title !== "") {
-            return title.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+            return title.toLowerCase().replace(/[\x00-\x2f\x3a-\x5e\x60\x7b-\x7f\s]/g, "_");
         }
         return "";
     }
@@ -290,11 +301,11 @@ Rectangle {
             id: root.effectiveSettingId,
             title: root.title,
             desc: root.description,
-            description: root.description,
             tab: info.tab,
             subtab: info.subtab,
             icon: root.icon,
             keywords: root.searchKeywords,
+            section: root.effectiveSection,
             target: root,
             unavailable: root.hiddenByConfig
         });
@@ -386,8 +397,8 @@ Rectangle {
     property int iconSize: 32
     property int iconFontSize: 16
     property real iconCornerRadius: ThemeBackend.borderRadius
-    property color iconAccentColor: ThemeBackend.surface0
-    property color iconTextColor: "#ffffff"
+    property color iconAccentColor: "transparent"
+    property color iconTextColor: ThemeBackend.subtext0
     property bool iconInteractive: false
 
     property string title: ""
@@ -404,12 +415,12 @@ Rectangle {
     property Component customLeftContent: null
 
     property bool fillControlWidth: false
+    property real stackBelowWidth: 560
+    readonly property bool stacked: !root.fillControlWidth && root.width < root.s(root.stackBelowWidth)
     property bool showDivider: false
     property color dividerColor: Qt.alpha(ThemeBackend.surface1, 0.3)
 
     property bool clickable: false
-    property bool animateHeight: false
-    property int animationDuration: 250
 
     signal clicked()
     signal rightClicked()
@@ -423,7 +434,7 @@ Rectangle {
         let base = (root.clickable && cardMa.containsMouse) ? root.hoverColor : root.baseColor;
         if (root.dimmed) base = Qt.alpha(base, base.a * 0.5);
         if (root.highlightFlash > 0.001) {
-            let k = root.dimmed ? 0.2 : 0.12;
+            let k = root.dimmed ? 0.2 : 0.16;
             if (root.inBlob) {
                 if (base.a < 0.001) {
                     let cardAlpha = 0.4;
@@ -435,30 +446,26 @@ Rectangle {
         }
         return base;
     }
-    color: rowGlass.active ? (root.highlightFlash > 0.001 ? Qt.alpha(ThemeBackend.mauve, root.highlightFlash * 0.12) : "transparent") : stateColor
-    border.color: root.borderColor
-    border.width: root.borderWidth
+    readonly property bool glassActive: rowGlassLoader.item !== null && rowGlassLoader.item.active
+    color: root.glassActive ? (root.highlightFlash > 0.001 ? Qt.alpha(ThemeBackend.mauve, root.highlightFlash * 0.12) : "transparent") : stateColor
     clip: true
 
     implicitHeight: contentCol.implicitHeight + root.verticalPadding * 2
 
-    Behavior on color { ColorAnimation { duration: 180 } }
-    Behavior on border.color { ColorAnimation { duration: 180 } }
-    Behavior on implicitHeight {
-        enabled: root.animateHeight
-        NumberAnimation { duration: root.animationDuration; easing.type: Easing.OutCubic }
-    }
+    Behavior on color { ColorAnimation { duration: 150 } }
 
-    GlassFill {
-        id: rowGlass
+    Loader {
+        id: rowGlassLoader
         anchors.fill: parent
-        allowed: !root.inBlob || root.blobPlacement.nested
-        radius: root.cornerRadius
-        tintColor: ThemeBackend.surface0
-        tintAmount: (root.clickable && cardMa.containsMouse ? 0.34 : 0.26) * (root.dimmed ? 0.5 : 1.0)
-        press: root.clickable && cardMa.containsMouse ? 0.2 : 0
-        Behavior on press { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-        Behavior on tintAmount { NumberAnimation { duration: 180 } }
+        active: !root.inBlob || root.blobPlacement.nested
+        sourceComponent: GlassFill {
+            radius: root.cornerRadius
+            tintColor: ThemeBackend.surface0
+            tintAmount: (root.clickable && cardMa.containsMouse ? 0.34 : 0.26) * (root.dimmed ? 0.5 : 1.0)
+            press: root.clickable && cardMa.containsMouse ? 0.2 : 0
+            Behavior on press { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+            Behavior on tintAmount { NumberAnimation { duration: 150 } }
+        }
     }
 
     MouseArea {
@@ -488,28 +495,33 @@ Rectangle {
         spacing: root.innerSpacing
 
         opacity: root.dimmed ? 0.4 : 1.0
-        Behavior on opacity { NumberAnimation { duration: 180 } }
+        Behavior on opacity { NumberAnimation { duration: 150 } }
 
-        RowLayout {
+        GridLayout {
             id: mainRow
             layoutDirection: I18n.layoutDirection
             Layout.fillWidth: true
-            spacing: root.spacing
+            columnSpacing: root.spacing
+            rowSpacing: root.controlSpacing
+            columns: (iconBtn.visible ? 1 : 0) + (root.stacked ? 1 : 2)
 
-            IconButton {
+            Loader {
                 id: iconBtn
-                visible: root.showIcon && root.icon !== ""
-                enabled: root.iconInteractive
-                size: root.s(root.iconSize)
-                Layout.preferredWidth: visible ? root.s(root.iconSize) : 0
-                Layout.preferredHeight: visible ? root.s(root.iconSize) : 0
+                active: root.showIcon && root.icon !== ""
+                visible: active
+                Layout.preferredWidth: active ? root.s(root.iconSize) : 0
+                Layout.preferredHeight: active ? root.s(root.iconSize) : 0
                 Layout.alignment: Qt.AlignVCenter
-                cornerRadius: root.iconCornerRadius
-                buttonIcon: root.icon
-                iconFontSize: root.s(root.iconFontSize)
-                accentColor: root.dimmed ? ThemeBackend.surface1 : root.iconAccentColor
-                textColor: root.dimmed ? ThemeBackend.subtext0 : root.iconTextColor
-                onClicked: root.iconClicked()
+                sourceComponent: IconButton {
+                    enabled: root.iconInteractive
+                    size: root.s(root.iconSize)
+                    cornerRadius: root.iconCornerRadius
+                    buttonIcon: root.icon
+                    iconFontSize: root.s(root.iconFontSize)
+                    accentColor: root.dimmed ? ThemeBackend.surface1 : root.iconAccentColor
+                    textColor: root.dimmed ? ThemeBackend.subtext0 : root.iconTextColor
+                    onClicked: root.iconClicked()
+                }
             }
 
             Loader {
@@ -569,8 +581,9 @@ Rectangle {
                     font.pixelSize: root.s(root.descriptionPixelSize)
                     color: root.dimmed ? ThemeBackend.subtext0 : root.descriptionColor
                     horizontalAlignment: I18n.textAlignment
-                    elide: root.wrapText ? Text.ElideNone : Text.ElideRight
-                    wrapMode: root.wrapText ? Text.WordWrap : Text.NoWrap
+                    elide: Text.ElideRight
+                    maximumLineCount: root.wrapText ? 99 : 2
+                    wrapMode: Text.WordWrap
                     visible: text !== ""
                 }
             }
@@ -583,7 +596,8 @@ Rectangle {
             RowLayout {
                 id: controlRow
                 enabled: !root.dimmed
-                Layout.fillWidth: root.fillControlWidth
+                Layout.fillWidth: root.fillControlWidth || root.stacked
+                Layout.columnSpan: root.stacked ? mainRow.columns : 1
                 Layout.alignment: root.fillControlWidth ? Qt.AlignVCenter : ((I18n.rtl ? Qt.AlignLeft : Qt.AlignRight) | Qt.AlignVCenter)
                 spacing: root.controlSpacing
             }

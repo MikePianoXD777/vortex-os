@@ -34,6 +34,16 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Components',
+      collapsible: false,
+      items: [
+        'components/serpantinum-audio',
+        'components/serpantinum-core',
+        'components/serpantinum-gamma',
+      ],
+    },
+    {
+      type: 'category',
       label: 'CLI',
       collapsible: false,
       items: [

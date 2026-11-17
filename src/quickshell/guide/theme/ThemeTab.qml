@@ -5,8 +5,6 @@ ThemeTabState {
     id: themeTabRoot
 
     property alias fontDropdown: appearanceSection.fontDropdown
-    property alias wpDirDropdown: wallpaperDirRow.wpDirDropdown
-    property alias themeEditorPopup: themeEditorPopup
 
     property real gridAvailableWidth: Math.max(0, settingsCol.width - rootObj.s(24))
     property real tileWidth: Math.max(rootObj.s(80), (gridAvailableWidth - 2 * rootObj.s(10)) / 3)
@@ -14,24 +12,31 @@ ThemeTabState {
     onVisibleChanged: {
         if (!visible) {
             if (fontDropdown.isOpen) fontDropdown.closePopup();
-            if (wpDirDropdown.isOpen) wpDirDropdown.closePopup();
-            themeEditorPopup.close();
+            if (themeEditorLoader.item) themeEditorLoader.item.close();
         }
     }
 
-    ThemeEditor {
-        id: themeEditorPopup
-        rootObj: themeTabRoot.rootObj
-        tileWidth: themeTabRoot.tileWidth
-        onSaveRequested: function(themeObj) {
-            themeTabRoot.saveCustomTheme(themeObj);
-            themeTabRoot.applyPreset(themeObj);
+    function openThemeEditorForNew() {
+        themeEditorLoader.active = true;
+        themeEditorLoader.item.openForNew();
+    }
+
+    Loader {
+        id: themeEditorLoader
+        active: false
+        sourceComponent: ThemeEditor {
+            rootObj: themeTabRoot.rootObj
+            tileWidth: themeTabRoot.tileWidth
+            onSaveRequested: function(themeObj) {
+                themeTabRoot.saveCustomTheme(themeObj);
+                themeTabRoot.applyPreset(themeObj);
+            }
         }
     }
 
     Flickable {
         anchors.fill: parent
-        anchors.topMargin: rootObj.s(4)
+        anchors.topMargin: rootObj.s(8)
         anchors.leftMargin: rootObj.s(8)
         anchors.rightMargin: rootObj.s(8)
         anchors.bottomMargin: rootObj.s(4)
@@ -42,13 +47,8 @@ ThemeTabState {
 
         ColumnLayout {
             id: settingsCol
-            x: rootObj.s(6)
-            width: parent.width - rootObj.s(12)
+            width: parent.width
             spacing: rootObj.s(6)
-
-            ThemeWallpaperPreview { tab: themeTabRoot }
-
-            ThemeWallpaperDirRow { id: wallpaperDirRow; tab: themeTabRoot }
 
             ThemeAppearanceSection { id: appearanceSection; tab: themeTabRoot }
 

@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import "../"
 import "../../"
+import "../../lock/redactor"
 
 GuideTab {
     id: displayLockscreenRoot
@@ -14,7 +15,8 @@ GuideTab {
         "passwordMaxAttempts": 5,
         "fingerprintMaxAttempts": 5,
         "backgroundMode": "follow",
-        "customBackground": ""
+        "customBackground": "",
+        "promptBackdropMode": "desktop"
     })
 
     property var lockscreenSettings: {
@@ -27,6 +29,7 @@ GuideTab {
     property bool fingerprintSupported: false
     property string currentBackgroundMode: lockscreenSettings.backgroundMode === "custom" ? "custom" : "follow"
     property string currentCustomBackground: lockscreenSettings.customBackground ? String(lockscreenSettings.customBackground) : ""
+    property string currentPromptBackdropMode: lockscreenSettings.promptBackdropMode === "wallpaper" ? "wallpaper" : "desktop"
     readonly property string currentWallpaperPath: {
         Wallpaper.screenWallpaperPaths;
         return Wallpaper.getWallpaperPath("");
@@ -41,7 +44,7 @@ GuideTab {
 
     Process {
         id: fingerprintProbe
-        command: ["bash", (Caching.serpantinumDir ? Caching.serpantinumDir : "") + "/scripts/system/fingerprint_available.sh"]
+        command: ["serpantinum-core", "system", "fingerprint"]
         onExited: (exitCode) => displayLockscreenRoot.fingerprintSupported = exitCode === 0
     }
 
@@ -57,13 +60,18 @@ GuideTab {
         displayLockscreenRoot.updateLockscreenSetting("backgroundMode", mode);
     }
 
+    function setPromptBackdropMode(mode) {
+        displayLockscreenRoot.currentPromptBackdropMode = mode;
+        displayLockscreenRoot.updateLockscreenSetting("promptBackdropMode", mode);
+    }
+
     function setCustomBackground(path) {
         displayLockscreenRoot.currentCustomBackground = path;
         displayLockscreenRoot.updateLockscreenSetting("customBackground", path);
     }
 
     function openRedactor() {
-        Quickshell.execDetached(["quickshell", "-p", Caching.mainQml, "ipc", "call", "lock-redactor", "open", ""]);
+        LockLayoutStore.openRedactor("");
         if (rootObj && typeof rootObj.closePopup === "function") {
             rootObj.closePopup();
         } else {

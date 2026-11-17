@@ -60,13 +60,13 @@ PanelWindow {
             widget: masterWindow.currentActive,
             screen: sName
         });
-        Quickshell.execDetached(["bash", "-c", "echo '" + payload + "' > " + Caching.runDir + "/current_widget"]);
+        currentWidgetFile.setText(payload + "\n");
     }
 
-    Process {
-        id: startupResetProcess
-        command: ["bash", "-c", `[ -n "${Caching.runDir}" ] && echo '{"widget":"hidden","screen":""}' > "${Caching.runDir}/current_widget"`]
-        running: true
+    FileView {
+        id: currentWidgetFile
+        path: (typeof Caching !== "undefined" && Caching.runDir) ? (Caching.runDir + "/current_widget") : ""
+        blockWrites: true
     }
 
     Connections {
@@ -87,13 +87,30 @@ PanelWindow {
             NotificationManager.clearNotifications();
         }
 
+        function embeddedSettings(action: string, tab: string): void {
+            masterWindow.handleEmbeddedSettings(action || "toggle", tab || "");
+        }
+
         function handleCommand(cmd: string, targetWidget: string, arg: string): void {
             cmd = cmd || "";
             targetWidget = targetWidget || "";
             arg = arg || "";
 
-            if (cmd === "clearNotifications" || cmd === "clear_notifications" || cmd === "clearNotifs") {
+            if (cmd === "notifications" && targetWidget === "clear") {
                 NotificationManager.clearNotifications();
+                return;
+            }
+
+            let isSettingsCmd = cmd === "settings" || targetWidget === "settings";
+            let isGuideCmd = cmd === "guide" || targetWidget === "guide";
+            if (isSettingsCmd || isGuideCmd) {
+                if (isGuideCmd) {
+                    console.warn("'guide' is deprecated, use 'settings' instead");
+                }
+                let settingsAction = cmd === "close" ? "close" : (cmd === "open" ? "open" : "toggle");
+                let settingsTab = (cmd === "settings" || cmd === "guide") ? targetWidget : arg;
+                if (settingsTab === "settings" || settingsTab === "guide") settingsTab = "";
+                masterWindow.handleEmbeddedSettings(settingsAction, settingsTab);
                 return;
             }
 
@@ -123,7 +140,23 @@ PanelWindow {
                 return;
             }
 
-            if (cmd === "airplane" || targetWidget === "airplane" || cmd === "flight" || targetWidget === "flight") {
+            if (cmd === "calendar" || targetWidget === "calendar") {
+                if (cmd === "close") {
+                    DashboardController.hide();
+                } else {
+                    LauncherController.hide();
+                    ClipboardController.hide();
+                    if (masterWindow.targetActive !== "hidden") switchWidget("hidden", "");
+                    if (cmd === "open") {
+                        DashboardController.show();
+                    } else {
+                        DashboardController.toggle();
+                    }
+                }
+                return;
+            }
+
+            if (cmd === "network" && targetWidget === "airplane") {
                 let isAirplane = !Networking.wifiEnabled && !(Bluetooth.defaultAdapter && Bluetooth.defaultAdapter.enabled);
                 if (isAirplane) {
                     Networking.wifiEnabled = true;
@@ -135,7 +168,7 @@ PanelWindow {
                 return;
             }
 
-            if (cmd === "autohide" || targetWidget === "autohide") {
+            if (cmd === "bar" && targetWidget === "autohide") {
                 let bar = Config.getSetting("bar", {});
                 bar.autohide = !bar.autohide;
                 Config.setSetting("bar", bar);
@@ -145,6 +178,7 @@ PanelWindow {
             let effectivelyActive = masterWindow.targetActive;
 
             if (cmd === "close") {
+                DashboardController.hide();
                 if (typeof DockAppMenuController !== "undefined") {
                     DockAppMenuController.hide();
                 }
@@ -206,6 +240,26 @@ PanelWindow {
     property string barPosition: (rawBarSettings && rawBarSettings.position !== undefined) ? rawBarSettings.position : "top"
     property bool barAutohide: (rawBarSettings && rawBarSettings.autohide !== undefined) ? Boolean(rawBarSettings.autohide) : false
 
+    function handleEmbeddedSettings(action, tab) {
+        let isOpen = masterWindow.targetActive === "guide";
+        if (action === "close") {
+            if (isOpen) switchWidget("hidden", "");
+            return;
+        }
+        if (!isOpen) {
+            let t = getLayout("guide");
+            if (t) switchWidget("guide", tab);
+            return;
+        }
+        let item = widgetCache["guide"] || widgetStack.currentItem;
+        if (tab !== "" && (action === "open" || tab !== masterWindow.activeArg)) {
+            masterWindow.activeArg = tab;
+            if (item && item.gotoTab !== undefined) item.gotoTab(tab);
+        } else if (action === "toggle") {
+            switchWidget("hidden", "");
+        }
+    }
+
     readonly property bool isFullscreenActive: {
         try {
             if (typeof Hyprland !== "undefined" && Hyprland.focusedWorkspace) {
@@ -219,7 +273,7 @@ PanelWindow {
     readonly property bool screenReady: masterWindow.width >= 100 && masterWindow.height >= 100
     readonly property bool isCurrentDraggable: {
         let t = getLayout(masterWindow.currentActive);
-        return Boolean(t && t.draggable) || masterWindow.currentActive === "guide";
+        return Boolean(t && t.draggable);
     }
 
     Item {
@@ -341,15 +395,13 @@ PanelWindow {
             if (masterWindow.currentActive === "hidden") {
                 let t = masterWindow.getLayout("guide");
                 if (t) masterWindow.ensureWidgetItem("guide", t);
-                let w = masterWindow.getLayout("wallpaper");
-                if (w) masterWindow.ensureWidgetItem("wallpaper", w);
             }
         });
     }
 
     Component.onDestruction: {
         if (typeof Caching !== "undefined" && Caching.runDir) {
-            Quickshell.execDetached(["bash", "-c", "echo '{\"widget\":\"hidden\",\"screen\":\"\"}' > " + Caching.runDir + "/current_widget"]);
+            currentWidgetFile.setText("{\"widget\":\"hidden\",\"screen\":\"\"}\n");
         }
     }
 
@@ -447,9 +499,9 @@ PanelWindow {
                 adjusted.ry = Math.max(Math.round(6 * scale), result.ry - offsetAdjustment);
             } else if (bp === "bottom") {
                 adjusted.ry = Math.min(masterWindow.height - result.h - Math.round(6 * scale), result.ry + offsetAdjustment);
-            } else if (bp === "left" && name !== "calendar") {
+            } else if (bp === "left") {
                 adjusted.rx = Math.max(Math.round(6 * scale), result.rx - offsetAdjustment);
-            } else if (bp === "right" && name !== "calendar") {
+            } else if (bp === "right") {
                 adjusted.rx = Math.min(masterWindow.width - result.w - Math.round(6 * scale), result.rx + offsetAdjustment);
             }
 
@@ -619,6 +671,8 @@ PanelWindow {
     }
 
     function switchWidget(newWidget, arg) {
+        if (newWidget === "hidden" && masterWindow.isClosing) return;
+
         masterWindow.switchGeneration++;
         let gen = masterWindow.switchGeneration;
         masterWindow.targetActive = newWidget;
@@ -666,6 +720,7 @@ PanelWindow {
                 }
             }
         } else {
+            DashboardController.hide();
             masterWindow.isClosing = false;
             let targetScreen = resolveTargetScreen();
             if (targetScreen && masterWindow.screen !== targetScreen) {

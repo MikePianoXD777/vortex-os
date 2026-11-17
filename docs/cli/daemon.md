@@ -19,11 +19,11 @@ slug: /cli/daemon
 
 ### `start`
 
-- `serpantinumd start`: Start the desktop shell and background services (default command).
+- `serpantinumd start`: Start the desktop shell and background services, including the [audio engine](/audio) (default command).
 
 ### `stop`
 
-- `serpantinumd stop`: Stop the running daemon and all background shell processes (`focus_daemon.py`, `quickshell`).
+- `serpantinumd stop`: Stop the running daemon and all background shell processes (`serpantinum-core screentime track`, `quickshell`).
 
 ### `status`
 

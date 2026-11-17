@@ -79,26 +79,18 @@ Item {
 
     function sendNotification() {
         let serpDir = (typeof Caching !== "undefined" && Caching.serpantinumDir) ? Caching.serpantinumDir : "";
-        let guideDir = (typeof Caching !== "undefined") ? Caching.getCacheDir("guide") : "";
         let appName = I18n.t("updater.notification.app_name");
         let actionText = I18n.t("updater.notification.action_open_guide");
         let notifTitle = I18n.t("updater.notification.update_available_title", { "remote": root.remoteVersion });
         let notifBody = I18n.t("updater.notification.update_available_body", { "local": root.localVersion });
         let actionArg = "default=" + actionText;
 
-        let script = 'if command -v notify-send >/dev/null 2>&1; then ' +
-            'ACTION=$(notify-send -a "' + appName.replace(/"/g, '\\"') + '" ' +
-            '-i "software-update-available" ' +
-            '-A "' + actionArg.replace(/"/g, '\\"') + '" ' +
-            '"' + notifTitle.replace(/"/g, '\\"') + '" ' +
-            '"' + notifBody.replace(/"/g, '\\"') + '"); ' +
-            'if [ "$ACTION" = "default" ]; then ' +
-            'echo "about" > "' + guideDir + '/last_tab.txt"; ' +
-            'DIR="' + serpDir + '"; ' +
-            'if [ -n "$DIR" ] && [ -f "$DIR/scripts/qs_manager.sh" ]; then ' +
-            'bash "$DIR/scripts/qs_manager.sh" toggle guide; ' +
-            'fi; fi; fi';
-        Quickshell.execDetached(["bash", "-c", script]);
+        let script = 'command -v serpantinum-core >/dev/null 2>&1 || exit 0; ' +
+            'ACTION=$(serpantinum-core notify --app "$1" --icon software-update-available --action "$2" -- "$3" "$4"); ' +
+            'if [ "$ACTION" = "default" ] && [ -n "$5" ] && [ -f "$5/scripts/settings.sh" ]; then ' +
+            'bash "$5/scripts/settings.sh" open about; ' +
+            'fi';
+        Quickshell.execDetached(["bash", "-c", script, "_", appName, actionArg, notifTitle, notifBody, serpDir]);
     }
 
     function checkUpdate() {

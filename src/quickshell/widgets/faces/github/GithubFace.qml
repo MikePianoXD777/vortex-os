@@ -239,9 +239,7 @@ Item {
     }
 
     function saveUsername(user) {
-        userSaveProcess.pendingUser = user;
-        userSaveProcess.running = false;
-        userSaveProcess.running = true;
+        userFile.setText(user);
     }
 
     function loadUser(user, forceFetch) {
@@ -262,8 +260,9 @@ Item {
     function readCacheForYear(user, year) {
         cacheReadProcess.targetUser = user;
         cacheReadProcess.targetYear = year;
-        cacheReadProcess.running = false;
-        cacheReadProcess.running = true;
+        let cacheFile = root.cacheFilePath(user, year);
+        if (cacheReadProcess.path === cacheFile) cacheReadProcess.reload();
+        else cacheReadProcess.path = cacheFile;
     }
 
     function saveCachedData(user, year, list, totalVal) {
@@ -274,11 +273,8 @@ Item {
                 total: totalVal,
                 contributions: list
             };
-            cacheSaveProcess.targetUser = user;
-            cacheSaveProcess.targetYear = year;
-            cacheSaveProcess.jsonData = JSON.stringify(obj);
-            cacheSaveProcess.running = false;
-            cacheSaveProcess.running = true;
+            cacheSaveProcess.path = root.cacheFilePath(user, year);
+            cacheSaveProcess.setText(JSON.stringify(obj));
         } catch(e) {}
     }
 
@@ -390,92 +386,70 @@ Item {
         xhr.send();
     }
 
-    Process {
-        id: userReadProcess
-        command: [
-            "bash",
-            "-c",
-            'FILE="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/github/user.txt"; if [ -f "$FILE" ]; then cat "$FILE"; fi'
-        ]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let u = this.text.trim();
-                if (u !== "") {
-                    root.loadUser(u, false);
-                } else if (typeof SystemInfo !== "undefined" && SystemInfo.username !== "") {
-                    root.loadUser(SystemInfo.username, false);
-                }
+    FileView {
+        id: userFile
+        printErrors: false
+        property bool restored: false
+
+        function restore(raw) {
+            if (restored) return;
+            restored = true;
+            let u = raw.trim();
+            if (u !== "") {
+                root.loadUser(u, false);
+            } else if (typeof SystemInfo !== "undefined" && SystemInfo.username !== "") {
+                root.loadUser(SystemInfo.username, false);
             }
         }
+
+        onLoaded: restore(text())
+        onLoadFailed: restore("")
     }
 
-    Process {
-        id: userSaveProcess
-        property string pendingUser: ""
-        command: [
-            "bash",
-            "-c",
-            'DIR="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/github"; mkdir -p "$DIR"; printf "%s" "$1" > "$DIR/user.txt"',
-            "--",
-            pendingUser
-        ]
-        running: false
-    }
-
-    Process {
+    FileView {
         id: cacheReadProcess
+        printErrors: false
         property string targetUser: ""
         property int targetYear: root.currentYear
-        command: [
-            "bash",
-            "-c",
-            'FILE="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/github/${1}_${2}.json"; if [ -f "$FILE" ] && [ -s "$FILE" ]; then cat "$FILE"; else echo "CACHE_MISS"; fi',
-            "--",
-            targetUser,
-            targetYear.toString()
-        ]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let content = this.text.trim();
-                let u = cacheReadProcess.targetUser;
-                let yr = cacheReadProcess.targetYear;
-                if (u !== root.username || yr !== root.selectedYear) return;
 
-                if (content !== "" && content !== "CACHE_MISS") {
-                    try {
-                        let parsed = JSON.parse(content);
-                        if (parsed && parsed.contributions && parsed.contributions.length > 0) {
-                            root.processContributions(parsed.contributions, parsed.total);
-                            return;
-                        }
-                    } catch(e) {}
-                }
-                root.fetchContributions(u, yr);
+        function handleRead(raw) {
+            let content = raw.trim();
+            let u = cacheReadProcess.targetUser;
+            let yr = cacheReadProcess.targetYear;
+            if (u !== root.username || yr !== root.selectedYear) return;
+
+            if (content !== "") {
+                try {
+                    let parsed = JSON.parse(content);
+                    if (parsed && parsed.contributions && parsed.contributions.length > 0) {
+                        root.processContributions(parsed.contributions, parsed.total);
+                        return;
+                    }
+                } catch(e) {}
             }
+            root.fetchContributions(u, yr);
         }
+
+        onLoaded: handleRead(text())
+        onLoadFailed: handleRead("")
     }
 
-    Process {
+    FileView {
         id: cacheSaveProcess
-        property string targetUser: ""
-        property int targetYear: root.currentYear
-        property string jsonData: ""
-        command: [
-            "bash",
-            "-c",
-            'DIR="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/github"; mkdir -p "$DIR"; printf "%s" "$3" > "$DIR/${1}_${2}.json"',
-            "--",
-            targetUser,
-            targetYear.toString(),
-            jsonData
-        ]
-        running: false
+        printErrors: false
+        preload: false
+    }
+
+    function cacheDirPath() {
+        return (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/serpantinum/github";
+    }
+
+    function cacheFilePath(user, year) {
+        return root.cacheDirPath() + "/" + String(user).replace(/[^A-Za-z0-9_.-]/g, "_") + "_" + year + ".json";
     }
 
     Component.onCompleted: {
-        userReadProcess.running = true;
+        userFile.path = root.cacheDirPath() + "/user.txt";
     }
 
     TextMetrics {
@@ -623,8 +597,6 @@ Item {
                         anchors.fill: parent
                         radius: ThemeBackend.borderRadius > 0 ? Math.min(ThemeBackend.borderRadius, Scaler.s(6)) : Scaler.s(6)
                         color: "transparent"
-                        border.width: 1.5
-                        border.color: ThemeBackend.surface1
                         visible: root.isEditingUser
                         z: 10
                     }
@@ -799,7 +771,7 @@ Item {
                                             height: root.cellSize
                                             radius: Math.max(2, Math.min(Scaler.s(4), Math.round(root.cellSize * 0.22)))
                                             color: cellBox.dayObj === null ? "transparent" : (tileMa.pressed ? Qt.darker(cellBox.baseColor, 1.12) : (cellBox.isHovered ? Qt.lighter(cellBox.baseColor, 1.12) : cellBox.baseColor))
-                                            Behavior on color { ColorAnimation { duration: 180 } }
+                                            Behavior on color { ColorAnimation { duration: 150 } }
 
                                             scale: (cellBox.dayObj === null ? 1.0 : (tileMa.pressed ? 1.08 : (cellBox.isHovered ? 1.04 : 1.0))) * cellBox.popScale
                                             Behavior on scale {
@@ -822,7 +794,7 @@ Item {
                                                     target: cellBox
                                                     property: "popScale"
                                                     to: 1.0
-                                                    duration: 420
+                                                    duration: 400
                                                     easing.type: Easing.OutQuint
                                                 }
                                             }
@@ -887,7 +859,7 @@ Item {
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        font.family: "Iosevka Nerd Font"
+                        font.family: ThemeBackend.iconFont
                         font.pixelSize: Scaler.s(22)
                         color: root.hasError ? ThemeBackend.red : ThemeBackend.subtext0
                         text: root.hasError ? "󰅚" : (root.loading ? "󰑓" : "󰊤")

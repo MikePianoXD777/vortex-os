@@ -9,7 +9,7 @@ slug: /overview
 
 ![Serpantinum Banner](./assets/banner.png)
 
-**Serpantinum** is a modern Wayland desktop shell designed to be aesthetic, performant, and effortless to use. Originally created by ilyamiro after his `nixos-configuration` project gained popularity, it has evolved into a dedicated desktop shell.
+**Serpantinum** is a Wayland desktop shell. It started as ilyamiro's `nixos-configuration` dotfiles and became a dedicated shell.
 
 ## Compositor configuration
 
@@ -22,9 +22,17 @@ Compositor guides:
 - [Sway](./configure/compositors/sway.md)
 - [Mango](./configure/compositors/mango.md)
 
+## App theming
+
+Recolor GTK, Qt, terminals, editors and other apps with the shell palette: [App theming](./configure/AppTheming.md).
+
 ## Installation
 
-Choose your operating system to get started:
-
-- [Arch Linux, Fedora, and derivatives](./installation/installation.md)
+- [Arch Linux, Fedora, Void Linux, and derivatives](./installation/installation.md)
 - [NixOS](./installation/nixos/flake.md)
+
+## Components
+
+- [serpantinum-audio](./components/serpantinum-audio.md)
+- [serpantinum-core](./components/serpantinum-core.md)
+- [serpantinum-gamma](./components/serpantinum-gamma.md)

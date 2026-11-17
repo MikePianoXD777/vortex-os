@@ -60,6 +60,9 @@ Item {
     readonly property string infoMode: readValue("mediaInfoMode", "mediaInfoMode", "duration")
     readonly property real configuredWidth: Number(readValue("mediaWidth", "mediaWidth", 120))
     readonly property bool showControls: readBool("mediaShowControls", "mediaShowControls")
+    readonly property bool hideWhenIdle: Boolean(readValue("mediaHideWhenIdle", "mediaHideWhenIdle", false))
+    readonly property bool idleHidden: hideWhenIdle && !isPreview && !isMediaActive
+    readonly property bool isFaceVisible: !idleHidden
     readonly property bool showIcon: isVertical ? (readBool("mediaShowIcon", "mediaShowIcon") || !showControls) : readBool("mediaShowIcon", "mediaShowIcon")
 
     property var player: MprisController.activePlayer
@@ -125,6 +128,7 @@ Item {
 
     property real targetLength: {
         if (module && !module.moduleActive) return 0;
+        if (idleHidden) return 0;
         if (isVertical) return baseHeight;
         let iconW = 0;
         if (showIcon) {
@@ -197,8 +201,6 @@ Item {
                                 height: barWindow ? barWindow.cs(root.isCompact ? 26 : 28) : (root.isCompact ? 26 : 28)
                                 radius: barWindow ? barWindow.cs(root.isCompact ? 9 : 10) : (root.isCompact ? 9 : 10)
                                 color: mediaThumbGlass.active ? "transparent" : (root.isCompact ? Qt.lighter(ThemeBackend.surface1, 1.1) : ThemeBackend.surface1)
-                                border.width: mediaThumbGlass.active && !root.isPlaying ? 0 : 1
-                                border.color: root.isPlaying ? ThemeBackend.mauve : (root.isCompact ? ThemeBackend.surface2 : ThemeBackend.surface1)
                                 clip: !mediaThumbGlass.active
                                 anchors.verticalCenter: parent.verticalCenter
 
@@ -213,13 +215,13 @@ Item {
                                 Text {
                                     anchors.centerIn: parent
                                     text: "󰎈"
-                                    font.family: ThemeBackend.fontFamily
+                                    font.family: ThemeBackend.iconFont
                                     font.pixelSize: barWindow ? barWindow.cs(root.isCompact ? 13 : 14) : (root.isCompact ? 13 : 14)
                                     color: root.isCompact ? ThemeBackend.text : ThemeBackend.subtext0
                                     visible: !root.hasArt
                                 }
 
-                                Image {
+                                BoundedImage {
                                     id: mediaArtImg
                                     anchors.fill: parent
                                     source: root.hasArt ? (MprisController.artUrl.startsWith("file://") || MprisController.artUrl.startsWith("http") ? MprisController.artUrl : "file://" + MprisController.artUrl) : ""
@@ -384,8 +386,6 @@ Item {
                     height: barWindow ? barWindow.cs(root.isCompact ? 26 : 28) : (root.isCompact ? 26 : 28)
                     radius: barWindow ? barWindow.cs(root.isCompact ? 7 : 8) : (root.isCompact ? 7 : 8)
                     color: sideThumbGlass.active ? "transparent" : (root.isCompact ? Qt.lighter(ThemeBackend.surface1, 1.1) : ThemeBackend.surface1)
-                    border.width: sideThumbGlass.active && !(isMediaActive && isPlaying) ? 0 : 1
-                    border.color: (isMediaActive && isPlaying) ? ThemeBackend.mauve : (root.isCompact ? ThemeBackend.surface2 : ThemeBackend.surface1)
                     clip: !sideThumbGlass.active
 
                     GlassFill {
@@ -405,7 +405,7 @@ Item {
                         visible: !isMediaActive || root.activeArtUrl === ""
                     }
 
-                    Image {
+                    BoundedImage {
                         id: sideArtImg
                         anchors.fill: parent
                         source: isMediaActive ? root.activeArtUrl : ""
