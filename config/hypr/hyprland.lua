@@ -79,7 +79,15 @@ local function comando_shell()
 end
 if ok_atajos then atajos.comando_shell = comando_shell end
 
+-- Serpantinum 2.5 fija QT_QPA_PLATFORMTHEME=qt6ct para todas las apps Qt; Vortex no instala qt6ct (los
+-- iconos del shell salen de QS_ICON_THEME, más abajo), así que esa variable se deja como esté.
+local env_original = hl.env
+hl.env = function(nombre, valor)
+    if nombre == "QT_QPA_PLATFORMTHEME" then return end
+    return env_original(nombre, valor)
+end
 require("config/env")
+hl.env = env_original
 -- No se carga config/autostart: activa EasyEffects en cada inicio de sesión.
 hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")

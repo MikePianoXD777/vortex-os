@@ -258,7 +258,7 @@ for _, par in ipairs(fuera) do
 end
 ok("los paneles de Serpantinum que no chocaban siguen (Super+B, Super+H)",
     binds[normalizar("SUPER + B")] and binds[normalizar("SUPER + H")])
-ok("Bloq Mayús / Bloq Num siguen avisando al shell", (binds[normalizar("Caps_Lock")] or ""):find("serpantinum:locks", 1, true))
+-- (Serpantinum 2.5 ya no usa el evento «serpantinum:locks»: el aviso de Bloq Mayús / Bloq Num lo da serpantinum-core.)
 
 ---------------------------------------------------------------------------------------------
 -- Lógica de las funciones

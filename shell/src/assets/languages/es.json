@@ -281,6 +281,12 @@
           "dont_show": "No volver a mostrar",
           "apply": "Aplicar",
           "cancel": "Cancelar"
+        },
+        "import": {
+          "button": "Importar",
+          "desc": "Agrega un preajuste desde un archivo JSON",
+          "picker": "Elegir archivo de preajuste",
+          "title": "Importar preajuste"
         }
       },
       "claude": {
@@ -492,6 +498,14 @@
         "app_icons": {
           "title": "Íconos de las apps",
           "desc": "Muestra los íconos de las apps abiertas en cada escritorio (estilo «pills»)"
+        },
+        "monitor_count": {
+          "desc": "Escritorios que le tocan a este monitor"
+        },
+        "per_monitor": {
+          "desc": "Solo en Hyprland. Numera los escritorios desde 1 en cada monitor y elige cuántos le tocan a cada uno",
+          "title": "Numeración por monitor",
+          "unavailable": "Solo disponible en Hyprland"
         }
       },
       "style": {
@@ -1038,7 +1052,18 @@
       "limit_overlay": {
         "title": "Límite diario alcanzado",
         "hold": "Mantén pulsado para continuar"
-      }
+      },
+      "day": "Día",
+      "less": "Menos",
+      "less_than_prev": "{time} menos que el día anterior",
+      "limit_progress": "{used} de {limit} de límite diario",
+      "limit_reached": "Llegaste al límite diario de {limit}",
+      "more": "Más",
+      "more_than_prev": "{time} más que el día anterior",
+      "peak_hour": "Hora pico",
+      "same_as_prev": "Igual que el día anterior",
+      "week": "Semana",
+      "week_total": "Total de la semana"
     },
     "update_available": "Actualización disponible",
     "autostart": {
@@ -1303,6 +1328,10 @@
         "end": {
           "title": "Fin de horas de silencio",
           "desc": "Hora local, de 0 a 23"
+        },
+        "range": {
+          "desc": "Arrastra los controles para elegir cuándo se frenan los avisos",
+          "title": "Horas de silencio"
         }
       },
       "kinds": {
@@ -1616,6 +1645,9 @@
         "badge": "Captura de pantalla",
         "fallback_summary": "Pantalla capturada",
         "click_to_open": "Haz clic para abrir la carpeta de capturas"
+      },
+      "battery": {
+        "title": "Batería"
       }
     }
   },
@@ -2016,7 +2048,8 @@
       "textContent": "Texto",
       "lineThickness": "Grosor",
       "usageStyle": "Estilo",
-      "visualizerStyle": "Estilo del visualizador"
+      "visualizerStyle": "Estilo del visualizador",
+      "hideText": "Ocultar texto"
     },
     "align": {
       "left": "Izquierda",
@@ -2800,5 +2833,8 @@
     "saved_obsidian": "Se guardan en tu Obsidian (Tareas.md)",
     "saved_file": "Se guardan en Documentos/Tareas.md",
     "open": "Abrir"
+  },
+  "common": {
+    "select": "Seleccionar..."
   }
 }

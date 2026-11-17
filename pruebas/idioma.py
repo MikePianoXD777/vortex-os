@@ -36,7 +36,7 @@ def main() -> int:
     usadas: dict[str, str] = {}
     for qml in sorted((RAIZ / "quickshell").rglob("*.qml")):
         for clave in LLAMADA.findall(qml.read_text(encoding="utf-8")):
-            if not clave.endswith("."):
+            if not clave.endswith((".", "_")):
                 usadas.setdefault(clave, str(qml.relative_to(RAIZ)))
     fallos = 0
     for idioma, textos in idiomas.items():
