@@ -169,7 +169,7 @@ borrar() {
   echo "Olvidé «$nombre»."
 }
 
-slug() { echo "$1" | iconv -f utf8 -t ascii//TRANSLIT 2>/dev/null | tr -cs 'A-Za-z0-9' '-' | sed 's/^-//; s/-$//' | tr 'A-Z' 'a-z'; }
+slug() { echo "$1" | LC_ALL=C.UTF-8 sed 'y/áéíóúüñÁÉÍÓÚÜÑ/aeiouunAEIOUUN/' | LC_ALL=C tr -cs 'A-Za-z0-9' '-' | sed 's/^-//; s/-$//' | LC_ALL=C tr 'A-Z' 'a-z'; }
 
 # Las entradas del lanzador: «Guardar sesión de trabajo» y una «Sesión: X» por cada guardada. Las de sesiones
 # borradas se quitan.

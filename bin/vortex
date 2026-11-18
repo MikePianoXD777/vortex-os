@@ -29,6 +29,7 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  guardados lista|restaurar            copias de tus partidas guardadas (se hacen solas al abrir un juego)
   sesiones guardar|abrir|lista|borrar  sesiones de trabajo: guarda las apps abiertas y su escritorio y las vuelve a abrir
   jugando                              sale con 0 si hay una partida o algo en pantalla completa (lo usan las tareas solas)
   modo-ia on|off|alternar|estado       el hermano del modo juego para la IA local: apaga los efectos y
@@ -1030,7 +1031,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-sesiones vortex-ia vortex-qr vortex-dictar vortex-bt-agente)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-sesiones vortex-guardados vortex-ia vortex-qr vortex-dictar vortex-bt-agente)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -2212,6 +2213,7 @@ case "${1:-ayuda}" in
   runner | exe) shift; exec "$VORTEX_DIR/bin/vortex-exe" "$@" ;;
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
+  guardados) shift; exec "$VORTEX_DIR/bin/vortex-guardados" "$@" ;;
   sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   reiniciar-shell) reiniciar_shell ;;
   arreglar) shift

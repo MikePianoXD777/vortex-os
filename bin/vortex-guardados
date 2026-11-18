@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# vortex-guardados (4.0): el respaldo de tus partidas guardadas. Un juego que se corrompe, un Proton que se
+# actualiza mal o un borrado sin querer se llevan horas de partida; aquí cada vez que abres un juego se hace una
+# copia de sus guardados, sin que tengas que acordarte ni configurar nada.
+#
+#   vortex-guardados antes CLASE [PID]   la copia de un juego que se abre (la llama vortex-gestor al empezar un
+#                                        juego, en segundo plano y con la prioridad más baja; sin avisos)
+#   vortex-guardados lista               los juegos con copias, y cuántas
+#   vortex-guardados restaurar [JUEGO [N]]  devuelve una copia (la más nueva, o la N de «lista»); sin JUEGO,
+#                                        lo elige con una ventana. Antes guarda lo que tienes ahora.
+#
+# Qué se copia: los guardados de Proton/Wine (Documentos, Saved Games y AppData del prefijo del juego: Steam,
+# Heroic, Lutris), la nube de Steam y las carpetas conocidas de algunos juegos de Linux. Solo se copia si
+# algo cambió desde la última copia, y se guardan las últimas 5 de cada juego. Si los guardados de un juego
+# pasan de 500 MB no se respaldan (casi siempre son cachés, no partidas).
+set -uo pipefail
+
+DESTINO="${VORTEX_GUARDADOS_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/vortex/partidas-guardadas}"
+STEAM="${VORTEX_STEAM:-$HOME/.local/share/Steam}"
+PROC="${VORTEX_PROC:-/proc}"
+COPIAS="${VORTEX_GUARDADOS_COPIAS:-5}"
+LIMITE_MB="${VORTEX_GUARDADOS_LIMITE_MB:-500}"
+MIN_ENTRE_COPIAS="${VORTEX_GUARDADOS_MINUTOS:-60}"   # abrir y cerrar un juego a cada rato no llena el disco
+
+aviso() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" -i document-revert "$@" 2>/dev/null; return 0; }
+dec() { echo "$*" >&2; }
+slug() { echo "$1" | LC_ALL=C.UTF-8 sed 'y/áéíóúüñÁÉÍÓÚÜÑ/aeiouunAEIOUUN/' | LC_ALL=C tr -cs 'A-Za-z0-9' '-' | sed 's/^-//; s/-$//' | LC_ALL=C tr 'A-Z' 'a-z'; }
+
+# Las bibliotecas de Steam (la de siempre y las que diga libraryfolders.vdf)
+bibliotecas() {
+  echo "$STEAM"
+  sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"$/\1/p' "$STEAM/steamapps/libraryfolders.vdf" 2>/dev/null
+}
+
+nombre_steam() { # APPID → el nombre del juego, o nada
+  local b f
+  while read -r b; do
+    f="$b/steamapps/appmanifest_$1.acf"
+    [[ -r "$f" ]] && { sed -n 's/^[[:space:]]*"name"[[:space:]]*"\(.*\)"$/\1/p' "$f" | head -n1; return 0; }
+  done < <(bibliotecas)
+  return 1
+}
+
+# Una variable del entorno de un proceso (los juegos de Proton y Wine llevan WINEPREFIX y el id de Steam)
+entorno_de() { # PID VARIABLE
+  [[ "$1" =~ ^[0-9]+$ ]] && ((${1:-0} > 1)) || return 1
+  tr '\0' '\n' <"$PROC/$1/environ" 2>/dev/null | sed -n "s/^$2=//p" | head -n1
+}
+
+# Carpetas de guardados de algunos juegos de Linux, por su clase de ventana (en minúsculas)
+conocidas() { # CLASE
+  case "${1,,}" in
+    terraria* | *terraria) echo "$HOME/.local/share/Terraria" ;;
+    stardewvalley* | stardew*) echo "$HOME/.config/StardewValley" ;;
+    minecraft* | *minecraft*) echo "$HOME/.minecraft/saves" ;;
+    factorio) echo "$HOME/.factorio/saves" ;;
+    hollow*knight*) echo "$HOME/.config/unity3d/Team Cherry/Hollow Knight" ;;
+  esac
+}
+
+# Las carpetas que valen la pena de un prefijo de Wine, una por línea
+dentro_de_prefijo() { # PREFIJO (la carpeta «pfx» o el WINEPREFIX)
+  local u d sub
+  for u in "$1"/drive_c/users/*/; do
+    [[ -d "$u" ]] || continue
+    [[ "$u" == */Public/ || "$u" == */Default/ ]] && continue
+    for sub in Documents "My Documents" "Saved Games" "AppData/Roaming" "AppData/LocalLow" "AppData/Local"; do
+      d="${u}${sub}"
+      [[ -d "$d" ]] && echo "$d"
+    done
+  done
+}
+
+# Un id → los guardados de ese juego: prefijo de Proton y nube de Steam
+carpetas_steam() { # APPID
+  local b u
+  while read -r b; do
+    [[ -d "$b/steamapps/compatdata/$1/pfx" ]] && dentro_de_prefijo "$b/steamapps/compatdata/$1/pfx"
+  done < <(bibliotecas)
+  for u in "$STEAM"/userdata/*/"$1"/remote; do
+    [[ -d "$u" ]] && echo "$u"
+  done
+}
+
+# La huella de lo que hay: nombre, tamaño y fecha de cada archivo. Si es igual a la de la última copia, no se copia.
+huella() { # CARPETAS...
+  local c
+  for c in "$@"; do find "$c" -type f -printf '%p %s %T@\n' 2>/dev/null; done | LC_ALL=C sort | sha256sum | cut -c1-32
+}
+
+copiar() { # NOMBRE ID_SEGURO CARPETAS...
+  local nombre="$1" id="$2"
+  shift 2
+  local dir="$DESTINO/$id" h ultimo tmp
+  mkdir -p "$dir"
+  [[ -e "$dir/.grande" ]] && return 0
+  h="$(huella "$@")"
+  [[ "$h" == "$(cat "$dir/.huella" 2>/dev/null)" ]] && return 0
+  if [[ -n "$(find "$dir" -maxdepth 1 -name '*.tar.gz' -mmin -"$MIN_ENTRE_COPIAS" 2>/dev/null)" ]]; then return 0; fi
+  printf '%s' "$nombre" >"$dir/.nombre"
+  tmp="$dir/.nueva.$$.tar.gz"
+  # Rutas desde la raíz (sin la «/»): al restaurar, cada cosa vuelve a su sitio.
+  if ! tar -C / -czf "$tmp" \
+    --exclude='*/[Cc]ache*' --exclude='*/GPUCache' --exclude='*/[Ss]hader[Cc]ache*' --exclude='*/Crashes' \
+    --exclude='*/Temp' --exclude='*/Microsoft' --exclude='*/Packages' --exclude='*/CrashDumps' \
+    "${@#/}" 2>/dev/null; then
+    # tar sale con error si un archivo cambió mientras se leía; si dejó algo usable, sirve
+    [[ -s "$tmp" ]] || { rm -f "$tmp"; return 0; }
+  fi
+  if (($(stat -c %s "$tmp") > LIMITE_MB * 1024 * 1024)); then
+    rm -f "$tmp"
+    : >"$dir/.grande"
+    return 0
+  fi
+  ultimo="$dir/$(date +%Y-%m-%d_%H-%M-%S).tar.gz"
+  [[ -e "$ultimo" ]] && ultimo="$dir/$(date +%Y-%m-%d_%H-%M-%S)-$$.tar.gz"   # dos copias en el mismo segundo
+  mv -f "$tmp" "$ultimo"
+  printf '%s' "$h" >"$dir/.huella"
+  printf '%s\n' "$@" >"${ultimo%.tar.gz}.carpetas"
+  # Solo se guardan las últimas COPIAS
+  # shellcheck disable=SC2012
+  ls -1t "$dir"/*.tar.gz 2>/dev/null | tail -n +$((COPIAS + 1)) | while read -r viejo; do
+    rm -f "$viejo" "${viejo%.tar.gz}.carpetas"
+  done
+}
+
+antes() {
+  local clase="${1:-}" pid="${2:-0}" id="" nombre="" prefijo="" c
+  local -a carpetas=()
+  [[ -n "$clase" ]] || return 0
+  if [[ "$clase" =~ ^steam_app_([0-9]+)$ ]]; then
+    id="${BASH_REMATCH[1]}"
+  else
+    id="$(entorno_de "$pid" SteamAppId)"
+    [[ "$id" =~ ^[0-9]+$ && "$id" != 0 ]] || id=""
+  fi
+  if [[ -n "$id" ]]; then
+    nombre="$(nombre_steam "$id")" || nombre=""
+    while read -r c; do [[ -n "$c" ]] && carpetas+=("$c"); done < <(carpetas_steam "$id")
+  fi
+  # Heroic, Lutris, Bottles…: el prefijo de Wine en el entorno del juego
+  if ((${#carpetas[@]} == 0)); then
+    prefijo="$(entorno_de "$pid" WINEPREFIX)"
+    if [[ -n "$prefijo" && -d "$prefijo" ]]; then
+      while read -r c; do [[ -n "$c" ]] && carpetas+=("$c"); done < <(dentro_de_prefijo "$prefijo")
+      [[ -n "$nombre" ]] || nombre="$(basename "$(dirname "${prefijo%/pfx}/x")")"
+    fi
+  fi
+  c="$(conocidas "$clase")"
+  [[ -n "$c" && -d "$c" ]] && carpetas+=("$c")
+  ((${#carpetas[@]})) || return 0
+  [[ -n "$nombre" ]] || nombre="$clase"
+  command -v nice >/dev/null && command -v ionice >/dev/null && {
+    # Sin romper la partida que empieza: la prioridad más baja, de CPU y de disco.
+    ionice -c3 -p $$ >/dev/null 2>&1 || true
+    renice -n 19 -p $$ >/dev/null 2>&1 || true
+  }
+  copiar "$nombre" "$(slug "$nombre")${id:+-$id}" "${carpetas[@]}"
+}
+
+lista() {
+  local d n k
+  [[ -d "$DESTINO" ]] || { echo "Todavía no hay copias: se hacen solas cuando abres un juego."; return 0; }
+  for d in "$DESTINO"/*/; do
+    [[ -d "$d" ]] || continue
+    k="$(ls -1 "$d"*.tar.gz 2>/dev/null | wc -l)"
+    ((k)) || continue
+    n="$(cat "$d/.nombre" 2>/dev/null)"
+    printf '%s  (%s copias; la última: %s)\n' "${n:-$(basename "$d")}" "$k" "$(ls -1t "$d"*.tar.gz | head -n1 | sed 's/.*\/\([0-9-]*\)_\([0-9]*\)-\([0-9]*\)-.*/\1 \2:\3/')"
+  done
+}
+
+# La carpeta de un juego por su nombre (o parte de él)
+buscar() { # TEXTO
+  local d n
+  for d in "$DESTINO"/*/; do
+    n="$(cat "$d/.nombre" 2>/dev/null)"
+    [[ "${n,,}" == *"${1,,}"* || "$(basename "$d")" == *"${1,,}"* ]] && { echo "${d%/}"; return 0; }
+  done
+  return 1
+}
+
+restaurar() {
+  local juego="${1:-}" n="${2:-1}" dir copia carpetas
+  if [[ -z "$juego" ]]; then
+    command -v zenity >/dev/null || { dec "Dime el juego: vortex-guardados restaurar «Hades»  (los que hay: vortex-guardados lista)"; return 2; }
+    local -a opciones=()
+    local d
+    for d in "$DESTINO"/*/; do
+      [[ -f "$d/.nombre" ]] && opciones+=("$(cat "$d/.nombre")")
+    done
+    ((${#opciones[@]})) || { dec "Todavía no hay copias."; return 1; }
+    juego="$(zenity --list --title="Restaurar partidas guardadas" --text="¿De qué juego quieres volver a tus partidas?" \
+      --column="Juego" "${opciones[@]}" 2>/dev/null)" || return 0
+    [[ -n "$juego" ]] || return 0
+  fi
+  dir="$(buscar "$juego")" || { dec "No tengo copias de «$juego». Los que hay: vortex-guardados lista"; return 1; }
+  # shellcheck disable=SC2012
+  copia="$(ls -1t "$dir"/*.tar.gz 2>/dev/null | sed -n "${n}p")"
+  [[ -n "$copia" ]] || { dec "No hay una copia número $n de «$juego»."; return 1; }
+  # Con el juego abierto, el juego pisaría lo restaurado al cerrar.
+  if command -v vortex >/dev/null && vortex jugando; then
+    dec "Estás jugando: cierra el juego y vuelve a intentarlo, o lo que restaure se perdería al cerrarlo."
+    return 1
+  fi
+  carpetas="${copia%.tar.gz}.carpetas"
+  # Se aparta la copia elegida: al guardar «lo de ahora» la rotación podría borrarla.
+  local elegida
+  elegida="$(mktemp "${TMPDIR:-/tmp}/vortex-guardados.XXXXXX")" || return 1
+  cp -f "$copia" "$elegida"
+  # Antes de pisar nada, lo que tienes ahora queda guardado como una copia más (por si te arrepientes).
+  if [[ -f "$carpetas" ]]; then
+    local -a actuales=()
+    mapfile -t actuales <"$carpetas"
+    (VORTEX_GUARDADOS_MINUTOS=0 copiar "$(cat "$dir/.nombre")" "$(basename "$dir")" "${actuales[@]}") || true
+  fi
+  if ! tar -C / -xzf "$elegida"; then
+    unlink "$elegida"
+    dec "No pude abrir la copia."
+    return 1
+  fi
+  unlink "$elegida"
+  echo "Listo: devolví tus partidas de «$(cat "$dir/.nombre")» a como estaban el $(basename "$copia" .tar.gz | sed 's/_/ a las /; s/-\([0-9][0-9]\)-\([0-9][0-9]\)$/:\1:\2/')."
+  aviso "Partidas restauradas" "Tus guardados de «$(cat "$dir/.nombre")» volvieron a como estaban. Lo que tenías antes quedó como otra copia, por si te arrepientes."
+}
+
+orden="${1:-}"
+shift || true
+case "$orden" in
+  antes) antes "$@" ;;
+  lista | "") lista ;;
+  restaurar) restaurar "$@" ;;
+  *) echo "uso: vortex-guardados antes CLASE [PID] | lista | restaurar [JUEGO [N]]" >&2; exit 2 ;;
+esac

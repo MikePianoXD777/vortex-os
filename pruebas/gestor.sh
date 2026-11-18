@@ -246,13 +246,17 @@ gestor() {
   env -u HYPRLAND_INSTANCE_SIGNATURE XDG_RUNTIME_DIR="$RUN" XDG_STATE_HOME="$T/estado" XDG_CONFIG_HOME="$T/conf" \
     VORTEX_GESTOR_PROC="$P" VORTEX_GESTOR_CGROOT="$CGR" VORTEX_GESTOR_SCX="$T/scx" VORTEX_GESTOR_PSI="$T/psi" \
     VORTEX_GESTOR_EVENTOS="$T/eventos" VORTEX_GESTOR_BUSCTL="$T/busctl" VORTEX_GESTOR_RENICE="$T/renice" \
-    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" \
+    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" VORTEX_GESTOR_GUARDADOS="$T/guardados" VORTEX_GESTOR_DISCO="$T/disco-falso" \
     VORTEX_GESTOR_NVIDIA_SMI="$T/nvidia-smi" VORTEX_GESTOR_IA="$T/vortex-ia" \
     "$AQUI/bin/vortex-gestor" >"$T/gestor.log" 2>&1 7>&- 8>&- &
   GESTOR=$!
   PIDS_FONDO+=("$GESTOR")
 }
 # El aviso al abrir un juego (--juego, 3.0) se anota aparte: no es el de quedarse sin memoria.
+# La copia de las partidas guardadas (4.0) y el aviso de disco: de mentira
+printf '#!/bin/sh\necho "$*" >>"%s/guardados-llamado"\n' "$T" >"$T/guardados"
+printf '#!/bin/sh\nexit 0\n' >"$T/disco-falso"
+chmod +x "$T/guardados" "$T/disco-falso"
 printf '#!/bin/sh\nif [ "$1" = --juego ]; then echo "$*" >>"%s/aviso-juego"; else : >"%s/aviso-memoria"; fi\n' "$T" "$T" >"$T/memoria"
 chmod +x "$T/memoria"
 printf 'DEPURAR=1\nMEM_REVISAR_S=1\nIA_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
@@ -329,6 +333,7 @@ esperar "grep -q '^juegos=1' '$EST'"
 probar "juego por contentType=game" "[[ \$(grep -c 'modo-juego on' '$T/vortex.log') == 2 ]]"
 esperar "grep -q 'un.juego.raro' '$T/aviso-juego' 2>/dev/null"
 probar "al abrir un juego mira si le alcanza la memoria, con su clase y su pid" "grep -qx -- '--juego un.juego.raro 4002' '$T/aviso-juego'"
+probar "y respalda sus partidas guardadas antes de jugar (4.0)" "grep -qx -- 'antes un.juego.raro 4002' '$T/guardados-llamado'"
 evento "closewindow>>abcd"
 esperar "[[ \$(grep -c 'modo-juego off' '$T/vortex.log') == 2 ]]"
 

@@ -64,6 +64,7 @@ VORTEX="${VORTEX_GESTOR_VORTEX:-vortex}"
 QS="${VORTEX_GESTOR_QS:-quickshell}"
 MEMORIA="${VORTEX_GESTOR_MEMORIA:-vortex-memoria}"
 DISCO="${VORTEX_GESTOR_DISCO:-vortex-disco}"
+GUARDADOS="${VORTEX_GESTOR_GUARDADOS:-vortex-guardados}"
 NVSMI="${VORTEX_GESTOR_NVIDIA_SMI:-nvidia-smi}"
 IA="${VORTEX_GESTOR_IA:-vortex-ia}"
 SHELL_QML=/usr/share/serpantinum/src/quickshell/Shell.qml
@@ -428,6 +429,8 @@ empezar_juego() {
   # 3.0: si al juego le queda poca memoria, ofrece cerrar lo que más gasta (lo decide vortex-memoria,
   # después de dejarlo cargar unos segundos). Una vez por partida: solo con el primer juego.
   "$MEMORIA" --juego "$1" "${2:-0}" >/dev/null 2>&1 &
+  # 4.0: la copia de tus partidas guardadas, antes de jugar (solo si cambiaron; en segundo plano y sin avisos).
+  "$GUARDADOS" antes "$1" "${2:-0}" >/dev/null 2>&1 &
   # El modo juego manda: el modo IA se quita (después de poner el del juego, para que los efectos y el
   # fondo no vuelvan entre uno y otro) y regresa callado cuando se cierre el juego.
   if ((IA_ACTIVA)); then
