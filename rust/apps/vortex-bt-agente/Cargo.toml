@@ -1,0 +1,25 @@
+[package]
+name = "vortex-bt-agente"
+description = "El agente de Bluetooth de Vortexine's OS en Rust (reemplaza a bin/vortex-bt-agente, de Python)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vortex-bt-agente"
+path = "src/main.rs"
+
+[dependencies]
+zbus.workspace = true
+async-io.workspace = true
+futures-util.workspace = true
+futures-channel.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

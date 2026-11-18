@@ -1,0 +1,22 @@
+[package]
+name = "vortex-local-ai"
+description = "Vortexine's Local AI en Rust (en construcción: la app de Python sigue siendo la oficial)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_local_ai"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-local-ai-rs"
+path = "src/main.rs"
+
+[dependencies]
+vortex-core.workspace = true
+
+[lints]
+workspace = true

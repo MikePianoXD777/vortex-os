@@ -1,0 +1,32 @@
+[package]
+name = "vortex-player"
+description = "Vortex Player en Rust (en construcción: la app de Python sigue siendo la oficial)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_player"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-player-rs"
+path = "src/main.rs"
+
+[dependencies]
+rand.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+vortex-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

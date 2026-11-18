@@ -1,0 +1,48 @@
+# CI de Rust en Linux (activo en .github/workflows/rust-linux.yml).
+name: Rust (Linux)
+
+on:
+  pull_request:
+    paths: ["rust/**", ".github/workflows/rust-linux.yml"]
+  push:
+    branches: [main, rust/paso-0]
+    paths: ["rust/**", ".github/workflows/rust-linux.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rust
+    env:
+      QT_QPA_PLATFORM: offscreen        # las pruebas nunca abren ventanas
+      QT_QUICK_BACKEND: software
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qt 6, C++, mpv y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtquick-window g++ mpv ffmpeg
+      - name: Rust (la versión de rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Formato
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      # En el CI la máquina es desechable: basta el tiempo límite. En tu PC usa rust/pruebas.sh (2 GB).
+      - name: Pruebas
+        run: timeout 1200 cargo test --locked
+      # Cuando vortex-core-qt entre al workspace: la demo sin pantalla debe guardar su captura.
+      # - name: Demo de Tema sin pantalla
+      #   run: |
+      #     VORTEX_DEMO_CAPTURA=$PWD/demo.png timeout 60 cargo run --locked --bin vortex-demo-tema
+      #     test -s demo.png
+      # Binarios para la Release (los baja el PKGBUILD con sha256sums): solo en las etiquetas que crea Mike.
+      # - name: Binarios
+      #   if: startsWith(github.ref, 'refs/tags/rust-')
+      #   run: cargo build --locked --release

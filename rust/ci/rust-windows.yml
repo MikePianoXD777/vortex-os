@@ -1,0 +1,40 @@
+# Esbozo del CI de Windows (Vortex Player en Rust). NO ESTÁ ACTIVO y no se ha probado: se completa cuando
+# el Player en Rust abra ventana. Mismo flujo que .github/workflows/vortex-player-windows.yml, pero con
+# cargo en vez de pyinstaller.
+name: Rust (Windows)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qt 6 con aqtinstall
+        run: |
+          pip install aqtinstall
+          aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 --outputdir C:\Qt
+          echo "C:\Qt\6.8.3\msvc2022_64\bin" >> $env:GITHUB_PATH
+          echo "QMAKE=C:\Qt\6.8.3\msvc2022_64\bin\qmake.exe" >> $env:GITHUB_ENV
+      - name: Rust (la versión de rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Compilar
+        run: cargo build --locked --release -p vortex-player
+      - name: Juntar Qt junto al .exe
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target\release\vortex-player-rs.exe dist\
+          windeployqt --release --qmldir apps\vortex-player\qml dist\vortex-player-rs.exe
+      # Luego: mpv, ffmpeg, ffprobe, yt-dlp y deno en dist\bin (como hoy) e Inno Setup (ISCC) con el
+      # instalador de empaquetado\windows. La Release la crea solo Mike.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vortex-player-rs-windows
+          path: rust/dist
