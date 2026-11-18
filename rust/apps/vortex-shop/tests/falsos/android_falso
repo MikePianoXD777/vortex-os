@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# vortex-android falso para las pruebas de la Shop. ANDROID_FALSO_DIR guarda el estado.
+d="${ANDROID_FALSO_DIR:?}"; mkdir -p "$d"
+echo "$*" >>"$d/llamadas"
+prep=false; [[ -e "$d/preparado" ]] && prep=true
+reg=false; [[ -e "$d/registrado" ]] && reg=true
+nv=${ANDROID_FALSO_NVIDIA:-false}
+case "$1" in
+  estado) echo "{\"instalado\": $prep, \"preparado\": $prep, \"corriendo\": false, \"nvidia\": $nv, \"software\": ${ANDROID_FALSO_SOFTWARE:-false}, \"registrado\": $reg}" ;;
+  preparar) for i in 1 2 3 4 5; do echo "PASO $i/5 Paso número $i"; sleep 0.2; done; touch "$d/preparado"; echo LISTO ;;
+  apps) $prep && echo '[{"paquete": "com.kiloo.subwaysurf", "nombre": "Subway Surfers", "icono": ""}]' || echo '[]' ;;
+  id-google) echo 3912345678901234567 ;;
+  registrado) touch "$d/registrado" ;;
+  tienda|buscar|abrir|quitar|parar) ;;
+  *) echo "vortex-android: no conozco «$1»" >&2; exit 1 ;;
+esac

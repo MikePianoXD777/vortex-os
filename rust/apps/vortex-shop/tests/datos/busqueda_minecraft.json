@@ -1,0 +1,374 @@
+{
+ "facetDistribution": {
+  "arches": {
+   "aarch64": 19,
+   "x86_64": 30
+  },
+  "is_free_license": {
+   "false": 8,
+   "true": 22
+  },
+  "main_categories": {
+   "Development": 1,
+   "Game": 26,
+   "System": 1,
+   "Utility": 2
+  },
+  "type": {
+   "desktop-application": 30
+  },
+  "verification_verified": {
+   "false": 8,
+   "true": 22
+  }
+ },
+ "facetStats": {},
+ "hits": [
+  {
+   "added_at": 1593156258,
+   "app_id": "io.mrarm.mcpelauncher",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "\n            To use this launcher you have to own Minecraft: Bedrock Edition on google play store, you may be unable to play the latest update of the Game. Otherwise you will get an license error while launching the google play apk.\n        \n      \n            This is an unofficial Linux launcher for the Minecraft Bedrock codebase. This project is not affiliated with Minecraft, Mojang or Microsoft.\n        \n      Not available Features you may miss\n      \n        Xbox live friend joining - Technically Working on Linux - usually times out or crashs the game in both directions - consider using the offical server software www.minecraft.net/en-us/download/server/bedrock - connect all by ip as external server\n        Xbox live login - a lot of devices seem to get error code \"drowned\" without beeing asked for login - error code \"drowned\" has more meanings like you closed the webview window without sign in - try to change your timezone to a different one\n      \n    ",
+   "developer_name": "minecraft-linux",
+   "favorites_count": 148,
+   "icon": "https://dl.flathub.org/media/io/mrarm/mcpelauncher/20475562c45c3e57853ca71a7fc117e9/icons/128x128/io.mrarm.mcpelauncher.png",
+   "id": "io_mrarm_mcpelauncher",
+   "installs_last_month": 26767,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": null,
+   "localized_keywords": null,
+   "main_categories": "game",
+   "name": "Minecraft Bedrock Launcher",
+   "project_license": "GPL-3.0",
+   "runtime": "org.kde.Platform/x86_64/6.10",
+   "sub_categories": [
+    "PackageManager"
+   ],
+   "summary": "Download and play Minecraft Bedrock Edition on GNU/Linux",
+   "translations": {},
+   "trending": -1.6460353906209106,
+   "type": "desktop-application",
+   "updated_at": 1789659632,
+   "verification_login_is_organization": null,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "none",
+   "verification_timestamp": null,
+   "verification_verified": false,
+   "verification_website": null
+  },
+  {
+   "added_at": 1556705126,
+   "app_id": "com.mojang.Minecraft",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "¡Todo el mundo esta jugando Minecraft, uno de los videojuegos más populares de hoy día! Tu imaginación es el límite en este juego divertido en donde puedes construir el mundo que te rodea. Juega con tus amigos, o solo, y aventura, recolecta, construye y batalla. Para obtener la mejor experiencia, recomendamos crear una cuenta y comprar el juego en línea antes de instalarlo minecraft.net/es-es/store ** Requiere internet.\n    ",
+   "developer_name": "Mojang AB",
+   "favorites_count": 88,
+   "icon": "https://dl.flathub.org/media/com/mojang/Minecraft/f54a9afb730dbc6b4d9827e274101545/icons/128x128/com.mojang.Minecraft.png",
+   "id": "com_mojang_Minecraft",
+   "installs_last_month": 25395,
+   "isMobileFriendly": false,
+   "is_free_license": false,
+   "keywords": null,
+   "localized_keywords": null,
+   "main_categories": "game",
+   "name": "Minecraft Launcher",
+   "project_license": "LicenseRef-proprietary",
+   "runtime": "org.freedesktop.Platform/x86_64/25.08",
+   "sub_categories": [],
+   "summary": "Crea tu propio mundo en este videojuego popular",
+   "trending": -0.766074150178214,
+   "type": "desktop-application",
+   "updated_at": 1787592879,
+   "verification_login_is_organization": null,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "none",
+   "verification_timestamp": null,
+   "verification_verified": false,
+   "verification_website": null
+  },
+  {
+   "added_at": 1751467612,
+   "app_id": "app.xmcl.voxelum",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "\n      X Minecraft Launcher (XMCL) is a feature-rich Minecraft launcher that lets you manage\n      resources like modpacks, resource packs, mods, and shader packs. It integrates with Minecraft\n      Forge, Fabric, Quilt, CurseForge, and Modrinth.\n    \n      Key features:\n      \n        ⚡️  Blazing-Fast Downloads: Concurrent multi-part downloads with HTTP/HTTPS socket reuse for maximum speed\n        📚 Isolated Multi-Instancing: Create conflict-free environments for mods, versions, and custom configurations\n        🗂 Smart Resource Management: Zero-duplication storage using hard/symbolic links to optimize disk space\n        📦 One-Click Modpacks: Fully compliant import/export for CurseForge &amp; Modrinth collections\n        🔧 Direct Mod Integration: Browse and install individual mods from CurseForge &amp; Modrinth\n        ⚙️  All Major Mod Loaders: Native support for Forge, Fabric, and Quilt frameworks\n        🎨 Visual Enhancement Hub: Unified management for resource packs, shader packs, and texture packs\n        👥 Multi-Account Hub: Seamless switching between Microsoft, Mojang, and third-party accounts\n        🌐 Serverless Multiplayer: Built-in peer-to-peer hosting for instant game sharing\n      \n    ",
+   "developer_name": "Voxelum",
+   "favorites_count": 25,
+   "icon": "https://dl.flathub.org/media/app/xmcl/voxelum/55a927de23a0aaa9aedb673dbcdfc43f/icons/128x128/app.xmcl.voxelum.png",
+   "id": "app_xmcl_voxelum",
+   "installs_last_month": 4906,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "minecraft",
+    "launcher",
+    "mod"
+   ],
+   "localized_keywords": [
+    "launcher",
+    "minecraft",
+    "mod"
+   ],
+   "main_categories": "game",
+   "name": "X Minecraft Launcher",
+   "project_license": "MIT",
+   "runtime": "org.freedesktop.Platform/x86_64/25.08",
+   "sub_categories": [
+    "Utility"
+   ],
+   "summary": "Play and manage Minecraft",
+   "translations": {},
+   "trending": -0.1953588732762816,
+   "type": "desktop-application",
+   "updated_at": 1792347650,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1783789696",
+   "verification_verified": true,
+   "verification_website": "xmcl.app"
+  },
+  {
+   "added_at": 1640164309,
+   "app_id": "com.thebrokenrail.MCPIReborn",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "Minecraft: Pi Edition Modding Project.\n      NOTE: This is not verified by, affiliated with, or supported by Mojang or Microsoft.\n    ",
+   "developer_name": "TheBrokenRail & Mojang AB",
+   "favorites_count": 19,
+   "icon": "https://dl.flathub.org/media/com/thebrokenrail/MCPIReborn/ade816fc42f7654c34729d6660e63f14/icons/128x128/com.thebrokenrail.MCPIReborn.png",
+   "id": "com_thebrokenrail_MCPIReborn",
+   "installs_last_month": 1928,
+   "isMobileFriendly": false,
+   "is_free_license": false,
+   "keywords": [
+    "sandbox",
+    "world",
+    "mining"
+   ],
+   "localized_keywords": [
+    "mining",
+    "sandbox",
+    "world"
+   ],
+   "main_categories": "game",
+   "name": "Minecraft: Pi Edition: Reborn",
+   "project_license": "LicenseRef-proprietary",
+   "runtime": "org.freedesktop.Platform/x86_64/25.08",
+   "sub_categories": [
+    "Simulation"
+   ],
+   "summary": "Fun with Blocks",
+   "translations": {},
+   "trending": -1.3082435111301305,
+   "type": "desktop-application",
+   "updated_at": 1777866337,
+   "verification_login_is_organization": null,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "none",
+   "verification_timestamp": null,
+   "verification_verified": false,
+   "verification_website": null
+  },
+  {
+   "added_at": 1675626426,
+   "app_id": "dev.mrquantumoff.mcmodpackmanager",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "\n      This is a powerful tool to manage your Minecraft: Java Edition mods.\n      With this app you can easily install mods, resourcepacks, shaders. You can also share you\n      modpacks with your friends, and you can back up your modpacks to the cloud!\n    \n      \n      NOTE: This app and its developer are not affiliated with Mojang Studios or Microsoft.\n    \n    ",
+   "developer_name": "qnt / MrQuantumOFF (Demir Yerli)",
+   "favorites_count": 4,
+   "icon": "https://dl.flathub.org/media/dev/mrquantumoff/mcmodpackmanager/026e9ceb00c4fbdfd7136bf3981b6dcf/icons/128x128/dev.mrquantumoff.mcmodpackmanager.png",
+   "id": "dev_mrquantumoff_mcmodpackmanager",
+   "installs_last_month": 433,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "minecraft",
+    "mods",
+    "modding"
+   ],
+   "localized_keywords": [
+    "minecraft",
+    "modding",
+    "mods"
+   ],
+   "main_categories": "game",
+   "name": "Quadrant for Minecraft",
+   "project_license": "MPL-2.0",
+   "runtime": "org.gnome.Platform/x86_64/51",
+   "sub_categories": [
+    "Utility"
+   ],
+   "summary": "Manage your mods and modpacks with ease",
+   "translations": {},
+   "trending": -0.47424942989313823,
+   "type": "desktop-application",
+   "updated_at": 1792044548,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1675671845",
+   "verification_verified": true,
+   "verification_website": "mrquantumoff.dev"
+  },
+  {
+   "added_at": 1666334692,
+   "app_id": "org.prismlauncher.PrismLauncher",
+   "arches": [
+    "aarch64",
+    "x86_64"
+   ],
+   "description": "Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity.\n      Features:\n      \n        Easily install game modifications, such as Fabric, Forge and Quilt\n        Easily install and update modpacks from the Launcher\n        Control your Java settings, and enable Mangohud or Gamemode with a toggle\n        Manage worlds and resource packs from the launcher\n        See logs and other details easily through a dashboard\n        Kill Minecraft in case of a crash/freeze\n        Isolate Minecraft instances to keep everything clean\n        Install and update mods directly from the launcher\n        Customize the launcher with themes, and more\n        And cat :3\n      \n    ",
+   "developer_name": "Prism Launcher Contributors",
+   "favorites_count": 304,
+   "icon": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/icons/128x128/org.prismlauncher.PrismLauncher.png",
+   "id": "org_prismlauncher_PrismLauncher",
+   "installs_last_month": 83600,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "game",
+    "minecraft",
+    "mc"
+   ],
+   "localized_keywords": [
+    "game",
+    "mc",
+    "minecraft"
+   ],
+   "main_categories": "game",
+   "name": "Prism Launcher",
+   "project_license": "GPL-3.0-only",
+   "runtime": "org.kde.Platform/x86_64/6.10",
+   "sub_categories": [
+    "ActionGame",
+    "AdventureGame",
+    "Simulation",
+    "PackageManager"
+   ],
+   "summary": "Custom Minecraft Launcher to easily manage multiple Minecraft installations at once",
+   "translations": {},
+   "trending": -0.20990886879784437,
+   "type": "desktop-application",
+   "updated_at": 1790694375,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1678358592",
+   "verification_verified": true,
+   "verification_website": "prismlauncher.org"
+  },
+  {
+   "added_at": 1714032230,
+   "app_id": "com.modrinth.ModrinthApp",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "A unique, open source Minecraft launcher that allows you to play your favorite mods, and keep them up to date, all in one neat little package.\n      Modrinth App is the easiest way to install and play content from Modrinth with whatever Minecraft version or mod loader you'd like. With first-party support for shared instances, friends, and Modrinth Hosting, Modrinth App aims to make playing with friends just as easy as playing singleplayer.\n      You can sync your settings across instances, making it quicker than ever to jump right into a new modpack. Browse for servers and join them (yes, even modded ones) with just a click. Customize and switch between your skins, with added support for the Ears mod! View all your screenshots in one place, and manage your Modrinth Hosting servers all without ever leaving the app.\n    ",
+   "developer_name": "Rinth, Inc",
+   "favorites_count": 83,
+   "icon": "https://dl.flathub.org/media/com/modrinth/ModrinthApp/f1b89986e357edc47b5670485bee470a/icons/128x128/com.modrinth.ModrinthApp.png",
+   "id": "com_modrinth_ModrinthApp",
+   "installs_last_month": 20756,
+   "isMobileFriendly": false,
+   "is_free_license": true,
+   "keywords": [
+    "game",
+    "minecraft",
+    "mc"
+   ],
+   "localized_keywords": [
+    "game",
+    "mc",
+    "minecraft"
+   ],
+   "main_categories": "game",
+   "name": "Modrinth App",
+   "project_license": "GPL-3.0-only",
+   "runtime": "org.gnome.Platform/x86_64/49",
+   "sub_categories": [
+    "ActionGame",
+    "AdventureGame",
+    "Simulation"
+   ],
+   "summary": "Play modded Minecraft with ease",
+   "translations": {},
+   "trending": 0.03817202277860663,
+   "type": "desktop-application",
+   "updated_at": 1792721037,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1769104651",
+   "verification_verified": true,
+   "verification_website": "modrinth.com"
+  },
+  {
+   "added_at": 1790782036,
+   "app_id": "com.overwolf.curseforge",
+   "arches": [
+    "x86_64"
+   ],
+   "description": "\n      CurseForge is the home for game modding. Browse and install mods, modpacks,\n      resource packs, worlds, and addons for Minecraft and other supported games,\n      and keep them up to date — all from one app.\n    \n      Features:\n      \n        Browse and one-click install mods and modpacks\n        Create, manage, and launch modded game profiles\n        Automatic updates for your installed content\n        Import and export modpacks to share with others\n      \n      \n      CurseForge is free to use, and every feature listed above works without paying.\n      The app shows ads. An optional paid subscription removes them and unlocks\n      cosmetic extras; it is not required for any of the functionality above.\n    \n    ",
+   "developer_name": "Overwolf",
+   "favorites_count": 11,
+   "icon": "https://dl.flathub.org/media/com/overwolf/curseforge/ffc3ebc89c6c74080069331675d5c1c3/icons/128x128/com.overwolf.curseforge.png",
+   "id": "com_overwolf_curseforge",
+   "installs_last_month": 9007,
+   "isMobileFriendly": false,
+   "is_free_license": false,
+   "keywords": [
+    "mods",
+    "modpacks",
+    "minecraft"
+   ],
+   "localized_keywords": [
+    "minecraft",
+    "modpacks",
+    "mods"
+   ],
+   "main_categories": "game",
+   "name": "CurseForge",
+   "project_license": "LicenseRef-proprietary=https://legal.overwolf.com/docs/overwolf/platform/platform-terms-of-use/",
+   "runtime": "org.freedesktop.Platform/x86_64/26.08",
+   "sub_categories": [],
+   "summary": "Mod your favorite games",
+   "translations": null,
+   "trending": 0.3536205792256631,
+   "type": "desktop-application",
+   "updated_at": 1792393354,
+   "verification_login_is_organization": false,
+   "verification_login_name": null,
+   "verification_login_provider": null,
+   "verification_method": "website",
+   "verification_timestamp": "1790840663",
+   "verification_verified": true,
+   "verification_website": "overwolf.com"
+  }
+ ],
+ "hitsPerPage": 30,
+ "page": 1,
+ "processingTimeMs": 5,
+ "query": "minecraft",
+ "totalHits": 30,
+ "totalPages": 1
+}
