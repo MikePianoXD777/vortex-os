@@ -508,6 +508,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-runner"
+version = "1.0.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "vortex-core",
+]
+
+[[package]]
 name = "wasip2"
 version = "1.0.4+wasi-0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"

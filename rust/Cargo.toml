@@ -6,6 +6,7 @@ members = [
     "crates/vortex-core",
     "apps/vortex-player",
     "apps/vortex-local-ai",
+    "apps/vortex-runner",
 ]
 # vortex-core-qt (el puente con QML, cxx-qt) entra a «members» en cuanto se bajen sus crates:
 # ver crates/vortex-core-qt/README.md.
@@ -25,6 +26,7 @@ regex = "1"
 rusqlite = { version = "0.34", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+vortex-runner = { path = "apps/vortex-runner" }
 tempfile = "3"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
