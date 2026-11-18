@@ -1106,6 +1106,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-connect"
+version = "1.0.0"
+dependencies = [
+ "regex",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
+name = "vortex-connect-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "serde_json",
+ "tempfile",
+ "vortex-connect",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-core"
 version = "0.1.0"
 dependencies = [
@@ -1168,6 +1192,30 @@ dependencies = [
  "serde_json",
  "vortex-core",
  "vortex-runner",
+]
+
+[[package]]
+name = "vortex-shared"
+version = "1.0.0"
+dependencies = [
+ "libc",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
+name = "vortex-shared-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-shared",
 ]
 
 [[package]]

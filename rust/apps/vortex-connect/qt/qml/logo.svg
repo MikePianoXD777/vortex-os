@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortexine Connect: un escudo con la señal de wifi adentro, en los colores de Vortexine's OS. Dibujo original
+     de este proyecto. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vc-g" x1="20" y1="20" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#vc-g)" stroke-opacity="0.45" stroke-width="1.5"/>
+  <path d="M64 20l34 12v28c0 23-15 39-34 48-19-9-34-25-34-48V32z" fill="none" stroke="url(#vc-g)" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M46 56a26 26 0 0 1 36 0M54 67a14 14 0 0 1 20 0" fill="none" stroke="url(#vc-g)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="64" cy="79" r="5" fill="url(#vc-g)"/>
+</svg>

@@ -14,6 +14,10 @@ members = [
     "apps/vortex-task-manager/qt",
     "apps/vortex-runner",
     "apps/vortex-runner/qt",
+    "apps/vortex-connect",
+    "apps/vortex-connect/qt",
+    "apps/vortex-shared",
+    "apps/vortex-shared/qt",
 ]
 
 [workspace.package]
@@ -30,6 +34,8 @@ regex = "1"
 rusqlite = { version = "0.34", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+vortex-connect = { path = "apps/vortex-connect" }
+vortex-shared = { path = "apps/vortex-shared" }
 tempfile = "3"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
