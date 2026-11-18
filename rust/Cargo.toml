@@ -12,6 +12,8 @@ members = [
     "apps/vortex-video/qt",
     "apps/vortex-task-manager",
     "apps/vortex-task-manager/qt",
+    "apps/vortex-runner",
+    "apps/vortex-runner/qt",
 ]
 
 [workspace.package]
@@ -36,10 +38,11 @@ zbus = { version = "=6.0.0" }
 async-io = "2"
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await-macro"] }
 futures-channel = "0.3"
-# La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
+vortex-runner = { path = "apps/vortex-runner" }
 vortex-video = { path = "apps/vortex-video" }
 vortex-task-manager = { path = "apps/vortex-task-manager" }
 libc = "0.2"
+# La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
 cxx = "1"
 cxx-qt = "=0.10.0"
 cxx-qt-lib = { version = "=0.10.0", features = ["qt_gui", "qt_qml"] }

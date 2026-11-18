@@ -1147,6 +1147,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-runner"
+version = "1.0.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "vortex-core",
+]
+
+[[package]]
+name = "vortex-runner-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "serde_json",
+ "vortex-core",
+ "vortex-runner",
+]
+
+[[package]]
 name = "vortex-task-manager"
 version = "1.0.2"
 dependencies = [

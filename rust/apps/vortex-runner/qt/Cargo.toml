@@ -1,0 +1,26 @@
+[package]
+name = "vortex-runner-qt"
+description = "Vortexine's Runner en Rust: la ventana (cxx-qt) sobre el motor vortex-runner"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-runner.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[[bin]]
+name = "vortex-runner-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true
