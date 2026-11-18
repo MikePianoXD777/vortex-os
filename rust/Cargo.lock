@@ -1183,6 +1183,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-gestor"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "regex",
+ "tempfile",
+]
+
+[[package]]
 name = "vortex-local-ai"
 version = "0.1.0"
 dependencies = [

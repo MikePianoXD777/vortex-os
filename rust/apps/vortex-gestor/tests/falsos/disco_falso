@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "$*" >>"$FALSO_T/disco-llamado"

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# busctl falso: crea el scope en el árbol de cgroups falso y mueve los procesos falsos.
+# Lo que necesita viene del entorno: FALSO_T (carpeta de la prueba), FALSO_PROC, FALSO_CGR y FALSO_RAIZ.
+echo "$*" >>"$FALSO_T/busctl.log"
+[[ -e "$FALSO_T/busctl-falla" ]] && exit 1
+args=("$@")
+metodo="${args[5]}" unidad="${args[7]}"
+peso=""
+for ((i = 0; i < ${#args[@]}; i++)); do [[ "${args[i]}" == CPUWeight ]] && peso="${args[i + 2]}"; done
+dir="$FALSO_CGR$FALSO_RAIZ/app.slice/$unidad"
+case "$metodo" in
+  StartTransientUnit)
+    mkdir -p "$dir"
+    echo "$peso" >"$dir/cpu.weight"
+    echo "default $peso" >"$dir/io.weight"
+    : >"$dir/memory.reclaim"
+    n="${args[12]}"
+    for ((i = 13; i < 13 + n; i++)); do echo "0::$FALSO_RAIZ/app.slice/$unidad" >"$FALSO_PROC/${args[i]}/cgroup"; done ;;
+  SetUnitProperties)
+    [[ -d "$dir" ]] || exit 1
+    echo "$peso" >"$dir/cpu.weight" ;;
+esac

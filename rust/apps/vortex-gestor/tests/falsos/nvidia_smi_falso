@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# nvidia-smi falso: las apps de cómputo (CUDA) y «-q -d PIDS» (ahí sale Vulkan) salen de dos archivos.
+echo "$*" >>"$FALSO_T/nvsmi.log"
+case "$1" in
+  --query-compute-apps*) cat "$FALSO_T/nvsmi-apps" 2>/dev/null ;;
+  -q) cat "$FALSO_T/nvsmi-q" 2>/dev/null ;;
+esac

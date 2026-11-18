@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# quickshell falso: anota lo que le piden y, con «show», dice qué funciones tiene el shell.
+echo "$*" >>"$FALSO_T/qs.log"
+if [[ "$*" == *" show" ]]; then
+  printf 'target wallpaper\n  function setPlayback(screenName: string, state: string): void\ntarget vortex\n  function soltarMemoria(): void\n'
+fi
