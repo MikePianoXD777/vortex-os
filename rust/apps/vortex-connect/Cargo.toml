@@ -1,0 +1,27 @@
+[package]
+name = "vortex-connect"
+description = "Vortexine Connect en Rust (en prueba: la app oficial sigue siendo la de Python)"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_connect"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-connect-motor"
+path = "src/main.rs"
+
+[dependencies]
+vortex-core.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
