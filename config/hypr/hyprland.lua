@@ -252,6 +252,16 @@ hl.window_rule({
     move = "monitor_w-window_w-7 41",
 })
 
+-- Juegos de Android (4.0, bin/vortex-android): la ventana de Android completo sale maximizada, opaca y
+-- sin que la pantalla se apague mientras juegas en pantalla completa.
+hl.window_rule({
+    name = "vortex-android",
+    match = { class = "^(Waydroid|waydroid\\..*)$" },   -- con una app al frente se llama waydroid.<paquete>
+    maximize = true,
+    opacity = "1.0 override",
+    idle_inhibit = "fullscreen",
+})
+
 -- Vortex App Installer (1.10): sale flotando al centro, como un diálogo, aunque estés en mosaico (abre
 -- lo que descargas y lo instala o descomprime). Su tamaño es el de la app.
 hl.window_rule({

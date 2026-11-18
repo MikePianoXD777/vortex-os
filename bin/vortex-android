@@ -16,7 +16,7 @@
 #
 # Para no gastar RAM: el contenedor de Waydroid no arranca con el sistema (gastaba ~25 MB sin usarse).
 # «iniciar» lo prende (una regla de polkit deja hacerlo sin contraseña) y un vigilante lo apaga solo
-# cuando cierras el último juego de Android (a los 3 minutos sin ventanas de Android).
+# cuando cierras la ventana de Android (a los 3 minutos sin ella).
 set -uo pipefail
 
 WAYDROID="${VORTEX_ANDROID_WAYDROID:-waydroid}"
@@ -30,10 +30,19 @@ SCRIPT_COMMIT=${VORTEX_ANDROID_SCRIPT_COMMIT:-main}
 aviso() { printf 'vortex-android: %s\n' "$*" >&2; }
 json_txt() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
 
-nvidia() { [[ -e /proc/driver/nvidia/version ]] || lspci -nn 2>/dev/null | grep -qiE '(vga|3d).*nvidia'; }
+# Ojo con pipefail: «algo | grep -q» puede salir mal aunque encuentre (grep cierra y el otro recibe SIGPIPE).
+# Por eso se busca en el texto ya leído.
+nvidia() { [[ -e /proc/driver/nvidia/version ]] || grep -qiE '(vga|3d).*nvidia' <<<"$(lspci -nn 2>/dev/null)"; }
+# Sin aceleración para Android: NVIDIA (driver propio), sin nodo de render, o una máquina virtual con
+# virtio-gpu sin 3D («-virgl» en el kernel; dmesg solo se lee como root, que es cuando se prepara).
+sin_aceleracion() {
+  nvidia && return 0
+  compgen -G '/dev/dri/renderD*' >/dev/null || return 0
+  grep -q 'features: -virgl' <<<"$(dmesg 2>/dev/null)"
+}
 intel_cpu() { grep -qm1 GenuineIntel /proc/cpuinfo; }
 preparado() { [[ -f "$VAR/images/system.img" && -f "$VAR/waydroid.cfg" ]]; }
-corriendo() { "$WAYDROID" status 2>/dev/null | grep -qE 'Session:\s*RUNNING'; }
+corriendo() { grep -qE 'Session:\s*RUNNING' <<<"$("$WAYDROID" status 2>/dev/null)"; }
 contenedor_activo() { systemctl is-active --quiet waydroid-container.service; }
 
 cmd_estado() {
@@ -66,14 +75,20 @@ cmd_preparar_root() {
     "$WAYDROID" init -s GAPPS || { aviso "no pude bajar Android"; exit 1; }
   fi
   echo "PASO 3/5 Ajustando la tarjeta de video"
-  # Con NVIDIA (driver propio) Waydroid no tiene aceleración: se dibuja por software (SwiftShader), si no,
-  # Android se queda en negro. Con AMD e Intel usa la GPU.
-  if nvidia; then
+  # Con NVIDIA (driver propio) o sin 3D, Waydroid no tiene aceleración: se dibuja por software
+  # (SwiftShader); si no, Android se queda en negro. Con AMD e Intel usa la GPU.
+  if sin_aceleracion; then
     cfg_prop ro.hardware.gralloc default
     cfg_prop ro.hardware.egl swiftshader
   fi
-  # Ventanas sueltas: cada juego en su propia ventana (y así el vigilante sabe si queda alguno abierto).
-  cfg_prop persist.waydroid.multi_windows true
+  # Una sola ventana con Android completo (la Play Store y los juegos se abren dentro). Con «una ventana
+  # por app», Waydroid le da a cada app una superficie del tamaño de la pantalla y el mosaico de Hyprland
+  # la corta (probado en la VM, 17/11).
+  cfg_prop persist.waydroid.multi_windows false
+  # Android en el idioma de la persona desde el primer encendido.
+  local idioma
+  idioma="$(sed -n 's/^LANG=//p' /etc/locale.conf 2>/dev/null | tr -d '"')"; idioma="${idioma%%.*}"; idioma="${idioma/_/-}"
+  [[ "$idioma" =~ ^[a-z]{2}(-[A-Z]{2})?$ ]] && cfg_prop persist.sys.locale "$idioma"
   "$WAYDROID" upgrade --offline >/dev/null 2>&1 || true
   echo "PASO 4/5 Traducción de juegos de celular (ARM)"
   traduccion_arm || aviso "no pude poner la traducción de ARM: algunos juegos no saldrán en la Play Store"
@@ -142,6 +157,21 @@ cmd_iniciar() {
     for _ in $(seq 1 90); do corriendo && break; sleep 1; done
     corriendo || { aviso "Android no arrancó"; exit 1; }
   fi
+  # «RUNNING» llega antes de que Android termine de encender: pedir la Play Store antes no abre nada.
+  for _ in $(seq 1 120); do
+    [[ "$("$WAYDROID" prop get sys.boot_completed 2>/dev/null)" == 1 ]] && break
+    sleep 1
+  done
+  # Una sola ventana con Android completo (ver «preparar»). Es un persist.*: Android guarda el valor que
+  # tuvo alguna vez y el de waydroid.cfg no lo pisa, así que se fija aquí también.
+  [[ "$("$WAYDROID" prop get persist.waydroid.multi_windows 2>/dev/null)" == false ]] ||
+    "$WAYDROID" prop set persist.waydroid.multi_windows false >/dev/null 2>&1
+  # Android en el idioma del sistema (es_MX.UTF-8 → es-MX). Se aplica la próxima vez que Android encienda.
+  local idioma="${LANG%%.*}"
+  idioma="${idioma/_/-}"
+  if [[ "$idioma" =~ ^[a-z]{2}(-[A-Z]{2})?$ && "$("$WAYDROID" prop get persist.sys.locale 2>/dev/null)" != "$idioma" ]]; then
+    "$WAYDROID" prop set persist.sys.locale "$idioma" >/dev/null 2>&1
+  fi
   mkdir -p "$ESTADO_DIR"
   # Un solo vigilante.
   if ! { [[ -f "$ESTADO_DIR/vigilante.pid" ]] && kill -0 "$(cat "$ESTADO_DIR/vigilante.pid")" 2>/dev/null; }; then
@@ -157,7 +187,7 @@ cmd_vigilar() {
   local sin_ventanas=0
   sleep 60
   while corriendo; do
-    if hyprctl clients -j 2>/dev/null | grep -qiE '"class": *"(waydroid|Waydroid)'; then
+    if hay_ventana; then
       sin_ventanas=0
     else
       sin_ventanas=$((sin_ventanas + 30))
@@ -175,9 +205,22 @@ cmd_parar() {
 
 intent() { "$WAYDROID" app intent android.intent.action.VIEW "$1" >/dev/null; }
 
+# La ventana de Android: se llama «Waydroid» y, con una app al frente, «waydroid.<paquete>» (hyprland.lua
+# la abre maximizada). Si ya está, no se abre otra.
+hay_ventana() { grep -qE '"class": *"(Waydroid|waydroid\.[^"]+)"' <<<"$(hyprctl clients -j 2>/dev/null)"; }
+ventana() {
+  hay_ventana && return 0
+  setsid -f "$WAYDROID" show-full-ui >/dev/null 2>&1
+  for _ in $(seq 1 20); do
+    hay_ventana && break
+    sleep 0.5
+  done
+}
+
 cmd_tienda() {
   local paquete="${1:-}"
   cmd_iniciar || exit 1
+  ventana
   if [[ -n "$paquete" ]]; then
     [[ "$paquete" =~ ^[A-Za-z0-9_.]+$ ]] || { aviso "paquete inválido"; exit 1; }
     intent "market://details?id=$paquete"
@@ -190,6 +233,7 @@ cmd_buscar() {
   local texto="${*:-}"
   [[ -n "$texto" ]] || { cmd_tienda; return; }
   cmd_iniciar || exit 1
+  ventana
   intent "market://search?q=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$texto")&c=apps"
 }
 
@@ -197,6 +241,7 @@ cmd_abrir() {
   local paquete="${1:?falta el paquete}"
   [[ "$paquete" =~ ^[A-Za-z0-9_.]+$ ]] || { aviso "paquete inválido"; exit 1; }
   cmd_iniciar || exit 1
+  ventana
   "$WAYDROID" app launch "$paquete" >/dev/null
 }
 
