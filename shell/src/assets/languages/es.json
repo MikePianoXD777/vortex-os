@@ -1425,7 +1425,21 @@
     "default_message": "Una aplicación está solicitando privilegios administrativos.",
     "default_description": "Se requiere autenticación para ejecutar esta acción como superusuario.",
     "password_placeholder": "Contraseña",
-    "error_failed": "Error de autenticación. Inténtalo de nuevo."
+    "error_failed": "Error de autenticación. Inténtalo de nuevo.",
+    "enter_password": "Escribe tu contraseña para continuar.",
+    "task": {
+      "time": "Poner la hora automática",
+      "bluetooth": "Encender el Bluetooth",
+      "boot": "Quitar un servicio que traba el arranque",
+      "updates_lock": "Destrabar las actualizaciones",
+      "disk": "Liberar espacio en el disco",
+      "android": "Preparar Android para los juegos",
+      "install": "Instalar o actualizar programas",
+      "remove": "Quitar programas",
+      "firewall": "Dejar pasar una app en el cortafuegos",
+      "vortex": "Hacer un ajuste de Vortexine's OS",
+      "generic": "Hacer un cambio en el sistema"
+    }
   },
   "applauncher": {
     "search": "Buscar",

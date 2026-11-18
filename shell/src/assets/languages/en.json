@@ -1372,7 +1372,21 @@
     "default_message": "An application is requesting administrative rights.",
     "default_description": "Authentication is needed to run this action as superuser.",
     "password_placeholder": "Password",
-    "error_failed": "Authentication failed. Please try again."
+    "error_failed": "Authentication failed. Please try again.",
+    "enter_password": "Enter your password to continue.",
+    "task": {
+      "time": "Turn on automatic time",
+      "bluetooth": "Turn on Bluetooth",
+      "boot": "Remove a service that slows down startup",
+      "updates_lock": "Unlock updates",
+      "disk": "Free up disk space",
+      "android": "Set up Android for games",
+      "install": "Install or update programs",
+      "remove": "Remove programs",
+      "firewall": "Allow an app through the firewall",
+      "vortex": "Make a Vortexine's OS change",
+      "generic": "Make a system change"
+    }
   },
   "applauncher": {
     "search": "Search",

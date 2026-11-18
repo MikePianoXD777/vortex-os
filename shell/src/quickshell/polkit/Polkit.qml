@@ -159,10 +159,7 @@ PanelWindow {
                     spacing: polkitWindow.s(3)
 
                     Text {
-                        text: {
-                            if (PolkitService.flow && PolkitService.flow.message) return PolkitService.flow.message;
-                            return typeof I18n !== "undefined" ? I18n.t("polkit.default_message") : "An application is requesting administrative rights.";
-                        }
+                        text: PolkitService.titulo
                         color: ThemeBackend.text
                         font.family: ThemeBackend.fontFamily
                         font.pixelSize: polkitWindow.s(14)
@@ -173,16 +170,26 @@ PanelWindow {
                     }
 
                     Text {
-                        text: {
-                            if (PolkitService.flow && PolkitService.flow.actionId) return PolkitService.flow.actionId;
-                            return typeof I18n !== "undefined" ? I18n.t("polkit.default_description") : "Authentication is needed to run this action as superuser.";
-                        }
+                        text: PolkitService.detalle
                         color: ThemeBackend.subtext0
                         font.family: ThemeBackend.fontFamily
                         font.pixelSize: polkitWindow.s(12)
                         wrapMode: Text.Wrap
                         horizontalAlignment: I18n.textAlignment
                         Layout.fillWidth: true
+                    }
+
+                    // El comando que va a correr, para que se vea (en letra de terminal y tenue).
+                    Text {
+                        visible: PolkitService.comandoCorto !== ""
+                        text: PolkitService.comandoCorto
+                        color: ThemeBackend.overlay0 !== undefined ? ThemeBackend.overlay0 : ThemeBackend.subtext0
+                        font.family: "monospace"
+                        font.pixelSize: polkitWindow.s(10.5)
+                        elide: Text.ElideRight
+                        horizontalAlignment: I18n.textAlignment
+                        Layout.fillWidth: true
+                        Layout.topMargin: polkitWindow.s(2)
                     }
                 }
 
