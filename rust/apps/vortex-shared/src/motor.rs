@@ -57,9 +57,7 @@ fn mensaje(clave: &str) -> &'static str {
 /// revisa carácter por carácter (nada de «--opción» ni de «;»).
 pub fn ticket_valido(t: &str) -> bool {
     t.strip_prefix("blob").is_some_and(|r| {
-        (10..=4000).contains(&r.len())
-            && r.bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        (10..=4000).contains(&r.len()) && r.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
     })
 }
 
@@ -73,17 +71,18 @@ pub fn usuario_valido(u: &str) -> bool {
 // sh corre sendme y se queda leyendo su entrada; al morir quien lo lanzó la tubería se cierra y corta a sendme.
 const GUARDIA: &str = "exec 3<&0; sendme \"$@\" </dev/null 3<&- & p=$!; (cat <&3 >/dev/null; kill \"$p\" 2>/dev/null) & g=$!; exec 3<&-; wait \"$p\"; c=$?; kill \"$g\" 2>/dev/null; exit \"$c\"";
 
-fn lanzar_sendme(
-    cfg: &Config,
-    args: &[&str],
-    cwd: &Path,
-    salida: Stdio,
-) -> std::io::Result<Child> {
+fn lanzar_sendme(cfg: &Config, args: &[&str], cwd: &Path, salida: Stdio) -> std::io::Result<Child> {
     let mut cmd = Command::new("sh");
     cmd.args(["-c", GUARDIA, "sendme"])
         .args(args)
         .current_dir(cwd)
-        .env("PATH", cfg.sistema.path.clone().unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default()))
+        .env(
+            "PATH",
+            cfg.sistema
+                .path
+                .clone()
+                .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default()),
+        )
         .stdin(Stdio::piped())
         .stdout(salida)
         .stderr(Stdio::null())
@@ -181,10 +180,7 @@ pub fn ip_permitida(texto: &str) -> bool {
     };
     let v4 = |a: Ipv4Addr| {
         let o = a.octets();
-        a.is_private()
-            || a.is_loopback()
-            || a.is_link_local()
-            || (o[0] == 100 && (64..128).contains(&o[1])) // Tailscale: 100.64.0.0/10
+        a.is_private() || a.is_loopback() || a.is_link_local() || (o[0] == 100 && (64..128).contains(&o[1])) // Tailscale: 100.64.0.0/10
     };
     match ip {
         IpAddr::V4(a) => v4(a),
@@ -202,11 +198,7 @@ pub fn limpiar_nombre(nombre: &str) -> String {
         .filter(|c| !matches!(c, '\u{0}'..='\u{1f}' | '\u{7f}' | '<' | '>' | '&'))
         .collect();
     let corto: String = limpio.trim().chars().take(80).collect();
-    if corto.is_empty() {
-        "archivo".into()
-    } else {
-        corto
-    }
+    if corto.is_empty() { "archivo".into() } else { corto }
 }
 
 /// Lo que llega en el aviso, ya revisado.
@@ -338,11 +330,7 @@ fn absoluta(r: &Path) -> PathBuf {
 }
 
 fn io(e: &std::io::Error) -> String {
-    e.to_string()
-        .split(" (os error")
-        .next()
-        .unwrap_or("")
-        .to_string()
+    e.to_string().split(" (os error").next().unwrap_or("").to_string()
 }
 
 /// Un sendme mandando esos archivos. Sirve mientras siga vivo; `terminar` limpia todo.
@@ -363,7 +351,10 @@ impl Envio {
         let faltan: Vec<String> = rutas
             .iter()
             .filter(|r| !r.exists())
-            .map(|r| r.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned()))
+            .map(|r| {
+                r.file_name()
+                    .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+            })
             .collect();
         if rutas.is_empty() || !faltan.is_empty() {
             return error(if faltan.is_empty() {
@@ -377,7 +368,10 @@ impl Envio {
         }
         let nombres = rutas
             .iter()
-            .map(|r| r.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned()))
+            .map(|r| {
+                r.file_name()
+                    .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+            })
             .collect();
         let tam = rutas.iter().map(|r| tamano(r).unwrap_or(0)).sum();
         std::fs::create_dir_all(&cfg.cache)
@@ -423,7 +417,11 @@ impl Envio {
         std::fs::create_dir(&destino)?;
         let mut usados = BTreeSet::new();
         for ruta in &self.rutas {
-            let original = ruta.file_name().unwrap_or_default().to_string_lossy().into_owned();
+            let original = ruta
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
             let (stem, ext) = match Path::new(&original).extension() {
                 Some(e) => (
                     Path::new(&original)
@@ -572,9 +570,7 @@ pub fn destino_de(host: &str, puerto: u16) -> Result<(String, u16), ErrorShared>
         p.len() == 6 && p.iter().all(|x| hex(x))
     };
     if es_mac(':') || es_mac('-') {
-        return error(
-            "Con una MAC no se puede llegar a otra compu: escribe su IP o su nombre en Tailscale.",
-        );
+        return error("Con una MAC no se puede llegar a otra compu: escribe su IP o su nombre en Tailscale.");
     }
     Ok((host.to_string(), puerto))
 }
@@ -626,7 +622,12 @@ pub fn mandar(
         match conexion.read(&mut trozo) {
             Ok(0) => return Err(cortada()),
             Ok(n) => buffer.extend_from_slice(&trozo[..n]),
-            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
                 continue;
             }
             Err(_) => return Err(cortada()),
@@ -660,10 +661,18 @@ fn sin_pisar(destino: &Path) -> PathBuf {
     if !destino.exists() {
         return destino.to_path_buf();
     }
-    let nombre = destino.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let nombre = destino
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     let (stem, ext) = match destino.extension() {
         Some(e) => (
-            destino.file_stem().unwrap_or_default().to_string_lossy().into_owned(),
+            destino
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
             format!(".{}", e.to_string_lossy()),
         ),
         None => (nombre, String::new()),
@@ -711,7 +720,9 @@ pub fn recibir(
             match p.try_wait() {
                 Ok(Some(e)) => break e,
                 Ok(None) => {}
-                Err(_) => return error("No se pudo bajar: revisa el código y que la otra compu siga mandando."),
+                Err(_) => {
+                    return error("No se pudo bajar: revisa el código y que la otra compu siga mandando.");
+                }
             }
             std::thread::sleep(Duration::from_millis(500));
             if cancelado() {
@@ -865,9 +876,10 @@ pub fn puerto_cerrado(cfg: &Config) -> bool {
     if marca_puerto(cfg).exists() || cfg.sistema.buscar("ufw").is_none() {
         return false;
     }
-    cfg.sistema
-        .codigo(&["systemctl", "is-active", "--quiet", "ufw"], Duration::from_secs(5))
-        == 0
+    cfg.sistema.codigo(
+        &["systemctl", "is-active", "--quiet", "ufw"],
+        Duration::from_secs(5),
+    ) == 0
 }
 
 /// Con ufw prendido, se abre el 1770 una sola vez y solo para Tailscale y redes privadas (pide la
@@ -907,6 +919,6 @@ pub fn espacio_libre(carpeta: &Path) -> u64 {
             return 0;
         }
         let s = s.assume_init();
-        (s.f_bavail as u64).saturating_mul(s.f_frsize as u64)
+        s.f_bavail.saturating_mul(s.f_frsize)
     }
 }

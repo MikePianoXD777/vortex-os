@@ -70,11 +70,7 @@ impl Entorno {
         programa(&bin, "sendme", SENDME, &base);
         programa(&bin, "notify-send", NOTIFY, &base);
         programa(&bin, "gdbus", GDBUS, &base);
-        let path = format!(
-            "{}:{}",
-            bin.display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
+        let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
         let cfg = Config {
             puerto: 1770,
             sin_avance: Duration::from_secs(2),
@@ -362,9 +358,7 @@ fn si_el_otro_se_apago_corta_y_limpia() {
     let err = motor::recibir(&e.cfg, &ticket_ok(), None, &|| false, 0).unwrap_err();
     assert!(err.0.contains("No llega nada"), "{err}");
     assert!(e.recibidos().is_empty());
-    let ocultos = std::fs::read_dir(e.base().join("recibidos"))
-        .unwrap()
-        .count();
+    let ocultos = std::fs::read_dir(e.base().join("recibidos")).unwrap().count();
     assert_eq!(ocultos, 0, "no queda la carpeta temporal");
 }
 
@@ -423,9 +417,7 @@ fn codigo_malo() {
 #[test]
 fn falta_el_archivo() {
     let e = Entorno::new();
-    let err = Envio::new(&e.cfg, &[e.base().join("no-existe")])
-        .err()
-        .unwrap();
+    let err = Envio::new(&e.cfg, &[e.base().join("no-existe")]).err().unwrap();
     assert!(err.0.contains("No encuentro"), "{err}");
 }
 
@@ -472,19 +464,17 @@ impl Punta {
     fn mandar(&self, rutas: &[PathBuf], usuario: &str) -> Result<Vec<String>, motor::ErrorShared> {
         let mut envio = Envio::new(&self.e.cfg, rutas)?;
         let mut estados: Vec<String> = Vec::new();
-        let r = envio
-            .preparar(Duration::from_secs(20))
-            .and_then(|_| {
-                motor::mandar(
-                    &self.e.cfg,
-                    "127.0.0.1",
-                    usuario,
-                    &envio,
-                    &mut |f, _| estados.push(f.to_string()),
-                    &|| false,
-                    Duration::from_secs(10),
-                )
-            });
+        let r = envio.preparar(Duration::from_secs(20)).and_then(|_| {
+            motor::mandar(
+                &self.e.cfg,
+                "127.0.0.1",
+                usuario,
+                &envio,
+                &mut |f, _| estados.push(f.to_string()),
+                &|| false,
+                Duration::from_secs(10),
+            )
+        });
         envio.terminar();
         r.map(|()| estados)
     }
@@ -608,9 +598,7 @@ fn de_internet_ni_contesta() {
     let mut cliente = TcpStream::connect(oyente.local_addr().unwrap()).unwrap();
     let (servidor, _) = oyente.accept().unwrap();
     servicio.atender(servidor, "8.8.8.8");
-    cliente
-        .set_read_timeout(Some(Duration::from_secs(1)))
-        .unwrap();
+    cliente.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
     let mut b = [0u8; 10];
     assert_eq!(cliente.read(&mut b).unwrap(), 0);
 }

@@ -8,7 +8,9 @@ fn main() {
     match cli::ejecutar(&args, &Config::del_entorno()) {
         Some(codigo) => std::process::exit(codigo),
         None => {
-            eprintln!("Uso: vortex-shared-motor escuchar | enviar | codigo | recibir | abrir-puerto | accion | --version");
+            eprintln!(
+                "Uso: vortex-shared-motor escuchar | enviar | codigo | recibir | abrir-puerto | accion | --version"
+            );
             eprintln!("La ventana es vortex-shared-rs.");
             std::process::exit(2);
         }

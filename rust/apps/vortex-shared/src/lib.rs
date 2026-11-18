@@ -57,9 +57,7 @@ fn variable(nombre: &str) -> Option<String> {
 }
 
 fn absoluta(nombre: &str) -> Option<PathBuf> {
-    variable(nombre)
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
+    variable(nombre).map(PathBuf::from).filter(|p| p.is_absolute())
 }
 
 fn numero(nombre: &str, defecto: f64) -> Duration {
@@ -101,8 +99,7 @@ impl Config {
                 .unwrap_or_else(|| home.join(".cache"))
                 .join("vortex-shared"),
             marca_juego: vortex_core::rutas::estado().join("modo-juego"),
-            run: absoluta("XDG_RUNTIME_DIR")
-                .unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", uid()))),
+            run: absoluta("XDG_RUNTIME_DIR").unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", uid()))),
             config: absoluta("XDG_CONFIG_HOME").unwrap_or_else(|| home.join(".config")),
             usuario,
             home,

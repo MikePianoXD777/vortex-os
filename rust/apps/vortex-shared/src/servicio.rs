@@ -91,7 +91,13 @@ pub fn preguntar(cfg: &Config, titulo: &str, cuerpo: &str) -> bool {
                 titulo,
                 cuerpo,
             ])
-            .env("PATH", cfg.sistema.path.clone().unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default()))
+            .env(
+                "PATH",
+                cfg.sistema
+                    .path
+                    .clone()
+                    .unwrap_or_else(|| std::env::var_os("PATH").unwrap_or_default()),
+            )
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -114,7 +120,11 @@ pub fn preguntar(cfg: &Config, titulo: &str, cuerpo: &str) -> bool {
             let _ = hijo.kill();
             let _ = hijo.wait();
             let salida = lector.join().unwrap_or_default();
-            if let Some(id) = salida.split_whitespace().next().filter(|p| p.bytes().all(|b| b.is_ascii_digit())) {
+            if let Some(id) = salida
+                .split_whitespace()
+                .next()
+                .filter(|p| p.bytes().all(|b| b.is_ascii_digit()))
+            {
                 cerrar_aviso(cfg, id);
             }
             return false;
@@ -152,8 +162,8 @@ pub fn avisar_listo(cfg: &Config, carpeta: &Path, texto: &str) {
     if r.salida.trim() != "abrir" {
         return;
     }
-    let firma = socket_hyprland(cfg)
-        .and_then(|p| p.parent()?.file_name().map(|n| n.to_string_lossy().into_owned()));
+    let firma =
+        socket_hyprland(cfg).and_then(|p| p.parent()?.file_name().map(|n| n.to_string_lossy().into_owned()));
     let ruta = carpeta.to_string_lossy().replace('"', "");
     for orden in [
         format!("hl.dsp.exec_cmd(\"xdg-open '{ruta}'\")"),
@@ -190,7 +200,11 @@ fn leer_linea(c: &mut TcpStream, espera: Duration) -> Vec<u8> {
         match c.read(&mut t) {
             Ok(0) => break,
             Ok(n) => datos.extend_from_slice(&t[..n]),
-            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
             Err(_) => break,
         }
     }
@@ -285,7 +299,10 @@ impl Servicio {
         let ultimo = std::cell::Cell::new(None::<Instant>);
         let mut avance = |n: u64| {
             let ahora = Instant::now();
-            if ultimo.get().is_none_or(|u| ahora.duration_since(u) >= Duration::from_secs(1)) {
+            if ultimo
+                .get()
+                .is_none_or(|u| ahora.duration_since(u) >= Duration::from_secs(1))
+            {
                 ultimo.set(Some(ahora));
                 let ok = responder(&mut avisos, json!({"r": "avance", "bytes": n}));
                 vivo.set(vivo.get() && ok);
@@ -304,7 +321,10 @@ impl Servicio {
         };
         responder(c, json!({"r": "listo"}));
         let _ = c.shutdown(std::net::Shutdown::Both);
-        let nombre_de = |p: &PathBuf| p.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+        let nombre_de = |p: &PathBuf| {
+            p.file_name()
+                .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+        };
         let nombre = if quedaron.len() == 1 {
             nombre_de(&quedaron[0])
         } else {
