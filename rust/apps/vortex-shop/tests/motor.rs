@@ -996,7 +996,7 @@ fn ids_raros_se_rechazan_sin_tocar_flatpak() {
         assert!(f.quitar(malo, None).is_err());
         assert!(f.abrir(malo).is_err());
         assert!(f.es_del_sistema(malo).is_err());
-        assert!(f.actualizar(Some(&[malo.clone()]), None).is_err());
+        assert!(f.actualizar(Some(std::slice::from_ref(malo)), None).is_err());
     }
     assert_eq!(b.llamadas(), antes);
     assert!(!marca.exists());
@@ -1075,12 +1075,13 @@ fn deshacer_url(t: &str) -> String {
     let mut v = Vec::new();
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'%' && i + 2 < b.len() + 0 {
-            if let Ok(x) = u8::from_str_radix(&t[i + 1..i + 3], 16) {
-                v.push(x);
-                i += 3;
-                continue;
-            }
+        if b[i] == b'%'
+            && i + 2 < b.len()
+            && let Ok(x) = u8::from_str_radix(&t[i + 1..i + 3], 16)
+        {
+            v.push(x);
+            i += 3;
+            continue;
         }
         v.push(b[i]);
         i += 1;

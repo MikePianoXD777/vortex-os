@@ -163,11 +163,12 @@ use vortex_shop::instancia::{self, Escucha};
 use vortex_shop::motor::MotorReal;
 use vortex_shop::proceso::Entorno;
 use vortex_shop::propias::Propias;
-use vortex_shop::tienda::{Evento, Grupo, Sumidero, Tienda};
+use vortex_shop::tienda::{Evento, Sumidero, Tienda};
 
 /// La carpeta de los QML (de ahí salen los íconos de las apps propias); `main` la pone antes de abrir.
 pub static CARPETA_QML: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
+#[derive(Default)]
 pub struct PuenteRust {
     tienda: Option<Arc<Tienda>>,
     estados: QVariant,
@@ -203,47 +204,6 @@ pub struct PuenteRust {
     android_cargado: bool,
     num_actualizaciones: i32,
     android_pct: i32,
-}
-
-impl Default for PuenteRust {
-    fn default() -> Self {
-        PuenteRust {
-            tienda: None,
-            estados: QVariant::default(),
-            instaladas_ids: QVariant::default(),
-            sistema_ids: QVariant::default(),
-            instaladas: QVariant::default(),
-            actualizables_ids: QVariant::default(),
-            actualizables: QVariant::default(),
-            categorias: QVariant::default(),
-            recomendadas: QVariant::default(),
-            populares: QVariant::default(),
-            categoria_actual: QVariant::default(),
-            categoria_apps: QVariant::default(),
-            busqueda_apps: QVariant::default(),
-            detalle: QVariant::default(),
-            propias: QVariant::default(),
-            propias_estados: QVariant::default(),
-            android_estado: QVariant::default(),
-            android_apps: QVariant::default(),
-            android_populares: QVariant::default(),
-            inicio_estado: QString::default(),
-            categoria_estado: QString::default(),
-            busqueda_texto: QString::default(),
-            busqueda_estado: QString::default(),
-            detalle_estado: QString::default(),
-            android_fase: QString::default(),
-            android_paso: QString::default(),
-            android_id: QString::default(),
-            revisando_actualizaciones: false,
-            ocupado: false,
-            categoria_hay_mas: false,
-            categoria_cargando_mas: false,
-            android_cargado: false,
-            num_actualizaciones: 0,
-            android_pct: 0,
-        }
-    }
 }
 
 fn texto(v: &Value) -> QString {
@@ -288,10 +248,14 @@ impl qobject::Puente {
             "androidFase" => self.as_mut().set_android_fase(texto(v)),
             "androidPaso" => self.as_mut().set_android_paso(texto(v)),
             "androidId" => self.as_mut().set_android_id(texto(v)),
-            "revisandoActualizaciones" => self.as_mut().set_revisando_actualizaciones(v.as_bool().unwrap_or(false)),
+            "revisandoActualizaciones" => self
+                .as_mut()
+                .set_revisando_actualizaciones(v.as_bool().unwrap_or(false)),
             "ocupado" => self.as_mut().set_ocupado(v.as_bool().unwrap_or(false)),
             "categoriaHayMas" => self.as_mut().set_categoria_hay_mas(v.as_bool().unwrap_or(false)),
-            "categoriaCargandoMas" => self.as_mut().set_categoria_cargando_mas(v.as_bool().unwrap_or(false)),
+            "categoriaCargandoMas" => self
+                .as_mut()
+                .set_categoria_cargando_mas(v.as_bool().unwrap_or(false)),
             "androidCargado" => self.as_mut().set_android_cargado(v.as_bool().unwrap_or(false)),
             "numActualizaciones" => self.as_mut().set_num_actualizaciones(entero(v)),
             "androidPct" => self.as_mut().set_android_pct(entero(v)),
@@ -396,7 +360,6 @@ impl cxx_qt::Initialize for qobject::Puente {
         }
     }
 }
-
 
 impl qobject::Puente {
     pub fn iniciar(self: Pin<&mut Self>) {
@@ -572,5 +535,4 @@ impl qobject::Puente {
             t.abrir(&app_id.to_string());
         }
     }
-
 }

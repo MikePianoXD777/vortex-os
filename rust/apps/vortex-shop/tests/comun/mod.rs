@@ -17,7 +17,13 @@ pub mod falso;
 pub const PRISM: &str = "org.prismlauncher.PrismLauncher";
 
 pub fn aqui() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests")
+    // también la usan las pruebas de la ventana (crate `qt`), que comparten estos datos y falsos
+    let propia = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
+    if propia.join("datos").is_dir() {
+        propia
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests")
+    }
 }
 
 pub fn leer_datos(nombre: &str) -> String {
@@ -333,8 +339,10 @@ impl BaseFlatpak {
     }
 }
 
+pub type Avances = Arc<Mutex<Vec<(i32, String)>>>;
+
 /// Recoge lo que avisa `progreso`.
-pub fn avance() -> (Arc<Mutex<Vec<(i32, String)>>>, impl Fn(i32, &str) + Sync + Clone) {
+pub fn avance() -> (Avances, impl Fn(i32, &str) + Sync + Clone) {
     let eventos = Arc::new(Mutex::new(Vec::new()));
     let e2 = eventos.clone();
     (eventos, move |p, t: &str| {

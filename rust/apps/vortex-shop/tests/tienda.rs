@@ -180,7 +180,8 @@ fn la_cola_instala_de_una_en_una_en_el_orden_pedido() {
         a.tienda.instalar(i);
     }
     assert!(a.ocupado(), "ocupado = true al encolar");
-    assert_eq!(a.tienda.leer("estados")[ids[0]]["fase"], "cola");
+    // la primera puede pasar a «instalando» enseguida; la última siempre espera su turno
+    assert_eq!(a.tienda.leer("estados")[ids[2]]["fase"], "cola");
     assert!(esperar_hasta(5.0, || a.tienda.leer("estados")[ids[0]]["pct"]
         .as_i64()
         .unwrap_or(0)
