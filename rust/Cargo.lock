@@ -897,6 +897,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-shared"
+version = "1.0.0"
+dependencies = [
+ "libc",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
+name = "vortex-shared-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-shared",
+]
+
+[[package]]
 name = "wasip2"
 version = "1.0.4+wasi-0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
