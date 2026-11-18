@@ -53,10 +53,12 @@ probar "lista dice el juego y cuántas" "[[ \"\$('$VG' lista)\" == 'Mi Juego: Ed
 rm -f "$U/Documents/My Games/slot1.sav" "$U/Documents/My Games/slot2.sav"
 echo "rota" >"$U/Documents/My Games/slot8.sav"
 mkdir -p "$T/bin2"; printf '#!/bin/sh\nexit 1\n' >"$T/bin2/vortex"; chmod +x "$T/bin2/vortex"
-PATH="$T/bin2:$PATH" "$VG" restaurar "mi juego"
+# Con la regla de siempre (una copia por hora como mucho): restaurar justo después de una copia también debe
+# guardar lo de ahora.
+PATH="$T/bin2:$PATH" VORTEX_GUARDADOS_MINUTOS=60 "$VG" restaurar "mi juego"
 probar "restaurar devuelve lo borrado" "[[ -f '$U/Documents/My Games/slot8.sav' && \$(cat '$U/Documents/My Games/slot8.sav') == 'partida 8' ]]"
 probar "y avisa claro" "grep -q 'Partidas restauradas' '$T/avisos'"
-probar "lo que había antes queda como otra copia" "[[ \$(nombre_copias) == 5 ]] && tar -xzOf \$(ls -1t '$D'/mi-juego-edicion-epica-1234/*.tar.gz | head -n1) '${U#/}/Documents/My Games/slot8.sav' | grep -q 'partida 8' || true"
+probar "lo que había antes queda como otra copia (aunque la última sea de hace segundos)" "[[ \$(nombre_copias) == 5 ]] && tar -xzOf \$(ls -1t '$D'/mi-juego-edicion-epica-1234/*.tar.gz | head -n1) '${U#/}/Documents/My Games/slot8.sav' | grep -qx 'rota'"
 mkdir -p "$T/bin3"; printf '#!/bin/sh\nexit 0\n' >"$T/bin3/vortex"; chmod +x "$T/bin3/vortex"
 probar "con un juego abierto, no restaura" "! PATH='$T/bin3:$PATH' '$VG' restaurar 'mi juego' 2>'$T/err' && grep -q 'Estás jugando' '$T/err'"
 probar "un juego sin copias lo dice" "! '$VG' restaurar 'Nada' 2>'$T/err' && grep -q 'No tengo copias' '$T/err'"

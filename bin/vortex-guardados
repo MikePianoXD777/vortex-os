@@ -212,7 +212,9 @@ restaurar() {
   if [[ -f "$carpetas" ]]; then
     local -a actuales=()
     mapfile -t actuales <"$carpetas"
-    (VORTEX_GUARDADOS_MINUTOS=0 copiar "$(cat "$dir/.nombre")" "$(basename "$dir")" "${actuales[@]}") || true
+    # (MIN_ENTRE_COPIAS, no VORTEX_GUARDADOS_MINUTOS: esa variable solo se lee al arrancar el script. Con ella,
+    # restaurar menos de una hora después de la última copia perdía lo de ahora sin decir nada.)
+    (MIN_ENTRE_COPIAS=0 copiar "$(cat "$dir/.nombre")" "$(basename "$dir")" "${actuales[@]}") || true
   fi
   if ! tar -C / -xzf "$elegida"; then
     unlink "$elegida"
