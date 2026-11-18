@@ -112,8 +112,18 @@ mod pruebas {
         let r = tmp.path().join("sock");
         assert!(!avisar_a_la_abierta(&r, &Mensaje { archivo: "x".into() }));
         let e = Escucha::new(&r).unwrap();
-        assert!(avisar_a_la_abierta(&r, &Mensaje { archivo: "/a/b c.zip".into() }));
-        assert!(avisar_a_la_abierta(&r, &Mensaje { archivo: String::new() }));
+        assert!(avisar_a_la_abierta(
+            &r,
+            &Mensaje {
+                archivo: "/a/b c.zip".into()
+            }
+        ));
+        assert!(avisar_a_la_abierta(
+            &r,
+            &Mensaje {
+                archivo: String::new()
+            }
+        ));
         std::thread::sleep(Duration::from_millis(50));
         let m = e.revisar();
         assert_eq!(m.len(), 2);

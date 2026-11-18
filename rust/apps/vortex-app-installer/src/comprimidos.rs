@@ -33,10 +33,26 @@ use std::time::Duration;
 type Renglon = Arc<dyn Fn(&str, bool) + Send + Sync>;
 
 pub const EXT_TAR: &[&str] = &[
-    ".tar.gz", ".tar.xz", ".tar.zst", ".tar.bz2", ".tar.lz4", ".tar.lzma", ".tar.lz", ".tgz", ".txz",
-    ".tzst", ".tbz2", ".tbz", ".tar",
+    ".tar.gz",
+    ".tar.xz",
+    ".tar.zst",
+    ".tar.bz2",
+    ".tar.lz4",
+    ".tar.lzma",
+    ".tar.lz",
+    ".tgz",
+    ".txz",
+    ".tzst",
+    ".tbz2",
+    ".tbz",
+    ".tar",
 ];
-pub const EXT_SUELTOS: &[(&str, &str)] = &[(".gz", "gzip"), (".xz", "xz"), (".zst", "zstd"), (".bz2", "bzip2")];
+pub const EXT_SUELTOS: &[(&str, &str)] = &[
+    (".gz", "gzip"),
+    (".xz", "xz"),
+    (".zst", "zstd"),
+    (".bz2", "bzip2"),
+];
 pub const EXT_OTROS: &[&str] = &[".zip", ".rar", ".7z", ".iso"];
 
 /// Contraseña de relleno: con ella bsdtar nunca pregunta (sin `--passphrase` intentaría leer la terminal).
@@ -62,7 +78,14 @@ impl Error {
     pub fn contrasena(ctx: &Contexto, incorrecta: bool) -> Error {
         Error::Contrasena {
             incorrecta,
-            mensaje: ctx.tr(if incorrecta { "contrasena_mala" } else { "contrasena_pide" }, &[]),
+            mensaje: ctx.tr(
+                if incorrecta {
+                    "contrasena_mala"
+                } else {
+                    "contrasena_pide"
+                },
+                &[],
+            ),
         }
     }
 }
@@ -144,7 +167,11 @@ pub fn formato_suelto(ctx: &Contexto, ruta: &Path) -> Option<&'static str> {
     }
     for (ext, fmt) in EXT_SUELTOS {
         if n.ends_with(ext) {
-            return if es_tar_por_dentro(ctx, ruta, fmt) { None } else { Some(fmt) };
+            return if es_tar_por_dentro(ctx, ruta, fmt) {
+                None
+            } else {
+                Some(fmt)
+            };
         }
     }
     None
@@ -205,7 +232,11 @@ pub fn peligrosa(e: &Entrada) -> bool {
         if e.destino.starts_with('/') {
             return e.tipo == Tipo::Enlace; // un enlace duro «/x» bsdtar lo deja dentro (le quita la «/»)
         }
-        let base = if e.tipo == Tipo::Enlace { dirname(&e.nombre) } else { String::new() };
+        let base = if e.tipo == Tipo::Enlace {
+            dirname(&e.nombre)
+        } else {
+            String::new()
+        };
         let norm = normpath(&unir(&base, &e.destino));
         return norm == ".." || norm.starts_with("../");
     }
@@ -237,7 +268,11 @@ pub fn raiz_unica(entradas: &[Entrada]) -> Option<String> {
 }
 
 pub fn tamano_total(entradas: &[Entrada]) -> u64 {
-    entradas.iter().filter(|e| e.tipo == Tipo::Archivo).map(|e| e.tamano).sum()
+    entradas
+        .iter()
+        .filter(|e| e.tipo == Tipo::Archivo)
+        .map(|e| e.tamano)
+        .sum()
 }
 
 /// Dónde queda lo descomprimido: la carpeta que ya trae, o una con el nombre del archivo.
@@ -251,7 +286,12 @@ pub fn destino_sugerido(archivo: &Path, entradas: &[Entrada], padre: &Path) -> P
 // --------------------------------------------------------------------------------------- procesos
 
 /// Corre un programa con los mensajes en inglés y UTF-8 (los que se reconocen), sin terminal.
-pub(crate) fn correr(ctx: &Contexto, programa: &str, args: &[String], limite: Option<Duration>) -> Resultado<proc::Salida> {
+pub(crate) fn correr(
+    ctx: &Contexto,
+    programa: &str,
+    args: &[String],
+    limite: Option<Duration>,
+) -> Resultado<proc::Salida> {
     let mut c = ctx.comando(programa);
     c.args(args).env("LC_ALL", "C.UTF-8").env("LANG", "C.UTF-8");
     match proc::ejecutar(c, None, limite) {
@@ -340,7 +380,10 @@ fn desde_bsdtar(salida: &str) -> Vec<Entrada> {
         let mut destino = String::new();
         let tipo;
         if modo.starts_with('l') && nombre.contains(" -> ") {
-            let (n, d) = nombre.split_once(" -> ").map(|(a, b)| (a.to_string(), b.to_string())).unwrap_or_default();
+            let (n, d) = nombre
+                .split_once(" -> ")
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .unwrap_or_default();
             nombre = n;
             destino = d;
             tipo = Tipo::Enlace;
@@ -361,7 +404,11 @@ fn desde_bsdtar(salida: &str) -> Vec<Entrada> {
         if nombre.is_empty() || nombre == "." {
             continue;
         }
-        let tam = if tipo == Tipo::Archivo { m["tam"].parse().unwrap_or(0) } else { 0 };
+        let tam = if tipo == Tipo::Archivo {
+            m["tam"].parse().unwrap_or(0)
+        } else {
+            0
+        };
         entradas.push(Entrada {
             nombre,
             tipo,
@@ -403,7 +450,10 @@ fn desde_7z(salida: &str) -> Vec<Entrada> {
             bloque.insert(k.trim().to_string(), v.to_string());
         }
     }
-    if entradas.first().is_some_and(|e| e.nombre.ends_with(".7z") || e.nombre.ends_with(".rar")) {
+    if entradas
+        .first()
+        .is_some_and(|e| e.nombre.ends_with(".7z") || e.nombre.ends_with(".rar"))
+    {
         entradas.remove(0);
     }
     entradas
@@ -470,7 +520,12 @@ pub fn listar(ctx: &Contexto, archivo: &Path, contrasena: Option<&str>) -> Resul
     let r = correr(
         ctx,
         &bsdtar(ctx)?,
-        &["-tvf".into(), s(archivo), "--passphrase".into(), contrasena.unwrap_or(RELLENO).into()],
+        &[
+            "-tvf".into(),
+            s(archivo),
+            "--passphrase".into(),
+            contrasena.unwrap_or(RELLENO).into(),
+        ],
         Some(Duration::from_secs(600)),
     )?;
     if r.codigo == Some(0) {
@@ -500,7 +555,11 @@ fn otro_programa(archivo: &Path) -> Option<&'static str> {
 /// Resuelve «rar» a `unrar` si está instalado, si no `7z`.
 fn programa_de_respaldo(ctx: &Contexto, p: &'static str) -> &'static str {
     if p == "rar" {
-        if ctx.which("unrar").is_some() { "unrar" } else { "7z" }
+        if ctx.which("unrar").is_some() {
+            "unrar"
+        } else {
+            "7z"
+        }
     } else {
         p
     }
@@ -515,14 +574,25 @@ fn exe_7z(ctx: &Contexto) -> Resultado<String> {
     Err(Error::falta_programa(ctx, "7z"))
 }
 
-fn listar_con(ctx: &Contexto, programa: &'static str, archivo: &Path, contrasena: Option<&str>) -> Resultado<Vec<Entrada>> {
+fn listar_con(
+    ctx: &Contexto,
+    programa: &'static str,
+    archivo: &Path,
+    contrasena: Option<&str>,
+) -> Resultado<Vec<Entrada>> {
     let programa = programa_de_respaldo(ctx, programa);
     if programa == "unrar" {
-        let exe = ctx.which("unrar").ok_or_else(|| Error::falta_programa(ctx, "unrar"))?;
+        let exe = ctx
+            .which("unrar")
+            .ok_or_else(|| Error::falta_programa(ctx, "unrar"))?;
         let r = correr(
             ctx,
             &s(&exe),
-            &["lt".into(), format!("-p{}", contrasena.unwrap_or("-")), s(archivo)],
+            &[
+                "lt".into(),
+                format!("-p{}", contrasena.unwrap_or("-")),
+                s(archivo),
+            ],
             Some(Duration::from_secs(600)),
         )?;
         if r.codigo == Some(0) {
@@ -536,7 +606,12 @@ fn listar_con(ctx: &Contexto, programa: &'static str, archivo: &Path, contrasena
     let r = correr(
         ctx,
         &exe_7z(ctx)?,
-        &["l".into(), "-slt".into(), format!("-p{}", contrasena.unwrap_or(RELLENO)), s(archivo)],
+        &[
+            "l".into(),
+            "-slt".into(),
+            format!("-p{}", contrasena.unwrap_or(RELLENO)),
+            s(archivo),
+        ],
         Some(Duration::from_secs(600)),
     )?;
     if r.codigo == Some(0) {
@@ -577,12 +652,7 @@ fn limpiar_enlaces(raiz: &Path) -> Vec<String> {
                 let b = base.to_string_lossy();
                 if real != b && !real.starts_with(&format!("{b}/")) {
                     let _ = std::fs::remove_file(&p);
-                    quitados.push(
-                        p.strip_prefix(base)
-                            .unwrap_or(&p)
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
+                    quitados.push(p.strip_prefix(base).unwrap_or(&p).to_string_lossy().into_owned());
                 }
             } else if m.is_dir() {
                 recorrer(&p, base, quitados);
@@ -604,14 +674,20 @@ fn permiso_de_escritura(raiz: &Path) {
             if let Ok(m) = std::fs::symlink_metadata(&p)
                 && m.is_dir()
             {
-                let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(m.permissions().mode() | 0o700));
+                let _ = std::fs::set_permissions(
+                    &p,
+                    std::fs::Permissions::from_mode(m.permissions().mode() | 0o700),
+                );
                 recorrer(&p);
             }
         }
     }
     recorrer(raiz);
     if let Ok(m) = std::fs::metadata(raiz) {
-        let _ = std::fs::set_permissions(raiz, std::fs::Permissions::from_mode(m.permissions().mode() | 0o700));
+        let _ = std::fs::set_permissions(
+            raiz,
+            std::fs::Permissions::from_mode(m.permissions().mode() | 0o700),
+        );
     }
 }
 
@@ -743,8 +819,15 @@ fn vigilar(
             if let Some(actual) = actual {
                 let parcial = std::fs::symlink_metadata(temporal.join(&actual)).map_or(0, |m| m.len());
                 let a = avance.lock().ok();
-                let (hecho, contado) = a.as_ref().map_or((0, true), |a| (a.hecho, a.contados.contains(&actual)));
-                let ya = hecho + if contado { 0 } else { parcial.min(tamanos.get(&actual).copied().unwrap_or(0)) };
+                let (hecho, contado) = a
+                    .as_ref()
+                    .map_or((0, true), |a| (a.hecho, a.contados.contains(&actual)));
+                let ya = hecho
+                    + if contado {
+                        0
+                    } else {
+                        parcial.min(tamanos.get(&actual).copied().unwrap_or(0))
+                    };
                 control.avanzar((ya as f64 / total as f64).min(1.0));
             }
         }
@@ -753,7 +836,8 @@ fn vigilar(
     for l in lectores {
         let _ = l.join();
     }
-    let texto = String::from_utf8_lossy(&partes_leidas.lock().map(|p| p.clone()).unwrap_or_default()).into_owned();
+    let texto =
+        String::from_utf8_lossy(&partes_leidas.lock().map(|p| p.clone()).unwrap_or_default()).into_owned();
     Ok(Terminado {
         texto,
         codigo: estado.and_then(|e| e.code()),
@@ -849,7 +933,17 @@ pub fn extraer(
     std::fs::create_dir_all(padre)?;
     let fmt = formato_suelto(ctx, archivo);
     let temporal = nueva_carpeta_temporal(padre)?;
-    let r = extraer_en_temporal(ctx, archivo, destino, entradas, contrasena, control, quitar_raiz, fmt, &temporal);
+    let r = extraer_en_temporal(
+        ctx,
+        archivo,
+        destino,
+        entradas,
+        contrasena,
+        control,
+        quitar_raiz,
+        fmt,
+        &temporal,
+    );
     if temporal.exists() {
         borrar_arbol(&temporal);
     }
@@ -898,7 +992,11 @@ fn extraer_en_temporal(
         .map(|e| (e.nombre.clone(), e.tamano))
         .collect();
     extraer_en(ctx, archivo, temporal, &tamanos, contrasena, control)?;
-    let mut saltados: Vec<String> = entradas.iter().filter(|e| peligrosa(e)).map(|e| e.nombre.clone()).collect();
+    let mut saltados: Vec<String> = entradas
+        .iter()
+        .filter(|e| peligrosa(e))
+        .map(|e| e.nombre.clone())
+        .collect();
     for q in limpiar_enlaces(temporal) {
         if !saltados.contains(&q) {
             saltados.push(q);
@@ -986,7 +1084,9 @@ fn extraer_con(
 ) -> Resultado<()> {
     let programa = programa_de_respaldo(ctx, programa);
     let (exe, args, unido) = if programa == "unrar" {
-        let exe = ctx.which("unrar").ok_or_else(|| Error::falta_programa(ctx, "unrar"))?;
+        let exe = ctx
+            .which("unrar")
+            .ok_or_else(|| Error::falta_programa(ctx, "unrar"))?;
         (
             s(&exe),
             vec![
@@ -1031,13 +1131,23 @@ fn extraer_con(
 
 /// Un archivo suelto: se le pasa por la tubería del programa que lo descomprime, y el avance es lo que ya
 /// se leyó del archivo.
-fn extraer_suelto(ctx: &Contexto, archivo: &Path, fmt: &str, salida: &Path, control: &Control) -> Resultado<()> {
+fn extraer_suelto(
+    ctx: &Contexto,
+    archivo: &Path,
+    fmt: &str,
+    salida: &Path,
+    control: &Control,
+) -> Resultado<()> {
     let (exe, opcion) = descompresor(fmt);
     let exe = ctx.which(exe).ok_or_else(|| Error::falta_programa(ctx, exe))?;
     let danado = || Error::Mensaje(ctx.tr("comprimido_danado", &[]));
     let total = std::fs::metadata(archivo).map_or(1, |m| m.len()).max(1);
     let mut crudo = std::fs::File::open(archivo)?;
-    let fuera = match std::fs::OpenOptions::new().write(true).create_new(true).open(salida) {
+    let fuera = match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(salida)
+    {
         Ok(f) => f,
         Err(e) if e.raw_os_error() == Some(28) => return Err(Error::Mensaje(ctx.tr("sin_espacio", &[]))),
         Err(_) => return Err(danado()),
@@ -1112,7 +1222,10 @@ mod pruebas {
             destino_sugerido(Path::new("/d/P-2.0.tar.gz"), &a, Path::new("/d")),
             PathBuf::from("/d/P-2.0")
         );
-        let b = vec![Entrada::new("a.jpg", Tipo::Archivo, 1), Entrada::new("b.jpg", Tipo::Archivo, 1)];
+        let b = vec![
+            Entrada::new("a.jpg", Tipo::Archivo, 1),
+            Entrada::new("b.jpg", Tipo::Archivo, 1),
+        ];
         assert_eq!(raiz_unica(&b), None);
         assert_eq!(
             destino_sugerido(Path::new("/d/fotos.zip"), &b, Path::new("/d")),
@@ -1147,7 +1260,10 @@ mod pruebas {
         assert_eq!(v[0].nombre, "carpeta");
         assert_eq!((v[1].tamano, v[1].ejecutable()), (12, true));
         assert_eq!((v[2].tipo, v[2].destino.as_str()), (Tipo::Enlace, "a b.txt"));
-        assert_eq!((v[3].tipo, v[3].destino.as_str()), (Tipo::Duro, "carpeta/a b.txt"));
+        assert_eq!(
+            (v[3].tipo, v[3].destino.as_str()),
+            (Tipo::Duro, "carpeta/a b.txt")
+        );
     }
 
     #[test]

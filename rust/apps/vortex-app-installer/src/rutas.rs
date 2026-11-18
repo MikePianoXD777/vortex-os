@@ -16,11 +16,7 @@ pub struct Rutas {
 
 impl Rutas {
     pub fn del_entorno() -> Self {
-        let var = |n: &str| {
-            std::env::var_os(n)
-                .map(PathBuf::from)
-                .filter(|p| p.is_absolute())
-        };
+        let var = |n: &str| std::env::var_os(n).map(PathBuf::from).filter(|p| p.is_absolute());
         Rutas {
             casa: std::env::var_os("HOME")
                 .filter(|v| !v.is_empty())
@@ -132,8 +128,19 @@ impl Rutas {
             self.papelera(),
         ];
         for n in [
-            "Descargas", "Downloads", "Documentos", "Documents", "Escritorio", "Desktop", "Imágenes",
-            "Pictures", "Música", "Music", "Vídeos", "Videos", ".minecraft",
+            "Descargas",
+            "Downloads",
+            "Documentos",
+            "Documents",
+            "Escritorio",
+            "Desktop",
+            "Imágenes",
+            "Pictures",
+            "Música",
+            "Music",
+            "Vídeos",
+            "Videos",
+            ".minecraft",
         ] {
             fijas.push(c.join(n));
         }

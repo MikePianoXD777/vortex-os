@@ -38,7 +38,11 @@ pub fn tamano_legible(ctx: &Contexto, n: u64) -> String {
     for unidad in ["KB", "MB", "GB", "TB"] {
         x /= 1024.0;
         if x < 1024.0 || unidad == "TB" {
-            let mut texto = if x >= 100.0 { format!("{x:.0}") } else { format!("{x:.1}") };
+            let mut texto = if x >= 100.0 {
+                format!("{x:.0}")
+            } else {
+                format!("{x:.1}")
+            };
             if texto.ends_with(".0") {
                 texto.truncate(texto.len() - 2);
             }
@@ -75,11 +79,16 @@ pub fn analizar(ctx: &Contexto, ruta: &Path, contrasena: Option<&str>) -> Info {
         }
     }
     if info.tipo == "windows" {
-        info.extra.insert("opciones_windows".into(), Value::Array(instalar::opciones_windows(ctx)));
+        info.extra.insert(
+            "opciones_windows".into(),
+            Value::Array(instalar::opciones_windows(ctx)),
+        );
     }
     if info.tipo == "mod" {
-        info.extra
-            .insert("instancias".into(), mods::instancias(ctx).map_or(Value::Null, Value::Array));
+        info.extra.insert(
+            "instancias".into(),
+            mods::instancias(ctx).map_or(Value::Null, Value::Array),
+        );
     }
     if info.tipo == "flatpakref" && info.extra_texto("nombre_programa").is_empty() {
         let stem = crate::util::raiz_de_nombre(&info.nombre).to_string();
@@ -107,7 +116,15 @@ pub const TIPOS: [(&str, &str); 13] = [
     ("falta", "tipo_falta"),
 ];
 
-fn accion(id: &str, texto: &str, tipo: &str, icono: &str, confirmar: Option<Value>, carpeta: bool, datos: Option<Value>) -> Value {
+fn accion(
+    id: &str,
+    texto: &str,
+    tipo: &str,
+    icono: &str,
+    confirmar: Option<Value>,
+    carpeta: bool,
+    datos: Option<Value>,
+) -> Value {
     json!({"id": id, "texto": texto, "tipo": tipo, "icono": icono, "confirmar": confirmar.unwrap_or_else(|| json!({})),
            "elegirCarpeta": carpeta, "datos": datos.unwrap_or_else(|| json!({}))})
 }
@@ -153,7 +170,17 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
     } else if info.de_internet {
         json!(ctx.tr("origen_descargas", &[]))
     } else {
-        json!(ctx.tr("origen_carpeta", &[("carpeta", if nombre_corto.is_empty() { "/" } else { &nombre_corto })]))
+        json!(ctx.tr(
+            "origen_carpeta",
+            &[(
+                "carpeta",
+                if nombre_corto.is_empty() {
+                    "/"
+                } else {
+                    &nombre_corto
+                }
+            )]
+        ))
     };
     if info.ejecuta_codigo() && info.de_internet {
         vista["aviso"] = json!(ctx.tr("aviso_internet", &[]));
@@ -195,10 +222,37 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
             };
             if t == "programa" {
                 let (carpeta, _) = instalar::plan_programa(entradas, ruta);
-                vista["descripcion"] = json!(ctx.tr("desc_programa", &[("carpeta", &format!("~/.local/opt/{carpeta}"))]));
-                acciones.push(accion("instalar_programa", &ctx.tr("boton_instalar", &[]), "primario", "descargar", None, false, None));
-                acciones.push(accion("descomprimir", &ctx.tr("boton_descomprimir_aqui", &[]), "secundario", "caja", None, false, None));
-                acciones.push(accion("descomprimir", &ctx.tr("boton_descomprimir_en", &[]), "secundario", "carpeta", None, true, None));
+                vista["descripcion"] = json!(ctx.tr(
+                    "desc_programa",
+                    &[("carpeta", &format!("~/.local/opt/{carpeta}"))]
+                ));
+                acciones.push(accion(
+                    "instalar_programa",
+                    &ctx.tr("boton_instalar", &[]),
+                    "primario",
+                    "descargar",
+                    None,
+                    false,
+                    None,
+                ));
+                acciones.push(accion(
+                    "descomprimir",
+                    &ctx.tr("boton_descomprimir_aqui", &[]),
+                    "secundario",
+                    "caja",
+                    None,
+                    false,
+                    None,
+                ));
+                acciones.push(accion(
+                    "descomprimir",
+                    &ctx.tr("boton_descomprimir_en", &[]),
+                    "secundario",
+                    "carpeta",
+                    None,
+                    true,
+                    None,
+                ));
             } else if info.extra_si("pide_contrasena") || !info.error.is_empty() || !entradas.is_empty() {
                 vista["descripcion"] = if entradas.is_empty() {
                     json!(ctx.tr("desc_comprimido_sin_lista", &[]))
@@ -206,8 +260,24 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
                     json!(ctx.tr("desc_comprimido", &[("destino", &nombre_de(&destino))]))
                 };
                 if info.error.is_empty() {
-                    acciones.push(accion("descomprimir", &ctx.tr("boton_descomprimir", &[]), "primario", "caja", None, false, None));
-                    acciones.push(accion("descomprimir", &ctx.tr("boton_descomprimir_en", &[]), "secundario", "carpeta", None, true, None));
+                    acciones.push(accion(
+                        "descomprimir",
+                        &ctx.tr("boton_descomprimir", &[]),
+                        "primario",
+                        "caja",
+                        None,
+                        false,
+                        None,
+                    ));
+                    acciones.push(accion(
+                        "descomprimir",
+                        &ctx.tr("boton_descomprimir_en", &[]),
+                        "secundario",
+                        "carpeta",
+                        None,
+                        true,
+                        None,
+                    ));
                 }
             } else {
                 vista["descripcion"] = json!(ctx.tr("desc_comprimido_vacio", &[]));
@@ -222,7 +292,15 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
                     &ctx.tr("boton_instalar", &[]),
                 )
             });
-            acciones.push(accion("instalar_appimage", &ctx.tr("boton_instalar", &[]), "primario", "descargar", conf, false, None));
+            acciones.push(accion(
+                "instalar_appimage",
+                &ctx.tr("boton_instalar", &[]),
+                "primario",
+                "descargar",
+                conf,
+                false,
+                None,
+            ));
             acciones.push(accion(
                 "abrir_appimage",
                 &ctx.tr("boton_solo_abrir", &[]),
@@ -263,7 +341,11 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
         }
         "deb" | "rpm" => {
             let app = info.extra.get("flathub").filter(|v| v.is_object());
-            let base = if t == "deb" { ctx.tr("desc_deb", &[]) } else { ctx.tr("desc_rpm", &[]) };
+            let base = if t == "deb" {
+                ctx.tr("desc_deb", &[])
+            } else {
+                ctx.tr("desc_rpm", &[])
+            };
             let nombre = {
                 let n = info.extra_texto("nombre_programa");
                 if n.is_empty() { info.nombre.clone() } else { n }
@@ -286,7 +368,10 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
             } else if info.extra_si("flathub_sin_red") {
                 vista["descripcion"] = json!(format!("{base} {}", ctx.tr("desc_flathub_sin_red", &[])));
             } else {
-                vista["descripcion"] = json!(format!("{base} {}", ctx.tr("desc_no_flathub", &[("nombre", &nombre)])));
+                vista["descripcion"] = json!(format!(
+                    "{base} {}",
+                    ctx.tr("desc_no_flathub", &[("nombre", &nombre)])
+                ));
             }
             acciones.push(accion(
                 "ver_contenido",
@@ -305,14 +390,26 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
             } else {
                 let nombre = {
                     let n = info.extra_texto("nombre_programa");
-                    if n.is_empty() { crate::util::raiz_de_nombre(&info.nombre).to_string() } else { n }
+                    if n.is_empty() {
+                        crate::util::raiz_de_nombre(&info.nombre).to_string()
+                    } else {
+                        n
+                    }
                 };
                 vista["descripcion"] = json!(if t == "flatpakref" {
                     ctx.tr("desc_flatpakref", &[("nombre", &nombre)])
                 } else {
                     ctx.tr("desc_flatpak", &[])
                 });
-                acciones.push(accion("instalar_flatpak", &ctx.tr("boton_instalar", &[]), "primario", "descargar", None, false, None));
+                acciones.push(accion(
+                    "instalar_flatpak",
+                    &ctx.tr("boton_instalar", &[]),
+                    "primario",
+                    "descargar",
+                    None,
+                    false,
+                    None,
+                ));
             }
         }
         "windows" => {
@@ -343,7 +440,11 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
             }
             vista["descripcion"] = json!(texto);
             for o in &opciones {
-                let tipo = if app.is_some() || !acciones.is_empty() { "secundario" } else { "primario" };
+                let tipo = if app.is_some() || !acciones.is_empty() {
+                    "secundario"
+                } else {
+                    "primario"
+                };
                 acciones.push(accion(
                     "windows",
                     &ctx.tr("boton_abrir_con", &[("programa", &texto_de(o, "nombre"))]),
@@ -378,7 +479,9 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
             vista["descripcion"] = json!(ctx.tr("desc_mod", &[("nombre", &nombre), ("loader", loader)]));
             vista["mod"] = m.clone();
             let instancias = info.extra.get("instancias");
-            let hay = instancias.and_then(Value::as_array).is_some_and(|l| !l.is_empty());
+            let hay = instancias
+                .and_then(Value::as_array)
+                .is_some_and(|l| !l.is_empty());
             match instancias {
                 Some(Value::Array(l)) if !l.is_empty() => {
                     let mod_loader = texto_de(&m, "loader");
@@ -435,8 +538,20 @@ pub fn para_mostrar(ctx: &Contexto, info: &Info) -> Value {
         _ => vista["descripcion"] = json!(ctx.tr("desc_desconocido", &[])),
     }
     if t != "falta" {
-        let tipo = if acciones.is_empty() { "primario" } else { "fantasma" };
-        acciones.push(accion("abrir_carpeta", &ctx.tr("boton_abrir_carpeta", &[]), tipo, "carpeta", None, false, None));
+        let tipo = if acciones.is_empty() {
+            "primario"
+        } else {
+            "fantasma"
+        };
+        acciones.push(accion(
+            "abrir_carpeta",
+            &ctx.tr("boton_abrir_carpeta", &[]),
+            tipo,
+            "carpeta",
+            None,
+            false,
+            None,
+        ));
     }
     vista["acciones"] = Value::Array(acciones);
     vista
@@ -487,17 +602,31 @@ fn traducir(ctx: &Contexto, e: Error) -> Error {
         Error::Conflicto { .. } | Error::Contrasena { .. } | Error::Cancelado | Error::Problema { .. } => e,
         Error::FaltaPrograma { mensaje, comando, .. } => Error::Problema { mensaje, comando },
         Error::Mensaje(m) => problema(m),
-        Error::Io(e) if e.kind() == std::io::ErrorKind::PermissionDenied => problema(ctx.tr("sin_permiso", &[])),
+        Error::Io(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            problema(ctx.tr("sin_permiso", &[]))
+        }
         Error::Io(e) if e.raw_os_error() == Some(28) => problema(ctx.tr("sin_espacio", &[])),
         Error::Io(e) => problema(ctx.tr("error_general", &[("detalle", &Error::texto_io(&e))])),
     }
 }
 
-pub fn ejecutar(ctx: &Contexto, info: &Info, accion: &str, opciones: &Opciones, control: &Control) -> Resultado<Value> {
+pub fn ejecutar(
+    ctx: &Contexto,
+    info: &Info,
+    accion: &str,
+    opciones: &Opciones,
+    control: &Control,
+) -> Resultado<Value> {
     hacer(ctx, info, accion, opciones, control).map_err(|e| traducir(ctx, e))
 }
 
-fn hacer(ctx: &Contexto, info: &Info, accion: &str, opciones: &Opciones, control: &Control) -> Resultado<Value> {
+fn hacer(
+    ctx: &Contexto,
+    info: &Info,
+    accion: &str,
+    opciones: &Opciones,
+    control: &Control,
+) -> Resultado<Value> {
     let ruta = PathBuf::from(&info.ruta);
     let contrasena = Some(opcion_texto(opciones, "contrasena")).filter(|c| !c.is_empty());
     let contrasena = contrasena.as_deref();
@@ -510,7 +639,14 @@ fn hacer(ctx: &Contexto, info: &Info, accion: &str, opciones: &Opciones, control
             } else {
                 info.entradas.clone()
             };
-            let e = instalar::instalar_programa(ctx, &ruta, &entradas, opcion_si(opciones, "reemplazar"), contrasena, control)?;
+            let e = instalar::instalar_programa(
+                ctx,
+                &ruta,
+                &entradas,
+                opcion_si(opciones, "reemplazar"),
+                contrasena,
+                control,
+            )?;
             let nombre = registro::texto_de(&e, "nombre");
             let mut r = resultado(
                 &ctx.tr("hecho_instalado", &[("nombre", nombre)]),
@@ -547,7 +683,13 @@ fn hacer(ctx: &Contexto, info: &Info, accion: &str, opciones: &Opciones, control
         }
         "correr" => {
             instalar::correr_script(ctx, &ruta)?;
-            hecho(resultado(&ctx.tr("hecho_terminal", &[]), &ctx.tr("hecho_terminal_texto", &[]), "", "", false))
+            hecho(resultado(
+                &ctx.tr("hecho_terminal", &[]),
+                &ctx.tr("hecho_terminal_texto", &[]),
+                "",
+                "",
+                false,
+            ))
         }
         "flathub" => {
             let de_info = info.extra.get("flathub").filter(|v| v.is_object());
@@ -590,10 +732,14 @@ fn hacer(ctx: &Contexto, info: &Info, accion: &str, opciones: &Opciones, control
         }
         "instalar_flatpak" => {
             let app_id = flatpak::instalar_archivo(ctx, &ruta, &info.tipo, control)?;
-            let nombre = [info.extra_texto("nombre_programa"), app_id.clone().unwrap_or_default(), info.nombre.clone()]
-                .into_iter()
-                .find(|n| !n.is_empty())
-                .unwrap_or_default();
+            let nombre = [
+                info.extra_texto("nombre_programa"),
+                app_id.clone().unwrap_or_default(),
+                info.nombre.clone(),
+            ]
+            .into_iter()
+            .find(|n| !n.is_empty())
+            .unwrap_or_default();
             if let Some(id) = &app_id {
                 registro::agregar(
                     ctx,
@@ -652,7 +798,10 @@ fn registrar_descomprimido(ctx: &Contexto, info: &Info, destino: &Path) -> Resul
     registro::agregar(
         ctx,
         Map::from_iter([
-            ("id".to_string(), json!(registro::id_libre(ctx, "descomprimido", &nombre))),
+            (
+                "id".to_string(),
+                json!(registro::id_libre(ctx, "descomprimido", &nombre)),
+            ),
             ("tipo".into(), json!("descomprimido")),
             ("nombre".into(), json!(nombre)),
             ("rutas".into(), json!([destino.to_string_lossy()])),
@@ -695,13 +844,25 @@ fn descomprimir(
         texto.push(' ');
         texto.push_str(&ctx.tr("hecho_saltados", &[("n", &r.saltados.len().to_string())]));
     }
-    let mut m = resultado(&ctx.tr("hecho_descomprimido", &[]), &texto, &r.destino.to_string_lossy(), "", true);
+    let mut m = resultado(
+        &ctx.tr("hecho_descomprimido", &[]),
+        &texto,
+        &r.destino.to_string_lossy(),
+        "",
+        true,
+    );
     m.insert("saltados".into(), json!(r.saltados.len()));
     Ok(Value::Object(m))
 }
 
 /// Saca lo que trae un .deb (su data.tar) o un .rpm a una carpeta, solo para verlo.
-fn ver_contenido(ctx: &Contexto, info: &Info, ruta: &Path, opciones: &Opciones, control: &Control) -> Resultado<Value> {
+fn ver_contenido(
+    ctx: &Contexto,
+    info: &Info,
+    ruta: &Path,
+    opciones: &Opciones,
+    control: &Control,
+) -> Resultado<Value> {
     let carpeta = opcion_texto(opciones, "carpeta");
     let padre = if carpeta.is_empty() {
         ruta.parent().unwrap_or(Path::new("/")).to_path_buf()
@@ -730,13 +891,27 @@ fn ver_contenido(ctx: &Contexto, info: &Info, ruta: &Path, opciones: &Opciones, 
         let r = comprimidos::correr(
             ctx,
             &comprimidos::bsdtar(ctx)?,
-            &["-xf".into(), ruta.to_string_lossy().into_owned(), "-C".into(), tmp.path().to_string_lossy().into_owned(), datos.clone()],
+            &[
+                "-xf".into(),
+                ruta.to_string_lossy().into_owned(),
+                "-C".into(),
+                tmp.path().to_string_lossy().into_owned(),
+                datos.clone(),
+            ],
             Some(std::time::Duration::from_secs(600)),
         )?;
         if r.codigo != Some(0) {
             return Err(problema(ctx.tr("comprimido_danado", &[])));
         }
-        comprimidos::extraer(ctx, &tmp.path().join(&datos), &destino, None, None, control, false)?
+        comprimidos::extraer(
+            ctx,
+            &tmp.path().join(&datos),
+            &destino,
+            None,
+            None,
+            control,
+            false,
+        )?
     } else {
         comprimidos::extraer(ctx, ruta, &destino, None, None, control, false)?
     };
@@ -761,10 +936,21 @@ fn mod_(ctx: &Contexto, info: &Info, ruta: &Path, accion: &str, opciones: &Opcio
         let r = opcion_texto(opciones, "ruta");
         let destino = mods::mover(ctx, ruta, &r)?;
         let inst = opcion_texto(opciones, "instancia");
-        (destino, if inst.is_empty() { nombre_de(Path::new(&r)) } else { inst })
+        (
+            destino,
+            if inst.is_empty() {
+                nombre_de(Path::new(&r))
+            } else {
+                inst
+            },
+        )
     } else {
         let nombre = Some(opcion_texto(opciones, "nombre")).filter(|n| !n.is_empty());
-        let destino = mods::copiar_a_carpeta(ruta, Path::new(&opcion_texto(opciones, "carpeta")), nombre.as_deref())?;
+        let destino = mods::copiar_a_carpeta(
+            ruta,
+            Path::new(&opcion_texto(opciones, "carpeta")),
+            nombre.as_deref(),
+        )?;
         let padre = destino.parent().unwrap_or(Path::new("/")).to_path_buf();
         let donde = if nombre_de(&padre) == "mods" {
             padre.parent().map(nombre_de).unwrap_or_default()
@@ -777,7 +963,10 @@ fn mod_(ctx: &Contexto, info: &Info, ruta: &Path, accion: &str, opciones: &Opcio
     registro::agregar(
         ctx,
         Map::from_iter([
-            ("id".to_string(), json!(registro::id_libre(ctx, "mod", &nombre_mod))),
+            (
+                "id".to_string(),
+                json!(registro::id_libre(ctx, "mod", &nombre_mod)),
+            ),
             ("tipo".into(), json!("mod")),
             ("nombre".into(), json!(nombre_mod)),
             ("rutas".into(), json!([destino.to_string_lossy()])),
@@ -807,7 +996,11 @@ const TIPO_INSTALADO: [(&str, &str); 5] = [
 
 /// Las claves de texto de «Instalado» (las pruebas revisan que existan).
 pub fn claves_de_tipos() -> Vec<&'static str> {
-    TIPOS.iter().map(|(_, c)| *c).chain(TIPO_INSTALADO.iter().map(|(_, c)| *c)).collect()
+    TIPOS
+        .iter()
+        .map(|(_, c)| *c)
+        .chain(TIPO_INSTALADO.iter().map(|(_, c)| *c))
+        .collect()
 }
 
 pub fn instalados(ctx: &Contexto) -> Vec<Value> {
@@ -815,7 +1008,10 @@ pub fn instalados(ctx: &Contexto) -> Vec<Value> {
         .iter()
         .map(|e| {
             let tipo = registro::texto_de(e, "tipo");
-            let mut fecha = registro::texto_de(e, "fecha").chars().take(10).collect::<String>();
+            let mut fecha = registro::texto_de(e, "fecha")
+                .chars()
+                .take(10)
+                .collect::<String>();
             if fecha.len() == 10 {
                 let p: Vec<&str> = fecha.split('-').collect();
                 if p.len() == 3 {
@@ -831,24 +1027,35 @@ pub fn instalados(ctx: &Contexto) -> Vec<Value> {
             let tipo_texto = if tipo == "descomprimido" && !abrir.is_empty() && Path::new(abrir).is_file() {
                 ctx.tr("instalado_descomprimido_archivo", &[])
             } else {
-                let clave = TIPO_INSTALADO.iter().find(|(t, _)| *t == tipo).map_or("instalado_programa", |(_, c)| c);
+                let clave = TIPO_INSTALADO
+                    .iter()
+                    .find(|(t, _)| *t == tipo)
+                    .map_or("instalado_programa", |(_, c)| c);
                 ctx.tr(clave, &[])
             };
             let detalle = {
                 let d = registro::texto_de(e, "detalle");
-                if d.is_empty() { registro::texto_de(e, "archivo") } else { d }
+                if d.is_empty() {
+                    registro::texto_de(e, "archivo")
+                } else {
+                    d
+                }
             };
             let nombre = {
                 let n = registro::texto_de(e, "nombre");
-                if n.is_empty() { id.to_string() } else { n.to_string() }
+                if n.is_empty() {
+                    id.to_string()
+                } else {
+                    n.to_string()
+                }
             };
             json!({"id": registro::texto_de(e, "id"), "tipo": tipo, "nombre": nombre, "tipoTexto": tipo_texto,
-                   "fecha": fecha, "icono": registro::texto_de(e, "icono"), "abrir": abrir, "detalle": detalle,
-                   "boton": if matches!(tipo, "appimage" | "programa" | "flatpak") {
-                       ctx.tr("boton_desinstalar", &[])
-                   } else {
-                       ctx.tr("boton_quitar", &[])
-                   }})
+            "fecha": fecha, "icono": registro::texto_de(e, "icono"), "abrir": abrir, "detalle": detalle,
+            "boton": if matches!(tipo, "appimage" | "programa" | "flatpak") {
+                ctx.tr("boton_desinstalar", &[])
+            } else {
+                ctx.tr("boton_quitar", &[])
+            }})
         })
         .collect()
 }
@@ -860,12 +1067,18 @@ pub fn deshacer(ctx: &Contexto, id: &str) -> Result<String, Error> {
         Ok(None) => return Err(problema(ctx.tr("ya_no_esta", &[]))),
         Err(Error::Mensaje(m)) => return Err(problema(m)),
         Err(Error::Io(e)) => {
-            return Err(problema(ctx.tr("error_general", &[("detalle", &Error::texto_io(&e))])));
+            return Err(problema(
+                ctx.tr("error_general", &[("detalle", &Error::texto_io(&e))]),
+            ));
         }
         Err(e) => return Err(e),
     };
     let tipo = registro::texto_de(&e, "tipo");
-    let clave = if matches!(tipo, "appimage" | "programa" | "flatpak") { "deshecho_app" } else { "deshecho_otro" };
+    let clave = if matches!(tipo, "appimage" | "programa" | "flatpak") {
+        "deshecho_app"
+    } else {
+        "deshecho_otro"
+    };
     let nombre = {
         let n = registro::texto_de(&e, "nombre");
         if n.is_empty() { id } else { n }

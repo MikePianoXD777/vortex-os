@@ -35,12 +35,24 @@ impl Casa {
         escribir_script(&bins.join("vortex"), "#!/bin/sh\nexit 1\n");
         escribir_script(
             &bins.join("flatpak"),
-            &format!("#!/bin/sh\necho \"$@\" >> \"{}/flatpak.log\"\nexit 0\n", tmp.path().display()),
+            &format!(
+                "#!/bin/sh\necho \"$@\" >> \"{}/flatpak.log\"\nexit 0\n",
+                tmp.path().display()
+            ),
         );
-        escribir_script(&bins.join("curl"), "#!/bin/sh\necho 'pruebas sin red' >&2\nexit 7\n");
+        escribir_script(
+            &bins.join("curl"),
+            "#!/bin/sh\necho 'pruebas sin red' >&2\nexit 7\n",
+        );
         let descargas = home.join("Descargas");
         std::fs::create_dir_all(&descargas).unwrap();
-        Casa { tmp, ctx, home, bins, descargas }
+        Casa {
+            tmp,
+            ctx,
+            home,
+            bins,
+            descargas,
+        }
     }
 
     /// Solo estos programas del sistema (los demás «no están instalados»), más los falsos de `bins`.
@@ -98,19 +110,40 @@ pub const SIMBOLICO: u8 = b'2';
 pub const CARPETA: u8 = b'5';
 
 pub fn arch(nombre: &str, datos: &[u8]) -> E {
-    E { nombre: nombre.into(), datos: datos.to_vec(), tipo: ARCHIVO, enlace: String::new(), modo: 0o644 }
+    E {
+        nombre: nombre.into(),
+        datos: datos.to_vec(),
+        tipo: ARCHIVO,
+        enlace: String::new(),
+        modo: 0o644,
+    }
 }
 
 pub fn exe(nombre: &str, datos: &[u8]) -> E {
-    E { modo: 0o755, ..arch(nombre, datos) }
+    E {
+        modo: 0o755,
+        ..arch(nombre, datos)
+    }
 }
 
 pub fn carpeta(nombre: &str) -> E {
-    E { nombre: nombre.into(), datos: vec![], tipo: CARPETA, enlace: String::new(), modo: 0o755 }
+    E {
+        nombre: nombre.into(),
+        datos: vec![],
+        tipo: CARPETA,
+        enlace: String::new(),
+        modo: 0o755,
+    }
 }
 
 pub fn enlace(nombre: &str, tipo: u8, destino: &str) -> E {
-    E { nombre: nombre.into(), datos: vec![], tipo, enlace: destino.into(), modo: 0o644 }
+    E {
+        nombre: nombre.into(),
+        datos: vec![],
+        tipo,
+        enlace: destino.into(),
+        modo: 0o644,
+    }
 }
 
 fn campo(bloque: &mut [u8], desde: usize, largo: usize, texto: &str) {
@@ -160,7 +193,10 @@ pub fn comprimir(datos: &[u8], formato: &str) -> Vec<u8> {
         otro => panic!("formato {otro}"),
     };
     let mut c = Command::new(programa);
-    c.arg("-c").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null());
+    c.arg("-c")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
     let mut hijo = c.spawn().unwrap();
     let mut entrada = hijo.stdin.take().unwrap();
     let copia = datos.to_vec();
@@ -186,7 +222,11 @@ fn crc32(datos: &[u8]) -> u32 {
     for b in datos {
         crc ^= *b as u32;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
         }
     }
     !crc
@@ -249,8 +289,10 @@ pub fn zip_(ruta: &Path, entradas: &[(&str, &[u8])]) -> PathBuf {
 
 // ------------------------------------------------------------------------------------ muestras
 
-pub const PNG_64: &[u8] = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x40\x00\x00\x00\x40\x08\x06\x00\x00\x00";
-pub const PNG_128: &[u8] = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x80\x00\x00\x00\x80\x08\x06\x00\x00\x00";
+pub const PNG_64: &[u8] =
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x40\x00\x00\x00\x40\x08\x06\x00\x00\x00";
+pub const PNG_128: &[u8] =
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x80\x00\x00\x00\x80\x08\x06\x00\x00\x00";
 
 pub fn peligroso_tar(ruta: &Path) -> PathBuf {
     tar(
@@ -280,7 +322,10 @@ pub fn programa_tar(ruta: &Path) -> PathBuf {
             arch("MiPrograma-1.0/mi-programa.desktop", desktop.as_bytes()),
             exe("MiPrograma-1.0/instalar.sh", b"#!/bin/sh\necho instalar\n"),
             exe("MiPrograma-1.0/desinstalar.sh", b"#!/bin/sh\necho suyo\n"),
-            exe("MiPrograma-1.0/mi-programa/mi-programa", b"#!/bin/sh\necho hola\n"),
+            exe(
+                "MiPrograma-1.0/mi-programa/mi-programa",
+                b"#!/bin/sh\necho hola\n",
+            ),
             exe("MiPrograma-1.0/mi-programa/_internal/libx.so", b"\x7fELF"),
             arch("MiPrograma-1.0/mi-programa/iconos/mi-programa.png", PNG_128),
         ],
@@ -314,11 +359,20 @@ pub fn deb(ruta: &Path, paquete: &str) -> PathBuf {
     let nombre = ruta.file_name().unwrap().to_string_lossy().into_owned();
     let carpeta_ = ruta.parent().unwrap().join(format!("{nombre}.partes"));
     std::fs::create_dir_all(&carpeta_).unwrap();
-    let control = format!("Package: {paquete}\nVersion: 1.0\nArchitecture: amd64\nDescription: Un navegador\n más texto\n");
-    tar(&carpeta_.join("control.tar.gz"), &[arch("./control", control.as_bytes())], "gz");
+    let control = format!(
+        "Package: {paquete}\nVersion: 1.0\nArchitecture: amd64\nDescription: Un navegador\n más texto\n"
+    );
+    tar(
+        &carpeta_.join("control.tar.gz"),
+        &[arch("./control", control.as_bytes())],
+        "gz",
+    );
     tar(
         &carpeta_.join("data.tar.gz"),
-        &[exe("./usr/bin/programa", b"#!/bin/sh\n"), arch("./usr/share/doc/leeme.txt", b"hola")],
+        &[
+            exe("./usr/bin/programa", b"#!/bin/sh\n"),
+            arch("./usr/share/doc/leeme.txt", b"hola"),
+        ],
         "gz",
     );
     std::fs::write(carpeta_.join("debian-binary"), "2.0\n").unwrap();
@@ -337,16 +391,34 @@ pub fn mod_fabric(ruta: &Path) -> PathBuf {
     let json = json!({"schemaVersion": 1, "id": "sodium", "name": "Sodium", "version": "0.6.0",
                       "depends": {"minecraft": "1.21.1"}})
     .to_string();
-    zip_(ruta, &[("fabric.mod.json", json.as_bytes()), ("net/x/A.class", b"\xca\xfe\xba\xbe")])
+    zip_(
+        ruta,
+        &[
+            ("fabric.mod.json", json.as_bytes()),
+            ("net/x/A.class", b"\xca\xfe\xba\xbe"),
+        ],
+    )
 }
 
 pub fn mod_neoforge(ruta: &Path) -> PathBuf {
     let toml = b"modLoader=\"javafml\"\nloaderVersion=\"[4,)\"\n[[mods]]\nmodId=\"jei\"\nversion=\"${file.jarVersion}\"\ndisplayName=\"Just Enough Items\"\n";
-    zip_(ruta, &[("META-INF/neoforge.mods.toml", toml), ("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\n")])
+    zip_(
+        ruta,
+        &[
+            ("META-INF/neoforge.mods.toml", toml),
+            ("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\n"),
+        ],
+    )
 }
 
 pub fn jar_java(ruta: &Path) -> PathBuf {
-    zip_(ruta, &[("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\nMain-Class: A\n"), ("A.class", b"\xca\xfe")])
+    zip_(
+        ruta,
+        &[
+            ("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\nMain-Class: A\n"),
+            ("A.class", b"\xca\xfe"),
+        ],
+    )
 }
 
 /// Todo lo que hay dentro de una carpeta, relativo y ordenado.

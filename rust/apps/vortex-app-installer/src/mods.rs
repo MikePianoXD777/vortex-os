@@ -68,9 +68,7 @@ fn primer_mod_toml(texto: &str) -> Map<String, Value> {
             dentro = l == "[[mods]]";
             continue;
         }
-        if dentro
-            && let Some((k, v)) = l.split_once('=')
-        {
+        if dentro && let Some((k, v)) = l.split_once('=') {
             let v = v.trim();
             let comilla = v.chars().next();
             if let Some(c @ ('"' | '\'')) = comilla {
@@ -88,16 +86,27 @@ fn primer_mod_toml(texto: &str) -> Map<String, Value> {
 pub fn leer_mod(ctx: &Contexto, ruta: &Path) -> Option<Map<String, Value>> {
     let r = ruta.to_string_lossy();
     let lista = bsdtar(ctx, &["-tf", &r])?;
-    let nombres: Vec<String> = String::from_utf8_lossy(&lista).lines().map(str::to_string).collect();
+    let nombres: Vec<String> = String::from_utf8_lossy(&lista)
+        .lines()
+        .map(str::to_string)
+        .collect();
     let hay = |n: &str| nombres.iter().any(|x| x == n);
     let stem = raiz_de_nombre(&nombre_de(ruta)).to_string();
     let leer = |n: &str| bsdtar(ctx, &["-xOf", &r, n]).map(|b| String::from_utf8_lossy(&b).into_owned());
     if hay("fabric.mod.json") || hay("quilt.mod.json") {
         let quilt = hay("quilt.mod.json") && !hay("fabric.mod.json");
-        let datos = json_flexible(&leer(if quilt { "quilt.mod.json" } else { "fabric.mod.json" })?)?;
+        let datos = json_flexible(&leer(if quilt {
+            "quilt.mod.json"
+        } else {
+            "fabric.mod.json"
+        })?)?;
         let datos = datos.as_object()?;
         if quilt {
-            let meta = datos.get("quilt_loader").and_then(Value::as_object).cloned().unwrap_or_default();
+            let meta = datos
+                .get("quilt_loader")
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default();
             let nombre = meta
                 .get("metadata")
                 .and_then(|m| m.get("name"))
@@ -116,7 +125,11 @@ pub fn leer_mod(ctx: &Contexto, ruta: &Path) -> Option<Map<String, Value>> {
         let depende = datos.get("depends").and_then(Value::as_object);
         let mc = match depende.and_then(|d| d.get("minecraft")) {
             Some(Value::String(s)) => s.clone(),
-            Some(Value::Array(v)) => v.iter().map(|x| como_texto(Some(x))).collect::<Vec<_>>().join(", "),
+            Some(Value::Array(v)) => v
+                .iter()
+                .map(|x| como_texto(Some(x)))
+                .collect::<Vec<_>>()
+                .join(", "),
             _ => String::new(),
         };
         let nombre = datos
@@ -133,15 +146,28 @@ pub fn leer_mod(ctx: &Contexto, ruta: &Path) -> Option<Map<String, Value>> {
             ("minecraft".into(), json!(mc)),
         ]));
     }
-    for (archivo, loader) in [("META-INF/neoforge.mods.toml", "neoforge"), ("META-INF/mods.toml", "forge")] {
+    for (archivo, loader) in [
+        ("META-INF/neoforge.mods.toml", "neoforge"),
+        ("META-INF/mods.toml", "forge"),
+    ] {
         if hay(archivo) {
             let mod_ = primer_mod_toml(&leer(archivo)?);
             let version = como_texto(mod_.get("version"));
             let texto = |k: &str| mod_.get(k).and_then(Value::as_str).filter(|s| !s.is_empty());
             return Some(Map::from_iter([
-                ("nombre".into(), json!(texto("displayName").or(texto("modId")).unwrap_or(&stem))),
+                (
+                    "nombre".into(),
+                    json!(texto("displayName").or(texto("modId")).unwrap_or(&stem)),
+                ),
                 ("id".into(), json!(como_texto(mod_.get("modId")))),
-                ("version".into(), json!(if version.starts_with('$') { String::new() } else { version })),
+                (
+                    "version".into(),
+                    json!(if version.starts_with('$') {
+                        String::new()
+                    } else {
+                        version
+                    }),
+                ),
                 ("loader".into(), json!(loader)),
                 ("minecraft".into(), json!("")),
             ]));
@@ -176,7 +202,10 @@ pub fn instancias(ctx: &Contexto) -> Option<Vec<Value>> {
         datos
             .iter()
             .filter_map(Value::as_object)
-            .filter(|d| d.get("ruta").is_some_and(|r| !matches!(r, Value::Null) && r != &json!("") && r != &json!(0)))
+            .filter(|d| {
+                d.get("ruta")
+                    .is_some_and(|r| !matches!(r, Value::Null) && r != &json!("") && r != &json!(0))
+            })
             .map(|d| {
                 let t = |k: &str| json!(como_texto_vacio(d.get(k)));
                 json!({"nombre": t("nombre"), "launcher": t("launcher"), "ruta": t("ruta"),
@@ -223,7 +252,11 @@ pub fn copiar_a_carpeta(archivo: &Path, carpeta: &Path, nombre: Option<&str>) ->
     if carpeta.join("mods").is_dir() && nombre_de(&carpeta) != "mods" {
         carpeta = carpeta.join("mods");
     }
-    let destino = carpeta.join(nombre.filter(|n| !n.is_empty()).map_or_else(|| nombre_de(archivo), str::to_string));
+    let destino = carpeta.join(
+        nombre
+            .filter(|n| !n.is_empty())
+            .map_or_else(|| nombre_de(archivo), str::to_string),
+    );
     if existe_o_enlace(&destino) {
         return Err(Error::Conflicto {
             sugerida: nombre_libre(&destino),

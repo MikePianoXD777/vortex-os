@@ -32,6 +32,7 @@ tempfile = "3"
 cxx = "1"
 cxx-qt = "=0.10.0"
 cxx-qt-lib = { version = "=0.10.0", features = ["qt_gui", "qt_qml"] }
+cxx-qt-build = { version = "=0.10.0", features = ["link_qt_object_files"] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).

@@ -152,13 +152,24 @@ fn nuevo_exec(viejo: &str, programa: &str, prefijo: &str) -> String {
     format!(
         "{prefijo}{}{}",
         comillas_exec(programa),
-        if args.is_empty() { String::new() } else { format!(" {args}") }
+        if args.is_empty() {
+            String::new()
+        } else {
+            format!(" {args}")
+        }
     )
     .trim()
     .to_string()
 }
 
-fn preparar_desktop(grupos: &mut Grupos, nombre: &str, programa: &str, icono: Option<&str>, id: &str, prefijo: &str) {
+fn preparar_desktop(
+    grupos: &mut Grupos,
+    nombre: &str,
+    programa: &str,
+    icono: Option<&str>,
+    id: &str,
+    prefijo: &str,
+) {
     if !grupos.iter().any(|(g, _)| g == "Desktop Entry") {
         grupos.insert(0, ("Desktop Entry".into(), Vec::new()));
     }
@@ -167,13 +178,21 @@ fn preparar_desktop(grupos: &mut Grupos, nombre: &str, programa: &str, icono: Op
         poner_entrada(grupos, "Name", Some(nombre));
     }
     let exec = valor_entrada(grupos, "Exec");
-    let exec = if exec.is_empty() { programa.to_string() } else { exec };
+    let exec = if exec.is_empty() {
+        programa.to_string()
+    } else {
+        exec
+    };
     poner_entrada(grupos, "Exec", Some(&nuevo_exec(&exec, programa, prefijo)));
     poner_entrada(grupos, "TryExec", Some(programa));
     poner_entrada(grupos, "Path", None);
     poner_entrada(grupos, "DBusActivatable", None); // sin servicio D-Bus instalado, el lanzador no la abriría
     let terminal = valor_entrada(grupos, "Terminal");
-    poner_entrada(grupos, "Terminal", Some(if terminal.is_empty() { "false" } else { &terminal }));
+    poner_entrada(
+        grupos,
+        "Terminal",
+        Some(if terminal.is_empty() { "false" } else { &terminal }),
+    );
     if let Some(i) = icono.filter(|i| !i.is_empty()) {
         poner_entrada(grupos, "Icon", Some(i));
     }
@@ -252,7 +271,12 @@ fn tipo_imagen(ruta: &Path) -> &'static str {
 }
 
 /// Copia el ícono al tema hicolor de tu usuario. Devuelve (nombre para `Icon=`, archivos creados).
-pub fn instalar_icono(ctx: &Contexto, origen: &Path, nombre: &str, id: &str) -> std::io::Result<(String, Vec<PathBuf>)> {
+pub fn instalar_icono(
+    ctx: &Contexto,
+    origen: &Path,
+    nombre: &str,
+    id: &str,
+) -> std::io::Result<(String, Vec<PathBuf>)> {
     let tipo = tipo_imagen(origen);
     if tipo.is_empty() {
         return Ok((String::new(), vec![]));
@@ -291,14 +315,20 @@ pub fn instalar_icono(ctx: &Contexto, origen: &Path, nombre: &str, id: &str) -> 
 
 // ------------------------------------------------------------------------------------ desinstalador
 
-pub fn escribir_desinstalador(ctx: &Contexto, ruta: &Path, nombre: &str, borrar: &[PathBuf]) -> std::io::Result<()> {
+pub fn escribir_desinstalador(
+    ctx: &Contexto,
+    ruta: &Path,
+    nombre: &str,
+    borrar: &[PathBuf],
+) -> std::io::Result<()> {
     let mut lineas = vec![
         "#!/bin/sh".to_string(),
         format!(
             "# Desinstalador de {nombre}, creado por Vortex App Installer el {}.",
             crate::util::ahora().dia_mes_anio()
         ),
-        "# También se puede desinstalar desde la app, en la pestaña «Instalado» (así va a la papelera).".into(),
+        "# También se puede desinstalar desde la app, en la pestaña «Instalado» (así va a la papelera)."
+            .into(),
         "set -u".into(),
     ];
     for p in borrar {
@@ -363,11 +393,13 @@ fn metadatos_appimage(ctx: &Contexto, appimage: &Path, carpeta: &Path) -> (Optio
         if let Some(bsdtar) = ctx.which("bsdtar") {
             let mut c = std::process::Command::new(bsdtar);
             ctx.preparar(&mut c);
-            c.arg("-xf")
-                .arg(appimage)
-                .arg("-C")
-                .arg(&raiz)
-                .args(["--no-same-owner", "*.desktop", ".DirIcon", "*.png", "*.svg"]);
+            c.arg("-xf").arg(appimage).arg("-C").arg(&raiz).args([
+                "--no-same-owner",
+                "*.desktop",
+                ".DirIcon",
+                "*.png",
+                "*.svg",
+            ]);
             let _ = proc::ejecutar(c, None, Some(Duration::from_secs(120)));
         }
     }
@@ -405,8 +437,10 @@ fn metadatos_appimage(ctx: &Contexto, appimage: &Path, carpeta: &Path) -> (Optio
             raiz.join(format!("{icono_nombre}.svg")),
             raiz.join(format!("{icono_nombre}.png")),
             raiz.join(&icono_nombre),
-            raiz.join("usr/share/icons/hicolor/scalable/apps").join(format!("{icono_nombre}.svg")),
-            raiz.join("usr/share/icons/hicolor/256x256/apps").join(format!("{icono_nombre}.png")),
+            raiz.join("usr/share/icons/hicolor/scalable/apps")
+                .join(format!("{icono_nombre}.svg")),
+            raiz.join("usr/share/icons/hicolor/256x256/apps")
+                .join(format!("{icono_nombre}.png")),
         ]);
     }
     candidatos.push(raiz.join(".DirIcon"));
@@ -420,7 +454,10 @@ fn metadatos_appimage(ctx: &Contexto, appimage: &Path, carpeta: &Path) -> (Optio
 fn copiar(origen: &Path, destino: &Path, control: &Control) -> Resultado<()> {
     let total = std::fs::metadata(origen)?.len().max(1);
     let mut f = std::fs::File::open(origen)?;
-    let mut fuera = std::fs::OpenOptions::new().write(true).create_new(true).open(destino)?;
+    let mut fuera = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destino)?;
     let mut buf = vec![0u8; 4 << 20];
     let mut hecho = 0u64;
     loop {
@@ -447,7 +484,8 @@ pub fn id_appimage(ruta: &Path) -> String {
     static ARQ: OnceLock<Regex> = OnceLock::new();
     let ext = EXT.get_or_init(|| Regex::new(r"(?i)\.appimage$").expect("regex"));
     let version = VERSION.get_or_init(|| Regex::new(r"[-_ ]v?\d").expect("regex"));
-    let arq = ARQ.get_or_init(|| Regex::new(r"(?i)[-_](x86_64|amd64|aarch64|arm64|i386|linux)$").expect("regex"));
+    let arq =
+        ARQ.get_or_init(|| Regex::new(r"(?i)[-_](x86_64|amd64|aarch64|arm64|i386|linux)$").expect("regex"));
     let nombre = nombre_de(ruta);
     let base = ext.replace(&nombre, "").into_owned();
     let base = version.split(&base).next().unwrap_or("").to_string();
@@ -467,7 +505,12 @@ fn rutas_json(creados: &[PathBuf]) -> Value {
     json!(creados.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>())
 }
 
-pub fn instalar_appimage(ctx: &Contexto, ruta: &Path, reemplazar: bool, control: &Control) -> Resultado<registro::Entrada> {
+pub fn instalar_appimage(
+    ctx: &Contexto,
+    ruta: &Path,
+    reemplazar: bool,
+    control: &Control,
+) -> Resultado<registro::Entrada> {
     let id = id_appimage(ruta);
     let previo = registro::buscar(ctx, &id);
     let mut destino = ctx.rutas.appimages().join(nombre_de(ruta));
@@ -476,7 +519,11 @@ pub fn instalar_appimage(ctx: &Contexto, ruta: &Path, reemplazar: bool, control:
     {
         let abrir = registro::texto_de(p, "abrir");
         return Err(Error::Conflicto {
-            ruta: if abrir.is_empty() { destino.clone() } else { PathBuf::from(abrir) },
+            ruta: if abrir.is_empty() {
+                destino.clone()
+            } else {
+                PathBuf::from(abrir)
+            },
             sugerida: destino,
         });
     }
@@ -516,7 +563,11 @@ pub fn instalar_appimage(ctx: &Contexto, ruta: &Path, reemplazar: bool, control:
         let ext = EXT.get_or_init(|| Regex::new(r"(?i)\.appimage$").expect("regex"));
         let nombre = {
             let n = valor_entrada(&grupos, "Name");
-            if n.is_empty() { ext.replace(&nombre_de(ruta), "").into_owned() } else { n }
+            if n.is_empty() {
+                ext.replace(&nombre_de(ruta), "").into_owned()
+            } else {
+                n
+            }
         };
         let base_icono = registro::slug(
             &desktop_origen
@@ -532,15 +583,26 @@ pub fn instalar_appimage(ctx: &Contexto, ruta: &Path, reemplazar: bool, control:
         if grupos.is_empty() {
             grupos = vec![(
                 "Desktop Entry".into(),
-                vec![("Name".into(), nombre.clone()), ("Categories".into(), "Utility;".into())],
+                vec![
+                    ("Name".into(), nombre.clone()),
+                    ("Categories".into(), "Utility;".into()),
+                ],
             )];
         }
-        let prefijo = if ctx.hay_fuse2() { "" } else { "env APPIMAGE_EXTRACT_AND_RUN=1 " };
+        let prefijo = if ctx.hay_fuse2() {
+            ""
+        } else {
+            "env APPIMAGE_EXTRACT_AND_RUN=1 "
+        };
         preparar_desktop(
             &mut grupos,
             &nombre,
             &destino.to_string_lossy(),
-            Some(if icono.is_empty() { "application-x-executable" } else { &icono }),
+            Some(if icono.is_empty() {
+                "application-x-executable"
+            } else {
+                &icono
+            }),
             &id,
             prefijo,
         );
@@ -589,7 +651,10 @@ pub fn instalar_appimage(ctx: &Contexto, ruta: &Path, reemplazar: bool, control:
 /// «Solo abrir»: le da permiso de ejecución y lo corre, sin instalar nada.
 pub fn abrir_appimage(ctx: &Contexto, ruta: &Path) -> Resultado<()> {
     let m = std::fs::metadata(ruta)?;
-    std::fs::set_permissions(ruta, std::fs::Permissions::from_mode(m.permissions().mode() | 0o100))?;
+    std::fs::set_permissions(
+        ruta,
+        std::fs::Permissions::from_mode(m.permissions().mode() | 0o100),
+    )?;
     ctx.lanzar(
         &[ruta.to_string_lossy().into_owned()],
         &ctx.entorno_appimage(),
@@ -617,7 +682,12 @@ fn es_programa(p: &Path) -> bool {
 }
 
 const INSTALADORES: [&str; 6] = [
-    "instalar.sh", "install.sh", "desinstalar.sh", "uninstall.sh", "installer.sh", "setup.sh",
+    "instalar.sh",
+    "install.sh",
+    "desinstalar.sh",
+    "uninstall.sh",
+    "installer.sh",
+    "setup.sh",
 ];
 
 fn caminar(raiz: &Path, carpeta: &Path, candidatos: &mut Vec<PathBuf>) {
@@ -639,14 +709,18 @@ fn caminar(raiz: &Path, carpeta: &Path, candidatos: &mut Vec<PathBuf>) {
         return;
     }
     for (p, m) in &hijos {
-        if m.is_dir() && !["_internal", "lib", "lib64", "share", "resources"].contains(&nombre_de(p).as_str()) {
+        if m.is_dir() && !["_internal", "lib", "lib64", "share", "resources"].contains(&nombre_de(p).as_str())
+        {
             caminar(raiz, p, candidatos);
         }
     }
 }
 
 fn solo_letras_y_numeros(s: &str) -> String {
-    s.to_lowercase().chars().filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit()).collect()
+    s.to_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+        .collect()
 }
 
 pub fn buscar_ejecutable(raiz: &Path, grupos: &Grupos, nombre_desktop: &str) -> Option<PathBuf> {
@@ -683,7 +757,10 @@ pub fn buscar_ejecutable(raiz: &Path, grupos: &Grupos, nombre_desktop: &str) -> 
     for pista in &pistas {
         let mut ordenados: Vec<&PathBuf> = candidatos.iter().collect();
         ordenados.sort_by_key(|c| por_hondura(c));
-        if let Some(c) = ordenados.into_iter().find(|c| nombre_de(c).to_lowercase() == *pista) {
+        if let Some(c) = ordenados
+            .into_iter()
+            .find(|c| nombre_de(c).to_lowercase() == *pista)
+        {
             return Some(c.clone());
         }
     }
@@ -814,7 +891,15 @@ pub fn instalar_programa(
         }
     }
     std::fs::create_dir_all(ctx.rutas.opt())?;
-    comprimidos::extraer(ctx, archivo, &destino, Some(entradas), contrasena, &control.escalado(0.9), true)?;
+    comprimidos::extraer(
+        ctx,
+        archivo,
+        &destino,
+        Some(entradas),
+        contrasena,
+        &control.escalado(0.9),
+        true,
+    )?;
     let mut creados: Vec<PathBuf> = vec![destino.clone()];
     let r = (|| -> Resultado<registro::Entrada> {
         let desktop_origen = if nombre_desktop.is_empty() {
@@ -837,7 +922,11 @@ pub fn instalar_programa(
         };
         let icono_decl = valor_entrada(&grupos, "Icon");
         let icono_origen = buscar_icono(&destino, &icono_decl);
-        let mut icono = if !icono_decl.is_empty() && !icono_decl.contains('/') { icono_decl.clone() } else { String::new() };
+        let mut icono = if !icono_decl.is_empty() && !icono_decl.contains('/') {
+            icono_decl.clone()
+        } else {
+            String::new()
+        };
         if let Some(io) = &icono_origen {
             let base = {
                 let s = raiz_de_nombre(&nombre_desktop);
@@ -851,14 +940,21 @@ pub fn instalar_programa(
         if grupos.is_empty() {
             grupos = vec![(
                 "Desktop Entry".into(),
-                vec![("Name".into(), nombre.clone()), ("Categories".into(), "Utility;".into())],
+                vec![
+                    ("Name".into(), nombre.clone()),
+                    ("Categories".into(), "Utility;".into()),
+                ],
             )];
         }
         preparar_desktop(
             &mut grupos,
             &nombre,
             &programa.to_string_lossy(),
-            Some(if icono.is_empty() { "application-x-executable" } else { &icono }),
+            Some(if icono.is_empty() {
+                "application-x-executable"
+            } else {
+                &icono
+            }),
             &id,
             "",
         );
@@ -877,7 +973,11 @@ pub fn instalar_programa(
         if script.exists() {
             // el que trae el comprimido es para su propio instalador: se guarda aparte
             let guardado = destino.join("desinstalar.sh.original");
-            let a = if existe_o_enlace(&guardado) { nombre_libre(&guardado) } else { guardado };
+            let a = if existe_o_enlace(&guardado) {
+                nombre_libre(&guardado)
+            } else {
+                guardado
+            };
             std::fs::rename(&script, a)?;
         }
         escribir_desinstalador(ctx, &script, &nombre, &creados)?;
@@ -954,14 +1054,23 @@ pub fn vista_script(ctx: &Contexto, ruta: &Path, cabeza: &[u8]) -> Map<String, V
             "comando_admin".into(),
             json!(format!(
                 "sudo {}",
-                comando.iter().map(|p| comillas_shell(p)).collect::<Vec<_>>().join(" ")
+                comando
+                    .iter()
+                    .map(|p| comillas_shell(p))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             )),
         ),
     ])
 }
 
 /// Cómo se corre el instalador: con el intérprete de su primera línea (#!), con `sh`, o directo si es binario.
-pub fn comando_script(ctx: &Contexto, ruta: &Path, cabeza: Option<&[u8]>, sin_admin: bool) -> Resultado<Vec<String>> {
+pub fn comando_script(
+    ctx: &Contexto,
+    ruta: &Path,
+    cabeza: Option<&[u8]>,
+    sin_admin: bool,
+) -> Resultado<Vec<String>> {
     let leida;
     let cabeza = match cabeza {
         Some(c) => c,
@@ -979,7 +1088,9 @@ pub fn comando_script(ctx: &Contexto, ruta: &Path, cabeza: Option<&[u8]>, sin_ad
         return Ok(vec![r]);
     }
     if let Some(resto) = cabeza.strip_prefix(b"#!") {
-        let primera = String::from_utf8_lossy(resto.split(|b| *b == b'\n').next().unwrap_or(&[])).trim().to_string();
+        let primera = String::from_utf8_lossy(resto.split(|b| *b == b'\n').next().unwrap_or(&[]))
+            .trim()
+            .to_string();
         let ps = partes_exec(&primera);
         if !ps.is_empty() {
             if sin_admin && ps.iter().any(|p| ADMIN.contains(&basename(p))) {
@@ -1005,10 +1116,38 @@ pub fn terminal(ctx: &Contexto, args: &[String], titulo: &str, carpeta: &Path) -
         v
     };
     let opciones: [(&str, Vec<String>); 4] = [
-        ("kitty", con(vec!["kitty", "--hold", "--title", titulo, "--directory", &c], Some("--"))),
-        ("foot", con(vec!["foot", "--hold", "--title", titulo, "--working-directory", &c], None)),
-        ("alacritty", con(vec!["alacritty", "--hold", "--title", titulo, "--working-directory", &c], Some("-e"))),
-        ("konsole", con(vec!["konsole", "--hold", "--workdir", &c], Some("-e"))),
+        (
+            "kitty",
+            con(
+                vec!["kitty", "--hold", "--title", titulo, "--directory", &c],
+                Some("--"),
+            ),
+        ),
+        (
+            "foot",
+            con(
+                vec!["foot", "--hold", "--title", titulo, "--working-directory", &c],
+                None,
+            ),
+        ),
+        (
+            "alacritty",
+            con(
+                vec![
+                    "alacritty",
+                    "--hold",
+                    "--title",
+                    titulo,
+                    "--working-directory",
+                    &c,
+                ],
+                Some("-e"),
+            ),
+        ),
+        (
+            "konsole",
+            con(vec!["konsole", "--hold", "--workdir", &c], Some("-e")),
+        ),
     ];
     for (exe, cmd) in opciones {
         if ctx.which(exe).is_some() {
@@ -1023,9 +1162,17 @@ pub fn correr_script(ctx: &Contexto, ruta: &Path) -> Resultado<()> {
     if args == [ruta.to_string_lossy().into_owned()] {
         // un binario: necesita permiso de ejecución
         let m = std::fs::metadata(ruta)?;
-        std::fs::set_permissions(ruta, std::fs::Permissions::from_mode(m.permissions().mode() | 0o100))?;
+        std::fs::set_permissions(
+            ruta,
+            std::fs::Permissions::from_mode(m.permissions().mode() | 0o100),
+        )?;
     }
-    terminal(ctx, &args, &nombre_de(ruta), ruta.parent().unwrap_or(Path::new("/")))
+    terminal(
+        ctx,
+        &args,
+        &nombre_de(ruta),
+        ruta.parent().unwrap_or(Path::new("/")),
+    )
 }
 
 /// Con qué se puede abrir un programa de Windows en este equipo: Vortexine's Runner (si lo instalaste desde
@@ -1064,7 +1211,9 @@ fn proton(ctx: &Contexto) -> Option<PathBuf> {
     ];
     let mut encontrados: Vec<PathBuf> = Vec::new();
     let hijos = |d: &Path| -> Vec<PathBuf> {
-        std::fs::read_dir(d).map(|l| l.flatten().map(|e| e.path()).collect()).unwrap_or_default()
+        std::fs::read_dir(d)
+            .map(|l| l.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default()
     };
     for r in &raices {
         for h in hijos(&r.join("steamapps/common")) {
@@ -1103,7 +1252,10 @@ pub fn abrir_windows(ctx: &Contexto, ruta: &Path, opcion: &str) -> Resultado<()>
         }
         "umu" => {
             if std::env::var_os("WINEPREFIX").is_none() {
-                entorno.push(("WINEPREFIX".into(), ctx.rutas.propios().join("windows").to_string_lossy().into_owned()));
+                entorno.push((
+                    "WINEPREFIX".into(),
+                    ctx.rutas.propios().join("windows").to_string_lossy().into_owned(),
+                ));
             }
             if msi {
                 vec!["umu-run".into(), "msiexec".into(), "/i".into(), r]
@@ -1123,10 +1275,15 @@ pub fn abrir_windows(ctx: &Contexto, ruta: &Path, opcion: &str) -> Resultado<()>
             } else {
                 abuelo.and_then(Path::parent)
             };
-            entorno.push(("STEAM_COMPAT_DATA_PATH".into(), prefijo.to_string_lossy().into_owned()));
+            entorno.push((
+                "STEAM_COMPAT_DATA_PATH".into(),
+                prefijo.to_string_lossy().into_owned(),
+            ));
             entorno.push((
                 "STEAM_COMPAT_CLIENT_INSTALL_PATH".into(),
-                steam.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
+                steam
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
             ));
             let mut v = vec![proton.to_string_lossy().into_owned(), "run".into()];
             if msi {
@@ -1159,18 +1316,30 @@ mod pruebas {
     fn exec_se_reemplaza() {
         assert_eq!(nuevo_exec("\"@EXEC@\" %F", "/o/p", ""), "/o/p %F");
         assert_eq!(nuevo_exec("AppRun %U", "/a b/c", ""), "\"/a b/c\" %U");
-        assert_eq!(nuevo_exec("env A=1 prog --x \"y z\" %u", "/p", ""), "/p --x \"y z\" %u");
+        assert_eq!(
+            nuevo_exec("env A=1 prog --x \"y z\" %u", "/p", ""),
+            "/p --x \"y z\" %u"
+        );
         assert_eq!(nuevo_exec("", "/p", "env X=1 "), "env X=1 /p");
         assert_eq!(comillas_exec("a\"b$c"), "\"a\\\"b\\$c\"");
     }
 
     #[test]
     fn ids_de_appimage() {
-        assert_eq!(id_appimage(Path::new("/x/Falso-1.0-x86_64.AppImage")), "appimage-falso");
-        assert_eq!(id_appimage(Path::new("BedrockOnLinux-2.2.7-x86_64.AppImage")), "appimage-bedrockonlinux");
+        assert_eq!(
+            id_appimage(Path::new("/x/Falso-1.0-x86_64.AppImage")),
+            "appimage-falso"
+        );
+        assert_eq!(
+            id_appimage(Path::new("BedrockOnLinux-2.2.7-x86_64.AppImage")),
+            "appimage-bedrockonlinux"
+        );
         assert_eq!(id_appimage(Path::new("Mi App_v2.appimage")), "appimage-mi-app");
         // Igual que Python: «_6» de «x86_64» corta el nombre (cosa rara que se conserva).
-        assert_eq!(id_appimage(Path::new("tool-x86_64.AppImage")), "appimage-tool-x86");
+        assert_eq!(
+            id_appimage(Path::new("tool-x86_64.AppImage")),
+            "appimage-tool-x86"
+        );
     }
 
     #[test]

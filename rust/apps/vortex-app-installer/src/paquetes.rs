@@ -53,7 +53,11 @@ pub fn leer_deb(ctx: &Contexto, ruta: &Path) -> BTreeMap<&'static str, String> {
         }
     }
     let g = |k: &str| campos.get(k).cloned().unwrap_or_default();
-    BTreeMap::from([("nombre", g("package")), ("version", g("version")), ("descripcion", g("description"))])
+    BTreeMap::from([
+        ("nombre", g("package")),
+        ("version", g("version")),
+        ("descripcion", g("description")),
+    ])
 }
 
 // Etiquetas del encabezado de un RPM
@@ -113,12 +117,20 @@ pub fn leer_rpm(ruta: &Path) -> BTreeMap<&'static str, String> {
         etiquetas.insert(NOMBRE, nombre);
     }
     let g = |k: u32| etiquetas.get(&k).cloned().unwrap_or_default();
-    BTreeMap::from([("nombre", g(NOMBRE)), ("version", g(VERSION)), ("descripcion", g(RESUMEN))])
+    BTreeMap::from([
+        ("nombre", g(NOMBRE)),
+        ("version", g(VERSION)),
+        ("descripcion", g(RESUMEN)),
+    ])
 }
 
 /// Lo que se sabe de un .deb o un .rpm: `nombre`, `version`, `descripcion` y `nombre_programa`.
 pub fn leer(ctx: &Contexto, ruta: &Path, tipo: &str) -> Map<String, Value> {
-    let mut datos = if tipo == "deb" { leer_deb(ctx, ruta) } else { leer_rpm(ruta) };
+    let mut datos = if tipo == "deb" {
+        leer_deb(ctx, ruta)
+    } else {
+        leer_rpm(ruta)
+    };
     if datos.get("nombre").is_none_or(String::is_empty) {
         let stem = raiz_de_nombre(&nombre_de(ruta)).to_string();
         datos.insert("nombre", stem.split('_').next().unwrap_or("").to_string());
@@ -150,7 +162,11 @@ pub fn nombre_de_exe(nombre_archivo: &str) -> String {
     let n = fin.replace(n, "");
     let n = separar_mayusculas(&n).replace(['_', '-'], " ");
     let n = n.split_whitespace().collect::<Vec<_>>().join(" ");
-    if n.is_empty() { nombre_archivo.to_string() } else { n }
+    if n.is_empty() {
+        nombre_archivo.to_string()
+    } else {
+        n
+    }
 }
 
 /// «MiPrograma» → «Mi Programa» (`(?<=[a-z])(?=[A-Z])`, que la biblioteca de expresiones de Rust no trae).
@@ -174,7 +190,10 @@ mod pruebas {
     #[test]
     fn nombres_de_exe() {
         assert_eq!(nombre_de_exe("DiscordSetup-1.0.9-x64.exe"), "Discord");
-        assert_eq!(nombre_de_exe("OBS-Studio-30.0-Full-Installer-x64.exe"), "OBS Studio");
+        assert_eq!(
+            nombre_de_exe("OBS-Studio-30.0-Full-Installer-x64.exe"),
+            "OBS Studio"
+        );
         assert_eq!(nombre_de_exe("MiPrograma.exe"), "Mi Programa");
         assert_eq!(nombre_de_exe("setup.exe"), "setup.exe");
     }

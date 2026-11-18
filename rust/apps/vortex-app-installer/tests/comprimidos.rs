@@ -11,7 +11,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use vortex_app_installer::{Control, Error, motor};
 
 fn listado(d: &Path) -> std::collections::BTreeSet<String> {
-    std::fs::read_dir(d).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect()
+    std::fs::read_dir(d)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect()
 }
 
 fn ruta_de(v: &Value, k: &str) -> PathBuf {
@@ -26,7 +30,10 @@ fn rutas_peligrosas_no_salen() {
     let origen = peligroso_tar(&trampa.join("mal.tar.gz"));
     let antes = (listado(c.tmp.path()), listado(&trampa));
     let info = c.detectar(&origen);
-    assert!(!texto(&motor::para_mostrar(&c.ctx, &info), "nota").is_empty(), "se avisa antes de descomprimir");
+    assert!(
+        !texto(&motor::para_mostrar(&c.ctx, &info), "nota").is_empty(),
+        "se avisa antes de descomprimir"
+    );
     let r = c.ejecutar(&info, "descomprimir", json!({})).unwrap();
     let destino = trampa.join("bien");
     assert_eq!(ruta_de(&r, "carpeta"), destino);
@@ -45,9 +52,17 @@ fn rutas_peligrosas_no_salen() {
         }
     }
     assert_eq!(std::fs::read_to_string(destino.join("a.txt")).unwrap(), "a");
-    assert!(destino.join("ok").is_symlink(), "el enlace bueno (a.txt, dentro) se queda");
+    assert!(
+        destino.join("ok").is_symlink(),
+        "el enlace bueno (a.txt, dentro) se queda"
+    );
     assert!(!destino.join("sube").exists() && !destino.join("absoluto").is_symlink());
-    assert!(listado(&trampa).iter().all(|n| !n.starts_with(".vortex-descomprimiendo-")), "sin restos");
+    assert!(
+        listado(&trampa)
+            .iter()
+            .all(|n| !n.starts_with(".vortex-descomprimiendo-")),
+        "sin restos"
+    );
 }
 
 #[test]
@@ -55,12 +70,19 @@ fn zip_con_rutas_peligrosas() {
     let c = Casa::nueva();
     let ruta = zip_(
         &c.descargas.join("malo.zip"),
-        &[("../../escapado.txt", b"x"), ("/absoluto.txt", b"y"), ("normal/ok.txt", b"z")],
+        &[
+            ("../../escapado.txt", b"x"),
+            ("/absoluto.txt", b"y"),
+            ("normal/ok.txt", b"z"),
+        ],
     );
     let info = c.detectar(&ruta);
     let r = c.ejecutar(&info, "descomprimir", json!({})).unwrap();
     assert!(!c.home.join("escapado.txt").exists() && !c.tmp.path().join("escapado.txt").exists());
-    assert_eq!(std::fs::read_to_string(c.descargas.join("malo/normal/ok.txt")).unwrap(), "z");
+    assert_eq!(
+        std::fs::read_to_string(c.descargas.join("malo/normal/ok.txt")).unwrap(),
+        "z"
+    );
     assert_eq!(r["saltados"], 1);
 }
 
@@ -80,7 +102,10 @@ fn una_sola_carpeta_no_se_anida() {
 #[test]
 fn varias_cosas_van_a_una_carpeta_con_su_nombre() {
     let c = Casa::nueva();
-    let ruta = zip_(&c.descargas.join("fotos.zip"), &[("a.jpg", b"a"), ("b.jpg", b"b")]);
+    let ruta = zip_(
+        &c.descargas.join("fotos.zip"),
+        &[("a.jpg", b"a"), ("b.jpg", b"b")],
+    );
     c.ejecutar(&c.detectar(&ruta), "descomprimir", json!({})).unwrap();
     assert_eq!(todo(&c.descargas.join("fotos")), ["a.jpg", "b.jpg"]);
 }
@@ -98,8 +123,12 @@ fn no_pisa_lo_que_existe() {
     };
     assert_eq!(sugerida.file_name().unwrap(), "fotos (2)");
     assert_eq!(std::fs::read(c.descargas.join("fotos/a.jpg")).unwrap(), b"mio");
-    c.ejecutar(&info, "descomprimir", json!({"nombre": "fotos (2)"})).unwrap();
-    assert_eq!(std::fs::read(c.descargas.join("fotos (2)/a.jpg")).unwrap(), b"nuevo");
+    c.ejecutar(&info, "descomprimir", json!({"nombre": "fotos (2)"}))
+        .unwrap();
+    assert_eq!(
+        std::fs::read(c.descargas.join("fotos (2)/a.jpg")).unwrap(),
+        b"nuevo"
+    );
 }
 
 #[test]
@@ -107,7 +136,13 @@ fn en_otra_carpeta() {
     let c = Casa::nueva();
     let ruta = zip_(&c.descargas.join("x.zip"), &[("x/1.txt", b"1")]);
     let otra = c.home.join("Documentos");
-    let r = c.ejecutar(&c.detectar(&ruta), "descomprimir", json!({"carpeta": otra.to_string_lossy()})).unwrap();
+    let r = c
+        .ejecutar(
+            &c.detectar(&ruta),
+            "descomprimir",
+            json!({"carpeta": otra.to_string_lossy()}),
+        )
+        .unwrap();
     assert!(otra.join("x/1.txt").exists());
     assert_eq!(ruta_de(&r, "carpeta"), otra.join("x"));
 }
@@ -120,7 +155,15 @@ fn contrasena() {
     std::fs::write(fuente.join("s.txt"), "secreto").unwrap();
     let ruta = c.descargas.join("c.zip");
     let ok = Command::new("bsdtar")
-        .args(["--format", "zip", "--options", "zip:encryption=aes256", "--passphrase", "clave", "-cf"])
+        .args([
+            "--format",
+            "zip",
+            "--options",
+            "zip:encryption=aes256",
+            "--passphrase",
+            "clave",
+            "-cf",
+        ])
         .arg(&ruta)
         .arg("-C")
         .arg(&fuente)
@@ -138,13 +181,19 @@ fn contrasena() {
         otro => panic!("se esperaba contraseña incorrecta: {otro:?}"),
     }
     assert!(!c.descargas.join("c").exists(), "lo de a medias no se queda");
-    c.ejecutar(&info, "descomprimir", json!({"contrasena": "clave"})).unwrap();
-    assert_eq!(std::fs::read_to_string(c.descargas.join("c/s.txt")).unwrap(), "secreto");
+    c.ejecutar(&info, "descomprimir", json!({"contrasena": "clave"}))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(c.descargas.join("c/s.txt")).unwrap(),
+        "secreto"
+    );
 }
 
 fn aleatorio(n: usize) -> Vec<u8> {
     let mut v = vec![0u8; n];
-    std::fs::File::open("/dev/urandom").and_then(|mut f| std::io::Read::read_exact(&mut f, &mut v)).unwrap();
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut v))
+        .unwrap();
     v
 }
 
@@ -157,7 +206,10 @@ fn suelto_y_progreso() {
     let copia = avances.clone();
     let control = Control::nuevo(move |f| copia.lock().unwrap().push(f), Arc::default());
     motor_ejecutar_con(&c, &c.detectar(&ruta), "descomprimir", json!({}), &control).unwrap();
-    assert_eq!(std::fs::metadata(c.descargas.join("grande.txt")).unwrap().len(), 3 << 20);
+    assert_eq!(
+        std::fs::metadata(c.descargas.join("grande.txt")).unwrap().len(),
+        3 << 20
+    );
     let a = avances.lock().unwrap();
     assert!(!a.is_empty() && (a[a.len() - 1] - 1.0).abs() <= 0.01);
     assert!(a.windows(2).all(|w| w[0] <= w[1]), "el avance solo sube");
@@ -202,7 +254,10 @@ fn iso_de_solo_lectura_se_puede_quitar() {
     motor::deshacer(&c.ctx, e["id"].as_str().unwrap()).unwrap();
     assert!(!Path::new(&destino).exists());
     let papelera = c.home.join(".local/share/Trash/files");
-    assert!(std::fs::read_dir(papelera).unwrap().next().is_some(), "a la papelera, no borrado");
+    assert!(
+        std::fs::read_dir(papelera).unwrap().next().is_some(),
+        "a la papelera, no borrado"
+    );
 }
 
 #[test]
@@ -216,5 +271,8 @@ fn falta_7z_lo_dice_con_el_comando() {
     std::fs::write(&ruta, datos).unwrap();
     let info = c.detectar(&ruta);
     assert_eq!(info.falta_comando, "sudo pacman -S 7zip");
-    assert_eq!(texto(&motor::para_mostrar(&c.ctx, &info), "comando"), "sudo pacman -S 7zip");
+    assert_eq!(
+        texto(&motor::para_mostrar(&c.ctx, &info), "comando"),
+        "sudo pacman -S 7zip"
+    );
 }

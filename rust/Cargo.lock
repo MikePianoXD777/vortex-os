@@ -860,8 +860,10 @@ version = "1.0.0"
 dependencies = [
  "cxx",
  "cxx-qt",
+ "cxx-qt-build",
  "cxx-qt-lib",
  "serde_json",
+ "tempfile",
  "vortex-app-installer",
  "vortex-core",
 ]

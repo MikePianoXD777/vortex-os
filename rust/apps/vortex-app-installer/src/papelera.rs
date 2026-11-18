@@ -44,7 +44,12 @@ pub fn mandar(ctx: &Contexto, ruta: &Path) -> std::io::Result<bool> {
     let (mut fd, trashinfo): (std::fs::File, PathBuf) = loop {
         let ti = info.join(format!("{nombre}.trashinfo"));
         // el .trashinfo se reserva primero (O_EXCL): así dos borrados no eligen el mismo nombre
-        match OpenOptions::new().write(true).create_new(true).mode(0o600).open(&ti) {
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&ti)
+        {
             Ok(f) => {
                 if std::fs::symlink_metadata(archivos.join(&nombre)).is_err() {
                     break (f, ti);

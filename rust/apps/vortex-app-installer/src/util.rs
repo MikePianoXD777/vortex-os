@@ -21,10 +21,7 @@ pub fn normpath(ruta: &str) -> String {
         if p.is_empty() || p == "." {
             continue;
         }
-        if p != ".."
-            || (!absoluta && partes.is_empty())
-            || partes.last().is_some_and(|u| *u == "..")
-        {
+        if p != ".." || (!absoluta && partes.is_empty()) || partes.last().is_some_and(|u| *u == "..") {
             partes.push(p);
         } else if !partes.is_empty() {
             partes.pop();
@@ -258,13 +255,44 @@ pub fn sitio(url: &str) -> String {
 /// ASCII ni se descompone se descarta. Sin crate de normalización Unicode: es la tabla de las comunes.
 pub fn a_ascii(s: &str) -> String {
     const TABLA: &[(&str, &str)] = &[
-        ("àáâãäåāăąǎ", "a"), ("ÀÁÂÃÄÅĀĂĄǍ", "A"), ("çćĉċč", "c"), ("ÇĆĈĊČ", "C"), ("ďđ", "d"), ("ĎĐ", "D"),
-        ("èéêëēĕėęě", "e"), ("ÈÉÊËĒĔĖĘĚ", "E"), ("ĝğġģ", "g"), ("ĜĞĠĢ", "G"), ("ĥħ", "h"), ("ĤĦ", "H"),
-        ("ìíîïĩīĭįǐ", "i"), ("ÌÍÎÏĨĪĬĮİǏ", "I"), ("ĵ", "j"), ("Ĵ", "J"), ("ķ", "k"), ("Ķ", "K"),
-        ("ĺļľŀł", "l"), ("ĹĻĽĿŁ", "L"), ("ñńņňǹ", "n"), ("ÑŃŅŇǸ", "N"), ("òóôõöōŏőǒ", "o"), ("ÒÓÔÕÖŌŎŐǑ", "O"),
-        ("ŕŗř", "r"), ("ŔŖŘ", "R"), ("śŝşš", "s"), ("ŚŜŞŠ", "S"), ("ţťŧ", "t"), ("ŢŤŦ", "T"),
-        ("ùúûüũūŭůűųǔ", "u"), ("ÙÚÛÜŨŪŬŮŰŲǓ", "U"), ("ŵ", "w"), ("Ŵ", "W"), ("ýÿŷ", "y"), ("ÝŸŶ", "Y"),
-        ("źżž", "z"), ("ŹŻŽ", "Z"),
+        ("àáâãäåāăąǎ", "a"),
+        ("ÀÁÂÃÄÅĀĂĄǍ", "A"),
+        ("çćĉċč", "c"),
+        ("ÇĆĈĊČ", "C"),
+        ("ďđ", "d"),
+        ("ĎĐ", "D"),
+        ("èéêëēĕėęě", "e"),
+        ("ÈÉÊËĒĔĖĘĚ", "E"),
+        ("ĝğġģ", "g"),
+        ("ĜĞĠĢ", "G"),
+        ("ĥħ", "h"),
+        ("ĤĦ", "H"),
+        ("ìíîïĩīĭįǐ", "i"),
+        ("ÌÍÎÏĨĪĬĮİǏ", "I"),
+        ("ĵ", "j"),
+        ("Ĵ", "J"),
+        ("ķ", "k"),
+        ("Ķ", "K"),
+        ("ĺļľŀł", "l"),
+        ("ĹĻĽĿŁ", "L"),
+        ("ñńņňǹ", "n"),
+        ("ÑŃŅŇǸ", "N"),
+        ("òóôõöōŏőǒ", "o"),
+        ("ÒÓÔÕÖŌŎŐǑ", "O"),
+        ("ŕŗř", "r"),
+        ("ŔŖŘ", "R"),
+        ("śŝşš", "s"),
+        ("ŚŜŞŠ", "S"),
+        ("ţťŧ", "t"),
+        ("ŢŤŦ", "T"),
+        ("ùúûüũūŭůűųǔ", "u"),
+        ("ÙÚÛÜŨŪŬŮŰŲǓ", "U"),
+        ("ŵ", "w"),
+        ("Ŵ", "W"),
+        ("ýÿŷ", "y"),
+        ("ÝŸŶ", "Y"),
+        ("źżž", "z"),
+        ("ŹŻŽ", "Z"),
     ];
     s.chars()
         .filter_map(|c| {
@@ -377,9 +405,7 @@ pub fn poner_atributo(ruta: &Path, clave: &str, valor: &[u8]) -> bool {
         return false;
     };
     // SAFETY: los punteros y el largo del valor vienen de referencias válidas durante la llamada.
-    unsafe {
-        libc::setxattr(r.as_ptr(), c.as_ptr(), valor.as_ptr().cast(), valor.len(), 0) == 0
-    }
+    unsafe { libc::setxattr(r.as_ptr(), c.as_ptr(), valor.as_ptr().cast(), valor.len(), 0) == 0 }
 }
 
 /// Mueve un archivo o carpeta (`shutil.move`): renombra y, entre discos, copia y borra.

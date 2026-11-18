@@ -34,14 +34,27 @@ fn archivos(info: &Info) -> Vec<String> {
 
 #[test]
 fn tar_de_todos_los_sabores() {
-    for (nombre, formato) in
-        [("a.tar.gz", "gz"), ("a.tgz", "gz"), ("a.tar.xz", "xz"), ("a.tar.bz2", "bz2"), ("a.tar.zst", "zst"), ("a.tar", "")]
-    {
+    for (nombre, formato) in [
+        ("a.tar.gz", "gz"),
+        ("a.tgz", "gz"),
+        ("a.tar.xz", "xz"),
+        ("a.tar.bz2", "bz2"),
+        ("a.tar.zst", "zst"),
+        ("a.tar", ""),
+    ] {
         let c = Casa::nueva();
-        let ruta = tar(&c.descargas.join(nombre), &[arch("carpeta/uno.txt", b"1"), arch("carpeta/dos.txt", b"22")], formato);
+        let ruta = tar(
+            &c.descargas.join(nombre),
+            &[arch("carpeta/uno.txt", b"1"), arch("carpeta/dos.txt", b"22")],
+            formato,
+        );
         let info = c.detectar(&ruta);
         assert_eq!(info.tipo, "comprimido", "{nombre}");
-        assert_eq!(archivos(&info), ["carpeta/dos.txt", "carpeta/uno.txt"], "{nombre}");
+        assert_eq!(
+            archivos(&info),
+            ["carpeta/dos.txt", "carpeta/uno.txt"],
+            "{nombre}"
+        );
         assert!(info.de_internet, "{nombre}: está en Descargas");
     }
 }
@@ -56,7 +69,11 @@ fn zip_7z_iso() {
     bsdtar_crear(&c.descargas.join("a.iso"), "iso9660", &otra);
     for (n, fmt) in [("a.zip", "zip"), ("a.7z", "7z"), ("a.iso", "iso")] {
         let info = c.detectar(&c.descargas.join(n));
-        assert_eq!((info.tipo.as_str(), info.formato.as_str()), ("comprimido", fmt), "{n}");
+        assert_eq!(
+            (info.tipo.as_str(), info.formato.as_str()),
+            ("comprimido", fmt),
+            "{n}"
+        );
         assert!(!info.entradas.is_empty(), "{n}");
     }
 }
@@ -102,13 +119,18 @@ fn rar_danado_se_dice_claro() {
     std::fs::write(&ruta, d).unwrap();
     let info = c.detectar(&ruta);
     assert_eq!(info.tipo, "comprimido");
-    assert!(!info.error.is_empty(), "dañado o falta un programa, pero nunca se queda callado");
+    assert!(
+        !info.error.is_empty(),
+        "dañado o falta un programa, pero nunca se queda callado"
+    );
 }
 
 #[test]
 fn programa_tar_gz() {
     let c = Casa::nueva();
-    let info = c.detectar(&programa_tar(&c.descargas.join("MiPrograma-1.0-linux-x86_64.tar.gz")));
+    let info = c.detectar(&programa_tar(
+        &c.descargas.join("MiPrograma-1.0-linux-x86_64.tar.gz"),
+    ));
     assert_eq!(info.tipo, "programa");
     let vista = motor::para_mostrar(&c.ctx, &info);
     assert_eq!(vista["acciones"][0]["id"], "instalar_programa");
@@ -154,7 +176,10 @@ fn scripts_y_binarios() {
 #[test]
 fn deb_y_rpm() {
     let c = Casa::nueva();
-    let info = c.detectar(&deb(&c.descargas.join("google-chrome-stable_current_amd64.deb"), "google-chrome-stable"));
+    let info = c.detectar(&deb(
+        &c.descargas.join("google-chrome-stable_current_amd64.deb"),
+        "google-chrome-stable",
+    ));
     assert_eq!(info.tipo, "deb");
     assert_eq!(info.extra_texto("nombre"), "google-chrome-stable");
     let rpm = c.descargas.join("hola-mundo-1.2-3.fc40.x86_64.rpm");
@@ -169,7 +194,11 @@ fn deb_y_rpm() {
 fn flatpak() {
     let c = Casa::nueva();
     let r = c.descargas.join("org.example.App.flatpakref");
-    std::fs::write(&r, "[Flatpak Ref]\nName=org.example.App\nTitle=Ejemplo\nUrl=https://dl.flathub.org/repo/\n").unwrap();
+    std::fs::write(
+        &r,
+        "[Flatpak Ref]\nName=org.example.App\nTitle=Ejemplo\nUrl=https://dl.flathub.org/repo/\n",
+    )
+    .unwrap();
     let info = c.detectar(&r);
     assert!(info.tipo == "flatpakref" && info.extra_texto("app_id") == "org.example.App");
     let bundle = c.descargas.join("app.flatpak");
@@ -206,7 +235,10 @@ fn jar_mod_y_programa() {
     let neo = c.detectar(&mod_neoforge(&c.descargas.join("jei.jar")));
     assert!(neo.tipo == "mod" && mod_de(&neo, "loader") == "neoforge");
     assert!(mod_de(&neo, "nombre") == "Just Enough Items" && mod_de(&neo, "version").is_empty());
-    assert_eq!(c.detectar(&jar_java(&c.descargas.join("herramienta.jar"))).tipo, "jar");
+    assert_eq!(
+        c.detectar(&jar_java(&c.descargas.join("herramienta.jar"))).tipo,
+        "jar"
+    );
 }
 
 #[test]
@@ -218,7 +250,12 @@ fn desconocido_y_carpeta() {
     let info = c.detectar(&raro);
     assert_eq!(info.tipo, "desconocido");
     let vista = motor::para_mostrar(&c.ctx, &info);
-    let ids: Vec<&str> = vista["acciones"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap()).collect();
+    let ids: Vec<&str> = vista["acciones"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["id"].as_str().unwrap())
+        .collect();
     assert_eq!(ids, ["abrir_carpeta"]);
     assert_eq!(c.detectar(&c.descargas).tipo, "carpeta");
     assert_eq!(c.detectar(&c.home.join("no-existe.zip")).tipo, "falta");

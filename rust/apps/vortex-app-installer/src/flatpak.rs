@@ -58,7 +58,11 @@ pub fn leer_ref(ruta: &Path) -> Map<String, Value> {
     if !hay {
         return Map::new();
     }
-    let programa = if titulo.is_empty() { nombre.clone() } else { titulo.clone() };
+    let programa = if titulo.is_empty() {
+        nombre.clone()
+    } else {
+        titulo.clone()
+    };
     Map::from_iter([
         ("app_id".into(), json!(nombre)),
         ("titulo".into(), json!(titulo)),
@@ -177,17 +181,36 @@ pub fn preparar_flathub(ctx: &Contexto) -> Resultado<()> {
 }
 
 /// Instala un .flatpakref o un .flatpak. Devuelve el id de la app instalada (si se pudo saber).
-pub fn instalar_archivo(ctx: &Contexto, ruta: &Path, tipo: &str, control: &Control) -> Resultado<Option<String>> {
+pub fn instalar_archivo(
+    ctx: &Contexto,
+    ruta: &Path,
+    tipo: &str,
+    control: &Control,
+) -> Resultado<Option<String>> {
     let antes = apps_instaladas(ctx);
-    let opcion = if tipo == "flatpakref" { "--from" } else { "--bundle" };
+    let opcion = if tipo == "flatpakref" {
+        "--from"
+    } else {
+        "--bundle"
+    };
     correr(
         ctx,
-        &["install", "--user", "-y", "--noninteractive", opcion, &ruta.to_string_lossy()],
+        &[
+            "install",
+            "--user",
+            "-y",
+            "--noninteractive",
+            opcion,
+            &ruta.to_string_lossy(),
+        ],
         control,
     )?;
     let nuevas: BTreeSet<String> = apps_instaladas(ctx).difference(&antes).cloned().collect();
     if tipo == "flatpakref"
-        && let Some(app) = leer_ref(ruta).get("app_id").and_then(Value::as_str).filter(|s| !s.is_empty())
+        && let Some(app) = leer_ref(ruta)
+            .get("app_id")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
     {
         return Ok(Some(app.to_string()));
     }
@@ -196,12 +219,21 @@ pub fn instalar_archivo(ctx: &Contexto, ruta: &Path, tipo: &str, control: &Contr
 
 pub fn instalar_flathub(ctx: &Contexto, app_id: &str, control: &Control) -> Resultado<String> {
     preparar_flathub(ctx)?;
-    correr(ctx, &["install", "--user", "-y", "--noninteractive", REMOTO, app_id], control)?;
+    correr(
+        ctx,
+        &["install", "--user", "-y", "--noninteractive", REMOTO, app_id],
+        control,
+    )?;
     Ok(app_id.to_string())
 }
 
 pub fn desinstalar(ctx: &Contexto, app_id: &str) -> Resultado<()> {
-    correr(ctx, &["uninstall", "--user", "-y", "--noninteractive", app_id], &Control::nulo()).map(|_| ())
+    correr(
+        ctx,
+        &["uninstall", "--user", "-y", "--noninteractive", app_id],
+        &Control::nulo(),
+    )
+    .map(|_| ())
 }
 
 pub fn abrir(ctx: &Contexto, app_id: &str) -> Resultado<()> {
@@ -216,7 +248,11 @@ mod pruebas {
     fn lee_un_flatpakref() {
         let t = vortex_core::carpeta_de_prueba("flatpakref");
         let r = t.join("a.flatpakref");
-        std::fs::write(&r, "[Flatpak Ref]\nName=org.example.App\nTitle=Ejemplo\nUrl=https://x/\n").unwrap();
+        std::fs::write(
+            &r,
+            "[Flatpak Ref]\nName=org.example.App\nTitle=Ejemplo\nUrl=https://x/\n",
+        )
+        .unwrap();
         let m = leer_ref(&r);
         assert_eq!(m["app_id"], "org.example.App");
         assert_eq!(m["nombre_programa"], "Ejemplo");

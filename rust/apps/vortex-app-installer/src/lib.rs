@@ -26,8 +26,8 @@ pub mod instalar;
 pub mod instancia;
 pub mod mods;
 pub mod motor;
-pub mod paquetes;
 pub mod papelera;
+pub mod paquetes;
 pub mod proc;
 pub mod registro;
 pub mod rutas;
@@ -52,9 +52,15 @@ pub const AGENTE: &str = "vortex-app-installer/1.0";
 #[derive(Debug)]
 pub enum Error {
     /// El destino ya existe. `sugerida` es un nombre libre al lado («Carpeta (2)»).
-    Conflicto { ruta: PathBuf, sugerida: PathBuf },
+    Conflicto {
+        ruta: PathBuf,
+        sugerida: PathBuf,
+    },
     /// El comprimido pide contraseña (o la que se dio no es).
-    Contrasena { incorrecta: bool, mensaje: String },
+    Contrasena {
+        incorrecta: bool,
+        mensaje: String,
+    },
     /// Falta un programa (`7z`, `unrar`, `bsdtar`…); `comando` es lo que hay que correr para instalarlo.
     FaltaPrograma {
         programa: String,
@@ -65,7 +71,10 @@ pub enum Error {
     /// Un error con su texto (`ErrorComprimido`, `ErrorInstalar`, `ErrorFlatpak`, `RuntimeError`).
     Mensaje(String),
     /// Lo que `motor::ejecutar` le muestra a la persona: texto y, si aplica, un comando para copiar.
-    Problema { mensaje: String, comando: String },
+    Problema {
+        mensaje: String,
+        comando: String,
+    },
     Io(std::io::Error),
 }
 

@@ -52,7 +52,8 @@ pub fn cargar(ctx: &Contexto) -> Vec<Entrada> {
         .into_iter()
         .filter_map(|d| match d {
             Value::Object(e)
-                if e.get("id").is_some_and(|i| i.as_str().is_some_and(|s| !s.is_empty()))
+                if e.get("id")
+                    .is_some_and(|i| i.as_str().is_some_and(|s| !s.is_empty()))
                     && TIPOS.contains(&texto_de(&e, "tipo")) =>
             {
                 Some(e)
@@ -63,7 +64,9 @@ pub fn cargar(ctx: &Contexto) -> Vec<Entrada> {
     let n = lista.len();
     let vivas: Vec<Entrada> = lista
         .into_iter()
-        .filter(|e| texto_de(e, "tipo") == "flatpak" || rutas_de(e).iter().any(|r| existe_o_enlace(Path::new(r))))
+        .filter(|e| {
+            texto_de(e, "tipo") == "flatpak" || rutas_de(e).iter().any(|r| existe_o_enlace(Path::new(r)))
+        })
         .collect();
     if vivas.len() != n {
         let _ = guardar(ctx, &vivas);
@@ -102,7 +105,10 @@ pub fn agregar(ctx: &Contexto, mut entrada: Entrada) -> std::io::Result<Entrada>
         .or_insert_with(|| json!(crate::util::ahora().iso()));
     entrada.entry("rutas").or_insert_with(|| json!([]));
     let id = texto_de(&entrada, "id").to_string();
-    let mut lista: Vec<Entrada> = cargar(ctx).into_iter().filter(|e| texto_de(e, "id") != id).collect();
+    let mut lista: Vec<Entrada> = cargar(ctx)
+        .into_iter()
+        .filter(|e| texto_de(e, "id") != id)
+        .collect();
     lista.insert(0, entrada.clone());
     guardar(ctx, &lista)?;
     Ok(entrada)
@@ -111,7 +117,10 @@ pub fn agregar(ctx: &Contexto, mut entrada: Entrada) -> std::io::Result<Entrada>
 /// Id nuevo para lo que puede repetirse (cada carpeta descomprimida, cada mod).
 pub fn id_libre(ctx: &Contexto, tipo: &str, nombre: &str) -> String {
     let base = format!("{tipo}-{}", slug(nombre));
-    let usados: HashSet<String> = cargar(ctx).iter().map(|e| texto_de(e, "id").to_string()).collect();
+    let usados: HashSet<String> = cargar(ctx)
+        .iter()
+        .map(|e| texto_de(e, "id").to_string())
+        .collect();
     let mut n = 1;
     let mut id = base.clone();
     while usados.contains(&id) {
@@ -147,7 +156,10 @@ pub fn deshacer(ctx: &Contexto, id: &str) -> Resultado<Option<Entrada>> {
             papelera::mandar(ctx, Path::new(&r))?;
         }
     }
-    let resto: Vec<Entrada> = cargar(ctx).into_iter().filter(|e| texto_de(e, "id") != id).collect();
+    let resto: Vec<Entrada> = cargar(ctx)
+        .into_iter()
+        .filter(|e| texto_de(e, "id") != id)
+        .collect();
     guardar(ctx, &resto)?;
     refrescar_lanzador(ctx);
     Ok(Some(entrada))

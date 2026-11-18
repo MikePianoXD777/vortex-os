@@ -6,7 +6,11 @@ use vortex_app_installer::{Contexto, motor};
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--version") {
-        println!("{} {}", vortex_app_installer::NOMBRE, vortex_app_installer::VERSION);
+        println!(
+            "{} {}",
+            vortex_app_installer::NOMBRE,
+            vortex_app_installer::VERSION
+        );
         return;
     }
     let ctx = Contexto::del_entorno();

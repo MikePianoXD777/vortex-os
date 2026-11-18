@@ -214,7 +214,8 @@ impl Sesion {
         }
         match info {
             Err(e) => {
-                self.error = json!({"titulo": self.ctx.tr("no_se_pudo_abrir", &[]), "texto": e, "comando": ""});
+                self.error =
+                    json!({"titulo": self.ctx.tr("no_se_pudo_abrir", &[]), "texto": e, "comando": ""});
                 self.poner("error");
             }
             Ok(info) => {
@@ -318,7 +319,11 @@ impl Sesion {
                 let instalacion = matches!(accion.as_str(), "instalar_appimage" | "instalar_programa");
                 let sug = crate::util::nombre_de(&sugerida);
                 let nombre = if instalacion {
-                    self.vista.get("nombre").and_then(Value::as_str).unwrap_or("").to_string()
+                    self.vista
+                        .get("nombre")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string()
                 } else {
                     crate::util::nombre_de(&ruta)
                 };
@@ -342,12 +347,20 @@ impl Sesion {
             Err(Error::Contrasena { incorrecta, .. }) => {
                 let mut op = opciones.clone();
                 op.remove("contrasena");
-                self.contrasena = json!({"accion": accion, "opciones": Value::Object(op), "incorrecta": incorrecta});
+                self.contrasena =
+                    json!({"accion": accion, "opciones": Value::Object(op), "incorrecta": incorrecta});
                 self.poner("listo");
             }
             Err(Error::Cancelado) => self.poner("listo"),
             Err(Error::Problema { mensaje, comando }) => {
-                let titulo = self.ctx.tr(if comando.is_empty() { "no_se_pudo_abrir" } else { "falta_titulo" }, &[]);
+                let titulo = self.ctx.tr(
+                    if comando.is_empty() {
+                        "no_se_pudo_abrir"
+                    } else {
+                        "falta_titulo"
+                    },
+                    &[],
+                );
                 self.error = json!({"titulo": titulo, "texto": mensaje, "comando": comando});
                 self.poner("error");
             }

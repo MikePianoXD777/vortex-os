@@ -41,7 +41,11 @@ impl Info {
 
     /// Un valor de `extra` como texto («» si no está).
     pub fn extra_texto(&self, clave: &str) -> String {
-        self.extra.get(clave).and_then(Value::as_str).unwrap_or("").to_string()
+        self.extra
+            .get(clave)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
     }
 
     pub fn extra_si(&self, clave: &str) -> bool {
@@ -130,7 +134,8 @@ pub fn formato_comprimido(nombre: &str, cab: &[u8]) -> String {
 fn tipo_de(ruta: &Path, cab: &[u8]) -> (&'static str, String) {
     let bajo = nombre_de(ruta).to_lowercase();
     let elf = cab.starts_with(b"\x7fELF");
-    if bajo.ends_with(".appimage") || (elf && cab.len() >= 11 && matches!(&cab[8..11], b"AI\x01" | b"AI\x02")) {
+    if bajo.ends_with(".appimage") || (elf && cab.len() >= 11 && matches!(&cab[8..11], b"AI\x01" | b"AI\x02"))
+    {
         return ("appimage", "appimage".into());
     }
     if bajo.ends_with(".flatpakref") {
@@ -150,12 +155,20 @@ fn tipo_de(ruta: &Path, cab: &[u8]) -> (&'static str, String) {
         || cab.starts_with(b"MZ")
         || (cab.starts_with(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1") && bajo.ends_with(".msi"))
     {
-        return ("windows", if bajo.ends_with(".msi") { "msi" } else { "exe" }.into());
+        return (
+            "windows",
+            if bajo.ends_with(".msi") { "msi" } else { "exe" }.into(),
+        );
     }
     if bajo.ends_with(".jar") {
         return ("jar", "jar".into());
     }
-    if bajo.ends_with(".sh") || bajo.ends_with(".run") || bajo.ends_with(".bin") || cab.starts_with(b"#!") || elf {
+    if bajo.ends_with(".sh")
+        || bajo.ends_with(".run")
+        || bajo.ends_with(".bin")
+        || cab.starts_with(b"#!")
+        || elf
+    {
         return ("script", if elf { "elf" } else { "texto" }.into());
     }
     let fmt = formato_comprimido(&nombre_de(ruta), cab);
@@ -200,7 +213,8 @@ pub fn detectar(ctx: &Contexto, ruta: &Path, contrasena: Option<&str>) -> Info {
     info.formato = fmt;
     info.de_internet = !url.is_empty() || en_descargas(ctx, ruta);
     info.origen = url;
-    info.extra.insert("ejecutable".into(), json!(st.mode() & 0o111 != 0));
+    info.extra
+        .insert("ejecutable".into(), json!(st.mode() & 0o111 != 0));
     match tipo {
         "comprimido" => {
             match comprimidos::listar(ctx, ruta, contrasena) {
@@ -228,8 +242,10 @@ pub fn detectar(ctx: &Contexto, ruta: &Path, contrasena: Option<&str>) -> Info {
             }
         }
         "windows" => {
-            info.extra
-                .insert("nombre_programa".into(), json!(paquetes::nombre_de_exe(&nombre_de(ruta))));
+            info.extra.insert(
+                "nombre_programa".into(),
+                json!(paquetes::nombre_de_exe(&nombre_de(ruta))),
+            );
         }
         _ => {}
     }

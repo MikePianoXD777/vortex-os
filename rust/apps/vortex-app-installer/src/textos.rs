@@ -34,12 +34,7 @@ impl Idioma {
         let var = |n: &str| std::env::var(n).unwrap_or_default();
         Self::de_variables(
             &var("VORTEX_APP_INSTALLER_IDIOMA"),
-            &[
-                var("LC_ALL"),
-                var("LC_MESSAGES"),
-                var("LANG"),
-                var("LANGUAGE"),
-            ],
+            &[var("LC_ALL"), var("LC_MESSAGES"), var("LANG"), var("LANGUAGE")],
         )
     }
 

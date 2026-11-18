@@ -40,7 +40,8 @@ impl App {
 /// `[{id, nombre, resumen, icono}]` de Flathub para ese texto. [`SinRed`] si no hay conexión.
 pub fn buscar(ctx: &Contexto, texto: &str, por_pagina: u32) -> Result<Vec<App>, SinRed> {
     let base = ctx.flathub.trim_end_matches('/');
-    let cuerpo = json!({"query": texto.chars().take(100).collect::<String>(), "hits_per_page": por_pagina, "page": 1});
+    let cuerpo =
+        json!({"query": texto.chars().take(100).collect::<String>(), "hits_per_page": por_pagina, "page": 1});
     let Some(curl) = ctx.which("curl") else {
         return Err(SinRed("curl no está instalado".into()));
     };
@@ -61,8 +62,12 @@ pub fn buscar(ctx: &Contexto, texto: &str, por_pagina: u32) -> Result<Vec<App>, 
         "@-",
         &format!("{base}/search?locale={}", ctx.idioma.codigo()),
     ]);
-    let r = proc::ejecutar(c, Some(cuerpo.to_string().as_bytes()), Some(Duration::from_secs(15)))
-        .map_err(|e| SinRed(e.to_string()))?;
+    let r = proc::ejecutar(
+        c,
+        Some(cuerpo.to_string().as_bytes()),
+        Some(Duration::from_secs(15)),
+    )
+    .map_err(|e| SinRed(e.to_string()))?;
     if !r.ok() {
         return Err(SinRed(r.texto_err()));
     }
@@ -102,7 +107,9 @@ fn norma(t: &str) -> String {
         .collect()
 }
 
-const SOBRAS: [&str; 9] = ["stable", "beta", "nightly", "bin", "desktop", "linux", "amd64", "x8664", "app"];
+const SOBRAS: [&str; 9] = [
+    "stable", "beta", "nightly", "bin", "desktop", "linux", "amd64", "x8664", "app",
+];
 
 fn raiz(nombre: &str) -> String {
     let mut n = norma(nombre);
@@ -122,7 +129,8 @@ fn raiz(nombre: &str) -> String {
 fn de_prueba() -> &'static Regex {
     static R: OnceLock<Regex> = OnceLock::new();
     R.get_or_init(|| {
-        Regex::new(r"(?i)unstable|beta|nightly|canary|\bdev\b|preview|insiders|\bgit\b").expect("regex de pruebas")
+        Regex::new(r"(?i)unstable|beta|nightly|canary|\bdev\b|preview|insiders|\bgit\b")
+            .expect("regex de pruebas")
     })
 }
 
@@ -199,8 +207,14 @@ mod pruebas {
         assert!(mejor("libreoffice", &h).is_none());
         let mut dev = vec![App::nuevo("com.google.ChromeDev", "Google Chrome (unstable)")];
         dev.extend(hits());
-        assert_eq!(mejor("google-chrome-stable", &dev).unwrap().id, "com.google.Chrome");
-        assert_eq!(mejor("google-chrome-unstable", &dev).unwrap().id, "com.google.ChromeDev");
+        assert_eq!(
+            mejor("google-chrome-stable", &dev).unwrap().id,
+            "com.google.Chrome"
+        );
+        assert_eq!(
+            mejor("google-chrome-unstable", &dev).unwrap().id,
+            "com.google.ChromeDev"
+        );
         assert!(mejor("google-chrome-stable", &dev[..1]).is_none());
         assert_eq!(para_buscar("google-chrome-stable"), "google chrome");
         assert_eq!(para_buscar("obs-studio"), "obs studio");
