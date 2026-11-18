@@ -29,6 +29,7 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  sesiones guardar|abrir|lista|borrar  sesiones de trabajo: guarda las apps abiertas y su escritorio y las vuelve a abrir
   jugando                              sale con 0 si hay una partida o algo en pantalla completa (lo usan las tareas solas)
   modo-ia on|off|alternar|estado       el hermano del modo juego para la IA local: apaga los efectos y
                                        pausa el fondo animado (lo pone solo el gestor cuando Ollama,
@@ -484,6 +485,7 @@ cmd_primer_inicio() {
   disco_salud_al_iniciar
   bt_agente_al_iniciar
   asociar_app_installer
+  command -v vortex-sesiones >/dev/null && { vortex-sesiones accion || true; }   # 4.0: las entradas del lanzador
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _
@@ -1028,7 +1030,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-ia vortex-qr vortex-dictar vortex-bt-agente)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-sesiones vortex-ia vortex-qr vortex-dictar vortex-bt-agente)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1745,6 +1747,8 @@ cmd_actualizar() {
   disco_salud_al_iniciar
   # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
   command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
+  # 4.0: sesiones de trabajo: «Guardar sesión de trabajo» y las «Sesión: …» en el lanzador.
+  command -v vortex-sesiones >/dev/null && { vortex-sesiones accion || true; }
   # 2.7: Vortexine Shared: el socket que recibe avisos (sin proceso en reposo), su clic derecho y, una sola vez,
   # dejar pasar los avisos en ufw (solo Tailscale y redes privadas; pide la contraseña).
   if command -v vortex-shared >/dev/null; then
@@ -2208,6 +2212,7 @@ case "${1:-ayuda}" in
   runner | exe) shift; exec "$VORTEX_DIR/bin/vortex-exe" "$@" ;;
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
+  sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   reiniciar-shell) reiniciar_shell ;;
   arreglar) shift
     case "${1:-}" in puerto | arranque) exec "$VORTEX_DIR/bin/vortex-arreglar" "$@" ;; esac

@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# vortex-sesiones (4.0): sesiones de trabajo. Guarda las apps que tienes abiertas y en qué escritorio está cada
+# una con un nombre («Escuela», «Programar») y las vuelve a abrir, cada una en su escritorio, con un clic.
+# No hay nada corriendo: guardar y abrir son comandos de una vez. Cada sesión guardada sale en el lanzador
+# como «Sesión: Escuela» (un .desktop), y «Guardar sesión de trabajo» también está ahí.
+#
+#   vortex-sesiones guardar [NOMBRE]   guarda lo que tienes abierto (sin NOMBRE, lo pregunta con una ventana)
+#   vortex-sesiones abrir NOMBRE       abre sus apps, cada una en su escritorio (lo que ya está abierto no se repite)
+#   vortex-sesiones lista              las sesiones guardadas
+#   vortex-sesiones ver NOMBRE         qué apps tiene una sesión
+#   vortex-sesiones borrar NOMBRE      la olvida
+#   vortex-sesiones accion             pone las entradas del lanzador (lo corren el primer inicio y vortex actualizar)
+#
+# Cada app se vuelve a abrir con su lanzador (.desktop) y, si no lo tiene, con el mismo comando con que estaba
+# abierta. Las terminales vuelven a su carpeta. Los juegos de Steam no se guardan (se abren desde Steam).
+set -uo pipefail
+
+DATOS="${XDG_DATA_HOME:-$HOME/.local/share}/vortex/sesiones"
+APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+HYPRCTL="${VORTEX_HYPRCTL:-hyprctl}"
+PROC="${VORTEX_PROC:-/proc}"
+PAUSA="${VORTEX_SESIONES_PAUSA:-0.4}"
+TERMINALES='^(kitty|foot|footclient|Alacritty|alacritty|org\.wezfurlong\.wezterm|com\.mitchellh\.ghostty|ghostty)$'
+
+hypr() { if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then "$HYPRCTL" "$@"; else "$HYPRCTL" -i 0 "$@"; fi; }
+aviso() { command -v notify-send >/dev/null && notify-send -a "Vortexine's OS" -i view-restore "$@" 2>/dev/null; return 0; }
+dec() { echo "$*" >&2; }
+
+# El nombre sin cosas raras (es parte del nombre del archivo)
+limpiar_nombre() { local n="$*"; n="${n//\//-}"; n="${n//\\/-}"; n="${n//[\"\`\$%]/}"; n="${n#"${n%%[![:space:]]*}"}"; n="${n%"${n##*[![:space:]]}"}"; n="${n#.}"; echo "${n:0:40}"; }
+archivo() { echo "$DATOS/$1.json"; }
+
+# El .desktop de una clase de ventana: por StartupWMClass o por nombre del archivo. Vacío si no hay.
+desktop_de() { # CLASE
+  local clase="$1" d f
+  for d in "$APPS" "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share/applications" \
+    /var/lib/flatpak/exports/share/applications /usr/local/share/applications /usr/share/applications; do
+    [[ -d "$d" ]] || continue
+    f="$(grep -ilx "StartupWMClass=$clase" "$d"/*.desktop 2>/dev/null | head -n1)"
+    [[ -z "$f" ]] && f="$(find "$d" -maxdepth 1 -iname "$clase.desktop" 2>/dev/null | head -n1)"
+    [[ -n "$f" ]] && { echo "$f"; return 0; }
+  done
+  return 1
+}
+
+# El comando con que se abre, sin los «%U» de los .desktop
+exec_de_desktop() { # ARCHIVO
+  sed -n 's/^Exec=//p' "$1" | head -n1 | sed -E 's/ ?%[a-zA-Z]//g'
+}
+
+# El comando del proceso (para lo que no tiene .desktop), con cada argumento bien entrecomillado
+cmd_de_pid() { # PID
+  local -a a=()
+  mapfile -d '' -t a <"$PROC/$1/cmdline" 2>/dev/null || return 1
+  ((${#a[@]})) || return 1
+  printf '%q ' "${a[@]}"
+}
+
+# La carpeta de una terminal: la de su primer proceso hijo (la shell), no la de la terminal misma
+carpeta_de() { # PID
+  local hijo
+  hijo="$(cat "$PROC/$1/task/$1/children" 2>/dev/null | awk '{print $1}')"
+  readlink "$PROC/${hijo:-$1}/cwd" 2>/dev/null
+}
+
+guardar() {
+  local nombre
+  nombre="$(limpiar_nombre "${*:-}")"
+  if [[ -z "$nombre" ]]; then
+    command -v zenity >/dev/null || { dec "Dime el nombre: vortex-sesiones guardar «Escuela»"; return 2; }
+    nombre="$(limpiar_nombre "$(zenity --entry --title="Guardar sesión de trabajo" \
+      --text="Ponle un nombre a lo que tienes abierto (por ejemplo: Escuela, Programar):" 2>/dev/null)")"
+    [[ -n "$nombre" ]] || return 0
+  fi
+  local clientes entradas="[]" linea clase pid esc cmd carpeta dk
+  clientes="$(hypr clients -j 2>/dev/null)" || clientes=""
+  jq -e 'type == "array"' >/dev/null 2>&1 <<<"$clientes" || { dec "No pude ver tus ventanas (¿Hyprland no está corriendo?)."; return 1; }
+  while IFS=$'\t' read -r clase pid esc; do
+    [[ -n "$clase" && "$pid" =~ ^[0-9]+$ ]] || continue
+    [[ "$clase" == steam_app_* || "$clase" == steam_proton ]] && continue
+    carpeta=""
+    [[ "$clase" =~ $TERMINALES ]] && carpeta="$(carpeta_de "$pid")"
+    cmd=""
+    if dk="$(desktop_de "$clase")" && [[ -n "$dk" ]]; then
+      cmd="$(exec_de_desktop "$dk")"
+    fi
+    [[ -n "$cmd" ]] || cmd="$(cmd_de_pid "$pid")"
+    [[ -n "$cmd" ]] || continue
+    entradas="$(jq -c --arg c "$clase" --arg k "$cmd" --arg d "$carpeta" --argjson e "$esc" \
+      '. + [{clase: $c, comando: $k, carpeta: $d, escritorio: $e}]' <<<"$entradas")"
+  done < <(jq -r '.[] | select(.mapped and .workspace.id > 0) | [.class, .pid, .workspace.id] | @tsv' <<<"$clientes")
+  # Una app que no es terminal se abre una vez por escritorio; las terminales, una por carpeta.
+  entradas="$(jq -c --arg t "$TERMINALES" '
+    unique_by(if (.clase | test($t)) then [.clase, .escritorio, .carpeta] else [.clase, .escritorio] end)
+    | sort_by(.escritorio)' <<<"$entradas")"
+  local n
+  n="$(jq 'length' <<<"$entradas")"
+  ((n)) || { dec "No tienes apps abiertas que guardar."; return 1; }
+  mkdir -p "$DATOS"
+  jq -n --arg nombre "$nombre" --arg fecha "$(date +%F)" --argjson v "$entradas" \
+    '{nombre: $nombre, guardada: $fecha, ventanas: $v}' >"$(archivo "$nombre")"
+  accion >/dev/null 2>&1 || true
+  echo "Guardé «$nombre»: $n apps."
+  aviso "Sesión «$nombre» guardada" "$n apps y su escritorio. Ábrela cuando quieras desde el lanzador: «Sesión: $nombre»."
+}
+
+# Una línea de Lua con un texto adentro, sin que nada de lo que tenga lo rompa
+lua_cadena() { local s="$1"; s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/ }"; printf '"%s"' "$s"; }
+
+abrir() {
+  local nombre f
+  nombre="$(limpiar_nombre "${*:-}")"
+  f="$(archivo "$nombre")"
+  [[ -n "$nombre" && -f "$f" ]] || { dec "No tengo una sesión llamada «$nombre». Las que hay: vortex-sesiones lista"; return 1; }
+  local abiertas lanzadas=0 ya=0 clase comando carpeta esc linea direccion
+  abiertas="$(hypr clients -j 2>/dev/null)" || abiertas="[]"
+  jq -e 'type == "array"' >/dev/null 2>&1 <<<"$abiertas" || { dec "No pude ver tus ventanas (¿Hyprland no está corriendo?)."; return 1; }
+  # Separador \x1f (no es espacio): con tabuladores, un campo vacío (sin carpeta) se tragaría al siguiente.
+  while IFS=$'\x1f' read -r clase comando carpeta esc; do
+    [[ -n "$clase" ]] || continue
+    if [[ ! "$clase" =~ $TERMINALES ]]; then
+      direccion="$(jq -r --arg c "$clase" '[.[] | select(.class == $c)][0].address // empty' <<<"$abiertas")"
+      if [[ -n "$direccion" ]]; then
+        # Ya está abierta: no se repite; se pasa a su escritorio.
+        hypr dispatch "hl.dsp.window.move({ window = \"address:$direccion\", workspace = $esc, follow = false })" >/dev/null 2>&1 || true
+        ya=$((ya + 1))
+        continue
+      fi
+    fi
+    linea="exec $comando"
+    [[ -n "$carpeta" && -d "$carpeta" ]] && case "$clase" in
+      kitty) linea="exec $comando --directory $(printf %q "$carpeta")" ;;
+      foot | footclient) linea="exec $comando -D $(printf %q "$carpeta")" ;;
+      Alacritty | alacritty) linea="exec $comando --working-directory $(printf %q "$carpeta")" ;;
+      *) linea="cd $(printf %q "$carpeta") && exec $comando" ;;
+    esac
+    hypr eval "hl.dispatch(hl.dsp.exec_cmd($(lua_cadena "sh -c $(printf %q "$linea")"), { workspace = \"$esc\" }))" >/dev/null 2>&1 || true
+    lanzadas=$((lanzadas + 1))
+    sleep "$PAUSA"
+  done < <(jq -r '.ventanas[] | [.clase, .comando, .carpeta, (.escritorio | tostring)] | join("\u001f")' "$f")
+  local extra=""
+  ((ya)) && extra=" ($ya ya estaban abiertas y las pasé a su escritorio)"
+  echo "Abrí «$nombre»: $lanzadas apps nuevas$extra."
+  aviso "Sesión «$nombre»" "Abriendo $lanzadas apps en sus escritorios$extra."
+}
+
+lista() {
+  local f
+  [[ -d "$DATOS" ]] || { echo "No tienes sesiones guardadas. Abre tus apps y corre: vortex-sesiones guardar «Escuela»"; return 0; }
+  for f in "$DATOS"/*.json; do
+    [[ -f "$f" ]] || continue
+    jq -r '"\(.nombre)  (\(.ventanas | length) apps, guardada \(.guardada))"' "$f"
+  done
+}
+
+ver() {
+  local f
+  f="$(archivo "$(limpiar_nombre "${*:-}")")"
+  [[ -f "$f" ]] || { dec "No existe esa sesión."; return 1; }
+  jq -r '.ventanas[] | "Escritorio \(.escritorio): \(.clase)\(if .carpeta != "" then " en " + .carpeta else "" end)"' "$f"
+}
+
+borrar() {
+  local nombre
+  nombre="$(limpiar_nombre "${*:-}")"
+  [[ -n "$nombre" && -f "$(archivo "$nombre")" ]] || { dec "No existe esa sesión."; return 1; }
+  unlink "$(archivo "$nombre")"
+  unlink "$APPS/vortex-sesion-$(slug "$nombre").desktop" 2>/dev/null || true
+  echo "Olvidé «$nombre»."
+}
+
+slug() { echo "$1" | iconv -f utf8 -t ascii//TRANSLIT 2>/dev/null | tr -cs 'A-Za-z0-9' '-' | sed 's/^-//; s/-$//' | tr 'A-Z' 'a-z'; }
+
+# Las entradas del lanzador: «Guardar sesión de trabajo» y una «Sesión: X» por cada guardada. Las de sesiones
+# borradas se quitan.
+accion() {
+  local f nombre n s bin
+  bin="$(command -v vortex-sesiones || echo /usr/local/bin/vortex-sesiones)"
+  mkdir -p "$APPS"
+  cat >"$APPS/vortex-sesion-guardar.desktop" <<D
+[Desktop Entry]
+Type=Application
+Name=Guardar sesión de trabajo
+Comment=Guarda las apps que tienes abiertas y su escritorio, para abrirlas juntas después
+Exec=$bin guardar
+Icon=document-save
+Categories=Utility;
+Keywords=sesion;trabajo;guardar;escritorios;apps;
+D
+  for f in "$APPS"/vortex-sesion-*.desktop; do
+    [[ -f "$f" && "$f" != */vortex-sesion-guardar.desktop ]] || continue
+    grep -q '^X-Vortex-Sesion=' "$f" && [[ ! -f "$(archivo "$(sed -n 's/^X-Vortex-Sesion=//p' "$f")")" ]] && unlink "$f"
+  done
+  for f in "$DATOS"/*.json; do
+    [[ -f "$f" ]] || continue
+    nombre="$(jq -r '.nombre' "$f")"
+    n="$(jq '.ventanas | length' "$f")"
+    s="$(slug "$nombre")"
+    [[ -n "$s" ]] || continue
+    cat >"$APPS/vortex-sesion-$s.desktop" <<D
+[Desktop Entry]
+Type=Application
+Name=Sesión: $nombre
+Comment=Abre tus $n apps de «$nombre», cada una en su escritorio
+Exec=$bin abrir "$nombre"
+Icon=view-restore
+Categories=Utility;
+Keywords=sesion;trabajo;$s;
+X-Vortex-Sesion=$nombre
+D
+  done
+}
+
+orden="${1:-}"
+shift || true
+case "$orden" in
+  guardar) guardar "$@" ;;
+  abrir) abrir "$@" ;;
+  lista | "") lista ;;
+  ver) ver "$@" ;;
+  borrar) borrar "$@" ;;
+  accion) accion ;;
+  *) echo "uso: vortex-sesiones guardar [NOMBRE] | abrir NOMBRE | lista | ver NOMBRE | borrar NOMBRE" >&2; exit 2 ;;
+esac
