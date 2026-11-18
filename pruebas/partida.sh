@@ -51,6 +51,14 @@ probar "y la de la GPU (nvidia-smi)" "grep -qx 'gpu=77' '$E/partida'"
 probar "el juego es la ventana en pantalla completa" "grep -qx 'juego=Hollow Knight' '$E/partida'"
 
 echo "== al terminar"
+# El detector de tirones (4.0), de mentira: anota cómo lo llaman y, si hay $T/con-tirones, da su resumen.
+cat >"$T/bin/vortex-tirones" <<FALSO
+#!/bin/sh
+echo "\$*" >>"$T/tirones.log"
+[ -e "$T/con-tirones" ] && printf '%s\n' "2 tirones por la memoria" "Se llenó la memoria y Google Chrome tenía 2,4 GB: ciérralo antes de jugar."
+exit 0
+FALSO
+chmod +x "$T/bin/vortex-tirones"; touch "$T/con-tirones"
 mkdir -p "$E/mangohud"
 { echo "os,cpu,gpu"; echo "Arch,i7,RTX"; echo "fps,frametime,cpu_load"
   for _ in $(seq 99); do echo "120,8.3,40"; done; echo "30,33,90"; } >"$E/mangohud/HollowKnight_2026-10-28.csv"
@@ -58,14 +66,17 @@ partida terminar >"$T/salida"
 probar "avisa con el nombre del juego" "grep -q '^Hollow Knight|Jugaste 0 min / ' '$T/avisos.log'"
 probar "dice las temperaturas máximas" "grep -q 'Máximo: CPU 84 °C · GPU 77 °C' '$T/avisos.log'"
 probar "FPS promedio y 1 % bajo del registro de MangoHud" "grep -q 'FPS promedio 119 · 1 % bajo 30' '$T/avisos.log'"
+probar "y los tirones, con su causa y qué hacer (4.0)" "grep -q 'GPU 77 °C / 2 tirones por la memoria / Se llenó la memoria y Google Chrome tenía 2,4 GB: ciérralo antes de jugar.\$' '$T/avisos.log'"
+probar "al detector se le pide el resumen de esta partida" "grep -qx 'terminar --desde [0-9]*' '$T/tirones.log'"
 probar "la partida queda en el historial" "tail -1 '$E/partidas.csv' | grep -q ',Hollow Knight,0,119,30,84,77$'"
 probar "el medidor se detiene solo" "sleep 0.4; ! midiendo && [[ ! -e '$E/partida' ]]"
 probar "un segundo «terminar» no avisa otra vez" "partida terminar; [[ \$(wc -l <'$T/avisos.log') == 1 ]]"
 
 echo "== partidas cortas y sin datos"
-rm -f "$E/mangohud/"*.csv
+rm -f "$E/mangohud/"*.csv "$T/con-tirones"
 MINIMO=120 partida empezar
 MINIMO=120 partida terminar
+probar "una partida corta también para al detector" "[[ \$(wc -l <'$T/tirones.log') == 2 ]]"
 probar "menos de 2 minutos: sin resumen ni historial" "[[ \$(wc -l <'$T/avisos.log') == 1 && \$(wc -l <'$E/partidas.csv') == 2 ]]"
 rm -rf "$T/hwmon/hwmon1"; printf '#!/bin/sh\nexit 1\n' >"$T/bin/nvidia-smi"
 echo '{"class":"kitty","fullscreen":0}' >"$T/ventana"

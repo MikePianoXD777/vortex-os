@@ -1327,6 +1327,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-tirones"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-usb"
 version = "0.1.0"
 dependencies = [

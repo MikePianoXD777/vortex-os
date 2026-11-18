@@ -681,6 +681,10 @@ impl Gestor {
         let guardados = self.r.guardados.clone();
         self.l
             .segundo_plano(&guardados, &["antes".into(), clase.into(), pid.to_string()]);
+        // 4.0: el detector de tirones mide la partida (lo que trabó al juego sale en el resumen del final).
+        let tirones = self.r.tirones.clone();
+        self.l
+            .segundo_plano(&tirones, &["medir".into(), pid.to_string(), clase.into()]);
         // El modo juego manda: el modo IA se quita (después de poner el del juego, para que los efectos y el
         // fondo no vuelvan entre uno y otro) y regresa callado cuando se cierre el juego.
         if self.ia_activa {

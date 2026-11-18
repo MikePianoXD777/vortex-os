@@ -9,6 +9,9 @@
 #   vortex-partida historial  las últimas partidas
 #
 # Las partidas de menos de 2 minutos no avisan (abrir y cerrar un juego no es jugar).
+#
+# 4.0: si el detector de tirones midió la partida (vortex-tirones, lo arranca el gestor al abrir el juego),
+# el aviso dice también cuántos tirones hubo, por qué (memoria, disco, procesador, calor) y qué hacer.
 set -uo pipefail
 
 ESTADO="${XDG_STATE_HOME:-$HOME/.local/state}/vortex"
@@ -18,6 +21,7 @@ MANGO_LOGS="$ESTADO/mangohud"
 PASO="${VORTEX_PARTIDA_PASO:-5}"
 MINIMO="${VORTEX_PARTIDA_MINIMO:-120}"
 HWMON="${VORTEX_HWMON:-/sys/class/hwmon}"
+TIRONES="${VORTEX_PARTIDA_TIRONES:-vortex-tirones}"
 
 # Temperatura de la CPU en °C (Intel: coretemp; AMD: k10temp o zenpower), vacía si no hay sensor
 temp_cpu() {
@@ -134,7 +138,7 @@ juego_que_no_abrio() {
 
 cmd_terminar() {
   [[ -s "$PARTIDA" ]] || return 0
-  local inicio fin seg juego cpu gpu fps="" bajo="" lineas=()
+  local inicio fin seg juego cpu gpu fps="" bajo="" lineas=() tirones=()
   exec 8>"$ESTADO/partida.datos"
   flock 8
   muestra
@@ -144,6 +148,9 @@ cmd_terminar() {
   rm -f "$PARTIDA"
   exec 8>&-
   [[ -n "$inicio" ]] || return 0
+  # Para al detector (también en las partidas cortas, que no avisan) y trae su resumen de esta partida.
+  command -v "$TIRONES" >/dev/null &&
+    mapfile -t tirones < <(timeout 6 "$TIRONES" terminar --desde "$inicio" 2>/dev/null)
   ((seg >= 60)) || juego_que_no_abrio
   ((seg >= MINIMO)) || return 0
   IFS=$'\t' read -r fps bajo < <(fps_de_partida "$inicio")
@@ -154,6 +161,7 @@ cmd_terminar() {
   lineas+=("Jugaste $(duracion "$seg")")
   [[ -n "$fps" ]] && lineas+=("FPS promedio $fps · 1 % bajo $bajo")
   [[ -n "$cpu$gpu" ]] && lineas+=("Máximo: ${cpu:+CPU $cpu °C}${cpu:+${gpu:+ · }}${gpu:+GPU $gpu °C}")
+  ((${#tirones[@]})) && lineas+=("${tirones[@]}")
   command -v notify-send >/dev/null &&
     notify-send -a "Vortexine's OS" -i applications-games "${juego:-Resumen de la partida}" \
       "$(printf '%s\n' "${lineas[@]}")" >/dev/null 2>&1

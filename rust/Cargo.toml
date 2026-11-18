@@ -27,6 +27,7 @@ members = [
     "apps/vortex-app-installer/qt",
     "apps/vortex-shop",
     "apps/vortex-shop/qt",
+    "apps/vortex-tirones",
 ]
 
 [workspace.package]

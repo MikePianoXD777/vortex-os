@@ -78,6 +78,8 @@ Uso: vortex <comando>
                                        Vídeos/Clips (graba en la RAM con la GPU; viene encendido)
   partidas                             tus últimas partidas: cuánto jugaste, FPS y temperaturas (al
                                        salir de un juego sale el resumen solo)
+  tirones                              los tirones de tu última partida: cuándo, cuánto y por qué
+                                       (memoria, disco, procesador o calor; se miden solos)
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
@@ -2219,6 +2221,9 @@ case "${1:-ayuda}" in
   runner | exe) shift; exec "$VORTEX_DIR/bin/vortex-exe" "$@" ;;
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
+  tirones)
+    command -v vortex-tirones >/dev/null || { aviso "falta vortex-tirones (viene en el paquete vortex-rust)"; exit 1; }
+    exec vortex-tirones ver ;;
   guardados) shift; exec "$VORTEX_DIR/bin/vortex-guardados" "$@" ;;
   sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   cerrar-app) shift; exec "$VORTEX_DIR/bin/vortex-cerrar-app" "$@" ;;

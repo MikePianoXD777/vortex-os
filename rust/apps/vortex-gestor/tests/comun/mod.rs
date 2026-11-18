@@ -175,6 +175,7 @@ impl Mundo {
             ("vortex_ia_falso", "vortex-ia"),
             ("memoria_falso", "vortex-memoria"),
             ("guardados_falso", "vortex-guardados"),
+            ("tirones_falso", "vortex-tirones"),
             ("disco_falso", "vortex-disco"),
         ] {
             instalar_falso(o, &bin, n);
@@ -233,6 +234,7 @@ impl Mundo {
             .env("VORTEX_GESTOR_QS", bin.join("quickshell"))
             .env("VORTEX_GESTOR_MEMORIA", bin.join("vortex-memoria"))
             .env("VORTEX_GESTOR_GUARDADOS", bin.join("vortex-guardados"))
+            .env("VORTEX_GESTOR_TIRONES", bin.join("vortex-tirones"))
             .env("VORTEX_GESTOR_DISCO", bin.join("vortex-disco"))
             .env("VORTEX_GESTOR_NVIDIA_SMI", bin.join("nvidia-smi"))
             .env("VORTEX_GESTOR_IA", bin.join("vortex-ia"))

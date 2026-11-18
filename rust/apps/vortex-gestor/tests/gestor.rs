@@ -228,6 +228,13 @@ fn foco_scopes_nice_juego_presion_y_salida() {
         m.linea_exacta("guardados-llamado", "antes un.juego.raro 4002"),
         "y respalda sus partidas guardadas antes de jugar (4.0)"
     );
+    esperar("el detector de tirones", || {
+        m.en_log("tirones-llamado", "un.juego.raro")
+    });
+    assert!(
+        m.linea_exacta("tirones-llamado", "medir 4002 un.juego.raro"),
+        "y empieza a medir los tirones de la partida, con el pid del juego (4.0)"
+    );
     m.hypr.evento(&["closewindow>>abcd"]);
     esperar("modo-juego off 2", || {
         m.cuenta("vortex.log", "modo-juego off") == 2

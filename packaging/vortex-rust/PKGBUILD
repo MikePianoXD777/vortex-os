@@ -18,12 +18,14 @@
 #   - vortex-gestor-rs: el gestor de recursos (foco, scopes, modo juego, modo IA, presión de memoria), sin Qt, en un
 #     solo proceso: reemplaza al bash bin/vortex-gestor y a su ayudante en C vortex-eventos. El script
 #     /usr/bin/vortex-gestor salta a este binario si existe; con VORTEX_GESTOR_BASH=1 se fuerza el bash.
+#   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
+#     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=7
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
+pkgrel=8
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -33,7 +35,7 @@ makedepends=('cargo' 'qt6-base' 'qt6-declarative')
 options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
-_crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
+_crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
@@ -56,7 +58,7 @@ check() {
     cd "$(_raiz)"
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
-    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria
+    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones
 }
 
 package() {
@@ -69,6 +71,7 @@ package() {
     install -Dm755 "$b/vortex-memoria-rs" "$pkgdir/usr/lib/vortex/vortex-memoria-rs"
     install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
     install -Dm755 "$b/vortex-gestor-rs" "$pkgdir/usr/lib/vortex/vortex-gestor-rs"
+    install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
     for a in task-manager runner video shop app-installer connect shared; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done

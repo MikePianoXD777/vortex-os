@@ -246,7 +246,7 @@ gestor() {
   env -u HYPRLAND_INSTANCE_SIGNATURE VORTEX_GESTOR_BASH=1 XDG_RUNTIME_DIR="$RUN" XDG_STATE_HOME="$T/estado" XDG_CONFIG_HOME="$T/conf" \
     VORTEX_GESTOR_PROC="$P" VORTEX_GESTOR_CGROOT="$CGR" VORTEX_GESTOR_SCX="$T/scx" VORTEX_GESTOR_PSI="$T/psi" \
     VORTEX_GESTOR_EVENTOS="$T/eventos" VORTEX_GESTOR_BUSCTL="$T/busctl" VORTEX_GESTOR_RENICE="$T/renice" \
-    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" VORTEX_GESTOR_GUARDADOS="$T/guardados" VORTEX_GESTOR_DISCO="$T/disco-falso" \
+    VORTEX_GESTOR_VORTEX="$T/vortex" VORTEX_GESTOR_QS="$T/quickshell" VORTEX_GESTOR_MEMORIA="$T/memoria" VORTEX_GESTOR_GUARDADOS="$T/guardados" VORTEX_GESTOR_TIRONES="$T/tirones" VORTEX_GESTOR_DISCO="$T/disco-falso" \
     VORTEX_GESTOR_NVIDIA_SMI="$T/nvidia-smi" VORTEX_GESTOR_IA="$T/vortex-ia" \
     "$AQUI/bin/vortex-gestor" >"$T/gestor.log" 2>&1 7>&- 8>&- &
   GESTOR=$!
@@ -255,8 +255,9 @@ gestor() {
 # El aviso al abrir un juego (--juego, 3.0) se anota aparte: no es el de quedarse sin memoria.
 # La copia de las partidas guardadas (4.0) y el aviso de disco: de mentira
 printf '#!/bin/sh\necho "$*" >>"%s/guardados-llamado"\n' "$T" >"$T/guardados"
+printf '#!/bin/sh\necho "$*" >>"%s/tirones-llamado"\n' "$T" >"$T/tirones"
 printf '#!/bin/sh\nexit 0\n' >"$T/disco-falso"
-chmod +x "$T/guardados" "$T/disco-falso"
+chmod +x "$T/guardados" "$T/tirones" "$T/disco-falso"
 printf '#!/bin/sh\nif [ "$1" = --juego ]; then echo "$*" >>"%s/aviso-juego"; else : >"%s/aviso-memoria"; fi\n' "$T" "$T" >"$T/memoria"
 chmod +x "$T/memoria"
 printf 'DEPURAR=1\nMEM_REVISAR_S=1\nIA_REVISAR_S=1\n' >"$T/conf/gestor.conf" && mkdir -p "$T/conf/vortex" && mv "$T/conf/gestor.conf" "$T/conf/vortex/"
@@ -334,6 +335,7 @@ probar "juego por contentType=game" "[[ \$(grep -c 'modo-juego on' '$T/vortex.lo
 esperar "grep -q 'un.juego.raro' '$T/aviso-juego' 2>/dev/null"
 probar "al abrir un juego mira si le alcanza la memoria, con su clase y su pid" "grep -qx -- '--juego un.juego.raro 4002' '$T/aviso-juego'"
 probar "y respalda sus partidas guardadas antes de jugar (4.0)" "grep -qx -- 'antes un.juego.raro 4002' '$T/guardados-llamado'"
+probar "y empieza a medir los tirones de la partida (4.0)" "grep -qx -- 'medir 4002 un.juego.raro' '$T/tirones-llamado'"
 evento "closewindow>>abcd"
 esperar "[[ \$(grep -c 'modo-juego off' '$T/vortex.log') == 2 ]]"
 

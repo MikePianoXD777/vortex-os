@@ -1,0 +1,26 @@
+[package]
+name = "vortex-tirones"
+description = "El detector de tirones de los juegos de Vortexine's OS (4.0): qué los causó, en el resumen de la partida"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-tirones"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+vortex-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
