@@ -440,6 +440,18 @@ fn decidir(e: &mut Evento, vigia: &Vigia) {
 
 // --------------------------------------------------------------------------------------- el informe
 
+/// «18/11 13:37» en la hora de la PC (con `date`, que sabe la zona); si no se puede, la de UTC.
+fn fecha_local(seg: u64) -> String {
+    std::process::Command::new("date")
+        .args(["-d", &format!("@{seg}"), "+%d/%m %H:%M"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|t| !t.is_empty())
+        .unwrap_or_else(|| vortex_core::registro::fecha_utc(UNIX_EPOCH + Duration::from_secs(seg)))
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Informe {
     pub juego: String,
@@ -551,7 +563,7 @@ impl Informe {
                 &self.juego
             },
             min,
-            vortex_core::registro::fecha_utc(UNIX_EPOCH + Duration::from_secs(self.inicio))
+            fecha_local(self.inicio)
         );
         for l in self.resumen() {
             s.push_str(&format!("  {l}\n"));
