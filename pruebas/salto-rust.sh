@@ -38,10 +38,31 @@ r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" apps/vortex-shared/vortex-
 r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" apps/vortex-shared/vortex-shared foto.png 2>&1)"
 [[ "$r" == "rust foto.png" ]] && bien "con archivos abre la ventana de Rust" || mal "con archivos no abrió la ventana: $r"
 
+echo "vortex-gestor: el servicio de recursos (sin python: el de bash es el viejo)"
+# El de bash, si corriera de verdad, buscaría el Hyprland de la sesión: aquí no hay ninguno (carpeta temporal),
+# así que sale enseguida con su aviso. Nada toca tu sesión.
+mkdir -p "$tmp/run-gestor" "$tmp/home-gestor"
+gestor() { # los comandos corren con el entorno de mentira y sin el Hyprland de verdad
+  env -u HYPRLAND_INSTANCE_SIGNATURE PATH="$tmp/bin:$PATH" XDG_RUNTIME_DIR="$tmp/run-gestor" HOME="$tmp/home-gestor" \
+    XDG_CONFIG_HOME="$tmp/home-gestor/c" XDG_STATE_HOME="$tmp/home-gestor/s" "$@" 2>&1
+}
+printf '#!/bin/sh\necho "rust $*"\n' >"$tmp/lib/vortex-gestor-rs"
+chmod +x "$tmp/lib/vortex-gestor-rs"
+r="$(gestor VORTEX_RUST_BIN="$tmp/lib" bin/vortex-gestor --hola)"
+[[ "$r" == "rust --hola" ]] && bien "con el binario de Rust, salta a él (y le pasa los argumentos)" || mal "no saltó a Rust: $r"
+r="$(gestor VORTEX_RUST_BIN="$tmp/lib" VORTEX_GESTOR_BASH=1 bin/vortex-gestor)"
+[[ "$r" == *"no encuentro Hyprland"* || "$r" == *"falta vortex-eventos"* ]] && bien "VORTEX_GESTOR_BASH=1 obliga a usar el de bash" || mal "VORTEX_GESTOR_BASH=1 no forzó bash: $r"
+rm "$tmp/lib/vortex-gestor-rs"
+r="$(gestor VORTEX_RUST_BIN="$tmp/lib" bin/vortex-gestor)"
+[[ "$r" == *"no encuentro Hyprland"* || "$r" == *"falta vortex-eventos"* ]] && bien "sin el binario de Rust, sigue con el de bash" || mal "sin Rust no usó bash: $r"
+
 echo "Paquete vortex-rust"
 grep -q 'vortex-shared-motor' packaging/vortex-rust/PKGBUILD && bien "instala vortex-shared-motor" || mal "no instala vortex-shared-motor"
 for a in task-manager runner video shop app-installer connect shared; do
   grep -q "vortex-$a-rs" packaging/vortex-rust/PKGBUILD && bien "instala vortex-$a-rs" || mal "no instala vortex-$a-rs"
 done
+
+grep -q 'vortex-gestor-rs' packaging/vortex-rust/PKGBUILD && bien "instala vortex-gestor-rs" || mal "no instala vortex-gestor-rs"
+grep -q '_crates=(.*vortex-gestor' packaging/vortex-rust/PKGBUILD && bien "compila vortex-gestor" || mal "no compila vortex-gestor"
 
 ((fallos == 0)) && echo "Todo bien" || { echo "$fallos fallos"; exit 1; }

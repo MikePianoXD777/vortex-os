@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# renice falso: cambia el nice en los stat falsos (nunca toca un proceso de verdad).
+echo "$*" >>"$FALSO_T/renice.log"
+v="$2"
+shift 3
+for tid in "$@"; do
+  for f in "$FALSO_PROC"/*/task/"$tid"/stat; do
+    awk -v v="$v" '{ i = index($0, ") "); pre = substr($0, 1, i + 1); n = split(substr($0, i + 2), c, " "); c[17] = v; s = c[1]; for (k = 2; k <= n; k++) s = s " " c[k]; print pre s }' "$f" >"$f.n" && mv "$f.n" "$f"
+  done
+done

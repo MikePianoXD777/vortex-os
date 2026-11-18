@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# vortex falso: «modo-juego» y «modo-ia» ponen o quitan su marca; lo demás no hace nada.
+echo "$*" >>"$FALSO_T/vortex.log"
+case "$1" in modo-juego | modo-ia) ;; *) exit 0 ;; esac
+case "$2" in
+  on) mkdir -p "$FALSO_T/estado/vortex"; touch "$FALSO_T/estado/vortex/$1" ;;
+  off) rm -f "$FALSO_T/estado/vortex/$1" ;;
+esac

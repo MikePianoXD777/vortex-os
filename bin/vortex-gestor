@@ -28,6 +28,15 @@
 #   PESO_FOCO=500  PESO_FONDO=50  NICE_FOCO=-5  RECLAMAR_MB=64
 #   IA_REVISAR_S=20  IA_VRAM_MB=1024   (IA_REVISAR_S=0 apaga el modo IA automático)
 set -uo pipefail
+
+# 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: hace lo mismo en un solo proceso (sin este
+# bash ni vortex-eventos) y no lanza programas por cada evento. El servicio de systemd no cambia.
+# VORTEX_GESTOR_BASH=1 obliga a usar este bash; VORTEX_RUST_BIN cambia la carpeta del binario.
+rust_bin="${VORTEX_RUST_BIN:-/usr/lib/vortex}/vortex-gestor-rs"
+if [[ -z "${VORTEX_GESTOR_BASH:-}" && -x "$rust_bin" ]]; then
+  export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}" MALLOC_TRIM_THRESHOLD_="${MALLOC_TRIM_THRESHOLD_:-131072}"
+  exec "$rust_bin" "$@"
+fi
 shopt -s nullglob
 
 # --- Ajustes ---

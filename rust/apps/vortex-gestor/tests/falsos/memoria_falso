@@ -1,0 +1,3 @@
+#!/bin/sh
+# vortex-memoria falso: el aviso al abrir un juego (--juego, 3.0) se anota aparte del de quedarse sin memoria.
+if [ "$1" = --juego ]; then echo "$*" >>"$FALSO_T/aviso-juego"; else : >"$FALSO_T/aviso-memoria"; fi

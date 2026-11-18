@@ -1,0 +1,26 @@
+[package]
+name = "vortex-gestor"
+description = "El gestor de recursos de Vortexine's OS en Rust (reemplaza a bin/vortex-gestor, de bash, y a su ayudante en C vortex-eventos)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_gestor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-gestor-rs"
+path = "src/main.rs"
+
+[dependencies]
+libc.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
