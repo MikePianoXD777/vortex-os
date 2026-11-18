@@ -7,6 +7,8 @@ members = [
     "apps/vortex-player",
     "apps/vortex-local-ai",
     "apps/vortex-bt-agente",
+    "apps/vortex-tareas",
+    "apps/vortex-usb",
     "crates/vortex-core-qt",
     "apps/vortex-video",
     "apps/vortex-video/qt",

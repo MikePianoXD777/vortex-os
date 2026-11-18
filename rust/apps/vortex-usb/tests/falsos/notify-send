@@ -1,0 +1,4 @@
+#!/bin/sh
+# notify-send falso: anota el aviso y, si trae botones, contesta lo que diga $FALSO_DIR/respuesta.
+echo "notify-send $*" >>"$FALSO_DIR/registro"
+case "$*" in *-A*) cat "$FALSO_DIR/respuesta" 2>/dev/null ;; esac

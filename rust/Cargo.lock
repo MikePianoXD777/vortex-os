@@ -1269,6 +1269,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-tareas"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "vortex-task-manager"
 version = "1.0.2"
 dependencies = [
@@ -1289,6 +1299,13 @@ dependencies = [
  "serde_json",
  "vortex-core",
  "vortex-task-manager",
+]
+
+[[package]]
+name = "vortex-usb"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

@@ -9,6 +9,13 @@
 #   vortex-usb --eventos   lee los eventos de udev de la entrada estándar (lo usan las pruebas)
 set -uo pipefail
 
+# 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: hace lo mismo con ~1 MB en vez de ~12.
+# VORTEX_USB_BASH=1 obliga a usar este (para las pruebas o si el de Rust falla); VORTEX_RUST_BIN cambia la carpeta.
+rust_bin="${VORTEX_RUST_BIN:-/usr/lib/vortex}/vortex-usb-rs"
+if [[ -z "${VORTEX_USB_BASH:-}" && -x "$rust_bin" ]]; then
+  exec "$rust_bin" "$@"
+fi
+
 APP="Vortexine's OS"
 
 avisar() { notify-send -a "$APP" -i drive-removable-media "$@" 2>/dev/null || true; }

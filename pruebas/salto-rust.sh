@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2015  # bien() y mal() nunca fallan
+# shellcheck disable=SC2015,SC2053  # bien() y mal() nunca fallan; $salida_py es un patrón a propósito
 # Los lanzadores de Python de las apps ya pasadas a Rust (4.0) saltan al binario de Rust si está.
 # Usa un binario falso y un python3 falso: nunca abre una app de verdad.
 set -uo pipefail
@@ -13,21 +13,43 @@ mkdir -p "$tmp/lib" "$tmp/bin"
 printf '#!/bin/sh\necho "python $*"\n' >"$tmp/bin/python3"
 chmod +x "$tmp/bin/python3"
 
-for a in task-manager runner video shop app-installer connect shared; do
+for a in task-manager runner video shop app-installer connect shared tareas; do
   echo "vortex-$a"
   lanzador="apps/vortex-$a/vortex-$a"
   [[ -f "$lanzador" ]] || lanzador="apps/$a/vortex-$a"
+  # El de las tareas es un script de Python (en bin/): se corre con el python3 de verdad (con el falso no
+  # llegaría ni a leer el salto); «--hola» no es una orden suya y solo imprime cómo se usa.
+  py="$tmp/bin"
+  salida_py="python*"
+  if [[ "$a" == tareas ]]; then
+    lanzador="bin/vortex-tareas"
+    py="$tmp/sin-python"
+    salida_py="vortex-tareas (Vortex 2.5)*"
+    mkdir -p "$py"
+  fi
   var="VORTEX_$(echo "$a" | tr 'a-z-' 'A-Z_')_PYTHON"
   printf '#!/bin/sh\necho "rust $*"\n' >"$tmp/lib/vortex-$a-rs"
   chmod +x "$tmp/lib/vortex-$a-rs"
-  r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
+  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
   [[ "$r" == "rust --hola" ]] && bien "con el binario de Rust, salta a él (y le pasa los argumentos)" || mal "no saltó a Rust: $r"
-  r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" env "$var=1" "$lanzador" --hola 2>&1)"
-  [[ "$r" == python* ]] && bien "$var=1 obliga a usar la de Python" || mal "$var=1 no forzó Python: $r"
+  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" env "$var=1" "$lanzador" --hola 2>&1)"
+  [[ "$r" == $salida_py ]] && bien "$var=1 obliga a usar la de Python" || mal "$var=1 no forzó Python: $r"
   rm "$tmp/lib/vortex-$a-rs"
-  r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
-  [[ "$r" == python* ]] && bien "sin el binario de Rust, sigue con la de Python" || mal "sin Rust no usó Python: $r"
+  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
+  [[ "$r" == $salida_py ]] && bien "sin el binario de Rust, sigue con la de Python" || mal "sin Rust no usó Python: $r"
 done
+
+echo "vortex-usb (bash)"
+# --eventos con la entrada vacía: el de bash no hace nada (nunca se pone a escuchar a udev de verdad)
+printf '#!/bin/sh\necho "rust $*"\n' >"$tmp/lib/vortex-usb-rs"
+chmod +x "$tmp/lib/vortex-usb-rs"
+r="$(VORTEX_RUST_BIN="$tmp/lib" bin/vortex-usb --eventos </dev/null 2>&1)"
+[[ "$r" == "rust --eventos" ]] && bien "con el binario de Rust, salta a él (y le pasa los argumentos)" || mal "no saltó a Rust: $r"
+r="$(VORTEX_RUST_BIN="$tmp/lib" VORTEX_USB_BASH=1 bin/vortex-usb --eventos </dev/null 2>&1)"
+[[ -z "$r" ]] && bien "VORTEX_USB_BASH=1 obliga a usar el de bash" || mal "VORTEX_USB_BASH=1 no forzó bash: $r"
+rm "$tmp/lib/vortex-usb-rs"
+r="$(VORTEX_RUST_BIN="$tmp/lib" bin/vortex-usb --eventos </dev/null 2>&1)"
+[[ -z "$r" ]] && bien "sin el binario de Rust, sigue con el de bash" || mal "sin Rust no usó bash: $r"
 
 echo "vortex-shared: el servicio va al motor sin Qt"
 printf '#!/bin/sh\necho "rust $*"\n' >"$tmp/lib/vortex-shared-rs"
@@ -40,7 +62,7 @@ r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" apps/vortex-shared/vortex-
 
 echo "Paquete vortex-rust"
 grep -q 'vortex-shared-motor' packaging/vortex-rust/PKGBUILD && bien "instala vortex-shared-motor" || mal "no instala vortex-shared-motor"
-for a in task-manager runner video shop app-installer connect shared; do
+for a in task-manager runner video shop app-installer connect shared tareas usb; do
   grep -q "vortex-$a-rs" packaging/vortex-rust/PKGBUILD && bien "instala vortex-$a-rs" || mal "no instala vortex-$a-rs"
 done
 

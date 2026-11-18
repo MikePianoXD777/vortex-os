@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# notify-send falso: anota el título (el penúltimo argumento) en $AVISOS y contesta lo que diga $RESPUESTA
+# (el botón elegido). Nunca avisa en ningún escritorio.
+printf '%s\n' "${@: -2:1}" >>"$AVISOS"
+printf '%s\n' "${RESPUESTA:-}"
