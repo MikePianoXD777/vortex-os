@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# vortex-cerrar-app: cierra una app POR COMPLETO y libera su memoria al instante (4.0).
+#
+# Cerrar la ventana no siempre cierra la app: Discord, Steam, Spotify y muchas más se quedan en la
+# bandeja o con procesos sueltos, y su RAM sigue ocupada. Esto cierra todo lo que es de esa app:
+#   - Flatpak: «flatpak kill» de su id.
+#   - Si la app tiene su propio scope de systemd (el gestor de Vortex mete ahí cada app con ventana) y
+#     en ese scope solo hay procesos de ella: se para el scope entero.
+#   - Si no (abierta desde una terminal, gestor apagado): se cierra su árbol de procesos.
+# Primero se le pide que cierre (SIGTERM) y, si a los 5 s sigue, se fuerza. Nunca toca Hyprland, el
+# shell, la sesión ni procesos de otro usuario.
+#
+#   vortex cerrar-app 0xDIRECCION…   las ventanas de Hyprland de la app (lo manda el menú del dock)
+#   vortex cerrar-app --pid PID      por número de proceso
+#   --nombre NOMBRE                  cómo se llama la app, para el aviso
+#   --explicar                       solo dice qué haría, sin cerrar nada (para pruebas)
+set -uo pipefail
+
+ESPERA_S="${VORTEX_CERRAR_ESPERA:-5}"
+explicar=0
+nombre_app=""
+pids=()
+
+aviso() { printf 'vortex-cerrar-app: %s\n' "$*" >&2; }
+notificar() { ((explicar)) || ! command -v notify-send >/dev/null || notify-send -a "Vortexine's OS" -i "${2:-}" "$1" "${3:-}" || true; }
+
+while (($#)); do
+  case "$1" in
+    --explicar) explicar=1 ;;
+    --pid) shift; pids+=("${1:-}") ;;
+    --nombre) shift; nombre_app="${1:-}" ;;
+    0x*) # Ventana de Hyprland → su proceso
+      p="$(hyprctl clients -j 2>/dev/null | jq -r --arg a "$1" '.[] | select(.address == $a) | .pid' 2>/dev/null | head -1)"
+      [[ -n "$p" ]] && pids+=("$p") ;;
+    -h | --help | ayuda) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) aviso "no entiendo «$1»"; exit 2 ;;
+  esac
+  shift
+done
+((${#pids[@]})) || { aviso "no encontré la app"; exit 1; }
+
+# Procesos que nunca se cierran desde aquí: la sesión y el propio sistema.
+protegido() {
+  local pid="$1" com
+  [[ "$pid" =~ ^[0-9]+$ ]] && ((pid > 1)) || return 0
+  [[ -d "/proc/$pid" ]] || return 0
+  [[ "$(stat -c %u "/proc/$pid")" == "$(id -u)" ]] || return 0
+  com="$(cat "/proc/$pid/comm" 2>/dev/null)"
+  case "$com" in
+    Hyprland | quickshell | qs | Xwayland | systemd | dbus-daemon | dbus-broker | pipewire* | wireplumber | *greet*) return 0 ;;
+  esac
+  ((pid == $$ || pid == PPID)) && return 0
+  return 1
+}
+
+# El scope o servicio de systemd donde vive el proceso (cgroup v2).
+unidad_de() { local cg; cg="$(sed -n 's/^0:://p' "/proc/$1/cgroup" 2>/dev/null)"; printf '%s\n' "${cg##*/}"; }
+procesos_de_unidad() { local cg; cg="$(sed -n 's/^0:://p' "/proc/$1/cgroup" 2>/dev/null)"; cat "/sys/fs/cgroup$cg/cgroup.procs" 2>/dev/null; }
+
+# El proceso y todos sus descendientes.
+arbol() {
+  local raiz="$1"
+  ps -eo pid=,ppid= 2>/dev/null | awk -v r="$raiz" '
+    { hijo[$2] = hijo[$2] " " $1 }
+    END { pila[1] = r; n = 1
+          while (n) { p = pila[n--]; print p; k = split(hijo[p], h, " "); for (i = 1; i <= k; i++) pila[++n] = h[i] } }'
+}
+
+kb_de() { local t=0 p; for p in "$@"; do t=$((t + $(awk '/^Rss:/{print $2}' "/proc/$p/smaps_rollup" 2>/dev/null || echo 0))); done; echo "$t"; }
+nombre_de() { local n; n="$(tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null | awk '{print $1}')"; n="${n##*/}"; echo "${n:-$(cat "/proc/$1/comm" 2>/dev/null)}"; }
+
+# TERM a todos, y KILL a los que sigan a los ESPERA_S segundos.
+cerrar_procesos() {
+  local p vivos
+  kill -TERM "$@" 2>/dev/null
+  for _ in $(seq 1 $((ESPERA_S * 10))); do
+    vivos=0
+    for p in "$@"; do [[ -d "/proc/$p" ]] && [[ "$(awk '{print $3}' "/proc/$p/stat" 2>/dev/null)" != Z ]] && vivos=1 && break; done
+    ((vivos)) || return 0
+    sleep 0.1
+  done
+  kill -KILL "$@" 2>/dev/null
+  return 0
+}
+
+hecho=0
+liberado=0
+nombre=""
+declare -A visto=()
+for pid in "${pids[@]}"; do
+  [[ -n "${visto[$pid]:-}" ]] && continue
+  visto[$pid]=1
+  if protegido "$pid"; then aviso "no cierro el proceso $pid: es del sistema o no existe"; continue; fi
+  nombre="$(nombre_de "$pid")"
+  unidad="$(unidad_de "$pid")"
+  mapfile -t mios < <(arbol "$pid")
+
+  if [[ "$unidad" =~ ^app-flatpak-(.+)-[0-9]+\.scope$ ]] && command -v flatpak >/dev/null; then
+    id="${BASH_REMATCH[1]}"
+    ((explicar)) && { echo "flatpak $id"; continue; }
+    mapfile -t todos < <(procesos_de_unidad "$pid")
+    liberado=$((liberado + $(kb_de "${todos[@]}")))
+    flatpak kill "$id" 2>/dev/null || cerrar_procesos "${todos[@]}"
+    hecho=1
+    continue
+  fi
+
+  # ¿El scope es solo de esta app? (todos sus procesos son el proceso o sus descendientes)
+  propio=0
+  if [[ "$unidad" == *.scope || "$unidad" == app-*.service ]] && [[ "$unidad" != session-*.scope ]]; then
+    mapfile -t todos < <(procesos_de_unidad "$pid")
+    if ((${#todos[@]})); then
+      declare -A en_arbol=()
+      for p in "${mios[@]}"; do en_arbol[$p]=1; done
+      propio=1
+      for p in "${todos[@]}"; do [[ -n "${en_arbol[$p]:-}" ]] || { propio=0; break; }; done
+      unset en_arbol
+    fi
+  fi
+
+  if ((propio)); then
+    ((explicar)) && { echo "unidad $unidad"; continue; }
+    liberado=$((liberado + $(kb_de "${todos[@]}")))
+    systemctl --user stop "$unidad" 2>/dev/null || cerrar_procesos "${todos[@]}"
+  else
+    ((explicar)) && { echo "arbol ${#mios[@]}"; continue; }
+    liberado=$((liberado + $(kb_de "${mios[@]}")))
+    cerrar_procesos "${mios[@]}"
+  fi
+  hecho=1
+done
+
+((explicar)) && exit 0
+((hecho)) || exit 1
+mb=$((liberado / 1024))
+[[ -n "$nombre_app" ]] && nombre="$nombre_app"
+if ((mb >= 1)); then
+  notificar "${nombre^} se cerró por completo" "${nombre,,}" "Se liberaron $mb MB de memoria."
+else
+  notificar "${nombre^} se cerró por completo" "${nombre,,}"
+fi
+exit 0

@@ -1261,7 +1261,8 @@
         "untitled": "Untitled",
         "new_window": "Nueva ventana",
         "pin": "Fijar en el dock",
-        "unpin": "Quitar del dock"
+        "unpin": "Quitar del dock",
+        "quit_fully": "Cerrar por completo"
       },
       "background": {
         "title": "Dibujar un fondo detrás de las apps",

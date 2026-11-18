@@ -1221,7 +1221,8 @@
         "new_window": "New window",
         "pin": "Pin to dock",
         "unpin": "Unpin from dock",
-        "untitled": "Untitled"
+        "untitled": "Untitled",
+        "quit_fully": "Quit completely"
       }
     },
     "lyrics_picker": {

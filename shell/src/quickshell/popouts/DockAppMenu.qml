@@ -458,6 +458,37 @@ PanelWindow {
                                 DockAppMenuController.hide();
                             }
                         }
+
+                        // Vortex 4.0: cerrar la app de verdad (bandeja y procesos sueltos incluidos) y
+                        // liberar su memoria al instante. Solo si tiene ventanas abiertas.
+                        ClickButton {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: dockAppMenuWindow.s(29)
+                            visible: dockAppMenuWindow.hasWindows
+                            cornerRadius: dockAppMenuWindow.s(8)
+                            contentAlignment: Qt.AlignLeft
+                            horizontalPadding: dockAppMenuWindow.s(8)
+                            buttonIcon: "󰅙"
+                            iconFontSize: dockAppMenuWindow.s(14)
+                            textFontSize: dockAppMenuWindow.s(11)
+                            buttonText: I18n.t("guide.dock.window_menu.quit_fully", "Quit completely")
+                            accentColor: ThemeBackend.surface0
+                            bgOpacity: ThemeBackend.elementOpacity
+                            textColor: ThemeBackend.red
+                            onClicked: {
+                                let args = ["vortex", "cerrar-app"];
+                                if (DockAppMenuController.appName) args.push("--nombre", String(DockAppMenuController.appName));
+                                let ws = dockAppMenuWindow.windowsList || [];
+                                for (let i = 0; i < ws.length; i++) {
+                                    let w = ws[i];
+                                    let pid = (w && w.native && w.native.lastIpcObject) ? w.native.lastIpcObject.pid : undefined;
+                                    if (pid !== undefined && pid > 1) args.push("--pid", String(pid));
+                                    else if (w && w.nativeId !== undefined && w.nativeId !== "") args.push(String(w.nativeId).startsWith("0x") ? String(w.nativeId) : ("0x" + String(w.nativeId)));
+                                }
+                                if (args.length > 2) Quickshell.execDetached(args);
+                                DockAppMenuController.hide();
+                            }
+                        }
                     }
                 }
             }
