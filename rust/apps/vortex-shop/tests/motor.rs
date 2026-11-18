@@ -1240,3 +1240,24 @@ fn android_errores_en_espanol() {
     assert!(!sin.estado().preparado);
     assert!(sin.apps().is_empty());
 }
+
+// ====================================================================== una sola ventana
+
+#[test]
+fn una_sola_ventana_la_segunda_pide_mostrar() {
+    use vortex_shop::instancia::{Escucha, avisar_a_la_abierta, nombre};
+    let t = tmp();
+    let ruta = t.path().join(nombre());
+    assert!(!avisar_a_la_abierta(&ruta), "sin ventana abierta, nadie contesta");
+    let escucha = Escucha::nueva(&ruta).unwrap();
+    assert_eq!(escucha.revisar(), 0);
+    assert!(avisar_a_la_abierta(&ruta));
+    assert!(avisar_a_la_abierta(&ruta));
+    assert!(esperar_marca(&ruta));
+    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(escucha.revisar(), 2);
+    assert_eq!(escucha.revisar(), 0);
+    drop(escucha);
+    assert!(!ruta.exists(), "al cerrar se borra el socket");
+    assert!(nombre().starts_with("vortexines-shop-"));
+}

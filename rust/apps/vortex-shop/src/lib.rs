@@ -16,6 +16,7 @@ pub mod catalogo;
 pub mod errores;
 pub mod flatpak;
 pub mod ids;
+pub mod instancia;
 pub mod motor;
 pub mod proceso;
 pub mod propias;
