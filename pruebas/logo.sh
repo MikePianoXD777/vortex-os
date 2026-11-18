@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# El logo de Vortexine's OS («Rotor», docs/logo/rotor.svg) es solo del sistema: el ícono del sistema (instalador e
+# El logo de Vortexine's OS (v3 desde la 4.0, docs/logo/v3.svg; antes el «Rotor», docs/logo/rotor.svg) es solo del sistema: el ícono del sistema (instalador e
 # ícono «vortex-os», también el de la Shop), el shell y la terminal. Las apps Vortexine llevan su propio logo
 # (Mike, 09/11/2026): esta prueba también revisa que ninguna se quede con el Rotor.
 #
@@ -7,7 +7,7 @@
 set -uo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$AQUI" || exit 1
-MAESTRO=docs/logo/rotor.svg
+MAESTRO=docs/logo/v3.svg
 FALLOS=0
 bien() { printf '  ok  %s\n' "$*"; }
 mal() { printf '  MAL %s\n' "$*"; FALLOS=$((FALLOS + 1)); }
@@ -17,11 +17,11 @@ while IFS= read -r f; do
   cmp -s "$f" "$MAESTRO" || { mal "$f no es el logo"; distintos=$((distintos + 1)); }
 done < <(git ls-files --cached --others --exclude-standard 'apps/shop/vortex_shop/qml/vortex-os.svg' \
   'iso/airootfs/etc/calamares/branding/vortex/vortex-os.svg' 'iso/airootfs/usr/share/icons/hicolor/scalable/apps/*.svg')
-[[ $distintos == 0 ]] && bien "sistema e instalador: el logo Rotor"
+[[ $distintos == 0 ]] && bien "sistema e instalador: el logo del sistema"
 
 rotor_en_apps=0
 while IFS= read -r f; do
-  cmp -s "$f" "$MAESTRO" && { mal "$f es el Rotor: las apps llevan su propio logo"; rotor_en_apps=$((rotor_en_apps + 1)); }
+  cmp -s "$f" "$MAESTRO" && { mal "$f es el logo del sistema: las apps llevan su propio logo"; rotor_en_apps=$((rotor_en_apps + 1)); }
 done < <(git ls-files --cached --others --exclude-standard \
   'apps/*/share/icons/hicolor/*/apps/*.svg' 'apps/*/qml/logo.svg' 'apps/shop/vortex_shop/qml/propias/*.svg' \
   'apps/miku/icono/*.svg')
