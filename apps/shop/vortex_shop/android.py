@@ -79,7 +79,8 @@ def estado() -> dict:
         datos = json.loads(_correr("estado", timeout=20) or "{}")
     except (ErrorAndroid, json.JSONDecodeError):
         datos = {}
-    base = {"instalado": False, "preparado": False, "corriendo": False, "nvidia": False, "registrado": False}
+    base = {"instalado": False, "preparado": False, "corriendo": False, "nvidia": False, "software": False,
+            "registrado": False}
     return base | {k: bool(v) for k, v in datos.items() if k in base}
 
 

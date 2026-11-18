@@ -1,11 +1,13 @@
-// Aviso de error que aparece abajo y se cierra solo (o con la X).
+// Aviso que aparece abajo y se cierra solo (o con la X): rojo si algo salió mal, neutro si salió bien.
 import QtQuick
 
 Rectangle {
     id: raiz
     property string texto: ""
-    function mostrar(mensaje) {
+    property bool error: true
+    function mostrar(mensaje, esError) {
         texto = mensaje
+        error = esError !== false
         abierto = true
         reloj.restart()
     }
@@ -16,9 +18,9 @@ Rectangle {
     x: Tema.anchoLateral + (parent.width - Tema.anchoLateral - width) / 2   // centrado sobre el contenido
     y: abierto ? parent.height - height - 24 : parent.height + 8
     radius: 18
-    color: Tema.peligroFondo
+    color: error ? Tema.peligroFondo : Tema.tarjetaHover
     border.width: 1
-    border.color: Tema.peligroBorde
+    border.color: error ? Tema.peligroBorde : Tema.bordeHover
     opacity: abierto ? 1 : 0
     visible: opacity > 0
     z: 90
@@ -37,8 +39,8 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 22
             height: 22
-            nombre: "alerta"
-            color: Tema.peligro
+            nombre: raiz.error ? "alerta" : "visto"
+            color: raiz.error ? Tema.peligro : Tema.texto
         }
         Text {
             width: parent.width - 22 - 34 - parent.spacing * 2

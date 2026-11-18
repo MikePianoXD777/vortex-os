@@ -46,14 +46,21 @@ corriendo() { grep -qE 'Session:\s*RUNNING' <<<"$("$WAYDROID" status 2>/dev/null
 contenedor_activo() { systemctl is-active --quiet waydroid-container.service; }
 
 cmd_estado() {
-  local inst=false prep=false corr=false nv=false reg=false
+  local inst=false prep=false corr=false nv=false sw=false reg=false
   command -v "$WAYDROID" >/dev/null && inst=true
   preparado && prep=true
   $inst && corriendo && corr=true
   nvidia && nv=true
+  # Dibuja con el procesador: ya preparado, lo dice su configuración; antes, se adivina (sin root no
+  # se lee dmesg, así que una VM sin 3D puede salir como «sí» hasta prepararla).
+  if $prep; then
+    grep -q '^ro.hardware.egl *= *swiftshader' "$VAR/waydroid.cfg" 2>/dev/null && sw=true
+  elif sin_aceleracion; then
+    sw=true
+  fi
   [[ -e "$ESTADO_DIR/registrado" ]] && reg=true
-  printf '{"instalado": %s, "preparado": %s, "corriendo": %s, "nvidia": %s, "registrado": %s}\n' \
-    "$inst" "$prep" "$corr" "$nv" "$reg"
+  printf '{"instalado": %s, "preparado": %s, "corriendo": %s, "nvidia": %s, "software": %s, "registrado": %s}\n' \
+    "$inst" "$prep" "$corr" "$nv" "$sw" "$reg"
 }
 
 # --- Preparar (como root, con pkexec) ---

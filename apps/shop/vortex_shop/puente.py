@@ -156,7 +156,8 @@ class Puente(QObject):
     detalleCambio = Signal()
     androidCambio = Signal()     # juegos de Android (Waydroid): estado, preparación y lo instalado
     propiasCambio = Signal()     # las apps de Vortexine's (Vortexine's Camera…): si están y qué se hace
-    aviso = Signal(str)          # mensaje en español para el aviso que se cierra
+    aviso = Signal(str)          # mensaje en español para el aviso que se cierra (algo salió mal)
+    listo = Signal(str)          # el mismo aviso, pero de que algo salió bien (sin el rojo de error)
     mostrarVentana = Signal()    # otra instancia pidió traer esta ventana al frente
 
     def __init__(self, motor: Motor, parent: QObject | None = None):
@@ -475,7 +476,7 @@ class Puente(QObject):
             self._estado_propia(app_id, None)
             self._poner(self.propiasCambio, propias=propias.lista())
             nombre = propias.app(app_id)["nombre"]
-            self.aviso.emit(f"{nombre} quedó instalada: ábrela desde aquí o desde el lanzador." if fase == "instalando"
+            self.listo.emit(f"{nombre} quedó instalada: ábrela desde aquí o desde el lanzador." if fase == "instalando"
                             else f"{nombre} se quitó.")
 
         def fallo(e: BaseException) -> None:
@@ -523,7 +524,7 @@ class Puente(QObject):
         def fin(_: Any) -> None:
             self._poner(self.androidCambio, androidFase="", androidPaso="")
             if al_terminar:
-                self.aviso.emit(al_terminar)
+                self.listo.emit(al_terminar)
             if recargar:
                 self.cargarAndroid()
 

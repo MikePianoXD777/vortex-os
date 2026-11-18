@@ -54,7 +54,7 @@ def main() -> int:
     llamar(v, "navegar", "android", "")
     foto("android-1-sin-preparar", 1500)
     revisar(puente.androidCargado and not puente.androidEstado["preparado"], "debía verse sin preparar")
-    revisar(puente.androidEstado["nvidia"], "debía avisar de NVIDIA")
+    revisar(puente.androidEstado["nvidia"] or puente.androidEstado["software"], "debía avisar que Android dibuja con el procesador")
 
     puente.prepararAndroid()
     foto("android-2-preparando", 450)

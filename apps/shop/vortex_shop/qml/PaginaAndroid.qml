@@ -32,10 +32,10 @@ Pagina {
         visible: !tienda.androidCargado
     }
 
-    // --- Aviso de NVIDIA ---
+    // --- Aviso: Android dibuja con el procesador (NVIDIA o una PC sin 3D) ---
     Rectangle {
         Layout.fillWidth: true
-        visible: tienda.androidCargado && raiz.est.nvidia === true
+        visible: tienda.androidCargado && (raiz.est.nvidia === true || raiz.est.software === true)
         implicitHeight: filaNv.implicitHeight + 32
         radius: Tema.radioTarjeta
         color: Tema.tarjeta
@@ -49,7 +49,10 @@ Pagina {
             Icono { Layout.preferredWidth: 22; Layout.preferredHeight: 22; nombre: "info"; color: Tema.suave; trazo: 1.8 }
             Text {
                 Layout.fillWidth: true
-                text: "Tu tarjeta es NVIDIA: Android todavía no puede usarla, así que dibuja con el procesador. Los juegos ligeros (Subway Surfers, Clash Royale, Among Us…) van bien; los muy pesados pueden ir lentos."
+                text: (raiz.est.nvidia === true
+                       ? "Tu tarjeta es NVIDIA: Android todavía no puede usarla"
+                       : "Android no encontró aceleración 3D en esta PC")
+                      + ", así que dibuja con el procesador. Los juegos ligeros (Subway Surfers, Clash Royale, Among Us…) van bien; los muy pesados pueden ir lentos."
                 color: Tema.suave
                 font.pixelSize: 13
                 lineHeight: 1.2
@@ -178,19 +181,39 @@ Pagina {
         }
     }
 
-    // Lo que está pasando (abrir Android tarda unos segundos la primera vez)
-    Text {
+    // Lo que está pasando (abrir Android tarda unos segundos la primera vez). Su renglón queda siempre
+    // reservado y solo aparece y se desvanece: así no empuja lo de abajo cada vez que se abre algo.
+    Item {
         Layout.fillWidth: true
-        visible: raiz.listo && raiz.ocupado
-        text: tienda.androidPaso + "  La primera vez Android tarda unos segundos en prender."
-        color: Tema.suave
-        font.pixelSize: 13
-        wrapMode: Text.WordWrap
-        SequentialAnimation on opacity {
-            running: raiz.listo && raiz.ocupado
-            loops: Animation.Infinite
-            NumberAnimation { from: 1; to: 0.45; duration: 700; easing.type: Easing.InOutSine }
-            NumberAnimation { from: 0.45; to: 1; duration: 700; easing.type: Easing.InOutSine }
+        Layout.preferredHeight: 18
+        Layout.topMargin: -12
+        Layout.bottomMargin: -8
+        visible: raiz.listo
+        Row {
+            id: filaPaso
+            spacing: 10
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: raiz.ocupado ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Rectangle {
+                id: puntoPaso
+                width: 7; height: 7; radius: 3.5
+                anchors.verticalCenter: parent.verticalCenter
+                color: Tema.texto
+                SequentialAnimation on opacity {
+                    running: raiz.ocupado
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1; to: 0.25; duration: 650; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.25; to: 1; duration: 650; easing.type: Easing.InOutSine }
+                }
+            }
+            Text {
+                width: Math.max(0, raiz.width - puntoPaso.width - filaPaso.spacing - 8)
+                text: tienda.androidPaso + "  ·  La primera vez Android tarda unos segundos en prender."
+                color: Tema.suave
+                font.pixelSize: 13
+                elide: Text.ElideRight
+            }
         }
     }
 
@@ -238,7 +261,7 @@ Pagina {
                 Boton {
                     text: "Copiar"
                     tipo: "fantasma"
-                    onClicked: { copiador.text = tienda.androidId; copiador.selectAll(); copiador.copy(); tienda.aviso("Número copiado.") }
+                    onClicked: { copiador.text = tienda.androidId; copiador.selectAll(); copiador.copy(); tienda.listo("Número copiado.") }
                 }
                 TextEdit { id: copiador; visible: false }
             }

@@ -95,7 +95,8 @@ ApplicationWindow {
     }
     Connections {
         target: tienda
-        function onAviso(texto) { aviso.mostrar(texto) }
+        function onAviso(texto) { aviso.mostrar(texto, true) }
+        function onListo(texto) { aviso.mostrar(texto, false) }
         function onMostrarVentana() {
             ventana.show()
             ventana.raise()
