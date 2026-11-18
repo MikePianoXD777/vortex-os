@@ -20,8 +20,14 @@ repository = "https://github.com/MikePianoXD777/vortex-os"
 
 [workspace.dependencies]
 vortex-core = { path = "crates/vortex-core" }
+rand = "0.9"
+regex = "1"
+rusqlite = { version = "0.34", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
 # Mientras vortex-core-qt esté fuera del workspace, sus versiones viven en su propio Cargo.toml; al
 # meterlo, pasan aquí:  cxx = "1", cxx-qt = "=0.10.0", cxx-qt-lib = "=0.10.0", cxx-qt-build = "=0.10.0".
