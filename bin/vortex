@@ -403,8 +403,9 @@ fondos_nuevos() {
 cmd_fondo() {
   local archivo="${1:-}"
   if [[ -z "$archivo" ]]; then
-    # El de Vortex primero; si no está, el primero de la carpeta.
-    archivo="$(carpeta_fondos)/vortex-azul.jpg"
+    # El de Vortex primero (desde la 4.0, el negro con anillos); si no está, el primero de la carpeta.
+    archivo="$(carpeta_fondos)/vortex-negro.jpg"
+    [[ -f "$archivo" ]] || archivo="$(carpeta_fondos)/vortex-azul.jpg"
     [[ -f "$archivo" ]] || archivo="$(find "$(carpeta_fondos)" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null | sort | head -n1)"
     [[ -n "$archivo" ]] || { aviso "no hay fondos en $(carpeta_fondos)"; exit 1; }
   fi
@@ -1282,6 +1283,22 @@ apps_mezcla() {
   [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/icons/Vortex" ]] \
     && gsettings set org.gnome.desktop.interface icon-theme Vortex 2>/dev/null
   python3 /usr/share/serpantinum/src/scripts/theming/apptheme.py apply >/dev/null 2>&1 || true
+  fondo_mezcla
+}
+
+# El fondo de fábrica del diseño nuevo (config/fondos/vortex-negro.jpg) se pone solo si traías uno de los
+# fondos de Vortex de antes (o ninguno): si elegiste el tuyo, se respeta. Necesita el shell prendido.
+fondo_mezcla() {
+  local negro="$VORTEX_DIR/config/fondos/vortex-negro.jpg" dir actual m
+  [[ -f "$negro" ]] || return 0
+  dir="$(carpeta_fondos)"
+  mkdir -p "$dir" && { [[ -e "$dir/vortex-negro.jpg" ]] || cp "$negro" "$dir/"; }
+  grep -qxF vortex-negro.jpg "$CONF/fondos-vistos" 2>/dev/null || echo vortex-negro.jpg >>"$CONF/fondos-vistos"
+  m="$(monitores | head -n1)"
+  [[ -n "$m" ]] || return 0
+  actual="$(shell_ipc wallpaper getWallpaper "$m" 2>/dev/null)" || return 0
+  [[ -z "$actual" || "${actual##*/}" =~ ^vortex-(azul|violeta|ambar|turquesa)\.jpg$ ]] || return 0
+  cmd_fondo "$dir/vortex-negro.jpg"
 }
 
 # Tema de íconos «Vortex»: Papirus-Dark con las carpetas grises (lo mismo que hace papirus-folders, pero

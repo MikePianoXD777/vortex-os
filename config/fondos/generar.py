@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Genera los fondos originales de Vortexine's OS (remolinos galácticos), sin imágenes de terceros.
+"""Genera los fondos originales de Vortexine's OS (remolinos galácticos y, desde la 4.0, el negro con
+anillos de fábrica), sin imágenes de terceros.
 
     python3 config/fondos/generar.py            # todos los fondos en config/fondos/
     python3 config/fondos/generar.py --vista    # además, vistas previas pequeñas en /tmp
+    python3 config/fondos/generar.py --solo vortex-negro   # solo uno
 
 Cada fondo sale de una semilla y una paleta, así se puede regenerar idéntico.
 """
@@ -82,10 +84,49 @@ def generar(semilla, brazo, nucleo, n_brazos, torsion, inclinacion):
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
 
+def anillos():
+    """Fondo de fábrica del diseño 4.0: negro puro con anillos blancos y grises (como las maquetas)."""
+    from PIL import ImageDraw
+
+    k = 2  # se dibuja al doble y se reduce, para que los bordes salgan suaves
+    W, H = ANCHO * k, ALTO * k
+    base = Image.new("RGB", (W, H), (0, 0, 0))
+    capa = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(capa)
+
+    def circulo(cx, cy, r, relleno=None, borde=None, ancho=0):
+        caja = [(cx - r) * k, (cy - r) * k, (cx + r) * k, (cy + r) * k]
+        d.ellipse(caja, fill=relleno, outline=borde, width=ancho * k)
+
+    # Abajo a la izquierda: un disco casi negro y anillos finos alrededor, muy tenues.
+    circulo(-120, 1560, 760, relleno=(14, 14, 14, 255))
+    for i, r in enumerate((900, 1010, 1120, 1230)):
+        circulo(-120, 1560, r, borde=(255, 255, 255, 22 - i * 4), ancho=2)
+    # A la derecha: el anillo grueso gris y, adentro, uno fino blanco.
+    circulo(2300, 1180, 760, borde=(30, 30, 30, 255), ancho=96)
+    circulo(2300, 1180, 600, borde=(255, 255, 255, 120), ancho=3)
+    circulo(2300, 1180, 470, borde=(255, 255, 255, 30), ancho=2)
+    # Arriba: un círculo sólido gris oscuro con contorno, y un punto blanco.
+    circulo(560, 90, 250, relleno=(22, 22, 22, 255), borde=(255, 255, 255, 40), ancho=2)
+    circulo(1980, 300, 9, relleno=(255, 255, 255, 255))
+    circulo(1210, 1290, 5, relleno=(255, 255, 255, 150))
+
+    base.paste(capa, (0, 0), capa)
+    img = base.resize((ANCHO, ALTO), Image.LANCZOS)
+    # Grano muy suave para que el negro no haga bandas en los degradados de las pantallas.
+    rng = np.random.default_rng(4)
+    a = np.asarray(img, dtype=np.float32) + rng.normal(0, 1.2, (ALTO, ANCHO, 1))
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+
 def main():
     vista = "--vista" in sys.argv
-    for nombre, params in FONDOS.items():
-        img = generar(*params)
+    trabajos = [(n, lambda p=p: generar(*p)) for n, p in FONDOS.items()] + [("vortex-negro", anillos)]
+    if "--solo" in sys.argv:
+        quiero = sys.argv[sys.argv.index("--solo") + 1]
+        trabajos = [t for t in trabajos if t[0] == quiero]
+    for nombre, hacer in trabajos:
+        img = hacer()
         destino = AQUI / f"{nombre}.jpg"
         img.save(destino, quality=92, optimize=True)
         print(destino)
