@@ -40,9 +40,12 @@ printf '#!/usr/bin/env bash\ncase "$1" in MUSIC) echo "%s/home/Música" ;; VIDEO
 chmod +x "$T/bin/"*
 
 echo "== Qué enlaces cuentan"
-es() { python3 -c 'import importlib.util,importlib.machinery,sys
-l=importlib.machinery.SourceFileLoader("ve",sys.argv[1]); s=importlib.util.spec_from_loader("ve",l); m=importlib.util.module_from_spec(s); l.exec_module(m)
-print(m.sitio(sys.argv[2]))' "$VE" "$1"; }
+es() {
+  if python3 -c 'import importlib.util,importlib.machinery,sys; l=importlib.machinery.SourceFileLoader("ve",sys.argv[1]); s=importlib.util.spec_from_loader("ve",l); m=importlib.util.module_from_spec(s); l.exec_module(m); print(m.sitio(sys.argv[2]))' "$VE" "$1" 2>/dev/null; then
+    return 0
+  fi
+  "$VE" sitio "$1"
+}
 for par in "https://www.youtube.com/watch?v=dQw4w9WgXcQ|YouTube" "https://youtu.be/dQw4w9WgXcQ?si=abc|YouTube" \
   "https://youtube.com/shorts/abcDEF12345|YouTube" "https://music.youtube.com/watch?v=abcDEF12345&list=RD|YouTube" \
   "https://www.tiktok.com/@alguien/video/7312345678901234567|TikTok" "https://vm.tiktok.com/ZMabc123/|TikTok" \
