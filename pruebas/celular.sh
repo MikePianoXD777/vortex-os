@@ -116,6 +116,21 @@ printf '[General]\nsendPassword=true\n' >"$T/home/.config/kdeconnect/abc123/kdec
 celular compartir abc123
 [[ "$(auto abc123)" == false ]] && grep -qx 'sendPassword=true' "$T/home/.config/kdeconnect/abc123/kdeconnect_clipboard/config" &&
   bien "no pisa lo que ya tenía la config del complemento" || mal "config con otras claves"
+echo "== contraseñas copiadas (4.0)"
+C="$T/home/.config/kdeconnect"
+rm -rf "$C/abc123" "$C/xyz789" "$C/old_1"; : >"$REGISTRO_BUSCTL"
+celular estado >/dev/null
+grep -qx 'sendPassword=false' "$C/abc123/kdeconnect_clipboard/config" && grep -qx 'sendPassword=false' "$C/old_1/kdeconnect_clipboard/config" &&
+  bien "de fábrica, a los aparatos vinculados no se les mandan las contraseñas copiadas" || mal "sin sendPassword=false: $(cat "$C/abc123/kdeconnect_clipboard/config" 2>&1)"
+grep -qx 'busctl --user emit /kdeconnect/abc123/kdeconnect_clipboard org.kde.kdeconnect.config configChanged' "$REGISTRO_BUSCTL" &&
+  bien "y kdeconnectd se entera al momento" || mal "sin configChanged: $(cat "$REGISTRO_BUSCTL")"
+[[ ! -e "$C/xyz789" ]] && bien "a uno sin vincular no se le escribe nada" || mal "se escribió en xyz789"
+printf '[General]\nsendPassword=true\nautoShare=false\n' >"$C/abc123/kdeconnect_clipboard/config"; : >"$REGISTRO_BUSCTL"
+celular estado >/dev/null
+grep -qx 'sendPassword=true' "$C/abc123/kdeconnect_clipboard/config" && [[ ! -s "$REGISTRO_BUSCTL" ]] &&
+  bien "si la persona lo encendió en KDE Connect, se respeta" || mal "pisó sendPassword=true"
+celular vincular xyz789
+grep -qx 'sendPassword=false' "$C/xyz789/kdeconnect_clipboard/config" && bien "al vincular uno nuevo, ya queda sin contraseñas" || mal "vincular sin sendPassword"
 Q="$AQUI/shell/src/quickshell/celular/CelularPopup.qml"
 grep -q '"laptop"' "$Q" && grep -q '"desktop"' "$Q" && bien "el panel tiene ícono de PC y no ofrece «Hacer sonar» a una PC" || mal "panel sin PC"
 

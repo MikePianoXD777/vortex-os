@@ -28,22 +28,35 @@ auto_portapapeles() { # ID → true | false
   if grep -qsx 'autoShare=false' "$CONFIG_KDEC/$1/kdeconnect_clipboard/config"; then echo false; else echo true; fi
 }
 
-# Enciende o apaga ese complemento para un aparato (lo lee kdeconnectd al momento de copiar).
-alternar_portapapeles() { # ID
-  local f="$CONFIG_KDEC/$1/kdeconnect_clipboard/config" nuevo=false
-  [[ "$(auto_portapapeles "$1")" == false ]] && nuevo=true
+# Escribe CLAVE=VALOR en la config del complemento clipboard de un aparato sin pisar las demás claves, y se lo
+# avisa a kdeconnectd: guarda los valores al cargar el complemento y solo los vuelve a leer con esta señal (la
+# misma que manda su propia ventana de ajustes). Sin ella, el cambio no surtía efecto hasta reiniciarlo.
+poner_clave() { # ID CLAVE VALOR
+  local f="$CONFIG_KDEC/$1/kdeconnect_clipboard/config"
   mkdir -p "$(dirname "$f")"
-  if grep -qs '^autoShare=' "$f"; then
-    sed -i "s/^autoShare=.*/autoShare=$nuevo/" "$f"
+  if grep -qs "^$2=" "$f"; then
+    sed -i "s/^$2=.*/$2=$3/" "$f"
   elif [[ -s "$f" ]] && grep -qs '^\[General\]' "$f"; then
-    sed -i "/^\[General\]/a autoShare=$nuevo" "$f"
+    sed -i "/^\[General\]/a $2=$3" "$f"
   else
-    printf '[General]\nautoShare=%s\n' "$nuevo" >>"$f"
+    printf '[General]\n%s=%s\n' "$2" "$3" >>"$f"
   fi
-  # 4.0: kdeconnectd guarda el valor al cargar el complemento y solo lo vuelve a leer con esta señal (la misma
-  # que manda su propia ventana de ajustes). Sin ella, apagarlo aquí no surtía efecto hasta reiniciarlo: el
-  # panel decía «apagado» y el portapapeles se seguía mandando.
   busctl --user emit "/kdeconnect/$1/kdeconnect_clipboard" org.kde.kdeconnect.config configChanged >/dev/null 2>&1 || true
+}
+
+# Enciende o apaga ese complemento para un aparato. (4.0: antes no le avisaba a kdeconnectd y el panel decía
+# «apagado» mientras el portapapeles se seguía mandando.)
+alternar_portapapeles() { # ID
+  local nuevo=false
+  [[ "$(auto_portapapeles "$1")" == false ]] && nuevo=true
+  poner_clave "$1" autoShare "$nuevo"
+}
+
+# 4.0: KDE Connect manda de serie también lo que copian los gestores de contraseñas (sendPassword=true). De
+# fábrica no: a cada aparato vinculado que todavía no tenga la clave se le pone sendPassword=false. Si alguien
+# lo enciende en los ajustes de KDE Connect, la clave ya existe y se respeta.
+cuidar_contrasenas() { # ID
+  grep -qs '^sendPassword=' "$CONFIG_KDEC/$1/kdeconnect_clipboard/config" || poner_clave "$1" sendPassword false
 }
 
 estado() {
@@ -70,6 +83,7 @@ estado() {
     fi
     bateria="$(propiedad "$ruta/battery" org.kde.kdeconnect.device.battery charge)"
     cargando="$(propiedad "$ruta/battery" org.kde.kdeconnect.device.battery isCharging)"
+    [[ "$vinculado" == true ]] && cuidar_contrasenas "$id"
     lista+=("$(jq -n --arg id "$id" --arg nombre "${nombre:-$id}" --arg tipo "${tipo:-smartphone}" \
       --argjson alcanzable "$([[ "$alcanzable" == true ]] && echo true || echo false)" \
       --argjson vinculado "$([[ "$vinculado" == true ]] && echo true || echo false)" \
@@ -92,7 +106,7 @@ case "$accion" in
     [[ "$id" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "celular.sh: falta el id del dispositivo" >&2; exit 2; }
     case "$accion" in
       # Si el celular ya lo pidió, --pair lo acepta; si no, se lo pide al celular.
-      vincular) kdeconnect-cli -d "$id" --pair ;;
+      vincular) kdeconnect-cli -d "$id" --pair; cuidar_contrasenas "$id" ;;
       desvincular) kdeconnect-cli -d "$id" --unpair ;;
       sonar) kdeconnect-cli -d "$id" --ring ;;
       portapapeles) kdeconnect-cli -d "$id" --send-clipboard ;;
