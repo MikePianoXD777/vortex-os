@@ -1,0 +1,13 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+Barra 1.0 Barra.qml
+Dialogo 1.0 Dialogo.qml
+Aviso 1.0 Aviso.qml
+Mosaico 1.0 Mosaico.qml
+Comando 1.0 Comando.qml
+Progreso 1.0 Progreso.qml
+Girando 1.0 Girando.qml
+PaginaArchivo 1.0 PaginaArchivo.qml
+PaginaInstalado 1.0 PaginaInstalado.qml
