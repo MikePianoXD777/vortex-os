@@ -474,6 +474,15 @@ def _hyprctl(*args: str):
         raise ErrorAccion("No pude leer las ventanas de Hyprland.") from None
 
 
+def _despachar(lua: str, viejo: str) -> bool:
+    """Un dispatcher de Hyprland: primero con la sintaxis de la config en Lua (0.56+), que es la de
+    Vortexine's; si falla, la de antes («movecursor 10 20»). En la 0.57 «dispatch movecursor …» ya no existe."""
+    for orden in (lua, viejo):
+        if correr(["hyprctl", "dispatch", orden], timeout=5).returncode == 0:
+            return True
+    return False
+
+
 def _es_miku(c: dict) -> bool:
     return str(c.get("class", "")).lower() == "vortex-miku"
 
@@ -513,7 +522,7 @@ def escribir(a: dict) -> str:
                           "(enseña el comando y tiene sus protecciones).")
     detalle = f"En: {_nombre_ventana(v)}\n\n{t}" + ("\n\n(y luego Enter)" if enter else "")
     with Permiso("Escribir por ti", detalle):
-        correr(["hyprctl", "dispatch", "focuswindow", f"address:{v['address']}"], timeout=5)
+        _despachar(f'hl.dsp.focus({{ window = "address:{v['address']}" }})', f"focuswindow address:{v['address']}")
         time.sleep(0.3)
         r = correr(["wtype", "--", t], timeout=60)
         if r.returncode != 0:
@@ -601,7 +610,8 @@ def clic(a: dict) -> str:
     try:
         with Permiso(f"{accion} por ti", detalle, imagen=imagen, punto=[px, py]):
             _ydotoold()
-            correr(["hyprctl", "dispatch", "movecursor", str(gx), str(gy)], timeout=5)
+            if not _despachar(f"hl.dsp.cursor.move({{ x = {gx}, y = {gy} }})", f"movecursor {gx} {gy}"):
+                raise ErrorAccion("No pude mover el ratón a ese punto: no hice clic.")
             time.sleep(0.12)
             cmd = ["ydotool", "click"] + (["--repeat", "2", "--next-delay", "80"] if doble else []) + [BOTONES[boton]]
             r = correr(cmd, timeout=10)

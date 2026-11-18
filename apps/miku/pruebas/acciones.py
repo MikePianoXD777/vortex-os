@@ -312,7 +312,7 @@ def parte_escribir_clic() -> None:
     print("== Escribir y hacer clic (4.0)")
     r = mcp(env, "escribir", {"texto": "lofi hip hop", "enter": True})
     l = leer_log()
-    probar("escribe en la última ventana que no es Miku (Firefox)", "hyprctl dispatch focuswindow address:0xff" in l
+    probar("escribe en la última ventana que no es Miku (Firefox)", 'hyprctl dispatch hl.dsp.focus({ window = "address:0xff" })' in l
            and "wtype -- lofi hip hop" in l and "wtype -k Return" in l, l + r)
     probar("el permiso enseña la ventana y el texto exacto", "firefox" in boton.pedidos[-1]["detalle"]
            and "lofi hip hop" in boton.pedidos[-1]["detalle"], str(boton.pedidos[-1]))
@@ -330,7 +330,7 @@ def parte_escribir_clic() -> None:
     r = mcp(env, "clic", {"x": 800, "y": 300, "escala": 0.5, "que": "el primer video"})
     l = leer_log()
     # DP-1 con escala 2 y captura al 50 %: 800 px de la imagen = 800 lógicos → 1920 + 800 = 2720.
-    probar("el clic cae en el punto correcto del monitor con escala 2", "hyprctl dispatch movecursor 2720 300" in l
+    probar("el clic cae en el punto correcto del monitor con escala 2", "hyprctl dispatch hl.dsp.cursor.move({ x = 2720, y = 300 })" in l
            and "ydotool click 0xC0" in l, l + r)
     probar("arranca ydotoold solo la primera vez que hace falta", "systemctl --user start ydotool.service" in l, l)
     pedido = boton.pedidos[-1]
@@ -340,7 +340,7 @@ def parte_escribir_clic() -> None:
     log.unlink(missing_ok=True)
     r = mcp(env, "clic", {"x": 100, "y": 100, "escala": 0.5, "monitor": "HDMI-A-1", "boton": "derecho", "doble": True})
     l = leer_log()
-    probar("doble clic derecho en el otro monitor", "movecursor 200 200" in l
+    probar("doble clic derecho en el otro monitor", "x = 200, y = 200" in l
            and "ydotool click --repeat 2 --next-delay 80 0xC1" in l and "systemctl" not in l, l + r)
     n = len(boton.pedidos)
     r = mcp(env, "clic", {"x": 5000, "y": 100, "escala": 0.5})
@@ -350,7 +350,7 @@ def parte_escribir_clic() -> None:
     log.unlink(missing_ok=True)
     r = mcp(env, "clic", {"x": 10, "y": 10})
     probar("clic cancelado: no mueve el ratón ni hace clic", "NO lo autorizó" in r
-           and "ydotool" not in leer_log() and "movecursor" not in leer_log(), r)
+           and "ydotool" not in leer_log() and "cursor.move" not in leer_log(), r)
     subprocess.run(["rm", "-rf", str(tmp)])
 
 
