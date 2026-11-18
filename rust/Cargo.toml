@@ -20,6 +20,8 @@ members = [
     "apps/vortex-shared/qt",
     "apps/vortex-app-installer",
     "apps/vortex-app-installer/qt",
+    "apps/vortex-shop",
+    "apps/vortex-shop/qt",
 ]
 
 [workspace.package]
@@ -39,6 +41,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 vortex-connect = { path = "apps/vortex-connect" }
 vortex-shared = { path = "apps/vortex-shared" }
+vortex-shop = { path = "apps/vortex-shop" }
 tempfile = "3"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }

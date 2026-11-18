@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Un «flatpak» FALSO para las pruebas de la tienda (no toca el flatpak de verdad ni el sistema).
+# Su estado vive en la carpeta FAKE_FLATPAK_DIR:
+#   usuario.txt, sistema.txt   ids instalados (uno por línea)
+#   remotos.txt                remotos del usuario
+#   actualizaciones.txt        apps con versión nueva
+#   llamadas.log               cada invocación (todos los argumentos)
+#   abierta-ID                 la deja «flatpak run ID»
+# FAKE_FLATPAK_FALLA = red | espacio | noexiste | sistema : hace fallar install/update/remote-add.
+# Dibuja el progreso como el de verdad (con \r y una barra) solo si la salida es una terminal.
+set -u
+D="${FAKE_FLATPAK_DIR:?falta FAKE_FLATPAK_DIR}"
+echo "$*" >>"$D/llamadas.log"
+cmd="${1:-}"
+shift || true
+
+alcance="" posicionales=() actualizaciones=0 sin_usar=0
+for a in "$@"; do
+  case "$a" in
+    --user) alcance=user ;;
+    --system) alcance=system ;;
+    --updates) actualizaciones=1 ;;
+    --unused) sin_usar=1 ;;
+    -*) ;;
+    *) posicionales+=("$a") ;;
+  esac
+done
+touch "$D/usuario.txt" "$D/sistema.txt" "$D/remotos.txt" "$D/actualizaciones.txt"
+
+fallar() {
+  case "${FAKE_FLATPAK_FALLA:-}" in
+    red) echo "error: Unable to load summary from remote flathub: While fetching https://dl.flathub.org/repo/summary: [6] Could not resolve host: dl.flathub.org" >&2; exit 1 ;;
+    espacio) echo "error: Failed to install $1: Writing to file: No space left on device" >&2; exit 1 ;;
+    noexiste) echo "error: Nothing matches $1 in remote flathub" >&2; exit 1 ;;
+  esac
+}
+
+# barra NOMBRE n/N: dibuja de 0 a 100 %
+barra() {
+  local verbo="$1" n="$2" total="$3" p
+  for p in 0 20 45 70 100; do
+    if [[ -t 1 ]]; then
+      printf '\r\033[K%s %s/%s… [%-20s] %3d%%' "$verbo" "$n" "$total" "$(printf '%*s' $((p / 5)) '' | tr ' ' '#')" "$p"
+    else
+      [[ $p == 0 ]] && printf '%s %s/%s…\n' "$verbo" "$n" "$total"
+    fi
+    sleep 0.03
+  done
+  [[ -t 1 ]] && printf '\n'
+  return 0
+}
+
+case "$cmd" in
+  --version) echo "Flatpak 1.99.0-falso" ;;
+  list)
+    [[ "$alcance" != system ]] && cat "$D/usuario.txt"
+    [[ "$alcance" != user ]] && cat "$D/sistema.txt"
+    exit 0
+    ;;
+  remotes) cat "$D/remotos.txt" ;;
+  remote-add)
+    fallar flathub
+    # flatpak remote-add --user --if-not-exists NOMBRE URL
+    [[ "$alcance" == user ]] || { echo "error: PROHIBIDO en la prueba: remote-add sin --user" >&2; exit 9; }
+    grep -qx "${posicionales[0]}" "$D/remotos.txt" || echo "${posicionales[0]}" >>"$D/remotos.txt"
+    ;;
+  remote-ls)
+    [[ $actualizaciones == 1 ]] && cat "$D/actualizaciones.txt"
+    ;;
+  install)
+    [[ "$alcance" == user ]] || { echo "error: PROHIBIDO en la prueba: install sin --user" >&2; exit 9; }
+    id="${posicionales[1]:-}"
+    fallar "$id"
+    if [[ "${FAKE_FLATPAK_FALLA:-}" == sistema ]]; then echo "error: Permission denied" >&2; exit 1; fi
+    echo "Looking for matches…"
+    barra Installing 1 2
+    barra Installing 2 2
+    echo "$id" >>"$D/usuario.txt"
+    echo "Installation complete."
+    ;;
+  uninstall)
+    [[ "$alcance" == user ]] || { echo "error: PROHIBIDO en la prueba: uninstall sin --user" >&2; exit 9; }
+    if [[ $sin_usar == 1 ]]; then echo "Nothing unused to uninstall"; exit 0; fi
+    id="${posicionales[0]:-}"
+    grep -qx "$id" "$D/usuario.txt" || { echo "error: app/$id/x86_64/master not installed" >&2; exit 1; }
+    echo "Uninstalling 1/1…"
+    sleep 0.05
+    grep -vx "$id" "$D/usuario.txt" >"$D/usuario.nuevo"; mv "$D/usuario.nuevo" "$D/usuario.txt"
+    echo "Uninstall complete."
+    ;;
+  update)
+    [[ "$alcance" == user ]] || { echo "error: PROHIBIDO en la prueba: update sin --user" >&2; exit 9; }
+    fallar todo
+    if [[ ${#posicionales[@]} -eq 0 ]]; then mapfile -t posicionales <"$D/actualizaciones.txt"; fi
+    if [[ ${#posicionales[@]} -eq 0 ]]; then echo "Nothing to do."; exit 0; fi
+    total=${#posicionales[@]} n=0
+    for id in "${posicionales[@]}"; do
+      n=$((n + 1))
+      barra Updating "$n" "$total"
+      grep -vx "$id" "$D/actualizaciones.txt" >"$D/act.nuevo"; mv "$D/act.nuevo" "$D/actualizaciones.txt"
+    done
+    echo "Updates complete."
+    ;;
+  run)
+    sleep 0.4
+    : >"$D/abierta-${posicionales[0]:-?}"
+    ;;
+  *) echo "error: comando desconocido para el flatpak falso: $cmd" >&2; exit 2 ;;
+esac

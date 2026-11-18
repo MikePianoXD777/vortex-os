@@ -1,0 +1,295 @@
+{
+ "branding": [
+  {
+   "scheme_preference": "light",
+   "type": "primary",
+   "value": "#bef8a5"
+  },
+  {
+   "scheme_preference": "dark",
+   "type": "primary",
+   "value": "#056639"
+  }
+ ],
+ "bundle": {
+  "runtime": "org.gnome.Platform/x86_64/51",
+  "sdk": "org.gnome.Sdk/x86_64/51",
+  "type": "flatpak",
+  "value": "app/org.vinegarhq.Sober/x86_64/stable"
+ },
+ "categories": [
+  "Game",
+  "GNOME",
+  "GTK"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Funcionalidad de chat moderada entre jugadores • Compartición de datos diagnósticos que no permiten a otros identificar al usuario • Función de chat de audio o vídeo moderado entre usuarios • Compartición en redes sociales de nombres de usuario o direcciones de correo-e",
+     "id": "social",
+     "level": "intense"
+    },
+    {
+     "description": "Posibilidad de gastar dinero real en el juego • Juego usando dinero virtual • Se incita a los jugadores a comprar determinados elementos del mundo real",
+     "id": "money",
+     "level": "intense"
+    },
+    {
+     "description": "Personajes animados en conflictos agresivos • Personajes en conflictos agresivos distinguibles fácilmente de la realidad",
+     "id": "violence",
+     "level": "moderate"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 15,
+   "minimumAgeText": "12"
+  }
+ },
+ "description": "<p>Not affiliated with Roblox. Research project, use at your own risk. Read the notice on our website before using.</p>\n      <p>We ported Roblox to Linux because they wouldn't.</p>\n      <ul>\n        <li>Enjoy millions of experiences on Roblox, chat with friends, and explore!</li>\n        <li>Seamlessly run Roblox on Linux, faster than on Windows.</li>\n        <li>No emulators. No virtual machines. No cruft. We disable ads and telemetry by default.</li>\n        <li>No strings attached - Sober is a community project. We made it closed source to reduce the potential for abuse (which would lead to Roblox blocking us again)</li>\n      </ul>\n      <p>Make Sober your own. See our documentation for a list of options.</p>\n      <ul>\n        <li>Turn on server location indicators, bring back the nostalgic oof sound, customize textures, try experimental settings, and more.</li>\n      </ul>\n    ",
+ "developer_name": "VinegarHQ & Sober contributors",
+ "icon": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/icons/128x128/org.vinegarhq.Sober.png",
+ "icons": [
+  {
+   "height": 128,
+   "scale": null,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/icons/128x128/org.vinegarhq.Sober.png",
+   "width": 128
+  },
+  {
+   "height": 128,
+   "scale": 2,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/icons/128x128@2/org.vinegarhq.Sober.png",
+   "width": 128
+  }
+ ],
+ "id": "org.vinegarhq.Sober",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": false,
+ "keywords": [
+  "roblox",
+  "vinegar",
+  "launcher"
+ ],
+ "kudos": null,
+ "launchable": {
+  "type": "desktop-id",
+  "value": "org.vinegarhq.Sober.desktop"
+ },
+ "metadata": {
+  "flathub::manifest": null,
+  "flathub::verification::login_is_organization": false,
+  "flathub::verification::login_name": null,
+  "flathub::verification::login_provider": null,
+  "flathub::verification::method": "website",
+  "flathub::verification::timestamp": "1743317849",
+  "flathub::verification::verified": true,
+  "flathub::verification::website": "vinegarhq.org"
+ },
+ "mimetypes": null,
+ "name": "Sober",
+ "project_license": "LicenseRef-proprietary=https://sober.vinegarhq.org/notice.txt",
+ "provides": [
+  "sober",
+  "org.vinegarhq.Sober.desktop",
+  "x-scheme-handler/roblox",
+  "x-scheme-handler/roblox-player"
+ ],
+ "recommends": [
+  {
+   "type": "memory",
+   "value": "4096"
+  }
+ ],
+ "releases": [
+  {
+   "date": null,
+   "date_eol": null,
+   "description": "<ul>\n            <li>Fix many long-standing performance issues and freezes</li>\n            <li>Fix a rendering bug affecting Nullscape and various other titles on certain GPUs</li>\n            <li>Fix some Vulkan related crashes</li>\n            <li>Update to Roblox 2.741.1061</li>\n          </ul>\n        ",
+   "timestamp": "1790899200",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.8.0"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": "<ul>\n            <li>Update to Roblox 2.725.1142</li>\n            <li>Asynchronously upload font glyphs to the GPU to get rid of lagspikes when first typing in textboxes</li>\n            <li>Make the in-app exit button work</li>\n            <li>Fix some Vulkan related crashes</li>\n            <li>Add a workaround for a bug in certain NVIDIA driver releases that may fix Vulkan startup crashes</li>\n          </ul>\n        ",
+   "timestamp": "1781136000",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.7.1"
+  },
+  {
+   "date": null,
+   "date_eol": null,
+   "description": "<ul>\n            <li>Update to Roblox 2.723.787</li>\n            <li>Fix homescreen UI acting like a mobile interface</li>\n            <li>Fix videos not playing in certain experiences</li>\n            <li>Fix in-app trailers not playing</li>\n            <li>Fix captures feature not working</li>\n            <li>Fix in-app notifications and party features</li>\n            <li>Various other fixes and improvements to make Sober up to speed with native clients</li>\n          </ul>\n        ",
+   "timestamp": "1780099200",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "1.7.0"
+  }
+ ],
+ "requires": [
+  {
+   "type": "display_length",
+   "value": "600"
+  },
+  {
+   "compare": "ge",
+   "type": "kernel",
+   "value": "Linux",
+   "version": "5.11"
+  },
+  {
+   "bandwidth_mbitps": "2",
+   "type": "internet",
+   "value": "always"
+  }
+ ],
+ "screenshots": [
+  {
+   "caption": "Roblox home page showcasing a wide array of experiences",
+   "default": true,
+   "sizes": [
+    {
+     "height": "700",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-1_orig.png",
+     "width": "1000"
+    },
+    {
+     "height": "526",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-1_752x526@1.png",
+     "width": "752"
+    },
+    {
+     "height": "436",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-1_624x436@1.png",
+     "width": "624"
+    },
+    {
+     "height": "156",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-1_224x156@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "The FRONTLINES first-person shooter experience on Roblox",
+   "default": null,
+   "sizes": [
+    {
+     "height": "700",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-2_orig.png",
+     "width": "1000"
+    },
+    {
+     "height": "526",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-2_752x526@1.png",
+     "width": "752"
+    },
+    {
+     "height": "436",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-2_624x436@1.png",
+     "width": "624"
+    },
+    {
+     "height": "156",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-2_224x156@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "The Ultimate Battlegrounds experience on Roblox",
+   "default": null,
+   "sizes": [
+    {
+     "height": "700",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-3_orig.png",
+     "width": "1000"
+    },
+    {
+     "height": "526",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-3_752x526@1.png",
+     "width": "752"
+    },
+    {
+     "height": "436",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-3_624x436@1.png",
+     "width": "624"
+    },
+    {
+     "height": "156",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/vinegarhq/Sober/efc7e405d3a366657e27e4d8bcbfe228/screenshots/image-3_224x156@1.png",
+     "width": "224"
+    }
+   ]
+  }
+ ],
+ "summary": "Play, chat & explore on Roblox",
+ "supports": [
+  {
+   "type": "control",
+   "value": "pointing"
+  },
+  {
+   "type": "control",
+   "value": "keyboard"
+  },
+  {
+   "type": "control",
+   "value": "touch"
+  },
+  {
+   "type": "control",
+   "value": "gamepad"
+  }
+ ],
+ "translation": null,
+ "type": "desktop-application",
+ "urls": {
+  "bugtracker": "https://github.com/vinegarhq/sober/issues",
+  "contact": null,
+  "contribute": null,
+  "donation": null,
+  "faq": "https://vinegarhq.org/Sober/FAQ/index.html",
+  "help": "https://vinegarhq.org/Sober/Troubleshooting.html",
+  "homepage": "https://sober.vinegarhq.org",
+  "translate": null,
+  "vcs_browser": null
+ }
+}

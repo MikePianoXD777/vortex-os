@@ -1245,6 +1245,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-shop"
+version = "1.1.1"
+dependencies = [
+ "libc",
+ "regex",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "vortex-shop-qt"
+version = "1.1.1"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-shop",
+]
+
+[[package]]
 name = "vortex-task-manager"
 version = "1.0.2"
 dependencies = [

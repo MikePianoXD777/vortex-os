@@ -1,0 +1,379 @@
+{
+ "branding": null,
+ "bundle": {
+  "runtime": "org.kde.Platform/x86_64/6.10",
+  "sdk": "org.kde.Sdk/x86_64/6.10",
+  "type": "flatpak",
+  "value": "app/org.prismlauncher.PrismLauncher/x86_64/stable"
+ },
+ "categories": [
+  "Game",
+  "ActionGame",
+  "AdventureGame",
+  "Simulation",
+  "PackageManager"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Funcionalidad de chat sin controlar entre jugadores",
+     "id": "social",
+     "level": "intense"
+    },
+    {
+     "description": "Personajes en conflictos agresivos distinguibles fácilmente de la realidad",
+     "id": "violence",
+     "level": "moderate"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin posibilidad de gastar",
+     "id": "money",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 13,
+   "minimumAgeText": "12"
+  }
+ },
+ "description": "<p>Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity.</p>\n      <p>Features:</p>\n      <ul>\n        <li>Easily install game modifications, such as Fabric, Forge and Quilt</li>\n        <li>Easily install and update modpacks from the Launcher</li>\n        <li>Control your Java settings, and enable Mangohud or Gamemode with a toggle</li>\n        <li>Manage worlds and resource packs from the launcher</li>\n        <li>See logs and other details easily through a dashboard</li>\n        <li>Kill Minecraft in case of a crash/freeze</li>\n        <li>Isolate Minecraft instances to keep everything clean</li>\n        <li>Install and update mods directly from the launcher</li>\n        <li>Customize the launcher with themes, and more</li>\n        <li>And cat :3</li>\n      </ul>\n    ",
+ "developer_name": "Prism Launcher Contributors",
+ "icon": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/icons/128x128/org.prismlauncher.PrismLauncher.png",
+ "icons": [
+  {
+   "height": 128,
+   "scale": null,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/icons/128x128/org.prismlauncher.PrismLauncher.png",
+   "width": 128
+  },
+  {
+   "height": 128,
+   "scale": 2,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/icons/128x128@2/org.prismlauncher.PrismLauncher.png",
+   "width": 128
+  }
+ ],
+ "id": "org.prismlauncher.PrismLauncher",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": true,
+ "keywords": [
+  "game",
+  "minecraft",
+  "mc"
+ ],
+ "kudos": null,
+ "launchable": {
+  "type": "desktop-id",
+  "value": "org.prismlauncher.PrismLauncher.desktop"
+ },
+ "metadata": {
+  "flathub::manifest": null,
+  "flathub::verification::login_is_organization": false,
+  "flathub::verification::login_name": null,
+  "flathub::verification::login_provider": null,
+  "flathub::verification::method": "website",
+  "flathub::verification::timestamp": "1678358592",
+  "flathub::verification::verified": true,
+  "flathub::verification::website": "prismlauncher.org"
+ },
+ "mimetypes": null,
+ "name": "Prism Launcher",
+ "project_license": "GPL-3.0-only",
+ "provides": [
+  "application/zip",
+  "application/x-modrinth-modpack+zip",
+  "x-scheme-handler/curseforge",
+  "x-scheme-handler/prismlauncher",
+  "x-scheme-handler/prismlauncher"
+ ],
+ "recommends": null,
+ "releases": [
+  {
+   "date": null,
+   "date_eol": null,
+   "description": null,
+   "timestamp": "1320969600",
+   "type": "stable",
+   "urgency": null,
+   "url": null,
+   "version": "11.1.1"
+  }
+ ],
+ "requires": null,
+ "screenshots": [
+  {
+   "caption": "The main Prism Launcher window",
+   "default": true,
+   "sizes": [
+    {
+     "height": "764",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-1_orig.png",
+     "width": "1030"
+    },
+    {
+     "height": "557",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-1_752x557@1.png",
+     "width": "752"
+    },
+    {
+     "height": "462",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-1_624x462@1.png",
+     "width": "624"
+    },
+    {
+     "height": "166",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-1_224x166@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Modpack installation",
+   "default": null,
+   "sizes": [
+    {
+     "height": "850",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-2_orig.png",
+     "width": "1126"
+    },
+    {
+     "height": "567",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-2_752x567@1.png",
+     "width": "752"
+    },
+    {
+     "height": "471",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-2_624x471@1.png",
+     "width": "624"
+    },
+    {
+     "height": "169",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-2_224x169@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Modpack updating",
+   "default": null,
+   "sizes": [
+    {
+     "height": "677",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_orig.png",
+     "width": "930"
+    },
+    {
+     "height": "547",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_752x547@1.png",
+     "width": "752"
+    },
+    {
+     "height": "454",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_624x454@1.png",
+     "width": "624"
+    },
+    {
+     "height": "163",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-3_224x163@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Mod installation",
+   "default": null,
+   "sizes": [
+    {
+     "height": "558",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_orig.png",
+     "width": "848"
+    },
+    {
+     "height": "494",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_752x494@1.png",
+     "width": "752"
+    },
+    {
+     "height": "410",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_624x410@1.png",
+     "width": "624"
+    },
+    {
+     "height": "147",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-4_224x147@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Mod updating",
+   "default": null,
+   "sizes": [
+    {
+     "height": "748",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-5_orig.png",
+     "width": "860"
+    },
+    {
+     "height": "654",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-5_752x654@1.png",
+     "width": "752"
+    },
+    {
+     "height": "542",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-5_624x542@1.png",
+     "width": "624"
+    },
+    {
+     "height": "194",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-5_224x194@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Instance management",
+   "default": null,
+   "sizes": [
+    {
+     "height": "659",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-6_orig.png",
+     "width": "960"
+    },
+    {
+     "height": "516",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-6_752x516@1.png",
+     "width": "752"
+    },
+    {
+     "height": "428",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-6_624x428@1.png",
+     "width": "624"
+    },
+    {
+     "height": "153",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-6_224x153@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Cat :3",
+   "default": null,
+   "sizes": [
+    {
+     "height": "754",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-7_orig.png",
+     "width": "1042"
+    },
+    {
+     "height": "544",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-7_752x544@1.png",
+     "width": "752"
+    },
+    {
+     "height": "451",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-7_624x451@1.png",
+     "width": "624"
+    },
+    {
+     "height": "162",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-7_224x162@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "caption": "Customization",
+   "default": null,
+   "sizes": [
+    {
+     "height": "752",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-8_orig.png",
+     "width": "1040"
+    },
+    {
+     "height": "543",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-8_752x543@1.png",
+     "width": "752"
+    },
+    {
+     "height": "451",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-8_624x451@1.png",
+     "width": "624"
+    },
+    {
+     "height": "161",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/prismlauncher/PrismLauncher/61a6268120825540bced2adcb8e6b734/screenshots/image-8_224x161@1.png",
+     "width": "224"
+    }
+   ]
+  }
+ ],
+ "summary": "Custom Minecraft Launcher to easily manage multiple Minecraft installations at once",
+ "supports": null,
+ "translation": null,
+ "type": "desktop-application",
+ "urls": {
+  "bugtracker": "https://github.com/PrismLauncher/PrismLauncher/issues",
+  "contact": "https://prismlauncher.org/discord",
+  "contribute": "https://github.com/PrismLauncher/PrismLauncher/blob/develop/CONTRIBUTING.md",
+  "donation": "https://opencollective.com/prismlauncher",
+  "faq": "https://prismlauncher.org/wiki/overview/faq/",
+  "help": "https://prismlauncher.org/wiki/",
+  "homepage": "https://prismlauncher.org/",
+  "translate": "https://hosted.weblate.org/projects/prismlauncher/launcher",
+  "vcs_browser": "https://github.com/PrismLauncher/PrismLauncher"
+ }
+}

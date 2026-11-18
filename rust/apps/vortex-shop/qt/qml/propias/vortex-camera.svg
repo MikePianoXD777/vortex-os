@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vortexine's Camera: el lente de una cámara de seguridad dentro del remolino (el vórtice de
+     Vortexine's), en los colores de Vortexine's OS. Dibujo original de este proyecto. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="vc-trazo" x1="16" y1="24" x2="112" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff"/>
+      <stop offset="1" stop-color="#c6a8ff"/>
+    </linearGradient>
+    <linearGradient id="vc-borde" x1="8" y1="8" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9ec5ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c6a8ff" stop-opacity="0.25"/>
+    </linearGradient>
+    <radialGradient id="vc-lente" cx="58" cy="58" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c6a8ff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#11142a"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="#0b0d1a"/>
+  <rect x="4.75" y="4.75" width="118.5" height="118.5" rx="29.25" fill="none" stroke="url(#vc-borde)" stroke-width="1.5"/>
+  <path d="M64 22a42 42 0 1 1-37.5 23" fill="none" stroke="url(#vc-trazo)" stroke-width="5" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="64" cy="64" r="27" fill="none" stroke="url(#vc-trazo)" stroke-width="8"/>
+  <circle cx="64" cy="64" r="15" fill="url(#vc-lente)"/>
+  <circle cx="58" cy="58" r="4.5" fill="#e8ebff" opacity="0.85"/>
+  <circle cx="93" cy="35" r="5" fill="#ff7a8a"/>
+</svg>

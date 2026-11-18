@@ -1,0 +1,29 @@
+[package]
+name = "vortex-shop-qt"
+description = "Vortexine's Shop en Rust: la ventana (cxx-qt) sobre el motor vortex-shop"
+version = "1.1.1"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-shop.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[[bin]]
+name = "vortex-shop-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true

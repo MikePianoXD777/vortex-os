@@ -1,0 +1,322 @@
+{
+ "bundle": {
+  "runtime": "org.kde.Platform/x86_64/5.15-25.08",
+  "sdk": "org.kde.Sdk/x86_64/5.15-25.08",
+  "type": "flatpak",
+  "value": "app/org.videolan.VLC/x86_64/stable"
+ },
+ "categories": [
+  "AudioVideo",
+  "Player",
+  "Recorder"
+ ],
+ "content_rating_details": {
+  "es_ES": {
+   "categories": [
+    {
+     "description": "Sin posibilidad de chatear con otros jugadores",
+     "id": "social",
+     "level": "none"
+    },
+    {
+     "description": "Sin referencias a bebidas alcohólicas",
+     "id": "drugs",
+     "level": "none"
+    },
+    {
+     "description": "Sin blasfemia de ningún tipo",
+     "id": "language",
+     "level": "none"
+    },
+    {
+     "description": "Sin posibilidad de gastar",
+     "id": "money",
+     "level": "none"
+    },
+    {
+     "description": "Sin desnudos de ningún tipo",
+     "id": "sex",
+     "level": "none"
+    },
+    {
+     "description": "Sin violencia con personajes animados",
+     "id": "violence",
+     "level": "none"
+    }
+   ],
+   "contentRatingSystem": "PEGI",
+   "minimumAge": 3,
+   "minimumAgeText": "3"
+  }
+ },
+ "description": "<p>\n            VLC is a free and open source cross-platform multimedia player and\n            framework that plays most multimedia files as well as DVDs, Audio CDs,\n            VCDs, and various streaming protocols.\n        </p>\n    ",
+ "developer_name": "VideoLAN et al.",
+ "icon": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/icons/128x128/org.videolan.VLC.png",
+ "icons": [
+  {
+   "height": 128,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/icons/128x128/org.videolan.VLC.png",
+   "width": 128
+  },
+  {
+   "height": 128,
+   "scale": 2,
+   "type": "remote",
+   "url": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/icons/128x128@2/org.videolan.VLC.png",
+   "width": 128
+  }
+ ],
+ "id": "org.videolan.VLC",
+ "isMobileFriendly": false,
+ "is_eol": false,
+ "is_free_license": true,
+ "keywords": [
+  "Player",
+  "Capture",
+  "DVD"
+ ],
+ "launchable": {
+  "type": "desktop-id",
+  "value": "org.videolan.VLC.desktop"
+ },
+ "metadata": {},
+ "name": "VLC",
+ "project_license": "GPL-2.0+",
+ "provides": [
+  "libvlc.so.5",
+  "org.videolan.vlc",
+  "application/ogg",
+  "application/x-ogg",
+  "audio/ogg",
+  "audio/vorbis",
+  "audio/x-vorbis",
+  "audio/x-vorbis+ogg",
+  "video/ogg",
+  "video/x-ogm",
+  "video/x-ogm+ogg",
+  "video/x-theora+ogg",
+  "video/x-theora",
+  "audio/x-speex",
+  "audio/opus",
+  "application/x-flac",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/x-ms-asf",
+  "audio/x-ms-asx",
+  "audio/x-ms-wax",
+  "audio/x-ms-wma",
+  "video/x-ms-asf",
+  "video/x-ms-asf-plugin",
+  "video/x-ms-asx",
+  "video/x-ms-wm",
+  "video/x-ms-wmv",
+  "video/x-ms-wmx",
+  "video/x-ms-wvx",
+  "video/x-msvideo",
+  "audio/x-pn-windows-acm",
+  "video/divx",
+  "video/msvideo",
+  "video/vnd.divx",
+  "video/avi",
+  "video/x-avi",
+  "application/vnd.rn-realmedia",
+  "application/vnd.rn-realmedia-vbr",
+  "audio/vnd.rn-realaudio",
+  "audio/x-pn-realaudio",
+  "audio/x-pn-realaudio-plugin",
+  "audio/x-real-audio",
+  "audio/x-realaudio",
+  "video/vnd.rn-realvideo",
+  "audio/mpeg",
+  "audio/mpg",
+  "audio/mp1",
+  "audio/mp2",
+  "audio/mp3",
+  "audio/x-mp1",
+  "audio/x-mp2",
+  "audio/x-mp3",
+  "audio/x-mpeg",
+  "audio/x-mpg",
+  "video/mp2t",
+  "video/mpeg",
+  "video/mpeg-system",
+  "video/x-mpeg",
+  "video/x-mpeg2",
+  "video/x-mpeg-system",
+  "application/mpeg4-iod",
+  "application/mpeg4-muxcodetable",
+  "application/x-extension-m4a",
+  "application/x-extension-mp4",
+  "audio/aac",
+  "audio/m4a",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/x-aac",
+  "video/mp4",
+  "video/mp4v-es",
+  "video/x-m4v",
+  "application/x-quicktime-media-link",
+  "application/x-quicktimeplayer",
+  "video/quicktime",
+  "application/x-matroska",
+  "audio/x-matroska",
+  "video/x-matroska",
+  "video/webm",
+  "audio/webm",
+  "audio/3gpp",
+  "audio/3gpp2",
+  "audio/AMR",
+  "audio/AMR-WB",
+  "video/3gp",
+  "video/3gpp",
+  "video/3gpp2",
+  "x-scheme-handler/mms",
+  "x-scheme-handler/mmsh",
+  "x-scheme-handler/rtsp",
+  "x-scheme-handler/rtp",
+  "x-scheme-handler/rtmp",
+  "x-scheme-handler/icy",
+  "x-scheme-handler/icyx",
+  "application/x-cd-image",
+  "x-content/audio-player",
+  "application/ram",
+  "application/xspf+xml",
+  "audio/mpegurl",
+  "audio/x-mpegurl",
+  "audio/scpls",
+  "audio/x-scpls",
+  "text/google-video-pointer",
+  "text/x-google-video-pointer",
+  "video/vnd.mpegurl",
+  "application/vnd.apple.mpegurl",
+  "application/vnd.ms-asf",
+  "application/vnd.ms-wpl",
+  "application/sdp",
+  "audio/dv",
+  "video/dv",
+  "audio/x-aiff",
+  "audio/x-pn-aiff",
+  "video/x-anim",
+  "video/x-nsv",
+  "video/fli",
+  "video/flv",
+  "video/x-flc",
+  "video/x-fli",
+  "video/x-flv",
+  "audio/wav",
+  "audio/x-pn-au",
+  "audio/x-pn-wav",
+  "audio/x-wav",
+  "audio/x-adpcm",
+  "audio/ac3",
+  "audio/eac3",
+  "audio/vnd.dts",
+  "audio/vnd.dts.hd",
+  "audio/vnd.dolby.heaac.1",
+  "audio/vnd.dolby.heaac.2",
+  "audio/vnd.dolby.mlp",
+  "audio/basic",
+  "audio/midi",
+  "audio/x-ape",
+  "audio/x-gsm",
+  "audio/x-musepack",
+  "audio/x-tta",
+  "audio/x-wavpack",
+  "audio/x-shorten",
+  "application/x-shockwave-flash",
+  "application/x-flash-video",
+  "misc/ultravox",
+  "image/vnd.rn-realpix",
+  "audio/x-it",
+  "audio/x-mod",
+  "audio/x-s3m",
+  "audio/x-xm",
+  "application/mxf"
+ ],
+ "releases": [
+  {
+   "timestamp": "1767225600",
+   "type": "stable",
+   "version": "3.0.23"
+  }
+ ],
+ "screenshots": [
+  {
+   "default": true,
+   "sizes": [
+    {
+     "height": "720",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_orig.png",
+     "width": "1280"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "125",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-1_224x125@1.png",
+     "width": "224"
+    }
+   ]
+  },
+  {
+   "sizes": [
+    {
+     "height": "720",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_orig.png",
+     "width": "1280"
+    },
+    {
+     "height": "702",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_1248x702@1.png",
+     "width": "1248"
+    },
+    {
+     "height": "423",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_752x423@1.png",
+     "width": "752"
+    },
+    {
+     "height": "351",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_624x351@1.png",
+     "width": "624"
+    },
+    {
+     "height": "125",
+     "scale": "1x",
+     "src": "https://dl.flathub.org/media/org/videolan/VLC/34e7c2b6a026c5c290606225a84582d3/screenshots/image-2_224x125@1.png",
+     "width": "224"
+    }
+   ]
+  }
+ ],
+ "summary": "VLC media player, the open-source multimedia player",
+ "type": "desktop-application",
+ "urls": {
+  "bugtracker": "https://github.com/flathub/org.videolan.VLC/issues",
+  "donation": "https://www.videolan.org/contribute.html",
+  "homepage": "https://www.videolan.org/vlc/"
+ }
+}

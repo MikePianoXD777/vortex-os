@@ -1,0 +1,23 @@
+[package]
+name = "vortex-shop"
+description = "Vortexine's Shop en Rust: el motor (Flathub, flatpak, apps propias, Android). En prueba: la app oficial sigue siendo la de Python"
+version = "1.1.1"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_shop"
+path = "src/lib.rs"
+
+[dependencies]
+serde_json.workspace = true
+regex.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
