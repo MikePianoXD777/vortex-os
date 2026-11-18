@@ -5,7 +5,7 @@
 #   pruebas/memoria.sh
 set -uo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VM="$AQUI/bin/vortex-memoria"
+VM="${VM:-$AQUI/bin/vortex-memoria}"   # VM=… para probar otra versión (la de Rust)
 T="$(mktemp -d "${TMPDIR:-/tmp}/vortex-memoria.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 FALLOS=0
@@ -65,7 +65,9 @@ probar "si solo lo ignoras, no cierra nada" "[[ ! -e '$T/ordenes' ]]"
 correr PRUEBA_ACCION=cerrar
 probar "Cerrar cierra sus dos ventanas, con amabilidad" "grep -q 'address:0xd1' '$T/ordenes' && grep -q 'address:0xd2' '$T/ordenes'"
 probar "no toca otra app" "! grep -q 0xk1 '$T/ordenes'"
-probar "nada de matar procesos" "! grep -qE 'kill|SIG' '$VM'"
+# Estas dos miran el código de Python; con otra versión (VM=…, la de Rust) no aplican.
+ES_PYTHON=0; head -1 "$VM" | grep -q python && ES_PYTHON=1
+((ES_PYTHON)) && probar "nada de matar procesos" "! grep -qE 'kill|SIG' '$VM'"
 correr PRUEBA_ACCION=cerrar PRUEBA_LUA_NO=1
 probar "también en el Hyprland sin config Lua" "grep -q '^closewindow address:0xd1' '$T/ordenes'"
 
@@ -111,7 +113,8 @@ J
 juego() { rm -f "$T/aviso" "$T/ordenes"; env VORTEX_MEMORIA_ESPERA=0 "$@"; }
 SALIDA="$(juego "$VM" --juego steam_app_1 500 --ver)"
 probar "juego: dice cuánto le queda, con el nombre del juego de Steam (su título)" "[[ '$SALIDA' == *'Terraria tendrá'*'(ahora le quedan 1.9 GB)'* ]]"
-probar "juego: ofrece las que más gastan, de mayor a menor" "[[ '$SALIDA' == 'Cierra Discord, Chrome y Kitty y '* ]]"
+# (Chrome sale «Google Chrome» si está instalado de verdad: nombre_de también mira los .desktop de Flatpak del sistema.)
+probar "juego: ofrece las que más gastan, de mayor a menor" "[[ '$SALIDA' == 'Cierra Discord, '*'Chrome y Kitty y '* ]]"
 probar "juego: nunca el juego ni Steam, ni lo chiquito" "[[ '$SALIDA' != *Steam*Steam* && '$SALIDA' != *Mini* ]]"
 probar "juego: suma lo que recuperas" "[[ '$SALIDA' == *'unos 4.3 GB más'* ]]"
 juego PRUEBA_ACCION=cerrar "$VM" --juego steam_app_1 500
@@ -162,7 +165,7 @@ probar "gestor: después de 10 minutos, sí" "gestor_avisa 600000 8000000 0 0 $(
 PSIN="$(cd "$T" && (PROC="$T/no-existe"; eval "$(sed -n '/^memoria_baja() {/,/^}/p' "$AQUI/bin/vortex-gestor")"; memoria_baja && echo si || echo no))"
 probar "gestor: sin /proc/meminfo no se rompe" "[[ '$PSIN' == no ]]"
 
-probar "sintaxis de python" "python3 -c \"import ast;ast.parse(open('$VM').read())\""
+((ES_PYTHON)) && probar "sintaxis de python" "python3 -c \"import ast;ast.parse(open('$VM').read())\""
 probar "se instala con los demás comandos" "grep -q 'vortex-memoria' '$AQUI/install/30-escritorio.sh' && grep -q 'COMANDOS_VORTEX=.*vortex-memoria' '$AQUI/bin/vortex'"
 
 echo
