@@ -13,7 +13,7 @@ mkdir -p "$tmp/lib" "$tmp/bin"
 printf '#!/bin/sh\necho "python $*"\n' >"$tmp/bin/python3"
 chmod +x "$tmp/bin/python3"
 
-for a in task-manager runner video shop app-installer connect shared tareas; do
+for a in task-manager runner video shop app-installer connect shared tareas enlace; do
   echo "vortex-$a"
   lanzador="apps/vortex-$a/vortex-$a"
   [[ -f "$lanzador" ]] || lanzador="apps/$a/vortex-$a"
@@ -21,10 +21,10 @@ for a in task-manager runner video shop app-installer connect shared tareas; do
   # llegaría ni a leer el salto); «--hola» no es una orden suya y solo imprime cómo se usa.
   py="$tmp/bin"
   salida_py="python*"
-  if [[ "$a" == tareas ]]; then
-    lanzador="bin/vortex-tareas"
+  if [[ "$a" == tareas || "$a" == enlace ]]; then
+    lanzador="bin/vortex-$a"
     py="$tmp/sin-python"
-    salida_py="vortex-tareas (Vortex 2.5)*"
+    salida_py="vortex-$a (Vortex 2.5)*"
     mkdir -p "$py"
   fi
   var="VORTEX_$(echo "$a" | tr 'a-z-' 'A-Z_')_PYTHON"
@@ -62,7 +62,7 @@ r="$(PATH="$tmp/bin:$PATH" VORTEX_RUST_BIN="$tmp/lib" apps/vortex-shared/vortex-
 
 echo "Paquete vortex-rust"
 grep -q 'vortex-shared-motor' packaging/vortex-rust/PKGBUILD && bien "instala vortex-shared-motor" || mal "no instala vortex-shared-motor"
-for a in task-manager runner video shop app-installer connect shared tareas usb; do
+for a in task-manager runner video shop app-installer connect shared tareas usb enlace; do
   grep -q "vortex-$a-rs" packaging/vortex-rust/PKGBUILD && bien "instala vortex-$a-rs" || mal "no instala vortex-$a-rs"
 done
 

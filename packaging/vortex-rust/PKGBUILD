@@ -7,6 +7,8 @@
 #   - vortex-tareas-rs y vortex-usb-rs: los ayudantes que siempre corren (las tareas de la barra, ~1 MB en vez de
 #     ~22; el montador de memorias USB, ~1 MB en vez de ~12). Sin Qt. bin/vortex-tareas (Python) y bin/vortex-usb (bash)
 #     saltan a estos binarios si existen; con VORTEX_TAREAS_PYTHON=1 / VORTEX_USB_BASH=1 se fuerzan los viejos.
+#   - vortex-enlace-rs (lo escribió Mike): «bajar con copiar el enlace». wl-paste lo corre en cada copia; bin/vortex-enlace
+#     salta a este si existe (VORTEX_ENLACE_PYTHON=1 fuerza el de Python).
 #   - vortex-task-manager-rs, vortex-runner-rs, vortex-video-rs, vortex-shop-rs, vortex-app-installer-rs,
 #     vortex-connect-rs y vortex-shared-rs (+ vortex-shared-motor, el servicio sin Qt): las apps con ventana (cxx-qt, los mismos
 #     QML). Su lanzador de Python (/usr/bin/vortex-…) salta al de Rust si existe; con
@@ -15,8 +17,8 @@
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=4
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, tareas, USB, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
+pkgrel=5
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, tareas, USB, enlace, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -26,7 +28,7 @@ makedepends=('cargo' 'qt6-base' 'qt6-declarative')
 options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
-_crates=(vortex-bt-agente vortex-tareas vortex-usb vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
+_crates=(vortex-bt-agente vortex-tareas vortex-usb vortex-enlace vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
@@ -49,7 +51,7 @@ check() {
     cd "$(_raiz)"
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
-    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb
+    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace
 }
 
 package() {
@@ -58,6 +60,7 @@ package() {
     install -Dm755 "$b/vortex-bt-agente" "$pkgdir/usr/lib/vortex/vortex-bt-agente"
     install -Dm755 "$b/vortex-tareas-rs" "$pkgdir/usr/lib/vortex/vortex-tareas-rs"
     install -Dm755 "$b/vortex-usb-rs" "$pkgdir/usr/lib/vortex/vortex-usb-rs"
+    install -Dm755 "$b/vortex-enlace-rs" "$pkgdir/usr/lib/vortex/vortex-enlace-rs"
     install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
     for a in task-manager runner video shop app-installer connect shared; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"

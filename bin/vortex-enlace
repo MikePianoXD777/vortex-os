@@ -10,16 +10,24 @@ No avisa en modo juego ni dos veces por el mismo enlace. Lo arranca Hyprland al 
 """
 from __future__ import annotations
 
-import fcntl
-import json
 import os
-import re
-import shutil
-import subprocess
 import sys
-import tempfile
-import time
-from pathlib import Path
+
+# 4.0: si está la versión en Rust (paquete vortex-rust; la escribió Mike), se usa esa. Cada vez que copias algo,
+# wl-paste corre «revisar»: en Rust tarda ~1 ms y casi no gasta, en vez de arrancar un Python entero (~20 MB).
+# VORTEX_ENLACE_PYTHON=1 obliga a usar este (para las pruebas o si el de Rust falla); VORTEX_RUST_BIN cambia la carpeta.
+_RUST = os.path.join(os.environ.get("VORTEX_RUST_BIN", "/usr/lib/vortex"), "vortex-enlace-rs")
+if not os.environ.get("VORTEX_ENLACE_PYTHON") and os.access(_RUST, os.X_OK):
+    os.execv(_RUST, [_RUST, *sys.argv[1:]])
+
+import fcntl  # noqa: E402
+import json  # noqa: E402
+import re  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+import tempfile  # noqa: E402
+import time  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 HOME = Path.home()
 ESTADO = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "vortex"
