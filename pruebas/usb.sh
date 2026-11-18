@@ -4,7 +4,11 @@
 # findmnt, lsblk, xdg-open) en un PATH temporal y eventos de udev escritos a mano.
 #
 #   pruebas/usb.sh
+#
+# Prueba siempre el de bash (VORTEX_USB_BASH=1). Para correr esta misma batería contra el de Rust:
+#   VORTEX_USB_BASH= VORTEX_RUST_BIN=rust/target/debug pruebas/usb.sh
 set -uo pipefail
+export VORTEX_USB_BASH="${VORTEX_USB_BASH-1}"
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 T="$(mktemp -d "${TMPDIR:-/tmp}/vortex-usb-prueba.XXXXXX")"
 trap 'rm -rf "$T"' EXIT

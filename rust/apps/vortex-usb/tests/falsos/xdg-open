@@ -1,0 +1,3 @@
+#!/bin/sh
+# xdg-open falso: anota lo que le piden abrir.
+echo "xdg-open $*" >>"$FALSO_DIR/registro"

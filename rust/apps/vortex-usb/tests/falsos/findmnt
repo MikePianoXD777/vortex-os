@@ -1,0 +1,3 @@
+#!/bin/sh
+# findmnt falso: nada está montado todavía.
+exit 0

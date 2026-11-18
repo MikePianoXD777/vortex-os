@@ -1,0 +1,21 @@
+[package]
+name = "vortex-usb"
+description = "El montador de memorias USB de Vortexine's OS en Rust (reemplaza a bin/vortex-usb, de bash)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-usb-rs"
+path = "src/main.rs"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

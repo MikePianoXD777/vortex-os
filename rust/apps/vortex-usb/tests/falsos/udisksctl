@@ -1,0 +1,9 @@
+#!/bin/sh
+# udisksctl falso: anota la orden en $FALSO_DIR/registro. «mount» monta en /run/media/prueba/MEMORIA;
+# «unmount» falla si existe $FALSO_DIR/ocupada. Nunca monta ni desmonta nada de verdad.
+echo "udisksctl $*" >>"$FALSO_DIR/registro"
+case "$1" in
+  mount) echo "Mounted $3 at /run/media/prueba/MEMORIA." ;;
+  unmount) [ -e "$FALSO_DIR/ocupada" ] && { echo "target is busy" >&2; exit 1; } ; exit 0 ;;
+  power-off) exit 0 ;;
+esac

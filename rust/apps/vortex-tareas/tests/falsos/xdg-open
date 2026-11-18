@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# xdg-open falso: anota lo que le piden abrir en $ABIERTOS.
+printf '%s\n' "$1" >>"$ABIERTOS"
