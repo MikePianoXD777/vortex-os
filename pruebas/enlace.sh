@@ -8,7 +8,7 @@
 #   pruebas/enlace.sh
 set -uo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VE="$AQUI/bin/vortex-enlace"
+VE="${VE:-$AQUI/bin/vortex-enlace}"   # VE=… para probar otra versión (la de Rust)
 FALLOS=0
 bien() { printf '  ok  %s\n' "$*"; }
 mal() { printf '  MAL %s\n' "$*"; FALLOS=$((FALLOS + 1)); }

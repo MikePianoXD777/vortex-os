@@ -1,0 +1,19 @@
+[package]
+name = "vortex-enlace"
+description = "Bajar con copiar el enlace (la versión en Rust de bin/vortex-enlace). La escribe Mike."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vortex-enlace-rs"
+path = "src/main.rs"
+
+[dependencies]
+regex.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
