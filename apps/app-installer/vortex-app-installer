@@ -21,4 +21,7 @@ if [[ -z "$raiz" ]]; then
 fi
 
 export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
+# Vortex 4.0: que la memoria que la app suelta vuelva al sistema al momento (glibc guarda una
+# arena por hilo y casi nunca las devuelve). Solo en las apps propias, nunca para toda la sesión.
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}" MALLOC_TRIM_THRESHOLD_="${MALLOC_TRIM_THRESHOLD_:-131072}"
 exec python3 -m vortex_app_installer "$@"
