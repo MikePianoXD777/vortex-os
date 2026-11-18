@@ -182,8 +182,30 @@ end
 -- Juegos de Steam, Lutris y gamescope: sin vsync y sin que se bloquee la pantalla.
 -- Ventanas como en Caelestia: un poco transparentes (95 %) con el fondo desenfocado detrás, menos
 -- en pantalla completa y en los juegos (ahí, opacas). El modo juego apaga el desenfoque.
+-- 4.0 (diseño nuevo, tema Obsidian de fábrica): todo sólido. Ventanas opacas, sin sombra, con un
+-- borde blanco fino en la activa, esquinas de 20 y más aire entre ventanas (como las islas de la barra,
+-- que flotan a 10 px). Si en Ajustes prendes el desenfoque o el liquid glass (theme.blurBackground), o
+-- usas otro tema, vuelve lo de antes: 95 % con el fondo desenfocado detrás.
+local diseno_solido = false
+do
+    local f = io.open((os.getenv("XDG_CONFIG_HOME") or (home .. "/.config")) .. "/serpantinum/settings.json")
+    local ajustes = f and f:read("a") or ""
+    if f then f:close() end
+    diseno_solido = ajustes:find('"activePreset"%s*:%s*"Obsidian"') ~= nil
+        and ajustes:find('"blurBackground"%s*:%s*true') == nil
+end
 hl.config({ decoration = { blur = { ignore_opacity = true, popups = true, input_methods = true } } })
-hl.window_rule({ match = { fullscreen = false }, opacity = "0.95 override" })
+if diseno_solido then
+    hl.config({
+        general = {
+            gaps_in = 6, gaps_out = 12, border_size = 1,
+            col = { active_border = "rgba(ffffffd9)", inactive_border = "rgba(2a2a2aff)" },
+        },
+        decoration = { rounding = 20, shadow = { enabled = false } },
+    })
+else
+    hl.window_rule({ match = { fullscreen = false }, opacity = "0.95 override" })
+end
 hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, opacity = "1.0 override" })
 hl.window_rule({ match = { class = "^(steam_app_.*|gamescope)$" }, immediate = true, idle_inhibit = "always" })
 
