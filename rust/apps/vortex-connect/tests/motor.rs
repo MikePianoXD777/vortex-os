@@ -588,7 +588,15 @@ fn candado_es_de_uno_en_uno() {
     assert!(a.tomar());
     assert!(!b.tomar());
     a.soltar();
-    assert!(b.tomar());
+    // Otra prueba de este mismo programa puede estar lanzando procesos: entre su fork y su exec, el hijo
+    // tiene una copia del archivo de «a» (con el candado) por un instante. Se reintenta un momento.
+    let tomado = (0..100).any(|_| {
+        b.tomar() || {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            false
+        }
+    });
+    assert!(tomado);
     b.soltar();
 }
 
