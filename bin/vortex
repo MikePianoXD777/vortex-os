@@ -1223,7 +1223,7 @@ dock_ventanas() {
 
 # Rediseño «Mezcla» (Vortex Shell sobre Serpantinum 2.5): una sola vez, la barra pasa a islas (estilo
 # modular), el tema a Obsidian (la paleta sólida de Vortex, sin matugen) y la letra a Inter (Unbounded en
-# títulos y relojes). Lo que había
+# títulos y relojes); 4.0: el lanzador, al centro y grande (si estaba arriba, como venía). Lo que había
 # se guarda en ~/.config/vortex/ajustes-antes-mezcla.json y «vortex diseno anterior» lo regresa. Después
 # no se vuelve a tocar: lo que la persona cambie en Ajustes se queda.
 diseno_mezcla() {
@@ -1233,13 +1233,14 @@ diseno_mezcla() {
   mkdir -p "$CONF"
   # Si ya está puesto (se corrió «vortex diseno mezcla» dos veces), el respaldo de antes no se pisa.
   if [[ "$(diseno_actual)" != mezcla ]]; then
-    jq '{bar: (.bar // null), theme: (.theme // null), dock: (.dock // null)}' "$ajustes" >"$CONF/ajustes-antes-mezcla.json" 2>/dev/null || return 0
+    jq '{bar: (.bar // null), theme: (.theme // null), dock: (.dock // null), launcher: (.launcher // null)}' "$ajustes" >"$CONF/ajustes-antes-mezcla.json" 2>/dev/null || return 0
   fi
   tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || return 0
   # Las apps fijadas que trae Serpantinum 2.5 (Kitty y Ski) sacaban un dock en el mosaico: fuera, si son esas.
   jq --slurpfile o "$tema" '.bar = ((.bar // {}) + {style: "modular"})
       | .theme = ((.theme // {}) + {activePreset: "Obsidian", matugen: false, colors: $o[0].colors, fontFamily: "Inter", titleFont: "Unbounded"})
-      | if ((.dock.apps // []) | map(.desktop_id // "") | sort) == ["kitty", "ski"] then .dock.apps = [] else . end' \
+      | if ((.dock.apps // []) | map(.desktop_id // "") | sort) == ["kitty", "ski"] then .dock.apps = [] else . end
+      | if ((.launcher.position // "top") == "top") then .launcher = ((.launcher // {}) + {position: "center", width: 720, itemCount: 7}) else . end' \
     "$ajustes" >"$tmp" 2>/dev/null
   [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes" && touch "$marca" && apps_mezcla
   rm -f "$tmp"
@@ -1356,7 +1357,7 @@ cmd_diseno() {
     anterior)
       [[ -f "$previo" && -f "$ajustes" ]] || { aviso "no hay un diseño anterior guardado"; exit 1; }
       tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || exit 1
-      jq --slurpfile p "$previo" 'reduce ("bar", "theme", "dock") as $k (.; if $p[0][$k] == null then del(.[$k]) else .[$k] = $p[0][$k] end)' \
+      jq --slurpfile p "$previo" 'reduce ("bar", "theme", "dock", "launcher") as $k (.; if $p[0][$k] == null then del(.[$k]) else .[$k] = $p[0][$k] end)' \
         "$ajustes" >"$tmp" && [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes"
       rm -f "$tmp"
       apps_anterior

@@ -43,5 +43,10 @@
   },
   "dock": {
     "apps": []
+  },
+  "launcher": {
+    "position": "center",
+    "width": 720,
+    "itemCount": 7
   }
 }

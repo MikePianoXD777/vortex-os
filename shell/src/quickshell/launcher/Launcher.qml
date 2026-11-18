@@ -328,11 +328,17 @@ PanelWindow {
     property real cornerRadius: ThemeBackend.borderRadius <= 16 ? ThemeBackend.borderRadius * 2 : Math.min(32, 32 - 16 * Math.exp(-(ThemeBackend.borderRadius - 16) / 12))
     property real outerCornerRadius: cornerRadius
 
+    // Vortex 4.0: con el diseño nuevo (islas) y centrado, el lanzador es un buscador grande: búsqueda de
+    // 52 px con letra de 16, renglones de 52 con íconos de 38 y un borde fino para que se vea sobre lo negro.
+    readonly property bool grande: ThemeBackend.barIslas && isCentered
+    readonly property real altoBusqueda: s(grande ? 52 : 36)
+    readonly property real altoFila: s(grande ? 52 : 44)
+
     property real baseLauncherWidth: s(customWidth)
     property real collapsedCenterHeight: s(110)
 
     property real targetLauncherHeight: {
-        let headerH = s(36) + s(28) + s(8) + s(28);
+        let headerH = altoBusqueda + s(28) + s(8) + s(28);
         if (currentTabIndex === 2) {
             let totalRows = Math.ceil(emojiModel.count / 5);
             if (totalRows <= 0) {
@@ -344,7 +350,7 @@ PanelWindow {
         if (count <= 0) {
             return headerH;
         }
-        return headerH + s(8) + (count * s(48));
+        return headerH + s(8) + (count * (altoFila + s(4)));
     }
 
     property real animatedLauncherHeight: targetLauncherHeight
@@ -1399,6 +1405,17 @@ PanelWindow {
             color: "transparent"
             clip: true
 
+            // Vortex 4.0: borde fino del buscador grande.
+            Rectangle {
+                anchors.fill: parent
+                z: 20
+                visible: launcherWindow.grande
+                radius: container.dynamicCornerRadius
+                color: "transparent"
+                border.width: 1
+                border.color: ThemeBackend.surface2
+            }
+
             Item {
                 id: contentContainer
                 anchors.fill: parent
@@ -1416,7 +1433,7 @@ PanelWindow {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     y: contentContainer.isSearchAtBottom ? Math.max(0, parent.height - height) : 0
-                    height: launcherWindow.s(36)
+                    height: launcherWindow.altoBusqueda
 
                     baseColor: ThemeBackend.surface0
                     bgOpacity: ThemeBackend.glassActive ? 0.0 : 1.0
@@ -1425,7 +1442,7 @@ PanelWindow {
                     subTextColor: ThemeBackend.subtext0
                     borderColor: Qt.alpha(ThemeBackend.surface2, 0.6)
                     cornerRadius: ThemeBackend.borderRadius
-                    fontPixelSize: launcherWindow.s(12)
+                    fontPixelSize: launcherWindow.s(launcherWindow.grande ? 16 : 12)
                     charSpacing: 1
 
                     placeholderText: {
@@ -1649,7 +1666,7 @@ PanelWindow {
                         }
 
                         function getItemY(idx) {
-                            return idx * (launcherWindow.s(44) + spacing);
+                            return idx * (launcherWindow.altoFila + spacing);
                         }
 
                         function resetScroll() {
@@ -1697,7 +1714,7 @@ PanelWindow {
 
                         function ensureVisible(idx, animated) {
                             if (idx < 0 || appModel.count === 0) return;
-                            let itemH = launcherWindow.s(44);
+                            let itemH = launcherWindow.altoFila;
                             let step = itemH + spacing;
                             let itemTop = idx * step;
                             let itemBottom = itemTop + itemH;
@@ -1772,7 +1789,7 @@ PanelWindow {
                             }
                             x: 0
                             width: appList.width
-                            height: launcherWindow.s(44)
+                            height: launcherWindow.altoFila
                             radius: ThemeBackend.borderRadius
                             color: ThemeBackend.liquidGlass ? "transparent" : ThemeBackend.mauve
 
@@ -1797,7 +1814,7 @@ PanelWindow {
                         delegate: Item {
                             id: delegateRoot
                             width: ListView.view ? ListView.view.width : 0
-                            height: launcherWindow.s(44)
+                            height: launcherWindow.altoFila
                             clip: false
                             z: 1
 
@@ -1854,8 +1871,8 @@ PanelWindow {
 
                                     Item {
                                         id: delegateIconArea
-                                        Layout.preferredWidth: launcherWindow.s(32)
-                                        Layout.preferredHeight: launcherWindow.s(32)
+                                        Layout.preferredWidth: launcherWindow.s(launcherWindow.grande ? 38 : 32)
+                                        Layout.preferredHeight: launcherWindow.s(launcherWindow.grande ? 38 : 32)
                                         Layout.alignment: Qt.AlignVCenter
 
                                         readonly property real boxRadius: launcherWindow.s(8)
@@ -1965,7 +1982,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             text: model.name
                                             font.family: ThemeBackend.fontFamily
-                                            font.pixelSize: launcherWindow.s(12)
+                                            font.pixelSize: launcherWindow.s(launcherWindow.grande ? 14 : 12)
                                             font.weight: delegateRoot.isSelected ? Font.Bold : Font.Medium
                                             color: delegateRoot.isSelected ? (ThemeBackend.liquidGlass ? ThemeBackend.text : ThemeBackend.crust) : ThemeBackend.text
                                             horizontalAlignment: I18n.textAlignment
@@ -1981,7 +1998,7 @@ PanelWindow {
                                             visible: model.description !== undefined && model.description !== null && model.description !== ""
                                             text: model.description || ""
                                             font.family: ThemeBackend.fontFamily
-                                            font.pixelSize: launcherWindow.s(10)
+                                            font.pixelSize: launcherWindow.s(launcherWindow.grande ? 11 : 10)
                                             font.weight: Font.Normal
                                             color: delegateRoot.isSelected ? (ThemeBackend.liquidGlass ? ThemeBackend.text : ThemeBackend.crust) : ThemeBackend.subtext0
                                             horizontalAlignment: I18n.textAlignment
