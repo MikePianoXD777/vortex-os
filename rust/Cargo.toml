@@ -6,6 +6,7 @@ members = [
     "crates/vortex-core",
     "apps/vortex-player",
     "apps/vortex-local-ai",
+    "apps/vortex-bt-agente",
 ]
 # vortex-core-qt (el puente con QML, cxx-qt) entra a «members» en cuanto se bajen sus crates:
 # ver crates/vortex-core-qt/README.md.
@@ -28,6 +29,11 @@ serde_json = "1"
 tempfile = "3"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+# D-Bus sin tokio: ejecutor propio de zbus sobre async-io (menos RAM para un servicio que siempre corre).
+zbus = { version = "=6.0.0" }
+async-io = "2"
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await-macro"] }
+futures-channel = "0.3"
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
 # Mientras vortex-core-qt esté fuera del workspace, sus versiones viven en su propio Cargo.toml; al
 # meterlo, pasan aquí:  cxx = "1", cxx-qt = "=0.10.0", cxx-qt-lib = "=0.10.0", cxx-qt-build = "=0.10.0".
