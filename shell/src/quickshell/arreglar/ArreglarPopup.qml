@@ -6,7 +6,8 @@ import "../"
 import "../reusables"
 
 // Vortex 1.9: «Algo no funciona» (lanzador → «Algo no funciona», o «vortex arreglar»). Al abrirse
-// revisa sonido, micrófono, internet, Bluetooth, disco, hora y actualizaciones trabadas
+// revisa sonido, micrófono, internet, Bluetooth, disco, hora, actualizaciones trabadas,
+// puertos ocupados por servidores que se quedaron abiertos y por qué tarda en encender (4.0)
 // (vortex-arreglar revisar) y, en lo que falla, ofrece «Arreglar» (vortex-arreglar arreglar ID).
 // Después de cada arreglo vuelve a revisar, para que se vea si quedó.
 Item {
@@ -150,7 +151,9 @@ Item {
 
     function iconoDe(id) {
         let iconos = { sonido: "󰕾", microfono: "󰍬", internet: "󰖩", bluetooth: "󰂯", disco: "󰋊",
-                       hora: "󰥔", pacman: "󰏗", servicios: "󰒓", juego: "󰊴" };
+                       hora: "󰥔", pacman: "󰏗", servicios: "󰒓", juego: "󰊴", arranque: "󰔟" };
+        // 4.0: «puerto-3000», «puerto-8080»… (un puerto ocupado)
+        if (id.indexOf("puerto-") === 0) return "󰒍";
         return iconos[id] || "󰋼";
     }
 
@@ -306,6 +309,8 @@ Item {
                                         anchors.centerIn: parent
                                         text: window.arreglando === fila.r.arreglo ? window.t("fixing", "Fixing…")
                                             : fila.r.arreglo === "juego-registro" ? window.t("open_log", "Open with log")
+                                            : fila.r.arreglo.indexOf("puerto-") === 0 ? window.t("close_app", "Close it")
+                                            : fila.r.arreglo === "arranque-red" ? window.t("speed_up", "Speed up")
                                             : fila.r.arreglo === "portal" || fila.r.arreglo === "elegir-red" ? window.t("open", "Open")
                                             : window.t("fix", "Fix it")
                                         font.family: ThemeBackend.fontFamily

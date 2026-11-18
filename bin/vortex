@@ -63,6 +63,7 @@ Uso: vortex <comando>
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
+  arreglar puerto N | arranque         quién tiene ocupado un puerto / por qué tarda en encender
   reporte                              crea un archivo con lo que hace falta para saber qué le pasa al equipo (sin tus datos)
   novedades                            lo nuevo de la última versión (después de actualizar sale solo)
   restore [crear|lista|ver|volver…]    Vortexine Restore: puntos de restauración de Hyprland, tema, barra,
@@ -2175,7 +2176,9 @@ case "${1:-ayuda}" in
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
   reiniciar-shell) reiniciar_shell ;;
-  arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
+  arreglar) shift
+    case "${1:-}" in puerto | arranque) exec "$VORTEX_DIR/bin/vortex-arreglar" "$@" ;; esac
+    if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   reporte) exec "$VORTEX_DIR/bin/vortex-reporte" ;;
   novedades) shift; cmd_novedades "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;

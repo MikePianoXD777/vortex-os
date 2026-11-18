@@ -2684,6 +2684,8 @@
     "problems": "I found {n} problems.",
     "fix": "Fix it",
     "fixing": "Fixing…",
+    "close_app": "Close it",
+    "speed_up": "Speed up",
     "open": "Open",
     "again": "Check again",
     "hint": "If it keeps failing, restarting the computer fixes most things."

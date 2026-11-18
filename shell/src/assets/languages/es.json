@@ -2696,6 +2696,8 @@
     "problems": "Encontré {n} problemas.",
     "fix": "Arreglar",
     "fixing": "Arreglando…",
+    "close_app": "Cerrar",
+    "speed_up": "Acelerar",
     "open": "Abrir",
     "again": "Revisar otra vez",
     "hint": "Si sigue fallando, reiniciar el equipo arregla casi todo."
