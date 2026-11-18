@@ -479,6 +479,7 @@ cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
   restore_al_iniciar
+  disco_salud_al_iniciar
   bt_agente_al_iniciar
   asociar_app_installer
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
@@ -1416,6 +1417,7 @@ PAQUETES_NUEVOS=(
   wtype whisper-cpp # 2.7: vortex-dictar (dictar en cualquier app)
   python-gobject # 2.8.1: vortex-bt-agente (emparejar por Bluetooth)
   cachyos-rate-mirrors # 2.9.2: espejos cercanos (espejos_cercanos)
+  smartmontools # 4.0: vortex-disco salud (avisa si un disco empieza a fallar)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1709,6 +1711,8 @@ cmd_actualizar() {
   command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
   # 2.8.1: sin agente, Bluetooth no guarda la llave de los aparatos nuevos y los audífonos se caen a los segundos.
   bt_agente_al_iniciar
+  # 4.0: la salud de los discos (SMART), una vez al día con un temporizador.
+  disco_salud_al_iniciar
   # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
   command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
   # 2.7: Vortexine Shared: el socket que recibe avisos (sin proceso en reposo), su clic derecho y, una sola vez,
@@ -1851,6 +1855,40 @@ restore_al_iniciar() {
     (systemctl --user daemon-reload && systemctl --user enable --now vortex-restore.timer) >/dev/null 2>&1 || true
   fi
   setsid bash -c 'sleep 60; hyprctl -j version >/dev/null 2>&1 && exec vortex-restore auto inicio' </dev/null >/dev/null 2>&1 &
+}
+
+# Salud del disco (4.0, vortex-disco salud): una vez al día, y al encender si ya tocaba (Persistent). Es un
+# temporizador de systemd: entre una vez y otra no queda nada corriendo. Se escribe y enciende si falta.
+disco_salud_al_iniciar() {
+  [[ -e /etc/vortex/live ]] && return 0
+  command -v vortex-disco >/dev/null || return 0
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  [[ -f "$d/vortex-disco-salud.timer" ]] && return 0
+  mkdir -p "$d"
+  cat >"$d/vortex-disco-salud.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine: revisar la salud de los discos (SMART)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vortex-disco salud
+Nice=19
+IOSchedulingClass=idle
+UNIDAD
+  cat >"$d/vortex-disco-salud.timer" <<'UNIDAD'
+[Unit]
+Description=Vortexine: revisar la salud de los discos una vez al día
+
+[Timer]
+OnStartupSec=15min
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
+UNIDAD
+  (systemctl --user daemon-reload && systemctl --user enable --now vortex-disco-salud.timer) >/dev/null 2>&1 || true
 }
 
 # El agente de Bluetooth (bin/vortex-bt-agente): sin él, BlueZ no empareja de verdad. Se escribe y enciende si falta;

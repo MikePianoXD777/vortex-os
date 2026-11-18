@@ -6,6 +6,9 @@
 #
 #   vortex-disco revisar   avisa si hace falta (lo llama vortex-gestor cada 10 min; nunca con un juego)
 #   vortex-disco --ver     solo dice qué avisaría
+#   vortex-disco salud     (4.0) revisa la salud de cada disco (SMART) y avisa si empieza a fallar; lo llama un
+#                          temporizador de systemd una vez al día (vortex-disco-salud.timer), no hay nada corriendo
+#   vortex-disco salud --ver   lo mismo, pero solo lo dice en la terminal (no avisa ni apunta nada)
 #
 # Dos niveles, para no molestar con discos grandes medio llenos:
 #   casi lleno     quedan menos de 5 GB: aviso que se queda hasta que lo cierres, una vez al día
@@ -86,8 +89,156 @@ revisar() {
   return 0
 }
 
+# --- Salud del disco (4.0) ---
+# Los discos avisan antes de morirse (SMART): sectores dañados, el desgaste de un SSD, errores de memoria.
+# Se lee con smartctl (si el sistema lo deja sin root) y, si no, con udisks, que sí lo deja a tu usuario.
+# Los discos USB se saltan (los pendrives fallan seguido y no son «tu disco»).
+SMARTCTL="${VORTEX_DISCO_SMARTCTL:-smartctl}"
+LSBLK="${VORTEX_DISCO_LSBLK:-lsblk}"
+UDISKSCTL="${VORTEX_DISCO_UDISKSCTL:-udisksctl}"
+BUSCTL="${VORTEX_DISCO_BUSCTL:-busctl}"
+GRAVE_REAVISO_MIN=10080     # un disco que falla: se vuelve a avisar cada semana
+ATENCION_REAVISO_MIN=43200  # uno que se desgasta: cada mes
+
+# Una línea por disco: «dev<TAB>nombre» (solo discos internos reales).
+discos_internos() {
+  local linea name model tran type
+  while IFS= read -r linea; do
+    name="" model="" tran="" type=""
+    eval "$linea"
+    [[ "$type" == disk && "$tran" != usb && "$name" != zram* && "$name" != loop* ]] || continue
+    model="${model//$'\t'/ }"
+    printf '/dev/%s\t%s\n' "$name" "${model:-$name}"
+  done < <("$LSBLK" -dnPo NAME,TYPE,TRAN,MODEL 2>/dev/null | sed 's/\([A-Z]*\)=/\L\1=/g')
+}
+
+# «passed bad crit usado reserva reserva_min errores_media»; «-» si no se pudo leer.
+leer_smartctl() {
+  local json
+  json="$("$SMARTCTL" -j -H -A -n standby "$1" 2>/dev/null)" || true
+  [[ -n "$json" ]] || return 1
+  jq -r 'if (.smart_status // null) == null then empty else
+    [ (.smart_status.passed | tostring),
+      ([.ata_smart_attributes.table[]? | select(.id == 5 or .id == 197 or .id == 198) | .raw.value] | add // 0),
+      (.nvme_smart_health_information_log.critical_warning // 0),
+      (.nvme_smart_health_information_log.percentage_used // 0),
+      (.nvme_smart_health_information_log.available_spare // 100),
+      (.nvme_smart_health_information_log.available_spare_threshold // 0),
+      (.nvme_smart_health_information_log.media_errors // 0) ] | map(tostring) | join(" ") end' <<<"$json" 2>/dev/null
+}
+
+# Lo mismo con lo que udisks ya sabe del disco (sin root).
+leer_udisks() {
+  local obj falla malos crit
+  obj="$("$UDISKSCTL" info -b "$1" 2>/dev/null | sed -n "s/^ *Drive: *'\(.*\)'$/\1/p")" || obj=""
+  [[ -n "$obj" ]] || return 1
+  if falla="$("$BUSCTL" --system get-property org.freedesktop.UDisks2 "$obj" org.freedesktop.UDisks2.Drive.Ata SmartFailing 2>/dev/null)"; then
+    malos="$("$BUSCTL" --system get-property org.freedesktop.UDisks2 "$obj" org.freedesktop.UDisks2.Drive.Ata SmartNumBadSectors 2>/dev/null | awk '{print $2}')"
+    [[ "$malos" =~ ^[0-9]+$ ]] || malos=0
+    [[ "$falla" == "b true" ]] && echo "false $malos 0 0 100 0 0" || echo "true $malos 0 0 100 0 0"
+    return 0
+  fi
+  if crit="$("$BUSCTL" --system get-property org.freedesktop.UDisks2 "$obj" org.freedesktop.UDisks2.NVMe.Controller SmartCriticalWarning 2>/dev/null)"; then
+    # «as 0» = sin avisos; «as 1 "spare"» = hay alguno
+    [[ "$crit" == "as 0" ]] && echo "true 0 0 0 100 0 0" || echo "false 0 1 0 100 0 0"
+    return 0
+  fi
+  return 1
+}
+
+# De los números al veredicto: «bien», «atencion|motivo» o «grave|motivo» (motivo en palabras normales).
+evaluar_salud() {
+  local passed="$1" bad="$2" crit="$3" usado="$4" reserva="$5" rmin="$6" errores="$7" m=()
+  local grave=0
+  if [[ "$passed" == false ]]; then
+    grave=1; m+=("el propio disco dice que está fallando")
+  fi
+  if ((crit != 0)); then
+    grave=1; m+=("el disco reporta una falla crítica")
+  fi
+  if ((rmin > 0 && reserva <= rmin)); then
+    grave=1; m+=("se le acabó el espacio de repuesto")
+  fi
+  if ((bad >= 100)); then
+    grave=1; m+=("tiene $bad sectores dañados")
+  elif ((bad > 0)); then
+    m+=("tiene $bad sectores dañados")
+  fi
+  if ((usado >= 100)); then
+    grave=1; m+=("ya gastó toda su vida útil")
+  elif ((usado >= 90)); then
+    m+=("ya gastó el $usado % de su vida útil")
+  fi
+  ((errores > 0)) && m+=("registró $errores errores de memoria")
+  if ((${#m[@]} == 0)); then
+    echo bien
+    return 0
+  fi
+  local motivo="" i
+  for i in "${!m[@]}"; do
+    if ((i == 0)); then motivo="${m[i]}"; elif ((i == ${#m[@]} - 1)); then motivo+=" y ${m[i]}"; else motivo+=", ${m[i]}"; fi
+  done
+  ((grave)) && echo "grave|$motivo" || echo "atencion|$motivo"
+}
+
+# Ya avisó de este disco igual que ahora (misma firma) hace poco.
+salud_reciente() {
+  local marca="$1" firma="$2" nivel="$3" minutos="$ATENCION_REAVISO_MIN"
+  [[ "$nivel" == grave ]] && minutos="$GRAVE_REAVISO_MIN"
+  [[ -f "$marca" && "$(cat "$marca" 2>/dev/null)" == "$firma" ]] || return 1
+  [[ -n "$(find "$marca" -mmin -"$minutos" 2>/dev/null)" ]]
+}
+
+avisar_salud() {
+  local nivel="$1" nombre="$2" motivo="$3" titulo cuerpo urgencia=normal
+  if [[ "$nivel" == grave ]]; then
+    titulo="Tu disco «$nombre» está fallando"
+    cuerpo="${motivo^}. Copia ya tus archivos importantes a otro lado (otro disco, un pendrive o la nube) y cambia el disco pronto: puede dejar de funcionar de un momento a otro."
+    urgencia=critical
+  else
+    titulo="Tu disco «$nombre» empieza a desgastarse"
+    cuerpo="${motivo^}. No es urgente, pero haz una copia de tus archivos importantes y ve pensando en cambiarlo."
+  fi
+  notify-send -a "Vortexine's OS" -i drive-harddisk -u "$urgencia" -t 0 "$titulo" "$cuerpo" 2>/dev/null || true
+}
+
+salud() {
+  local ver="$1" dev nombre datos veredicto nivel motivo marca firma
+  command -v jq >/dev/null || { ((ver)) && echo "Falta jq para leer la salud del disco." >&2; return 0; }
+  while IFS=$'\t' read -r dev nombre; do
+    [[ -n "$dev" ]] || continue
+    datos="$(leer_smartctl "$dev")" || datos=""
+    [[ -n "$datos" ]] || datos="$(leer_udisks "$dev")" || datos=""
+    if [[ -z "$datos" ]]; then
+      ((ver)) && echo "$nombre: este disco no dice su salud."
+      continue
+    fi
+    # shellcheck disable=SC2086
+    veredicto="$(evaluar_salud $datos)"
+    nivel="${veredicto%%|*}"
+    motivo="${veredicto#*|}"
+    marca="$ESTADO/salud-disco-${nombre//[^A-Za-z0-9_-]/_}"
+    if [[ "$nivel" == bien ]]; then
+      ((ver)) && echo "$nombre: bien."
+      ((ver)) || unlink "$marca" 2>/dev/null
+      continue
+    fi
+    if ((ver)); then
+      echo "$nombre: $motivo ($nivel)."
+      continue
+    fi
+    firma="$nivel|$motivo"
+    salud_reciente "$marca" "$firma" "$nivel" && continue
+    command -v notify-send >/dev/null || continue
+    mkdir -p "$ESTADO" && printf '%s' "$firma" >"$marca"
+    avisar_salud "$nivel" "$nombre" "$motivo"
+  done < <(discos_internos)
+  return 0
+}
+
 case "${1:-}" in
   revisar) revisar 0 ;;
   --ver) revisar 1 ;;
-  *) echo "uso: vortex-disco revisar | --ver" >&2; exit 2 ;;
+  salud) [[ "${2:-}" == --ver ]] && salud 1 || salud 0 ;;
+  *) echo "uso: vortex-disco revisar | --ver | salud [--ver]" >&2; exit 2 ;;
 esac
