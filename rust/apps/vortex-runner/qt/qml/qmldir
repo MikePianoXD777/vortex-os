@@ -1,0 +1,17 @@
+singleton Tema 1.0 Tema.qml
+singleton Iconos 1.0 Iconos.qml
+Icono 1.0 Icono.qml
+Boton 1.0 Boton.qml
+BotonIcono 1.0 BotonIcono.qml
+Campo 1.0 Campo.qml
+CampoTexto 1.0 CampoTexto.qml
+Dialogo 1.0 Dialogo.qml
+Interruptor 1.0 Interruptor.qml
+Selector 1.0 Selector.qml
+MenuVortex 1.0 MenuVortex.qml
+OpcionMenu 1.0 OpcionMenu.qml
+Punto 1.0 Punto.qml
+Tarjeta 1.0 Tarjeta.qml
+DialogoPrograma 1.0 DialogoPrograma.qml
+DialogoInstalado 1.0 DialogoInstalado.qml
+DialogoArchivo 1.0 DialogoArchivo.qml
