@@ -68,8 +68,27 @@ falso pkexec 'exit 0'
 falso flatpak 'exit 0'
 falso sleep 'exit 0'
 
+# ss y systemd-analyze de mentira (4.0): lo que dicen sale de $T/ss y de $T/analyze-*
+cat >"$T/ss" <<F
+#!/bin/sh
+cat "$T/ss.txt" 2>/dev/null
+F
+cat >"$T/analyze" <<F
+#!/bin/sh
+case "\$*" in
+  *time*) cat "$T/analyze-time" ;;
+  *critical-chain*) cat "$T/analyze-chain" ;;
+  *blame*) cat "$T/analyze-blame" ;;
+esac
+F
+chmod +x "$T/ss" "$T/analyze"
+echo 'Startup finished in 4.1s (firmware) + 2.0s (loader) + 1.5s (kernel) + 9.4s (userspace) = 17.0s' >"$T/analyze-time"
+printf 'graphical.target @9.0s\n└─multi-user.target @9.0s\n' >"$T/analyze-chain"
+: >"$T/analyze-blame"
+: >"$T/ss.txt"
+
 arreglar() {
-  HOME="$T/home" XDG_CACHE_HOME="$T/home/.cache" VORTEX_SYS="$T/sys" VORTEX_RAIZ="$T/raiz" PATH="$T/bin:$PATH" \
+  VORTEX_SS="$T/ss" VORTEX_ANALYZE="$T/analyze" HOME="$T/home" XDG_CACHE_HOME="$T/home/.cache" VORTEX_SYS="$T/sys" VORTEX_RAIZ="$T/raiz" PATH="$T/bin:$PATH" \
     bash "$AQUI/bin/vortex-arreglar" "$@"
 }
 estado_de() { arreglar revisar | jq -r --arg id "$1" '.[] | select(.id == $id) | "\(.estado) \(.arreglo)"'; }
@@ -235,6 +254,48 @@ contiene "$(arreglar arreglar juego-registro)" 'sigue abierto' && [[ ! -e "$T/st
   bien "con el juego abierto no reinicia Steam" || mal "reinició Steam con el juego abierto"
 rm -f "$J/logs/gameprocess_log.txt"
 [[ -z "$(arreglar juego)" ]] && bien "sin Steam no sale la fila" || mal "sin Steam: $(arreglar juego)"
+
+echo "== puerto ocupado (4.0)"
+sleep 300 & DORMIDO=$!
+trap 'kill $DORMIDO 2>/dev/null; rm -rf "$T"' EXIT
+printf 'LISTEN 0 511 0.0.0.0:3000 0.0.0.0:* users:(("node",pid=%s,fd=20))\nLISTEN 0 4096 127.0.0.1:631 0.0.0.0:*\n' "$DORMIDO" >"$T/ss.txt"
+normal
+[[ "$(estado_de puerto-3000)" == "aviso puerto-3000" ]] && bien "puerto de desarrollo ocupado → Cerrar" || mal "puerto: $(estado_de puerto-3000)"
+contiene "$(arreglar revisar | jq -r '.[] | select(.id == "puerto-3000") | .detalle')" "«node» (proceso $DORMIDO) tiene ocupado el puerto 3000" &&
+  bien "dice quién lo tiene, en palabras normales" || mal "detalle del puerto"
+[[ -z "$(estado_de puerto-631)" ]] && bien "un puerto que no es de desarrollo no estorba" || mal "631 apareció"
+contiene "$(arreglar puerto 3000)" "«node»" && contiene "$(arreglar puerto 4321)" "libre" && bien "vortex-arreglar puerto N" || mal "cmd puerto"
+printf 'LISTEN 0 511 127.0.0.1:8080 0.0.0.0:* users:(("quickshell",pid=%s,fd=9))\n' "$DORMIDO" >"$T/ss.txt"
+[[ -z "$(estado_de puerto-8080)" ]] && bien "lo del escritorio no se ofrece cerrar" || mal "quickshell listado"
+contiene "$(arreglar arreglar puerto-8080)" "lo necesita el sistema" && kill -0 "$DORMIDO" && bien "y si se pide, no lo cierra" || mal "cerró quickshell"
+printf 'LISTEN 0 511 0.0.0.0:3000 0.0.0.0:* users:(("node",pid=%s,fd=20))\n' "$DORMIDO" >"$T/ss.txt"
+contiene "$(arreglar arreglar puerto-3000)" "Listo: cerré «node»" && ! kill -0 "$DORMIDO" 2>/dev/null && bien "Cerrar termina el proceso" || mal "no cerró"
+: >"$T/ss.txt"
+contiene "$(arreglar arreglar puerto-3000)" "ya está libre" && bien "puerto ya libre: lo dice" || mal "libre"
+contiene "$(arreglar arreglar 'puerto-3000;ls' 2>&1)" "no es válido" && bien "un puerto raro no pasa" || mal "puerto raro"
+
+echo "== diagnóstico de arranque (4.0)"
+[[ "$(estado_de arranque)" == "bien " ]] && bien "arranque de 17 s: bien" || mal "arranque rápido: $(estado_de arranque)"
+echo 'Startup finished in 6.0s (firmware) + 2.0s (loader) + 3.0s (kernel) + 1min 5.5s (userspace) = 1min 16.5s' >"$T/analyze-time"
+cat >"$T/analyze-chain" <<'F'
+graphical.target @1min 5.0s
+└─multi-user.target @1min 5.0s
+  └─docker.service @40.0s +25.1s
+    └─NetworkManager-wait-online.service @10.0s +30.2s
+      └─NetworkManager.service @9.0s +900ms
+F
+[[ "$(estado_de arranque)" == "aviso arranque-red" ]] && bien "arranque lento con wait-online → ofrece acelerar" || mal "lento: $(estado_de arranque)"
+d="$(arreglar revisar | jq -r '.[] | select(.id == "arranque") | .detalle')"
+contiene "$d" "tarda 76 s en encender" && contiene "$d" "«NetworkManager-wait-online» (30 s): espera a que haya internet" && contiene "$d" "«docker» (25 s)" &&
+  ! contiene "$d" "NetworkManager.service" && bien "explica qué tarda, sin jerga" || mal "detalle: $d"
+echo 'Startup finished in 50s (firmware) + 2.0s (loader) + 3.0s (kernel) + 6.0s (userspace) = 1min 1s' >"$T/analyze-time"
+printf 'graphical.target @6.0s\n' >"$T/analyze-chain"
+d="$(arreglar revisar | jq -r '.[] | select(.id == "arranque") | .detalle')"
+contiene "$d" "La BIOS del equipo tarda 50 s" && bien "si es la BIOS, lo dice" || mal "bios: $d"
+: >"$T/registro"
+arreglar arreglar arranque-red >/dev/null 2>&1; grep -q "systemctl is-enabled" "$T/registro" && bien "Acelerar usa systemctl (con pkexec para apagar la espera)" || mal "arranque-red"
+rm -f "$T/analyze"
+[[ -z "$(estado_de arranque)" ]] && bien "sin systemd-analyze: no se muestra" || mal "sin analyze"
 
 echo
 ((FALLOS)) && { echo "$FALLOS pruebas fallaron."; exit 1; }

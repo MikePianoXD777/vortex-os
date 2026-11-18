@@ -61,7 +61,7 @@ printf '#!/bin/sh\necho kdeconnectd >>"%s/registro"\n' "$T" >"$T/bin/kdeconnectd
 printf '#!/bin/sh\necho "pkill $*" >>"%s/registro"\n' "$T" >"$T/bin/pkill"
 chmod +x "$T/bin/"*
 touch "$T/foto.jpg"
-celular() { PATH="$T/bin:$PATH" bash "$SCRIPT" "$@"; }
+celular() { XDG_CONFIG_HOME="$T/home/.config" PATH="$T/bin:$PATH" bash "$SCRIPT" "$@"; }
 vortex() {
   HOME="$T/home" XDG_CONFIG_HOME="$T/home/.config" XDG_STATE_HOME="$T/home/.local/state" \
     PATH="$T/bin:$PATH" bash "$AQUI/bin/vortex" "$@"
@@ -98,6 +98,22 @@ grep -q -- "--share $T/foto.jpg" "$T/registro" && ! grep -q "no-existe" "$T/regi
 : >"$T/registro"
 celular sonar 'x; rm -rf /' 2>/dev/null
 [[ $? == 2 && ! -s "$T/registro" ]] && bien "un id raro no llega a kdeconnect-cli" || mal "id raro: $(cat "$T/registro")"
+
+echo "== portapapeles compartido y PC con Windows (4.0)"
+auto() { celular estado | jq -r --arg id "$1" '.dispositivos[] | select(.id == $id) | .auto'; }
+[[ "$(auto abc123)" == true ]] && bien "por defecto el portapapeles se comparte solo (como KDE Connect)" || mal "auto por defecto: $(auto abc123)"
+celular compartir abc123
+[[ "$(auto abc123)" == false ]] && grep -qx 'autoShare=false' "$T/home/.config/kdeconnect/abc123/kdeconnect_clipboard/config" &&
+  bien "«Dejar de compartirlo solo» escribe autoShare=false en su config" || mal "apagar: $(auto abc123)"
+[[ "$(auto xyz789)" == true ]] && bien "y solo cambia ese aparato" || mal "otro aparato cambió"
+celular compartir abc123
+[[ "$(auto abc123)" == true ]] && bien "volver a pulsar lo enciende" || mal "encender: $(auto abc123)"
+printf '[General]\nsendPassword=true\n' >"$T/home/.config/kdeconnect/abc123/kdeconnect_clipboard/config"
+celular compartir abc123
+[[ "$(auto abc123)" == false ]] && grep -qx 'sendPassword=true' "$T/home/.config/kdeconnect/abc123/kdeconnect_clipboard/config" &&
+  bien "no pisa lo que ya tenía la config del complemento" || mal "config con otras claves"
+Q="$AQUI/shell/src/quickshell/celular/CelularPopup.qml"
+grep -q '"laptop"' "$Q" && grep -q '"desktop"' "$Q" && bien "el panel tiene ícono de PC y no ofrece «Hacer sonar» a una PC" || mal "panel sin PC"
 
 echo "== vortex celular"
 rm -f "$T/corriendo"

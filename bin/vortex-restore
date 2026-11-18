@@ -237,6 +237,9 @@ case "${1:-lista}" in
   crear) shift; c="$(guardar manual "${*:-Punto manual}" --siempre)" && echo "Punto $c guardado." ;;
   auto) shift; tipo=auto; [[ "${1:-}" == inicio || "${1:-}" == actualizar ]] && { tipo="$1"; shift; }
     nota="${*:-}"
+    # 4.0: el punto de cada 30 min (escribe a disco) espera a que termine la partida; los de inicio y de
+    # antes de actualizar sí se hacen.
+    [[ "$tipo" == auto ]] && command -v vortex >/dev/null && vortex jugando && exit 0
     [[ -n "$nota" ]] || case "$tipo" in inicio) nota="Inicio de sesión" ;; actualizar) nota="Antes de actualizar" ;; *) nota="Cambios guardados solos" ;; esac
     if [[ "$tipo" == inicio ]]; then guardar "$tipo" "$nota" --siempre >/dev/null; else guardar "$tipo" "$nota" >/dev/null; fi
     exit 0 ;;

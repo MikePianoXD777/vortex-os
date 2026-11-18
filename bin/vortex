@@ -29,6 +29,9 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  guardados lista|restaurar            copias de tus partidas guardadas (se hacen solas al abrir un juego)
+  sesiones guardar|abrir|lista|borrar  sesiones de trabajo: guarda las apps abiertas y su escritorio y las vuelve a abrir
+  jugando                              sale con 0 si hay una partida o algo en pantalla completa (lo usan las tareas solas)
   modo-ia on|off|alternar|estado       el hermano del modo juego para la IA local: apaga los efectos y
                                        pausa el fondo animado (lo pone solo el gestor cuando Ollama,
                                        llama.cpp, ComfyUI o PyTorch usan la gráfica)
@@ -63,6 +66,7 @@ Uso: vortex <comando>
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
+  arreglar puerto N | arranque         quién tiene ocupado un puerto / por qué tarda en encender
   reporte                              crea un archivo con lo que hace falta para saber qué le pasa al equipo (sin tus datos)
   novedades                            lo nuevo de la última versión (después de actualizar sale solo)
   restore [crear|lista|ver|volver…]    Vortexine Restore: puntos de restauración de Hyprland, tema, barra,
@@ -479,8 +483,10 @@ cmd_primer_inicio() {
   avisos_primera_vez
   aviso_atajos
   restore_al_iniciar
+  disco_salud_al_iniciar
   bt_agente_al_iniciar
   asociar_app_installer
+  command -v vortex-sesiones >/dev/null && { vortex-sesiones accion || true; }   # 4.0: las entradas del lanzador
   local cache="${XDG_CACHE_HOME:-$HOME/.cache}/serpantinum/wallpaper"
   compgen -G "$cache/current_*" >/dev/null && return 0
   local _
@@ -489,6 +495,23 @@ cmd_primer_inicio() {
     sleep 1
   done
   cmd_fondo
+}
+
+# 4.0: «no interrumpir partidas». Lo que corre solo (revisar actualizaciones, puntos de Restore, la salud del
+# disco) pregunta esto antes de empezar y, si hay una partida, se salta esa vuelta: no gasta red ni disco
+# mientras juegas. Es un comando y no un demonio: no queda nada corriendo.
+#   vortex jugando    sale con 0 si hay una partida (modo juego de esta sesión) o algo en pantalla completa
+partida_en_curso() {
+  local marca="$ESTADO/modo-juego" arranque
+  if [[ -e "$marca" ]]; then
+    # La marca de una sesión anterior (se cayó el equipo jugando) no cuenta: tiene que ser de este arranque.
+    arranque=$(($(date +%s) - $(cut -d. -f1 /proc/uptime)))
+    (($(stat -c %Y "$marca" 2>/dev/null || echo 0) >= arranque)) && return 0
+  fi
+  # Pantalla completa (un juego que el gestor no reconoció, un video): tampoco es momento de molestar.
+  hypr_corriendo || return 1
+  [[ "$(hypr activewindow -j 2>/dev/null | jq -r '.fullscreen // 0' 2>/dev/null)" =~ ^(0|false)?$ ]] && return 1
+  return 0
 }
 
 cmd_modo_juego() {
@@ -527,6 +550,9 @@ cmd_modo_juego() {
           "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
       fi
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
+      # 4.0: con la partida en marcha los avisos normales no salen encima del juego (se guardan en el panel de
+      # avisos; solo los urgentes se muestran).
+      shell_ipc notificaciones jugando true >/dev/null 2>&1 || true
       ;;
     off)
       # Recargar devuelve todo a como estaba en la config.
@@ -543,6 +569,7 @@ cmd_modo_juego() {
         shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
       fi
       rm -f "$marca" "$marca.anterior" "$marca.fondo"
+      shell_ipc notificaciones jugando false >/dev/null 2>&1 || true
       # Vortex 2.0.2: deja de grabar clips y suelta su RAM (250-400 MB).
       "$VORTEX_DIR/bin/vortex-clips" detener 2>/dev/null || true
       # Vortex 1.10: el resumen de la partida (cuánto jugaste, FPS y temperaturas) en vez del aviso
@@ -1004,7 +1031,7 @@ cmd_java() {
 # misma lista, pruebas/otaku.sh vigila que no se separen). El shell que trae el repo llama a
 # algunos (vortex-otaku), así que se actualizan juntos: tras el pull se copian los que cambiaron.
 # El destino se puede cambiar con VORTEX_BIN_DESTINO (las pruebas no tocan el sistema).
-COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-ia vortex-qr vortex-dictar vortex-bt-agente vortex-android)
+COMANDOS_VORTEX=(vortex vortex-bench vortex-mcp vortex-gestor vortex-otaku vortex-pantallas vortex-limpiar vortex-captura vortex-usb vortex-texto vortex-arreglar vortex-onedrive vortex-restore vortex-mods vortex-clips vortex-partida vortex-camara vortex-exe vortex-tareas vortex-enlace vortex-pdf vortex-reporte vortex-memoria vortex-disco vortex-sesiones vortex-guardados vortex-ia vortex-qr vortex-dictar vortex-bt-agente vortex-android)
 
 instalar_comandos() {
   local destino="${VORTEX_BIN_DESTINO:-/usr/local/bin}" c
@@ -1416,6 +1443,7 @@ PAQUETES_NUEVOS=(
   wtype whisper-cpp # 2.7: vortex-dictar (dictar en cualquier app)
   python-gobject # 2.8.1: vortex-bt-agente (emparejar por Bluetooth)
   cachyos-rate-mirrors # 2.9.2: espejos cercanos (espejos_cercanos)
+  smartmontools # 4.0: vortex-disco salud (avisa si un disco empieza a fallar)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1598,6 +1626,13 @@ espejos_cercanos() {
 
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
+    # 4.0: actualizar gasta red y disco; con un juego abierto lo notas en los FPS. Se pregunta (en la terminal).
+    if [[ -t 0 ]] && partida_en_curso; then
+      local r
+      echo "Estás jugando: actualizar ahora gasta internet y disco y puede bajarte los FPS."
+      read -r -p "¿Actualizo de todos modos? [s/N]: " r
+      [[ "${r,,}" == s* ]] || { echo "Está bien: actualiza cuando termines de jugar."; exit 0; }
+    fi
     if ! hay_internet; then
       echo
       echo "No hay internet (o no responde el DNS): no se actualizó nada."
@@ -1709,8 +1744,12 @@ cmd_actualizar() {
   command -v vortex-pdf >/dev/null && { vortex-pdf accion || true; }
   # 2.8.1: sin agente, Bluetooth no guarda la llave de los aparatos nuevos y los audífonos se caen a los segundos.
   bt_agente_al_iniciar
+  # 4.0: la salud de los discos (SMART), una vez al día con un temporizador.
+  disco_salud_al_iniciar
   # 2.7: «Pasar al cel» en el clic derecho de Thunar (bin/vortex-qr).
   command -v vortex-qr >/dev/null && { vortex-qr accion || true; }
+  # 4.0: sesiones de trabajo: «Guardar sesión de trabajo» y las «Sesión: …» en el lanzador.
+  command -v vortex-sesiones >/dev/null && { vortex-sesiones accion || true; }
   # 2.7: Vortexine Shared: el socket que recibe avisos (sin proceso en reposo), su clic derecho y, una sola vez,
   # dejar pasar los avisos en ufw (solo Tailscale y redes privadas; pide la contraseña).
   if command -v vortex-shared >/dev/null; then
@@ -1851,6 +1890,40 @@ restore_al_iniciar() {
     (systemctl --user daemon-reload && systemctl --user enable --now vortex-restore.timer) >/dev/null 2>&1 || true
   fi
   setsid bash -c 'sleep 60; hyprctl -j version >/dev/null 2>&1 && exec vortex-restore auto inicio' </dev/null >/dev/null 2>&1 &
+}
+
+# Salud del disco (4.0, vortex-disco salud): una vez al día, y al encender si ya tocaba (Persistent). Es un
+# temporizador de systemd: entre una vez y otra no queda nada corriendo. Se escribe y enciende si falta.
+disco_salud_al_iniciar() {
+  [[ -e /etc/vortex/live ]] && return 0
+  command -v vortex-disco >/dev/null || return 0
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  [[ -f "$d/vortex-disco-salud.timer" ]] && return 0
+  mkdir -p "$d"
+  cat >"$d/vortex-disco-salud.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine: revisar la salud de los discos (SMART)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vortex-disco salud
+Nice=19
+IOSchedulingClass=idle
+UNIDAD
+  cat >"$d/vortex-disco-salud.timer" <<'UNIDAD'
+[Unit]
+Description=Vortexine: revisar la salud de los discos una vez al día
+
+[Timer]
+OnStartupSec=15min
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
+UNIDAD
+  (systemctl --user daemon-reload && systemctl --user enable --now vortex-disco-salud.timer) >/dev/null 2>&1 || true
 }
 
 # El agente de Bluetooth (bin/vortex-bt-agente): sin él, BlueZ no empareja de verdad. Se escribe y enciende si falta;
@@ -2057,6 +2130,9 @@ cmd_actualizaciones() {
       ;;
     revisar)
       local pendientes huella anterior n_sis n_app vortex_nuevo cuerpo sonido=""
+      # 4.0: con una partida en curso no se revisa (ni red ni disco ni aviso encima del juego): se hace en
+      # la próxima vuelta del temporizador, 10 min después. A mano (--siempre) sí.
+      [[ "${2:-}" != --siempre ]] && partida_en_curso && return 0
       pendientes="$(avisos_pendientes | sort)"
       [[ -n "$pendientes" ]] || return 0
       # Solo se avisa una vez de lo mismo: si sale algo nuevo, otra vez.
@@ -2122,6 +2198,7 @@ cmd_configurar_usuario() {
 
 case "${1:-ayuda}" in
   modo-juego) shift; cmd_modo_juego "$@" ;;
+  jugando) partida_en_curso ;;
   modo-ia) shift; cmd_modo_ia "$@" ;;
   configurar-usuario) cmd_configurar_usuario ;;
   gestor) shift; cmd_gestor "$@" ;;
@@ -2136,8 +2213,12 @@ case "${1:-ayuda}" in
   runner | exe) shift; exec "$VORTEX_DIR/bin/vortex-exe" "$@" ;;
   clips) shift; exec "$VORTEX_DIR/bin/vortex-clips" "$@" ;;
   partidas) exec "$VORTEX_DIR/bin/vortex-partida" historial ;;
+  guardados) shift; exec "$VORTEX_DIR/bin/vortex-guardados" "$@" ;;
+  sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   reiniciar-shell) reiniciar_shell ;;
-  arreglar) shift; if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
+  arreglar) shift
+    case "${1:-}" in puerto | arranque) exec "$VORTEX_DIR/bin/vortex-arreglar" "$@" ;; esac
+    if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;
   reporte) exec "$VORTEX_DIR/bin/vortex-reporte" ;;
   novedades) shift; cmd_novedades "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;

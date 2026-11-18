@@ -2093,7 +2093,7 @@
     },
     "celular": {
       "name": "Tu celular",
-      "desc": "Notificaciones, archivos y batería de tu celular (Super+Shift+P)"
+      "desc": "Notificaciones, archivos, portapapeles y batería de tu celular o PC con Windows (Super+Shift+P)"
     },
     "juegos": {
       "name": "Tus juegos",
@@ -2511,15 +2511,15 @@
   },
   "celular": {
     "title": "Tu celular",
-    "subtitle": "Con KDE Connect, por tu Wi-Fi",
+    "subtitle": "Celular o PC con Windows, con KDE Connect, por tu Wi-Fi",
     "search": "Buscar",
-    "intro": "Mira aquí las notificaciones de tu celular, mándale archivos o lo que copiaste, y hazlo sonar cuando no lo encuentres.",
-    "step1": "Instala KDE Connect en tu celular (Play Store o F-Droid).",
+    "intro": "Mira aquí las notificaciones de tu celular, mándale archivos y hazlo sonar cuando no lo encuentres. Con tu celular o con una PC con Windows, lo que copies en uno se puede pegar en el otro.",
+    "step1": "Instala KDE Connect en tu celular (Play Store o F-Droid) o en tu PC con Windows (Microsoft Store).",
     "step2": "Conéctalo al mismo Wi-Fi que esta PC.",
-    "step3": "Enciéndelo aquí y acepta la vinculación en tu celular.",
+    "step3": "Enciéndelo aquí y acepta la vinculación en el otro aparato.",
     "turn_on": "Encender",
     "turning_on": "Encendiendo…",
-    "empty": "Todavía no hay celulares. Abre KDE Connect en tu celular, en el mismo Wi-Fi, y aparecerá aquí.",
+    "empty": "Todavía no hay aparatos. Abre KDE Connect en tu celular o en tu PC con Windows, en el mismo Wi-Fi, y aparecerá aquí.",
     "wants_pair": "Quiere vincularse",
     "not_paired": "Sin vincular",
     "offline": "No conectado",
@@ -2530,6 +2530,10 @@
     "send_file": "Mandar archivos",
     "send_clipboard": "Mandar portapapeles",
     "unpair": "Desvincular",
+    "clip_on": "Portapapeles compartido: lo que copies aquí se puede pegar allá, y al revés.",
+    "clip_off": "El portapapeles no se comparte solo: usa «Mandar portapapeles» cuando lo necesites.",
+    "clip_stop": "Dejar de compartirlo solo",
+    "clip_start": "Compartirlo solo",
     "turn_off": "Apagar KDE Connect"
   },
   "juegos": {
@@ -2696,6 +2700,8 @@
     "problems": "Encontré {n} problemas.",
     "fix": "Arreglar",
     "fixing": "Arreglando…",
+    "close_app": "Cerrar",
+    "speed_up": "Acelerar",
     "open": "Abrir",
     "again": "Revisar otra vez",
     "hint": "Si sigue fallando, reiniciar el equipo arregla casi todo."

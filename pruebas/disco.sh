@@ -111,6 +111,64 @@ probar "gestor: lo llama con su ruta de siempre" "grep -q 'DISCO=\"\${VORTEX_GES
 
 probar "se instala con los demás comandos" "grep -q 'vortex-disco' '$AQUI/install/30-escritorio.sh' && grep -q 'COMANDOS_VORTEX=.*vortex-disco' '$AQUI/bin/vortex'"
 
+# --- Salud del disco (4.0): lsblk, smartctl y notify-send falsos ---
+cat >"$T/bin/lsblk" <<F
+#!/bin/sh
+cat "$T/lsblk"
+F
+cat >"$T/bin/smartctl" <<F
+#!/bin/sh
+for ult; do :; done
+d="\${ult##*/}"
+[ -e "$T/smart-\$d.json" ] && cat "$T/smart-\$d.json"
+F
+chmod +x "$T/bin/lsblk" "$T/bin/smartctl"
+cat >"$T/lsblk" <<'F'
+NAME="sda" TYPE="disk" TRAN="sata" MODEL="Kingston SA400"
+NAME="nvme0n1" TYPE="disk" TRAN="nvme" MODEL="Samsung 980"
+NAME="sdb" TYPE="disk" TRAN="usb" MODEL="Pendrive"
+NAME="zram0" TYPE="disk" TRAN="" MODEL=""
+F
+export VORTEX_DISCO_UDISKSCTL=false
+ata() { # passed y sectores dañados
+  echo "{\"smart_status\":{\"passed\":$1},\"ata_smart_attributes\":{\"table\":[{\"id\":5,\"raw\":{\"value\":$2}},{\"id\":9,\"raw\":{\"value\":500}}]}}"
+}
+nvme() { # critical_warning, percentage_used, spare, spare_thr, media_errors
+  echo "{\"smart_status\":{\"passed\":true},\"nvme_smart_health_information_log\":{\"critical_warning\":$1,\"percentage_used\":$2,\"available_spare\":$3,\"available_spare_threshold\":$4,\"media_errors\":$5}}"
+}
+salud() { rm -f "$T/aviso"; "$VD" salud; }
+
+ata true 0 >"$T/smart-sda.json"; nvme 0 3 100 10 0 >"$T/smart-nvme0n1.json"
+probar "salud --ver: discos sanos, y salta el USB y el zram" "[[ \"\$('$VD' salud --ver)\" == \$'Kingston SA400: bien.\nSamsung 980: bien.' ]]"
+salud
+probar "discos sanos: no avisa" "[[ ! -e '$T/aviso' ]]"
+
+ata true 24 >"$T/smart-sda.json"
+salud
+probar "sectores dañados: aviso normal, en palabras normales" "grep -qx 'Tu disco «Kingston SA400» empieza a desgastarse' '$T/aviso' && grep -q 'Tiene 24 sectores dañados' '$T/aviso' && grep -qx normal '$T/aviso'"
+salud
+probar "no repite igual" "[[ ! -e '$T/aviso' ]]"
+ata true 30 >"$T/smart-sda.json"
+salud
+probar "si empeora, avisa otra vez" "[[ -e '$T/aviso' ]]"
+
+ata false 0 >"$T/smart-sda.json"
+salud
+probar "el disco dice que falla: aviso crítico que no se va solo" "grep -qx 'Tu disco «Kingston SA400» está fallando' '$T/aviso' && grep -qx critical '$T/aviso' && grep -qx 0 '$T/aviso' && grep -q 'Copia ya tus archivos' '$T/aviso'"
+
+ata true 0 >"$T/smart-sda.json"; nvme 0 93 100 10 2 >"$T/smart-nvme0n1.json"
+salud
+probar "NVMe gastado y con errores: lo dice" "grep -q 'Ya gastó el 93 % de su vida útil y registró 2 errores de memoria' '$T/aviso'"
+nvme 0 40 8 10 0 >"$T/smart-nvme0n1.json"
+salud
+probar "espacio de repuesto agotado: crítico" "grep -q 'Se le acabó el espacio de repuesto' '$T/aviso' && grep -qx critical '$T/aviso'"
+nvme 0 3 100 10 0 >"$T/smart-nvme0n1.json"
+salud
+probar "al sanar se olvida y avisaría de nuevo" "[[ ! -e '$T/estado/vortex/salud-disco-Samsung_980' ]]"
+rm -f "$T/smart-sda.json"
+probar "sin dato de un disco, no inventa" "[[ \"\$('$VD' salud --ver)\" == *'Kingston SA400: este disco no dice su salud.'* ]]"
+probar "el temporizador y el paquete están en vortex" "grep -q 'vortex-disco-salud.timer' '$AQUI/bin/vortex' && grep -q '^smartmontools' '$AQUI/iso/paquetes.txt'"
+
 echo
 if ((FALLOS)); then echo "Fallaron $FALLOS"; exit 1; fi
 echo "Todas las pruebas pasaron."

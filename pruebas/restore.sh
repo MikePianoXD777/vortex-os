@@ -16,7 +16,8 @@ H="$T/home"
 mkdir -p "$T/bin" "$H/.config/hypr" "$H/.config/serpantinum" "$H/.config/vortex/onedrive" \
   "$H/.config/vortex/respaldo-20261026-1" "$H/.local/state/serpantinum/widgets/DP-1" "$H/.config/kitty"
 printf '#!/bin/sh\necho "hyprctl $*" >>"%s/registro"\n' "$T" >"$T/bin/hyprctl"
-printf '#!/bin/sh\necho "vortex $*" >>"%s/registro"\n' "$T" >"$T/bin/vortex"
+# «vortex jugando» (4.0): no hay partida; todo lo demás se anota
+printf '#!/bin/sh\n[ "$1" = jugando ] && exit 1\necho "vortex $*" >>"%s/registro"\n' "$T" >"$T/bin/vortex"
 chmod +x "$T/bin/"*
 echo 'gaps = 7' >"$H/.config/hypr/hyprland.lua"
 echo '{"theme": "azul"}' >"$H/.config/serpantinum/settings.json"
