@@ -1,0 +1,44 @@
+# vortex-rust: los programas de Vortexine's OS ya reescritos en Rust (la 4.0 los va pasando uno por uno).
+# Se COMPILA aquí mismo desde rust/ de este repo; no se baja ningún binario ya hecho.
+#
+# Por ahora trae:
+#   - vortex-bt-agente: el agente de Bluetooth (~4,6 MB de RAM contra ~33 MB del de Python). El script de
+#     /usr/local/bin/vortex-bt-agente salta a este binario si existe, así el servicio no cambia.
+#
+#   cd packaging/vortex-rust && makepkg -si
+pkgname=vortex-rust
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (agente de Bluetooth)"
+arch=('x86_64')
+url='https://github.com/MikePianoXD777/vortex-os'
+license=('MIT')
+depends=('gcc-libs' 'glibc' 'dbus' 'libnotify')
+makedepends=('cargo')
+options=('!lto')
+
+_raiz() { echo "$startdir/../../rust"; }
+
+prepare() {
+    cd "$(_raiz)"
+    # El rust-toolchain.toml del repo pide una versión fija con rustup; aquí basta la estable del sistema.
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$(_raiz)"
+    export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
+    cargo build --release --frozen -p vortex-bt-agente
+}
+
+check() {
+    cd "$(_raiz)"
+    export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
+    command -v dbus-daemon >/dev/null || return 0
+    cargo test --release --frozen -p vortex-bt-agente
+}
+
+package() {
+    install -Dm755 "$srcdir/target/release/vortex-bt-agente" "$pkgdir/usr/lib/vortex/vortex-bt-agente"
+}

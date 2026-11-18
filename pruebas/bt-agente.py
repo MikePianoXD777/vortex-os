@@ -104,7 +104,7 @@ case "$*" in *"-A"*) printf '%s\\n' "$respuesta";; esac
         self.esperar(lambda: len(self.bluez.llamadas) >= 2)
 
     def arrancar_agente(self, path=None):
-        env = dict(os.environ, DBUS_SYSTEM_BUS_ADDRESS=self.direccion, PATH=path or f"{self.t}/bin:{os.environ['PATH']}")
+        env = dict(os.environ, VORTEX_BT_AGENTE_PYTHON="1", DBUS_SYSTEM_BUS_ADDRESS=self.direccion, PATH=path or f"{self.t}/bin:{os.environ['PATH']}")
         return subprocess.Popen([sys.executable, "-I", str(AGENTE)], env=env, stderr=subprocess.DEVNULL)
 
     def parar_agente(self):

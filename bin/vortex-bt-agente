@@ -10,6 +10,14 @@ aparato que se empareje sin que digas que sí podría hacerse pasar por un tecla
 """
 from __future__ import annotations
 
+import os
+
+# 4.0: si está el agente en Rust (paquete vortex-rust), se usa ese: hace lo mismo con ~5 MB en vez de ~33.
+# VORTEX_BT_AGENTE_PYTHON=1 obliga a usar este (para las pruebas o si el de Rust falla).
+_RUST = "/usr/lib/vortex/vortex-bt-agente"
+if not os.environ.get("VORTEX_BT_AGENTE_PYTHON") and os.access(_RUST, os.X_OK):
+    os.execv(_RUST, [_RUST])
+
 import html
 import re
 import shutil

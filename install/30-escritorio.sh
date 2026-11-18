@@ -115,6 +115,18 @@ else
   fi
   rm -rf "$VORTEX_DIR/packaging/vortex-task-manager/"{pkg,src} "$VORTEX_DIR/packaging/vortex-task-manager/"*.pkg.tar.*
 fi
+# 4.0: los programas ya reescritos en Rust (por ahora, el agente de Bluetooth). Si no compila, se queda
+# el de Python: nada se pierde.
+if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
+  run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-rust)"
+else
+  if (cd "$VORTEX_DIR/packaging/vortex-rust" && con_reintentos makepkg -sif --noconfirm); then
+    bien "Programas en Rust instalados (vortex-rust)"
+  else
+    aviso "No se pudieron compilar los programas en Rust (packaging/vortex-rust): se usan los de Python"
+  fi
+  rm -rf "$VORTEX_DIR/packaging/vortex-rust/"{pkg,src} "$VORTEX_DIR/packaging/vortex-rust/"*.pkg.tar.*
+fi
 # Vortexine Video (2.7): la cámara, como la de Windows.
 if [[ "$VORTEX_DRY_RUN" == 1 ]]; then
   run makepkg -sif --noconfirm "(en $VORTEX_DIR/packaging/vortex-video)"
