@@ -1,12 +1,12 @@
-# CI de Rust en Linux (activo en .github/workflows/rust-linux.yml).
+# CI de Rust en Linux. NO ESTÁ ACTIVO: para activarlo, Mike lo copia a .github/workflows/rust-linux.yml.
 name: Rust (Linux)
 
 on:
   pull_request:
-    paths: ["rust/**", ".github/workflows/rust-linux.yml"]
+    paths: ["rust/**"]
   push:
-    branches: [main, rust/paso-0]
-    paths: ["rust/**", ".github/workflows/rust-linux.yml"]
+    branches: [main]
+    paths: ["rust/**"]
   workflow_dispatch:
 
 permissions:
@@ -23,8 +23,8 @@ jobs:
       QT_QUICK_BACKEND: software
     steps:
       - uses: actions/checkout@v4
-      - name: Qt 6, C++, mpv y ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtquick-window g++ mpv ffmpeg
+      - name: Qt 6 y compilador de C++ (para vortex-core-qt)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtquick-window g++
       - name: Rust (la versión de rust-toolchain.toml)
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2

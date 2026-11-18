@@ -1,0 +1,29 @@
+[package]
+name = "vortex-task-manager-qt"
+description = "Vortexine Task Manager en Rust: la ventana (cxx-qt) sobre el motor vortex-task-manager"
+version = "1.0.2"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-task-manager.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[dev-dependencies]
+libc.workspace = true
+
+[[bin]]
+name = "vortex-task-manager-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true
