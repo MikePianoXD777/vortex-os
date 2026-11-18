@@ -14,15 +14,15 @@
     "overlay0": "#5c5c5c",
     "overlay1": "#7a7a7a",
     "overlay2": "#9a9a9a",
-    "blue": "#8a5cf5",
-    "sapphire": "#8a5cf5",
-    "peach": "#8a5cf5",
-    "green": "#8a5cf5",
+    "blue": "#ffffff",
+    "sapphire": "#ffffff",
+    "peach": "#ffffff",
+    "green": "#ffffff",
     "red": "#ef4b5c",
-    "mauve": "#8a5cf5",
-    "pink": "#8a5cf5",
-    "yellow": "#8a5cf5",
+    "mauve": "#ffffff",
+    "pink": "#ffffff",
+    "yellow": "#ffffff",
     "maroon": "#ef4b5c",
-    "teal": "#8a5cf5"
+    "teal": "#ffffff"
   }
 }
