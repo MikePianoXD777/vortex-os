@@ -189,7 +189,8 @@ fn var(nombre: &str, defecto: &str) -> String {
 fn memoria_por_defecto() -> String {
     use std::os::unix::fs::PermissionsExt;
     let rust = PathBuf::from(var("VORTEX_RUST_BIN", "/usr/lib/vortex")).join("vortex-memoria-rs");
-    let ejecutable = std::fs::metadata(&rust).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+    let ejecutable =
+        std::fs::metadata(&rust).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
     if ejecutable && std::env::var_os("VORTEX_MEMORIA_PYTHON").is_none_or(|v| v.is_empty()) {
         rust.to_string_lossy().into_owned()
     } else {
