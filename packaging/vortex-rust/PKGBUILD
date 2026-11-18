@@ -4,20 +4,26 @@
 # Por ahora trae:
 #   - vortex-bt-agente: el agente de Bluetooth (~4,6 MB de RAM contra ~33 MB del de Python). El script de
 #     /usr/local/bin/vortex-bt-agente salta a este binario si existe, así el servicio no cambia.
+#   - vortex-task-manager-rs, vortex-runner-rs y vortex-video-rs: las apps con ventana (cxx-qt, los mismos
+#     QML). Su lanzador de Python (/usr/bin/vortex-…) salta al de Rust si existe; con
+#     VORTEX_<APP>_PYTHON=1 se fuerza el de Python. Video usa los QML del paquete vortex-video.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=1
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (agente de Bluetooth)"
+pkgrel=2
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (agente de Bluetooth, Task Manager, Runner y Video)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
-depends=('gcc-libs' 'glibc' 'dbus' 'libnotify')
-makedepends=('cargo')
+depends=('gcc-libs' 'glibc' 'dbus' 'libnotify' 'qt6-base' 'qt6-declarative' 'qt6-svg')
+optdepends=('vortex-video: los QML y el reproductor de Vortex Video (qt6-multimedia)')
+makedepends=('cargo' 'qt6-base' 'qt6-declarative')
 options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
+_crates=(vortex-bt-agente vortex-task-manager-qt vortex-runner-qt vortex-video-qt)
+_paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
     cd "$(_raiz)"
@@ -29,7 +35,9 @@ prepare() {
 build() {
     cd "$(_raiz)"
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
-    cargo build --release --frozen -p vortex-bt-agente
+    # Dos a la vez: con más, cxx-qt se come la memoria de una PC chica.
+    # shellcheck disable=SC2046
+    CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" QMAKE="${QMAKE:-qmake6}" cargo build --release --frozen $(_paquetes)
 }
 
 check() {
@@ -40,5 +48,15 @@ check() {
 }
 
 package() {
-    install -Dm755 "$srcdir/target/release/vortex-bt-agente" "$pkgdir/usr/lib/vortex/vortex-bt-agente"
+    local r b="$srcdir/target/release" a
+    r="$(_raiz)"
+    install -Dm755 "$b/vortex-bt-agente" "$pkgdir/usr/lib/vortex/vortex-bt-agente"
+    for a in task-manager runner video; do
+        install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
+    done
+    # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).
+    install -d "$pkgdir/usr/share/vortex-task-manager/qml" "$pkgdir/usr/share/vortex-runner-rs/qml"
+    cp -r "$r/apps/vortex-task-manager/qml/." "$pkgdir/usr/share/vortex-task-manager/qml/"
+    cp -r "$r/apps/vortex-runner/qt/qml/." "$pkgdir/usr/share/vortex-runner-rs/qml/"
+    find "$pkgdir/usr/share" -type f -exec chmod 644 {} +
 }

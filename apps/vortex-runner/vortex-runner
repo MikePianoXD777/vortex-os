@@ -8,6 +8,14 @@
 #      «vortex runner instalar»).
 set -euo pipefail
 
+# 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: misma ventana, menos memoria.
+# VORTEX_RUNNER_PYTHON=1 obliga a usar la de Python.
+rust_bin="${VORTEX_RUST_BIN:-/usr/lib/vortex}/vortex-runner-rs"
+if [[ -z "${VORTEX_RUNNER_PYTHON:-}" && -x "$rust_bin" ]]; then
+  export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}" MALLOC_TRIM_THRESHOLD_="${MALLOC_TRIM_THRESHOLD_:-131072}"
+  exec "$rust_bin" "$@"
+fi
+
 aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 raiz=""
 for candidato in "${VORTEX_RUNNER_DIR:-}" "$aqui"; do
