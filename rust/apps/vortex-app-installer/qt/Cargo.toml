@@ -1,0 +1,29 @@
+[package]
+name = "vortex-app-installer-qt"
+description = "Vortexine's App Installer en Rust: la ventana (cxx-qt) sobre el motor vortex-app-installer"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-app-installer.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[bin]]
+name = "vortex-app-installer-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true

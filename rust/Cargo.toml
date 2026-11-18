@@ -18,6 +18,8 @@ members = [
     "apps/vortex-connect/qt",
     "apps/vortex-shared",
     "apps/vortex-shared/qt",
+    "apps/vortex-app-installer",
+    "apps/vortex-app-installer/qt",
 ]
 
 [workspace.package]
@@ -29,6 +31,7 @@ repository = "https://github.com/MikePianoXD777/vortex-os"
 
 [workspace.dependencies]
 vortex-core = { path = "crates/vortex-core" }
+vortex-app-installer = { path = "apps/vortex-app-installer" }
 rand = "0.9"
 regex = "1"
 rusqlite = { version = "0.34", features = ["bundled"] }
