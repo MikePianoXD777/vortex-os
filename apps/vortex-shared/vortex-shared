@@ -7,6 +7,20 @@
 #   3. /usr/share/vortex-shared, donde lo instala el paquete.
 set -euo pipefail
 
+# 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: misma ventana, menos memoria.
+# VORTEX_SHARED_PYTHON=1 obliga a usar la de Python.
+rust_bin="${VORTEX_RUST_BIN:-/usr/lib/vortex}/vortex-shared-rs"
+if [[ -z "${VORTEX_SHARED_PYTHON:-}" && -x "$rust_bin" ]]; then
+  export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}" MALLOC_TRIM_THRESHOLD_="${MALLOC_TRIM_THRESHOLD_:-131072}"
+  # Las órdenes sin ventana (el servicio «escuchar» que arranca el socket, enviar, recibir…) las
+  # atiende el motor, un binario sin Qt de ~3 MB.
+  case "${1:-}" in
+    escuchar | enviar | codigo | recibir | abrir-puerto | accion)
+      [[ -x "${rust_bin%-rs}-motor" ]] && exec "${rust_bin%-rs}-motor" "$@" ;;
+  esac
+  exec "$rust_bin" "$@"
+fi
+
 aqui="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 raiz=""
 for candidato in "${VORTEX_SHARED_DIR:-}" "$aqui" /usr/share/vortex-shared; do

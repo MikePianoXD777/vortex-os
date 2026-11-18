@@ -277,10 +277,10 @@ fn atender(e: &EstadoServidor, c: TcpStream) {
 /// Copia un programa falso a `destino/nombre` (ejecutable).
 pub fn instalar_falso(origen: &str, destino: &Path, nombre: &str) {
     std::fs::create_dir_all(destino).unwrap();
-    let d = destino.join(nombre);
-    std::fs::copy(aqui().join("falsos").join(origen), &d).unwrap();
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&d, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // Enlace, no copia: un archivo recién escrito puede dar «Text file busy» al ejecutarlo si otra
+    // prueba hace fork en ese momento (el hijo hereda el descriptor de escritura hasta su exec).
+    // El falso del repo ya es ejecutable y nunca se abre para escribir.
+    std::os::unix::fs::symlink(aqui().join("falsos").join(origen), destino.join(nombre)).unwrap();
 }
 
 /// Un PATH con un «flatpak» falso al principio y su carpeta de estado. HOME es la carpeta temporal.
@@ -352,21 +352,9 @@ pub fn avance() -> (Avances, impl Fn(i32, &str) + Sync + Clone) {
 
 /// Un `vortex` falso (para las apps propias): deja la carpeta como el de verdad, o falla si existe `fallar`.
 pub fn entorno_vortex_falso(t: &Path) -> Entorno {
+    // El falso es un archivo del repo y se enlaza (ver instalar_falso: así no da «Text file busy»).
+    instalar_falso("vortex_falso", t, "vortex");
     let falso = t.join("vortex");
-    std::fs::write(
-        &falso,
-        "#!/usr/bin/env bash\n\
-         echo \"$*\" >>\"$(dirname \"$0\")/llamadas\"\n\
-         d=\"$XDG_DATA_HOME/vortex-camera/vortex_camera\"\n\
-         case \"$2\" in\n\
-           instalar) [[ -e \"$(dirname \"$0\")/fallar\" ]] && { echo \"vortex camara: le falta: ffmpeg\" >&2; exit 2; }\n\
-                     mkdir -p \"$d\" && : >\"$d/__init__.py\" ;;\n\
-           quitar) rm -rf \"$XDG_DATA_HOME/vortex-camera\" ;;\n\
-         esac\n",
-    )
-    .unwrap();
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&falso, std::fs::Permissions::from_mode(0o755)).unwrap();
     Entorno::default()
         .con("VORTEX_SHOP_VORTEX", falso.as_os_str())
         .con("XDG_DATA_HOME", t.join("datos").as_os_str())

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+echo "$*" >>"$(dirname "$0")/llamadas"
+d="$XDG_DATA_HOME/vortex-camera/vortex_camera"
+case "$2" in
+instalar) [[ -e "$(dirname "$0")/fallar" ]] && { echo "vortex camara: le falta: ffmpeg" >&2; exit 2; }
+mkdir -p "$d" && : >"$d/__init__.py" ;;
+quitar) rm -rf "$XDG_DATA_HOME/vortex-camera" ;;
+esac

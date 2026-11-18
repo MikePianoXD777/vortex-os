@@ -4,15 +4,16 @@
 # Por ahora trae:
 #   - vortex-bt-agente: el agente de Bluetooth (~4,6 MB de RAM contra ~33 MB del de Python). El script de
 #     /usr/local/bin/vortex-bt-agente salta a este binario si existe, así el servicio no cambia.
-#   - vortex-task-manager-rs, vortex-runner-rs y vortex-video-rs: las apps con ventana (cxx-qt, los mismos
+#   - vortex-task-manager-rs, vortex-runner-rs, vortex-video-rs, vortex-shop-rs, vortex-app-installer-rs,
+#     vortex-connect-rs y vortex-shared-rs (+ vortex-shared-motor, el servicio sin Qt): las apps con ventana (cxx-qt, los mismos
 #     QML). Su lanzador de Python (/usr/bin/vortex-…) salta al de Rust si existe; con
 #     VORTEX_<APP>_PYTHON=1 se fuerza el de Python. Video usa los QML del paquete vortex-video.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=2
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (agente de Bluetooth, Task Manager, Runner y Video)"
+pkgrel=3
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -22,7 +23,8 @@ makedepends=('cargo' 'qt6-base' 'qt6-declarative')
 options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
-_crates=(vortex-bt-agente vortex-task-manager-qt vortex-runner-qt vortex-video-qt)
+_crates=(vortex-bt-agente vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
+         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -51,12 +53,17 @@ package() {
     local r b="$srcdir/target/release" a
     r="$(_raiz)"
     install -Dm755 "$b/vortex-bt-agente" "$pkgdir/usr/lib/vortex/vortex-bt-agente"
-    for a in task-manager runner video; do
+    install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
+    for a in task-manager runner video shop app-installer connect shared; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done
     # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).
     install -d "$pkgdir/usr/share/vortex-task-manager/qml" "$pkgdir/usr/share/vortex-runner-rs/qml"
     cp -r "$r/apps/vortex-task-manager/qml/." "$pkgdir/usr/share/vortex-task-manager/qml/"
     cp -r "$r/apps/vortex-runner/qt/qml/." "$pkgdir/usr/share/vortex-runner-rs/qml/"
+    for a in shop app-installer connect shared; do
+        install -d "$pkgdir/usr/share/vortex-$a-rs/qml"
+        cp -r "$r/apps/vortex-$a/qt/qml/." "$pkgdir/usr/share/vortex-$a-rs/qml/"
+    done
     find "$pkgdir/usr/share" -type f -exec chmod 644 {} +
 }
