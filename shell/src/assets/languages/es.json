@@ -1851,6 +1851,15 @@
       "system_name": "Sistema",
       "hibernate_error_title": "Hibernación no disponible",
       "hibernate_error_body": "La hibernación no está disponible en este sistema. Revisa la configuración de swap."
+    },
+    "tiles": {
+      "night_light": "Luz nocturna",
+      "caffeine": "Cafeína",
+      "wifi": "Wi-Fi",
+      "bluetooth": "Bluetooth",
+      "airplane": "Modo avión",
+      "on": "Encendido",
+      "off": "Apagado"
     }
   },
   "volumepopup": {

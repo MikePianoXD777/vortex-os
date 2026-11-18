@@ -1798,6 +1798,15 @@
       "system_name": "System",
       "hibernate_error_title": "Hibernation unavailable",
       "hibernate_error_body": "Hibernation is unavailable on this system. Please check your swap configuration."
+    },
+    "tiles": {
+      "night_light": "Night light",
+      "caffeine": "Caffeine",
+      "wifi": "Wi-Fi",
+      "bluetooth": "Bluetooth",
+      "airplane": "Airplane mode",
+      "on": "On",
+      "off": "Off"
     }
   },
   "volumepopup": {

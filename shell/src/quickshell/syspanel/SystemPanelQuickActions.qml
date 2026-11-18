@@ -25,6 +25,10 @@ Item {
         readonly property bool isHovered: qaMa.containsMouse
         property real customFontSize: 0
         property string customFontFamily: ""
+        // Vortex 4.0 (diseño nuevo, islas): fichas grandes con el ícono en un círculo, el nombre y el estado.
+        property string etiqueta: ""
+        property string estado: isActive ? I18n.t("syspanel.tiles.on", "On") : I18n.t("syspanel.tiles.off", "Off")
+        readonly property bool ficha: view.fichas
 
         property real togglePulse: 0.0
 
@@ -66,10 +70,49 @@ Item {
             NumberAnimation { duration: 250; easing.type: Easing.OutQuart }
         }
 
+        Rectangle {
+            id: qaCirculo
+            visible: qaBtn.ficha
+            anchors.left: parent.left
+            anchors.leftMargin: view.panel.s(10)
+            anchors.verticalCenter: parent.verticalCenter
+            width: view.panel.s(32)
+            height: width
+            radius: width / 2
+            color: qaBtn.isActive ? Qt.alpha(ThemeBackend.crust, 0.12) : ThemeBackend.surface1
+        }
+
+        Column {
+            visible: qaBtn.ficha
+            anchors.left: qaCirculo.right
+            anchors.leftMargin: view.panel.s(10)
+            anchors.right: parent.right
+            anchors.rightMargin: view.panel.s(8)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: view.panel.s(1)
+            Text {
+                width: parent.width
+                text: qaBtn.etiqueta
+                elide: Text.ElideRight
+                font.family: ThemeBackend.fontFamily
+                font.pixelSize: view.panel.s(12)
+                font.weight: Font.DemiBold
+                color: (qaBtn.isActive && !qaGlass.active) ? ThemeBackend.crust : ThemeBackend.text
+            }
+            Text {
+                width: parent.width
+                text: qaBtn.estado
+                elide: Text.ElideRight
+                font.family: ThemeBackend.fontFamily
+                font.pixelSize: view.panel.s(10)
+                color: (qaBtn.isActive && !qaGlass.active) ? Qt.alpha(ThemeBackend.crust, 0.7) : ThemeBackend.subtext0
+            }
+        }
+
         Text {
-            anchors.centerIn: parent
+            anchors.centerIn: qaBtn.ficha ? qaCirculo : parent
             font.family: qaBtn.customFontFamily !== "" ? qaBtn.customFontFamily : ThemeBackend.iconFont
-            font.pixelSize: qaBtn.customFontSize > 0 ? qaBtn.customFontSize : view.panel.s(18)
+            font.pixelSize: qaBtn.customFontSize > 0 ? qaBtn.customFontSize : view.panel.s(qaBtn.ficha ? 16 : 18)
             font.weight: qaBtn.customFontSize > 0 ? Font.Bold : Font.Normal
             color: (qaBtn.isActive && !qaGlass.active) ? ThemeBackend.crust : ((qaBtn.isActive || qaMa.containsMouse) ? ThemeBackend.text : ThemeBackend.subtext0)
             text: qaBtn.iconText
@@ -94,18 +137,24 @@ Item {
 
     id: view
     z: 5
+    readonly property bool fichas: ThemeBackend.barIslas
+    readonly property real altoFicha: view.panel.s(50)
+    readonly property real altoTotal: fichas ? altoFicha * 3 + view.panel.s(6) * 2 : view.panel.s(73)
     Layout.fillWidth: true
-    Layout.preferredHeight: view.panel.s(73)
-    Layout.maximumHeight: view.panel.s(73)
+    Layout.preferredHeight: altoTotal
+    Layout.maximumHeight: altoTotal
     opacity: view.panel.introQuickActions
     transform: Translate { x: (view.panel.isLeftAnchored ? -view.panel.rowSlideDistance : view.panel.rowSlideDistance) * (1.0 - view.panel.introQuickActions) }
 
-    RowLayout {
+    GridLayout {
         anchors.fill: parent
-        spacing: view.panel.s(6)
+        columns: view.fichas ? 2 : 5
+        rowSpacing: view.panel.s(6)
+        columnSpacing: view.panel.s(6)
 
         QuickActionBtn {
             id: nightLightBtn
+            etiqueta: I18n.t("syspanel.tiles.night_light", "Night light")
             iconText: "󰖔"
             activeColor: ThemeBackend.peach
 
@@ -186,6 +235,8 @@ Item {
 
         QuickActionBtn {
             id: coffeeBtn
+            etiqueta: I18n.t("syspanel.tiles.caffeine", "Caffeine")
+            estado: isActive ? remainingTimeString : I18n.t("syspanel.tiles.off", "Off")
             activeColor: Qt.tint(ThemeBackend.peach, "#5c3016")
 
             property double coffeeStartTime: 0
@@ -204,8 +255,8 @@ Item {
                 return Math.max(1, m) + "m";
             }
 
-            iconText: (isActive && isHovered) ? remainingTimeString : "󰅶"
-            customFontSize: (isActive && isHovered) ? view.panel.s(12) : 0
+            iconText: (isActive && isHovered && !ficha) ? remainingTimeString : "󰅶"
+            customFontSize: (isActive && isHovered && !ficha) ? view.panel.s(12) : 0
             customFontFamily: (isActive && isHovered) ? ThemeBackend.fontFamily : ""
 
             function updateRemaining() {
@@ -318,6 +369,7 @@ Item {
         }
 
         QuickActionBtn {
+            etiqueta: I18n.t("syspanel.tiles.wifi", "Wi-Fi")
             iconText: isActive ? "󰤨" : "󰤮"
             activeColor: ThemeBackend.blue
             isActive: view.panel.wifiRadioEnabled
@@ -332,6 +384,7 @@ Item {
         }
 
         QuickActionBtn {
+            etiqueta: I18n.t("syspanel.tiles.bluetooth", "Bluetooth")
             iconText: isActive ? "󰂯" : "󰂲"
             activeColor: ThemeBackend.mauve
             isActive: view.panel.btRadioEnabled
@@ -348,6 +401,8 @@ Item {
         }
 
         QuickActionBtn {
+            etiqueta: I18n.t("syspanel.tiles.airplane", "Airplane mode")
+            Layout.columnSpan: view.fichas ? 2 : 1
             iconText: "󰀝"
             activeColor: ThemeBackend.red
             isActive: !view.panel.wifiRadioEnabled && !view.panel.btRadioEnabled
