@@ -66,7 +66,8 @@ arbol() {
           while (n) { p = pila[n--]; print p; k = split(hijo[p], h, " "); for (i = 1; i <= k; i++) pila[++n] = h[i] } }'
 }
 
-kb_de() { local t=0 p; for p in "$@"; do t=$((t + $(awk '/^Rss:/{print $2}' "/proc/$p/smaps_rollup" 2>/dev/null || echo 0))); done; echo "$t"; }
+# Lo que es de la app (PSS: la memoria compartida se reparte, no se cuenta dos veces).
+kb_de() { local t=0 p; for p in "$@"; do t=$((t + $(awk '/^Pss:/{print $2}' "/proc/$p/smaps_rollup" 2>/dev/null || echo 0))); done; echo "$t"; }
 nombre_de() { local n; n="$(tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null | awk '{print $1}')"; n="${n##*/}"; echo "${n:-$(cat "/proc/$1/comm" 2>/dev/null)}"; }
 
 # TERM a todos, y KILL a los que sigan a los ESPERA_S segundos.
