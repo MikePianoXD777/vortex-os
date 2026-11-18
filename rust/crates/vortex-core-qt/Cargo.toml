@@ -1,22 +1,25 @@
-# El puente de vortex-core con QML (cxx-qt). TODAVÍA FUERA DEL WORKSPACE: sus crates no se han bajado
-# (ver README.md). Al meterlo a «members», estas versiones pasan a [workspace.dependencies].
 [package]
 name = "vortex-core-qt"
 description = "Los QObject de vortex-core para QML: la paleta en vivo (Colores) para Tema.qml"
 version = "0.1.0"
-edition = "2024"
-rust-version = "1.100"
-license = "MIT"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-vortex-core = { path = "../vortex-core" }
-cxx = "1"
-cxx-qt = "=0.10.0"
-cxx-qt-lib = { version = "=0.10.0", features = ["qt_gui", "qt_qml"] }
+vortex-core.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
 
 [build-dependencies]
-cxx-qt-build = { version = "=0.10.0", features = ["link_qt_object_files"] }
+cxx-qt-build.workspace = true
+
 
 [[bin]]
 name = "vortex-demo-tema"
 path = "src/bin/vortex-demo-tema.rs"
+
+[lints]
+workspace = true

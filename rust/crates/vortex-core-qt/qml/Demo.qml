@@ -13,6 +13,9 @@ Window {
     title: "Vortexine · demo de Tema (Rust + cxx-qt)"
     color: Tema.fondo
 
+    // grabToImage no incluye el color de la ventana: el fondo va en un rectángulo.
+    Rectangle { anchors.fill: parent; color: Tema.fondo }
+
     Column {
         anchors.centerIn: parent
         spacing: 16

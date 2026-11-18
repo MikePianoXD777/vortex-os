@@ -7,10 +7,10 @@ members = [
     "apps/vortex-player",
     "apps/vortex-local-ai",
     "apps/vortex-bt-agente",
+    "crates/vortex-core-qt",
+    "apps/vortex-video",
+    "apps/vortex-video/qt",
 ]
-# vortex-core-qt (el puente con QML, cxx-qt) entra a «members» en cuanto se bajen sus crates:
-# ver crates/vortex-core-qt/README.md.
-exclude = ["crates/vortex-core-qt"]
 
 [workspace.package]
 version = "0.1.0"
@@ -35,11 +35,14 @@ async-io = "2"
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await-macro"] }
 futures-channel = "0.3"
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
-# Mientras vortex-core-qt esté fuera del workspace, sus versiones viven en su propio Cargo.toml; al
-# meterlo, pasan aquí:  cxx = "1", cxx-qt = "=0.10.0", cxx-qt-lib = "=0.10.0", cxx-qt-build = "=0.10.0".
+vortex-video = { path = "apps/vortex-video" }
+cxx = "1"
+cxx-qt = "=0.10.0"
+cxx-qt-lib = { version = "=0.10.0", features = ["qt_gui", "qt_qml"] }
+cxx-qt-build = { version = "=0.10.0", features = ["link_qt_object_files"] }
 
 [workspace.lints.rust]
-unsafe_code = "deny"            # el único unsafe permitido es el que genera cxx-qt (en vortex-core-qt)
+unsafe_code = "deny"            # el único unsafe permitido es el que genera cxx-qt (con #![allow] en su módulo)
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
