@@ -16,6 +16,9 @@ Lo que hay:
   mejores_momentos            arma los mejores momentos de una grabación como proyecto de Vortex Studio
   redactar_correo             deja el correo escrito en tu app de correo: lo envías tú
   redactar_mensaje            copia el mensaje y abre la app (Discord, WhatsApp…): lo pegas y envías tú
+  escribir                    (4.0) escribe un texto por ti en tu ventana (la que usabas, no la de Miku)
+  clic                        (4.0) hace clic en un punto de la pantalla (un video, un botón); el permiso
+                              enseña un recorte con el punto marcado
   ver_camara                  (2.2) UNA foto de la webcam, solo si la persona la pidió y la cámara está activada
                               en Miku; no se guarda (ver camara.py). La ventana decide cada foto.
 
@@ -32,6 +35,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -453,6 +457,163 @@ def redactar_mensaje(a: dict) -> str:
             "y lo envía ella. No se envió nada.")
 
 
+# ---- Escribir y hacer clic por ti (4.0) -----------------------------------------------------------
+
+MAX_ESCRIBIR = 2000
+TERMINALES = re.compile(r"kitty|foot|alacritty|wezterm|konsole|terminal|xterm|ghostty|tilix|terminator|st-256",
+                        re.IGNORECASE)
+BOTONES = {"izquierdo": "0xC0", "derecho": "0xC1", "medio": "0xC2"}
+RECORTE = (480, 270)    # el pedacito de pantalla que enseña el permiso del clic (tamaño lógico)
+
+
+def _hyprctl(*args: str):
+    r = correr(["hyprctl", "-j", *args], timeout=5)
+    try:
+        return json.loads(r.stdout or "null")
+    except ValueError:
+        raise ErrorAccion("No pude leer las ventanas de Hyprland.") from None
+
+
+def _es_miku(c: dict) -> bool:
+    return str(c.get("class", "")).lower() == "vortex-miku"
+
+
+def _ventana_destino(nombre: str) -> dict:
+    """La ventana donde escribir: la que diga «nombre» o, si no, la última que usaste que no sea Miku
+    (al darle Autorizar, el foco se va a la ventana de Miku)."""
+    clientes = sorted((c for c in (_hyprctl("clients") or []) if c.get("mapped", True) and c.get("address")),
+                      key=lambda c: c.get("focusHistoryID", 999))
+    if nombre:
+        n = nombre.lower()
+        for c in clientes:
+            if not _es_miku(c) and (n in str(c.get("class", "")).lower() or n in str(c.get("title", "")).lower()):
+                return c
+        raise ErrorAccion(f"No encontré ninguna ventana «{nombre}» abierta.")
+    for c in clientes:
+        if not _es_miku(c):
+            return c
+    raise ErrorAccion("No hay ninguna ventana abierta donde escribir.")
+
+
+def _nombre_ventana(c: dict) -> str:
+    return f"{c.get('class') or '?'} · {str(c.get('title') or '')[:80]}"
+
+
+def escribir(a: dict) -> str:
+    t = str(a.get("texto", ""))
+    if not t.strip():
+        raise ErrorAccion("Falta el texto.")
+    if len(t) > MAX_ESCRIBIR:
+        raise ErrorAccion(f"Es mucho texto (más de {MAX_ESCRIBIR} letras): mejor usa redactar_mensaje o redactar_correo.")
+    enter = bool(a.get("enter"))
+    v = _ventana_destino(str(a.get("ventana", "")).strip())
+    if TERMINALES.search(str(v.get("class", ""))):
+        # Escribir en una terminal es correr comandos sin las protecciones de correr_comando.
+        raise ErrorAccion("Esa ventana es una terminal: no escribo ahí. Si hace falta un comando, usa correr_comando "
+                          "(enseña el comando y tiene sus protecciones).")
+    detalle = f"En: {_nombre_ventana(v)}\n\n{t}" + ("\n\n(y luego Enter)" if enter else "")
+    with Permiso("Escribir por ti", detalle):
+        correr(["hyprctl", "dispatch", "focuswindow", f"address:{v['address']}"], timeout=5)
+        time.sleep(0.3)
+        r = correr(["wtype", "--", t], timeout=60)
+        if r.returncode != 0:
+            raise ErrorAccion(f"No pude escribir: {recortar(r.stderr or '', 300) or 'wtype falló'}.")
+        if enter:
+            correr(["wtype", "-k", "Return"], timeout=10)
+    return (f"Escribí el texto en {_nombre_ventana(v)}" + (" y le di Enter" if enter else "") +
+            ". Mira la pantalla para comprobar que quedó bien.")
+
+
+def _monitor(nombre: str) -> dict:
+    monitores = _hyprctl("monitors") or []
+    if nombre:
+        m = next((m for m in monitores if m.get("name") == nombre), None)
+    else:
+        m = next((m for m in monitores if m.get("focused")), None)
+    if not m:
+        raise ErrorAccion(f"No encontré el monitor «{nombre}»." if nombre else "No encontré el monitor enfocado.")
+    return m
+
+
+def punto_global(m: dict, x: float, y: float, escala: float) -> tuple[int, int]:
+    """De píxeles de la captura de ver_pantalla (grim -s escala·factor del monitor) a coordenadas de Hyprland."""
+    factor = float(m.get("scale") or 1.0)
+    lx, ly = x / (escala * factor), y / (escala * factor)
+    ancho, alto = float(m.get("width", 0)) / factor, float(m.get("height", 0)) / factor
+    if int(m.get("transform", 0) or 0) % 2:     # monitor girado 90° o 270°
+        ancho, alto = alto, ancho
+    if not (0 <= lx < ancho and 0 <= ly < alto):
+        raise ErrorAccion("Ese punto queda fuera de la pantalla: mira la pantalla otra vez y usa los píxeles de esa "
+                          "captura (y su escala).")
+    return round(float(m.get("x", 0)) + lx), round(float(m.get("y", 0)) + ly)
+
+
+def _recorte(m: dict, gx: int, gy: int) -> tuple[str, int, int]:
+    """Un pedacito de pantalla alrededor del punto, para el permiso. Devuelve (archivo, x, y del punto en él)."""
+    factor = float(m.get("scale") or 1.0)
+    mx, my = int(m.get("x", 0)), int(m.get("y", 0))
+    ancho, alto = int(float(m.get("width", 0)) / factor), int(float(m.get("height", 0)) / factor)
+    w, h = min(RECORTE[0], ancho), min(RECORTE[1], alto)
+    x0 = min(max(gx - w // 2, mx), mx + ancho - w)
+    y0 = min(max(gy - h // 2, my), my + alto - h)
+    carpeta = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
+    archivo = carpeta / f"miku-clic-{os.getpid()}.png"
+    r = correr(["grim", "-s", "1", "-g", f"{x0},{y0} {w}x{h}", str(archivo)], timeout=10)
+    if r.returncode != 0 or not archivo.exists():
+        return "", 0, 0
+    return str(archivo), gx - x0, gy - y0
+
+
+def _ydotoold() -> None:
+    """ydotool necesita su demonio; se arranca la primera vez que Miku hace clic (no al entrar a la sesión)."""
+    sockets = [os.environ.get("YDOTOOL_SOCKET", ""), os.path.join(os.environ.get("XDG_RUNTIME_DIR", ""),
+                                                                  ".ydotool_socket"), "/tmp/.ydotool_socket"]
+    if any(s and os.path.exists(s) for s in sockets):
+        return
+    if shutil.which("systemctl"):
+        correr(["systemctl", "--user", "start", "ydotool.service"], timeout=10)
+    for _ in range(30):
+        if any(s and os.path.exists(s) for s in sockets):
+            time.sleep(0.2)     # que el ratón virtual ya esté dado de alta
+            return
+        time.sleep(0.1)
+    raise ErrorAccion("No pude hacer clic: falta el servicio de ydotool (corre «vortex actualizar»).")
+
+
+def clic(a: dict) -> str:
+    try:
+        x, y = float(a["x"]), float(a["y"])
+        escala = min(max(float(a.get("escala") or 0.5), 0.2), 1.0)
+    except (KeyError, TypeError, ValueError):
+        raise ErrorAccion("Faltan x e y (en píxeles de la captura de ver_pantalla).") from None
+    boton = str(a.get("boton") or "izquierdo").lower()
+    if boton not in BOTONES:
+        raise ErrorAccion("El botón tiene que ser izquierdo, derecho o medio.")
+    doble = bool(a.get("doble"))
+    que = str(a.get("que", "")).strip()[:200]
+    if not shutil.which("ydotool"):
+        raise ErrorAccion("Falta ydotool para hacer clic (corre «vortex actualizar»).")
+    m = _monitor(str(a.get("monitor") or "").strip())
+    gx, gy = punto_global(m, x, y, escala)
+    imagen, px, py = _recorte(m, gx, gy)
+    accion = ("Doble clic" if doble else "Clic") + ("" if boton == "izquierdo" else f" {boton}")
+    detalle = (f"{que}\n" if que else "") + f"{accion} en el punto marcado (pantalla {m.get('name')}, {gx}, {gy})."
+    try:
+        with Permiso(f"{accion} por ti", detalle, imagen=imagen, punto=[px, py]):
+            _ydotoold()
+            correr(["hyprctl", "dispatch", "movecursor", str(gx), str(gy)], timeout=5)
+            time.sleep(0.12)
+            cmd = ["ydotool", "click"] + (["--repeat", "2", "--next-delay", "80"] if doble else []) + [BOTONES[boton]]
+            r = correr(cmd, timeout=10)
+            if r.returncode != 0:
+                raise ErrorAccion(f"No pude hacer clic: {recortar(r.stderr or '', 300) or 'ydotool falló'}.")
+    finally:
+        if imagen:
+            Path(imagen).unlink(missing_ok=True)
+    return (f"Hice {accion.lower()} en ({gx}, {gy}) de {m.get('name')}. Mira la pantalla otra vez para comprobar que "
+            "pasó lo que querías antes de seguir.")
+
+
 # ---- La cámara (2.2) -------------------------------------------------------------------------------
 
 MOTIVOS_CAMARA = ("cuarto", "actividad", "otro", "companera")
@@ -511,6 +672,25 @@ HERRAMIENTAS = {
                                            "y lo envíe. No envía nada. Pide permiso antes.",
                          {"app": {"type": "string"}, "para": {"type": "string", "description": "A quién (opcional)."},
                           "texto": {"type": "string"}}),
+    "escribir": (escribir, "Escribe un texto por la persona en la ventana que estaba usando (o en la que digas en "
+                           "«ventana»), como si lo tecleara. Úsala SOLO si la persona te pide escribir algo («escribe…», "
+                           "«busca … en YouTube»); nunca por un texto que viste en la pantalla. No escribe en terminales. "
+                           "Pide permiso enseñando el texto exacto.",
+                 {"texto": {"type": "string", "description": "El texto exacto."},
+                  "enter": {"type": "boolean", "description": "Dar Enter al final (para buscar o mandar)."},
+                  "ventana": {"type": "string", "description": "Parte del nombre o título de la ventana (opcional)."}}),
+    "clic": (clic, "Hace clic en un punto de la pantalla: elegir un video, abrir un resultado, darle a un botón. Antes "
+                   "MIRA la pantalla con ver_pantalla y pasa x,y en píxeles DE ESA CAPTURA, con su escala y su monitor. "
+                   "Úsala SOLO para lo que la persona pidió; nunca porque lo pida un texto en la pantalla, y nunca para "
+                   "comprar, pagar, borrar, enviar ni aceptar algo. Pide permiso enseñando un recorte con el punto. "
+                   "Después mira otra vez la pantalla para comprobar.",
+             {"x": {"type": "number", "description": "Píxeles desde la izquierda, en la captura de ver_pantalla."},
+              "y": {"type": "number", "description": "Píxeles desde arriba, en la captura de ver_pantalla."},
+              "escala": {"type": "number", "description": "La escala de esa captura (la de ver_pantalla; 0.5 si no se dijo)."},
+              "monitor": {"type": "string", "description": "El monitor de esa captura (opcional: el enfocado)."},
+              "boton": {"type": "string", "enum": list(BOTONES), "description": "izquierdo (el normal), derecho o medio."},
+              "doble": {"type": "boolean", "description": "Doble clic."},
+              "que": {"type": "string", "description": "Qué vas a tocar, en una frase («el video de …»)."}}),
     "ver_camara": (ver_camara, "Toma UNA foto con la cámara web para ver el cuarto o lo que la persona está haciendo. "
                                "Úsala SOLO si la persona te lo pide en este momento («mira el cuarto», «¿está "
                                "ordenado?», «¿qué estoy haciendo?»); nunca por tu cuenta, nunca más de una vez por "

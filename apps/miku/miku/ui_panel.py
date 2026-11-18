@@ -6,7 +6,7 @@ Los colores siguen al fondo de pantalla (colores.py) y el tamaño a general.uiSc
 """
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
 
@@ -176,6 +176,8 @@ class PanelVoz(QWidget):
         self.respuesta.setWordWrap(True)
         self.respuesta.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.respuesta.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.vista = QLabel("")         # (4.0) el recorte de pantalla de un permiso de clic, con el punto
+        self.vista.hide()
         self.prep = QWidget()
         self.prep_titulo = QLabel("")
         self.prep_titulo.setWordWrap(True)
@@ -196,7 +198,7 @@ class PanelVoz(QWidget):
         lv = QVBoxLayout(contenido)
         lv.setContentsMargins(0, 0, self.px(4), 0)
         lv.setSpacing(self.px(2))
-        for w in (self.tu, self.respuesta, self.prep, self.botones):
+        for w in (self.tu, self.respuesta, self.vista, self.prep, self.botones):
             lv.addWidget(w)
         lv.addStretch(1)
         self.scroll = QScrollArea()
@@ -229,6 +231,7 @@ class PanelVoz(QWidget):
         a.usuario.connect(lambda t: (self.tu.setText(f"Tú: {t}"), self.respuesta.setText(""), self._tocada()))
         a.respuesta.connect(self._respuesta)
         a.aviso.connect(self._aviso)
+        a.vista.connect(self._vista)
         a.nivel.connect(self._nivel)
         a.progreso.connect(self._progreso)
         a.acciones.connect(self._acciones)
@@ -301,6 +304,30 @@ class PanelVoz(QWidget):
         self._aviso_activo = True
         self._estilo_respuesta(True)
         self.respuesta.setText(texto)
+
+    def _vista(self, ruta: str, x: int, y: int) -> None:
+        """Enseña dónde va a hacer clic Miku: el recorte con un círculo en el punto."""
+        imagen = QPixmap(ruta) if ruta else QPixmap()
+        if imagen.isNull():
+            self.vista.clear()
+            self.vista.hide()
+            return
+        ancho = self.px(ANCHO - 40)
+        f = ancho / imagen.width()
+        imagen = imagen.scaledToWidth(ancho, Qt.TransformationMode.SmoothTransformation)
+        p = QPainter(imagen)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        centro, r = QPointF(x * f, y * f), self.px(14)
+        for color, grueso in ((QColor(0, 0, 0, 200), self.px(5)), (QColor(255, 255, 255), self.px(2))):
+            p.setPen(QPen(color, grueso))
+            p.drawEllipse(centro, r, r)
+            p.drawLine(QPointF(centro.x() - r * 1.6, centro.y()), QPointF(centro.x() - r * 0.5, centro.y()))
+            p.drawLine(QPointF(centro.x() + r * 0.5, centro.y()), QPointF(centro.x() + r * 1.6, centro.y()))
+            p.drawLine(QPointF(centro.x(), centro.y() - r * 1.6), QPointF(centro.x(), centro.y() - r * 0.5))
+            p.drawLine(QPointF(centro.x(), centro.y() + r * 0.5), QPointF(centro.x(), centro.y() + r * 1.6))
+        p.end()
+        self.vista.setPixmap(imagen)
+        self.vista.show()
 
     def _nivel(self, v: float) -> None:
         self.mic.nivel = v

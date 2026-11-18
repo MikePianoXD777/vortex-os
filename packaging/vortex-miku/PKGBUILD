@@ -11,7 +11,7 @@
 #   cd packaging/vortex-miku && makepkg -si
 pkgname=vortex-miku
 pkgver=2.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Miku, la asistente de voz de Vortexine's OS: 3D, voz y oído locales, y Claude como cerebro (SUPER + O)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -23,7 +23,8 @@ license=('MIT')
 # las partidas y ffmpeg busca sus mejores momentos. ollama + ollama-vulkan son la IA local (sin cuenta): el
 # motor Vulkan sirve en NVIDIA, AMD e Intel y pesa ~5 MB (ollama-cuda y ollama-rocm, casi 1 GB cada uno).
 depends=('python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland' 'python-numpy' 'python-onnxruntime-cpu'
-         'whisper-cpp' 'pipewire' 'gpu-screen-recorder' 'ffmpeg' 'ollama' 'ollama-vulkan')
+         'whisper-cpp' 'pipewire' 'gpu-screen-recorder' 'ffmpeg' 'ollama' 'ollama-vulkan'
+         'wtype' 'ydotool' 'grim')   # 4.0: Miku escribe por ti (wtype) y hace clic (ydotool; grim, el recorte del permiso)
 optdepends=("claude-code: el cerebro de Miku (en Vortexine's se activa con «vortex claude activar»)"
             'libsecret: guarda la clave de ElevenLabs en el llavero (sin él, en un archivo 0600)')
 source=("three-0.180.0.tgz::https://registry.npmjs.org/three/-/three-0.180.0.tgz"
@@ -70,6 +71,11 @@ package() {
     install -Dm755 "$origen/vortex-miku" "$pkgdir/usr/bin/vortex-miku"
     # El ícono: la barra (íconos de los escritorios) lo busca por el app_id «vortex-miku».
     install -Dm644 "$origen/icono/vortex-miku.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-miku.svg"
+    # 4.0: el clic de Miku (ydotool) crea un ratón virtual en /dev/uinput. El paquete ydotool lo deja solo al grupo
+    # «input»; esto se lo da también a quien está sentado frente a la PC (como hace Steam con sus mandos).
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/udev/rules.d/71-vortex-miku-uinput.rules" <<'REGLA'
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess"
+REGLA
     # La IA local: Ollama para tu usuario (no arranca sola; la levanta Miku cuando la necesita).
     install -Dm644 "$origen/systemd/vortex-ollama.service" "$pkgdir/usr/lib/systemd/user/vortex-ollama.service"
 

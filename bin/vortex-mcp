@@ -150,7 +150,10 @@ def ver_pantalla(args: dict) -> list[dict]:
     avisar("Claude miró tu pantalla")
     return [
         {"type": "image", "data": base64.b64encode(imagen).decode(), "mimeType": "image/jpeg"},
-        texto(f"Captura al {int(escala * 100)} % de resolución."),
+        texto(f"Captura al {int(escala * 100)} % de resolución"
+              + (f" del monitor {monitor}" if monitor else "")
+              + f". Para hacer clic en algo de esta imagen (acción «clic» de Miku): x,y en píxeles de ESTA "
+                f"imagen, escala={round(escala, 4):g}" + (f", monitor={monitor}" if monitor else "") + "."),
     ]
 
 

@@ -275,8 +275,88 @@ def parte_asistente() -> None:
     probar("al cerrar a Miku se borra el socket", not Path(ruta).exists())
 
 
+def parte_escribir_clic() -> None:
+    """(4.0) escribir y clic: con hyprctl, wtype, ydotool, grim y systemctl falsos (nada toca la sesión)."""
+    tmp = Path(tempfile.mkdtemp(prefix="vortex-miku-clic."))
+    b = tmp / "bin"
+    b.mkdir()
+    (tmp / "run").mkdir()
+    log = tmp / "log"
+    clientes = json.dumps([
+        {"address": "0xmiku", "class": "vortex-miku", "title": "Miku", "focusHistoryID": 0, "mapped": True},
+        {"address": "0xff", "class": "firefox", "title": "YouTube", "focusHistoryID": 1, "mapped": True},
+        {"address": "0xkk", "class": "kitty", "title": "zsh", "focusHistoryID": 2, "mapped": True}])
+    # Dos monitores como los de Mike: el principal a la derecha, con escala 2.
+    monitores = json.dumps([
+        {"name": "DP-1", "x": 1920, "y": 0, "width": 3840, "height": 2160, "scale": 2, "focused": True, "transform": 0},
+        {"name": "HDMI-A-1", "x": 0, "y": 0, "width": 1920, "height": 1080, "scale": 1, "focused": False}])
+    (tmp / "clientes.json").write_text(clientes)
+    (tmp / "monitores.json").write_text(monitores)
+    programas = {
+        "hyprctl": f'case "$*" in "-j clients") cat {tmp}/clientes.json;; "-j monitors") cat {tmp}/monitores.json;; esac',
+        "wtype": "", "ydotool": "",
+        "grim": 'for a; do f="$a"; done; printf "PNG" > "$f"',
+        "systemctl": ': > "$XDG_RUNTIME_DIR/.ydotool_socket"',
+        "notify-send": "",
+    }
+    for prog, extra in programas.items():
+        (b / prog).write_text(f'#!/bin/sh\necho "{prog} $*" >> "$LOG"\n{extra}\n')
+        (b / prog).chmod(0o755)
+    boton = Boton(tmp / "autorizar.sock")
+    env = {"PATH": f"{b}:/usr/bin:/bin", "HOME": str(tmp), "LOG": str(log), "XDG_RUNTIME_DIR": str(tmp / "run"),
+           "VORTEX_MIKU_AUTORIZAR": str(boton.ruta)}
+
+    def leer_log():
+        return log.read_text() if log.exists() else ""
+
+    print("== Escribir y hacer clic (4.0)")
+    r = mcp(env, "escribir", {"texto": "lofi hip hop", "enter": True})
+    l = leer_log()
+    probar("escribe en la última ventana que no es Miku (Firefox)", "hyprctl dispatch focuswindow address:0xff" in l
+           and "wtype -- lofi hip hop" in l and "wtype -k Return" in l, l + r)
+    probar("el permiso enseña la ventana y el texto exacto", "firefox" in boton.pedidos[-1]["detalle"]
+           and "lofi hip hop" in boton.pedidos[-1]["detalle"], str(boton.pedidos[-1]))
+    n = len(boton.pedidos)
+    r = mcp(env, "escribir", {"texto": "rm -rf ~", "enter": True, "ventana": "kitty"})
+    probar("en una terminal no escribe (ni pide permiso)", "terminal" in r and len(boton.pedidos) == n
+           and "rm -rf" not in leer_log(), r)
+    boton.responder = False
+    log.unlink(missing_ok=True)
+    r = mcp(env, "escribir", {"texto": "hola"})
+    probar("escribir cancelado: no teclea nada", "NO lo autorizó" in r and "wtype" not in leer_log(), r)
+    boton.responder = True
+
+    log.unlink(missing_ok=True)
+    r = mcp(env, "clic", {"x": 800, "y": 300, "escala": 0.5, "que": "el primer video"})
+    l = leer_log()
+    # DP-1 con escala 2 y captura al 50 %: 800 px de la imagen = 800 lógicos → 1920 + 800 = 2720.
+    probar("el clic cae en el punto correcto del monitor con escala 2", "hyprctl dispatch movecursor 2720 300" in l
+           and "ydotool click 0xC0" in l, l + r)
+    probar("arranca ydotoold solo la primera vez que hace falta", "systemctl --user start ydotool.service" in l, l)
+    pedido = boton.pedidos[-1]
+    probar("el permiso trae el recorte y el punto dentro de él", str(pedido.get("imagen", "")).endswith(".png")
+           and pedido.get("punto") == [240, 135] and "el primer video" in pedido["detalle"], str(pedido))
+    probar("el recorte se borra al terminar", not Path(pedido.get("imagen", "x")).exists())
+    log.unlink(missing_ok=True)
+    r = mcp(env, "clic", {"x": 100, "y": 100, "escala": 0.5, "monitor": "HDMI-A-1", "boton": "derecho", "doble": True})
+    l = leer_log()
+    probar("doble clic derecho en el otro monitor", "movecursor 200 200" in l
+           and "ydotool click --repeat 2 --next-delay 80 0xC1" in l and "systemctl" not in l, l + r)
+    n = len(boton.pedidos)
+    r = mcp(env, "clic", {"x": 5000, "y": 100, "escala": 0.5})
+    probar("un punto fuera de la pantalla: no pide permiso ni hace clic", "fuera de la pantalla" in r
+           and len(boton.pedidos) == n, r)
+    boton.responder = False
+    log.unlink(missing_ok=True)
+    r = mcp(env, "clic", {"x": 10, "y": 10})
+    probar("clic cancelado: no mueve el ratón ni hace clic", "NO lo autorizó" in r
+           and "ydotool" not in leer_log() and "movecursor" not in leer_log(), r)
+    subprocess.run(["rm", "-rf", str(tmp)])
+
+
 def main() -> int:
     parte_mcp()
+    parte_escribir_clic()
     parte_web()
     parte_asistente()
     print("\nTodo bien" if not FALLOS else f"\nFALLARON {FALLOS} pruebas")

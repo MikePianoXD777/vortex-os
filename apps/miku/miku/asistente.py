@@ -100,6 +100,7 @@ class Asistente(QObject):
     usuario = Signal(str)               # lo que dijiste (o escribiste)
     respuesta = Signal(str, bool)       # texto de Miku hasta ahora, ¿ya terminó?
     aviso = Signal(str)                 # mensaje para la persona (qué falta, qué hacer)
+    vista = Signal(str, int, int)       # (4.0) el recorte de pantalla de un permiso de clic y el punto; "" = quitarlo
     nivel = Signal(float)               # volumen del micrófono mientras escucha, 0..1
     boca = Signal(object, int)          # (pista de visemas [[aa, ih, ou, ee, oh], ...], cuadros por segundo)
     boca_fin = Signal()
@@ -864,11 +865,26 @@ class Asistente(QObject):
             return
         self._cambiar_estado(PENSANDO, "Esperando tu permiso...")
         self.aviso.emit(f"¿Lo hago?  {titulo}\n\n{detalle}")
+        self._mostrar_vista(m)
         self._poner_acciones([["autorizar", "Autorizar"], ["autorizar_todo", "Autorizar todo"], ["cancelar", "Cancelar"]])
         self._decir("¿Me das permiso?")
         self._permiso_reloj.start()
 
+    def _mostrar_vista(self, m: dict) -> None:
+        """(4.0) El permiso de un clic trae un recorte de la pantalla con el punto: se enseña con el aviso.
+        Solo una imagen de la carpeta de la sesión (la deja acciones_mcp.py en $XDG_RUNTIME_DIR)."""
+        ruta, punto = str(m.get("imagen") or ""), m.get("punto") or [0, 0]
+        base = os.path.realpath(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
+        if (not ruta or not os.path.realpath(ruta).startswith(base + os.sep) or not ruta.endswith(".png")
+                or not os.path.isfile(ruta)):
+            return
+        try:
+            self.vista.emit(ruta, int(punto[0]), int(punto[1]))
+        except (TypeError, ValueError, IndexError):
+            pass
+
     def _responder_permiso(self, ok: bool, texto: str = "") -> None:
+        self.vista.emit("", 0, 0)
         s, self._permiso = self._permiso, None
         es_camara, self._permiso_camara = self._permiso_camara, False
         self._permiso_reloj.stop()
