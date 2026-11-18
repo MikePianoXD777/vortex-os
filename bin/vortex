@@ -29,6 +29,7 @@ ayuda() {
 Uso: vortex <comando>
 
   modo-juego on|off|alternar           apaga los efectos del escritorio mientras juegas
+  jugando                              sale con 0 si hay una partida o algo en pantalla completa (lo usan las tareas solas)
   modo-ia on|off|alternar|estado       el hermano del modo juego para la IA local: apaga los efectos y
                                        pausa el fondo animado (lo pone solo el gestor cuando Ollama,
                                        llama.cpp, ComfyUI o PyTorch usan la gráfica)
@@ -493,6 +494,23 @@ cmd_primer_inicio() {
   cmd_fondo
 }
 
+# 4.0: «no interrumpir partidas». Lo que corre solo (revisar actualizaciones, puntos de Restore, la salud del
+# disco) pregunta esto antes de empezar y, si hay una partida, se salta esa vuelta: no gasta red ni disco
+# mientras juegas. Es un comando y no un demonio: no queda nada corriendo.
+#   vortex jugando    sale con 0 si hay una partida (modo juego de esta sesión) o algo en pantalla completa
+partida_en_curso() {
+  local marca="$ESTADO/modo-juego" arranque
+  if [[ -e "$marca" ]]; then
+    # La marca de una sesión anterior (se cayó el equipo jugando) no cuenta: tiene que ser de este arranque.
+    arranque=$(($(date +%s) - $(cut -d. -f1 /proc/uptime)))
+    (($(stat -c %Y "$marca" 2>/dev/null || echo 0) >= arranque)) && return 0
+  fi
+  # Pantalla completa (un juego que el gestor no reconoció, un video): tampoco es momento de molestar.
+  hypr_corriendo || return 1
+  [[ "$(hypr activewindow -j 2>/dev/null | jq -r '.fullscreen // 0' 2>/dev/null)" =~ ^(0|false)?$ ]] && return 1
+  return 0
+}
+
 cmd_modo_juego() {
   local marca="$ESTADO/modo-juego"
   mkdir -p "$ESTADO"
@@ -529,6 +547,9 @@ cmd_modo_juego() {
           "$VORTEX_DIR/bin/vortex-clips" servicio >/dev/null 2>&1 </dev/null &
       fi
       notificar -t 2000 "Modo juego activado" "Efectos apagados mientras juegas"
+      # 4.0: con la partida en marcha los avisos normales no salen encima del juego (se guardan en el panel de
+      # avisos; solo los urgentes se muestran).
+      shell_ipc notificaciones jugando true >/dev/null 2>&1 || true
       ;;
     off)
       # Recargar devuelve todo a como estaba en la config.
@@ -545,6 +566,7 @@ cmd_modo_juego() {
         shell_ipc wallpaper setPlayback all play >/dev/null 2>&1 || true
       fi
       rm -f "$marca" "$marca.anterior" "$marca.fondo"
+      shell_ipc notificaciones jugando false >/dev/null 2>&1 || true
       # Vortex 2.0.2: deja de grabar clips y suelta su RAM (250-400 MB).
       "$VORTEX_DIR/bin/vortex-clips" detener 2>/dev/null || true
       # Vortex 1.10: el resumen de la partida (cuánto jugaste, FPS y temperaturas) en vez del aviso
@@ -1601,6 +1623,13 @@ espejos_cercanos() {
 
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
+    # 4.0: actualizar gasta red y disco; con un juego abierto lo notas en los FPS. Se pregunta (en la terminal).
+    if [[ -t 0 ]] && partida_en_curso; then
+      local r
+      echo "Estás jugando: actualizar ahora gasta internet y disco y puede bajarte los FPS."
+      read -r -p "¿Actualizo de todos modos? [s/N]: " r
+      [[ "${r,,}" == s* ]] || { echo "Está bien: actualiza cuando termines de jugar."; exit 0; }
+    fi
     if ! hay_internet; then
       echo
       echo "No hay internet (o no responde el DNS): no se actualizó nada."
@@ -2096,6 +2125,9 @@ cmd_actualizaciones() {
       ;;
     revisar)
       local pendientes huella anterior n_sis n_app vortex_nuevo cuerpo sonido=""
+      # 4.0: con una partida en curso no se revisa (ni red ni disco ni aviso encima del juego): se hace en
+      # la próxima vuelta del temporizador, 10 min después. A mano (--siempre) sí.
+      [[ "${2:-}" != --siempre ]] && partida_en_curso && return 0
       pendientes="$(avisos_pendientes | sort)"
       [[ -n "$pendientes" ]] || return 0
       # Solo se avisa una vez de lo mismo: si sale algo nuevo, otra vez.
@@ -2161,6 +2193,7 @@ cmd_configurar_usuario() {
 
 case "${1:-ayuda}" in
   modo-juego) shift; cmd_modo_juego "$@" ;;
+  jugando) partida_en_curso ;;
   modo-ia) shift; cmd_modo_ia "$@" ;;
   configurar-usuario) cmd_configurar_usuario ;;
   gestor) shift; cmd_gestor "$@" ;;

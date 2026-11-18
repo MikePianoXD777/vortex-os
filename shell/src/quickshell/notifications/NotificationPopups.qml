@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import Quickshell.Io
 import "../"
 import "../reusables"
 
@@ -25,7 +26,7 @@ PanelWindow {
         return false;
     }
 
-    visible: (!popupWindow.dndEnabled || popupWindow.hasCriticalPopup) && !NotificationManager.sysPanelOpen && NotificationManager.activePopupsModel.count > 0
+    visible: (!popupWindow.callado || popupWindow.hasCriticalPopup) && !NotificationManager.sysPanelOpen && NotificationManager.activePopupsModel.count > 0
 
     function storeNotif(uid, notif) {
         NotificationManager.liveNotifs[uid] = notif;
@@ -105,6 +106,29 @@ PanelWindow {
 
     mask: Region {
         item: popupContainer
+    }
+
+    // 4.0: mientras hay una partida los avisos normales no salen encima del juego (van al panel de avisos);
+    // solo los urgentes. «vortex modo-juego on/off» lo cambia por IPC (notificaciones jugando true|false).
+    property bool jugando: false
+    readonly property bool callado: dndEnabled || jugando
+
+    IpcHandler {
+        target: "notificaciones"
+
+        function jugando(estado: bool): void {
+            popupWindow.jugando = estado;
+        }
+    }
+
+    // Si el shell se reinició con una partida en marcha, se entera por la marca del modo juego.
+    Process {
+        id: marcaJuego
+        command: ["sh", "-c", "m=\"${XDG_STATE_HOME:-$HOME/.local/state}/vortex/modo-juego\"; [ -e \"$m\" ] && [ \"$(stat -c %Y \"$m\")\" -ge $(( $(date +%s) - $(cut -d. -f1 /proc/uptime) )) ]"]
+        running: true
+        onExited: function(exitCode, exitStatus) {
+            popupWindow.jugando = exitCode === 0;
+        }
     }
 
     property bool dndEnabled: {
@@ -203,7 +227,7 @@ PanelWindow {
                     id: delegateWrapper
                     width: ListView.view.width
 
-                    property bool isSuppressedByDnd: popupWindow.dndEnabled && model.urgency !== 2
+                    property bool isSuppressedByDnd: popupWindow.callado && model.urgency !== 2
 
                     implicitHeight: isSuppressedByDnd ? 0 : (typeLoader.item ? typeLoader.item.implicitHeight : popupWindow.s(70))
                     height: implicitHeight

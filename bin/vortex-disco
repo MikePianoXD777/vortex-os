@@ -204,6 +204,8 @@ avisar_salud() {
 
 salud() {
   local ver="$1" dev nombre datos veredicto nivel motivo marca firma
+  # 4.0: con una partida en curso no se lee el disco ni se avisa; el temporizador lo vuelve a intentar mañana.
+  ((ver)) || { command -v vortex >/dev/null && vortex jugando && return 0; }
   command -v jq >/dev/null || { ((ver)) && echo "Falta jq para leer la salud del disco." >&2; return 0; }
   while IFS=$'\t' read -r dev nombre; do
     [[ -n "$dev" ]] || continue
