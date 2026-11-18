@@ -1,1 +1,3 @@
 /target
+# Lo genera cxx-qt al compilar, con rutas de cada máquina
+.qmlls.ini
