@@ -77,3 +77,10 @@ rust/pruebas.sh        # cargo fmt --check, clippy -D warnings y cargo test, con
 Mismo escenario en las dos (dos programas, búsqueda, «Configurar», «Quitar», pregunta de un .exe): las 5
 capturas de 1180 × 780 son **idénticas píxel por píxel**, salvo 2378 píxeles de «Configurar»: el texto de la
 ruta del .exe (cada una corre en su carpeta temporal).
+
+## Rendimiento (ventana offscreen 30 s, release, 2 programas, backend de software)
+| | Python (PySide6) | Rust |
+|---|---|---|
+| RssAnon | ~41.7 MB | ~24.5 MB |
+| Rss (VmRSS = VmHWM) | ~118 MB | ~86 MB |
+| Hilos | 8 | 11 |
