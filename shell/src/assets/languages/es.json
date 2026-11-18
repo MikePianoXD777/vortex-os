@@ -1485,7 +1485,7 @@
       "locked": "Bloqueado",
       "access_denied": "Acceso denegado",
       "authenticating": "Autenticando...",
-      "enter_pin": "Introduce el PIN",
+      "enter_pin": "Contraseña",
       "too_many_attempts": "Demasiados intentos"
     },
     "fingerprint": {

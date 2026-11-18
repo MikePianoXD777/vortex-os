@@ -8,16 +8,20 @@ Item {
     required property var screenRoot
     property alias freezeWallpaperView: freezeWallpaperView
     property bool wallpaperSettled: false
+    readonly property bool solido: ThemeBackend.barIslas && !ThemeBackend.blurBackground
 
     anchors.fill: parent
 
     readonly property real wallpaperReveal: screenRoot.isPlayingIntro ? 1.0 : screenRoot.panelReveal
-    readonly property bool showFrozenDesktop: screenRoot.lockSettings.promptBackdropMode !== "wallpaper"
+    // Vortex: en el modo sólido no se usa la captura congelada del escritorio (sin desenfoque se veía tal cual,
+    // a veces con el aviso de Hyprland); el fondo es negro con el fondo de pantalla tenue.
+    readonly property bool showFrozenDesktop: !backdrop.solido && screenRoot.lockSettings.promptBackdropMode !== "wallpaper"
 
     Item {
         id: freezeBackdropLayer
         anchors.fill: parent
         z: 0
+        opacity: (backdrop.solido && !screenRoot.isPlayingIntro) ? 0.0 : 1.0
 
         Rectangle {
             anchors.fill: parent
@@ -131,23 +135,32 @@ Item {
         }
     }
 
+    // Vortex: base negra opaca debajo de todo, para que nunca se asome lo de atrás del bloqueo.
+    Rectangle {
+        anchors.fill: parent
+        z: -1
+        color: ThemeBackend.crust
+    }
+
     MultiEffect {
         id: blurEffect
         source: wallpaperContainer
         anchors.fill: parent
         z: 1
         autoPaddingEnabled: false
+        // Vortex (rediseño «Mezcla»): sin desenfoque de fábrica (todo sólido); si la persona activa el
+        // desenfoque o el liquid glass en Ajustes, el bloqueo vuelve a desenfocar como antes.
         blurEnabled: true
         blurMax: screenRoot.s(64)
         saturation: 0.25
         contrast: 0.06
         brightness: 0.02
-        blur: screenRoot.inputActive ? 1.0 : 0.72
+        blur: backdrop.solido ? 0.0 : (screenRoot.inputActive ? 1.0 : 0.72)
         Behavior on blur {
             enabled: !screenRoot.isPlayingIntro && !screenRoot.isUnlocking
             NumberAnimation { duration: 500; easing.type: Easing.OutCubic }
         }
-        opacity: backdrop.wallpaperReveal
+        opacity: backdrop.wallpaperReveal * (backdrop.solido ? 0.35 : 1.0)
         visible: opacity > 0.01
     }
 

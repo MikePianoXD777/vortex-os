@@ -28,7 +28,8 @@ Item {
         subTextColor: ThemeBackend.subtext0
         errorColor: ThemeBackend.red
         busyColor: ThemeBackend.peach
-        cornerRadius: ThemeBackend.borderRadius
+        // Vortex: en el diseño de islas, la contraseña es una píldora como la barra.
+        cornerRadius: ThemeBackend.barIslas ? height / 2 : ThemeBackend.borderRadius
         horizontalPadding: Scaler.s(12)
         fontFamily: ThemeBackend.fontFamily
         fontPixelSize: Scaler.s(14)
