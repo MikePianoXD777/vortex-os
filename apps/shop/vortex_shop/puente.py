@@ -19,9 +19,10 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from PySide6.QtCore import (Property, QObject, QRunnable, QThreadPool, QTimer,
-                            Signal, Slot)
+                            QUrl, Signal, Slot)
+from PySide6.QtGui import QDesktopServices
 
-from . import propias
+from . import android, propias
 
 # Lo que flatpak instala pero no es una app (runtimes, temas, extensiones): la tienda no lo muestra.
 _PREFIJOS_NO_APP = ("org.freedesktop.Platform", "org.freedesktop.Sdk", "org.gnome.Platform",
@@ -153,6 +154,7 @@ class Puente(QObject):
     categoriaCambio = Signal()
     busquedaCambio = Signal()
     detalleCambio = Signal()
+    androidCambio = Signal()     # juegos de Android (Waydroid): estado, preparación y lo instalado
     propiasCambio = Signal()     # las apps de Vortexine's (Vortexine's Camera…): si están y qué se hace
     aviso = Signal(str)          # mensaje en español para el aviso que se cierra
     mostrarVentana = Signal()    # otra instancia pidió traer esta ventana al frente
@@ -170,6 +172,8 @@ class Puente(QObject):
             "busquedaTexto": "", "busquedaApps": [], "busquedaEstado": "listo",
             "detalle": {}, "detalleEstado": "cargando",
             "propias": propias.lista(), "propiasEstados": {},
+            "androidEstado": {}, "androidApps": [], "androidFase": "", "androidPaso": "", "androidPct": 0,
+            "androidId": "", "androidCargado": False,
         }
         self._info: dict[str, dict] = {}          # fichas conocidas (id → dict), para listas locales
         self._ids_instaladas: list[str] = []
@@ -220,6 +224,14 @@ class Puente(QObject):
     detalleEstado = Property(str, lambda s: s._v["detalleEstado"], notify=detalleCambio)
     propias = Property("QVariant", lambda s: s._v["propias"], notify=propiasCambio)
     propiasEstados = Property("QVariant", lambda s: s._v["propiasEstados"], notify=propiasCambio)
+    androidEstado = Property("QVariant", lambda s: s._v["androidEstado"], notify=androidCambio)
+    androidApps = Property("QVariant", lambda s: s._v["androidApps"], notify=androidCambio)
+    androidFase = Property(str, lambda s: s._v["androidFase"], notify=androidCambio)   # «», «preparando», «abriendo»…
+    androidPaso = Property(str, lambda s: s._v["androidPaso"], notify=androidCambio)
+    androidPct = Property(int, lambda s: s._v["androidPct"], notify=androidCambio)
+    androidId = Property(str, lambda s: s._v["androidId"], notify=androidCambio)
+    androidCargado = Property(bool, lambda s: s._v["androidCargado"], notify=androidCambio)
+    androidPopulares = Property("QVariant", lambda s: android.POPULARES, constant=True)
 
     def _poner(self, senal: Signal, **valores: Any) -> None:
         self._v.update(valores)
@@ -254,7 +266,7 @@ class Puente(QObject):
             return "sinred", "Sin conexión a internet. Revisa tu red y vuelve a intentarlo."
         if isinstance(e, self._motor.errores.ErrorFlatpak):
             return "error", str(e) or "No se pudo completar la operación."
-        if isinstance(e, propias.ErrorPropia):
+        if isinstance(e, (propias.ErrorPropia, android.ErrorAndroid)):
             return "error", str(e)
         traceback.print_exception(type(e), e, e.__traceback__, file=sys.stderr)
         return "error", "Algo salió mal. Vuelve a intentarlo en un momento."
@@ -488,6 +500,87 @@ class Puente(QObject):
         QTimer.singleShot(4000, lambda: self._estado_propia(app_id, None) if self._v["propiasEstados"].get(app_id) == "abriendo" else None)
         self._lanzar(lambda: propias.abrir(app_id), None, lambda e: (self._estado_propia(app_id, None), self._avisar_error(e)))
 
+    # --- Juegos de Android (Waydroid, con «vortex-android») ---
+
+    @Slot()
+    def cargarAndroid(self) -> None:
+        """Al entrar a la página: si Android está listo y qué juegos hay. No prende Android."""
+        def leer() -> tuple[dict, list]:
+            est = android.estado()
+            return est, (android.apps() if est["preparado"] else [])
+
+        def listo(v: tuple[dict, list]) -> None:
+            self._poner(self.androidCambio, androidEstado=v[0], androidApps=v[1], androidCargado=True)
+
+        self._lanzar(leer, listo, lambda e: (self._poner(self.androidCambio, androidCargado=True), self._avisar_error(e)))
+
+    def _accion_android(self, fase: str, paso: str, funcion: Callable[[], Any], al_terminar: str = "",
+                        recargar: bool = False) -> None:
+        if self._v["androidFase"]:
+            return
+        self._poner(self.androidCambio, androidFase=fase, androidPaso=paso, androidPct=0)
+
+        def fin(_: Any) -> None:
+            self._poner(self.androidCambio, androidFase="", androidPaso="")
+            if al_terminar:
+                self.aviso.emit(al_terminar)
+            if recargar:
+                self.cargarAndroid()
+
+        def fallo(e: BaseException) -> None:
+            self._poner(self.androidCambio, androidFase="", androidPaso="")
+            self._avisar_error(e)
+            self.cargarAndroid()
+
+        self._lanzar(funcion, fin, fallo, cola=True)
+
+    @Slot()
+    def prepararAndroid(self) -> None:
+        senal = self._senales.progreso
+        self._accion_android("preparando", "Pidiendo permiso…",
+                             lambda: android.preparar(lambda pct, txt: senal.emit("android", pct, txt)),
+                             "Android quedó listo: busca un juego o abre la Play Store.", recargar=True)
+
+    @Slot(str)
+    def androidTienda(self, paquete: str) -> None:
+        self._accion_android("abriendo", "Abriendo la Play Store…", lambda: android.tienda(paquete), recargar=True)
+
+    @Slot(str)
+    def androidBuscar(self, texto: str) -> None:
+        if texto.strip():
+            self._accion_android("abriendo", "Buscando en la Play Store…", lambda: android.buscar(texto), recargar=True)
+
+    @Slot(str)
+    def androidAbrir(self, paquete: str) -> None:
+        self._accion_android("abriendo", "Abriendo el juego…", lambda: android.abrir(paquete), recargar=True)
+
+    @Slot(str, str)
+    def androidQuitar(self, paquete: str, nombre: str) -> None:
+        self._accion_android("quitando", f"Quitando {nombre}…", lambda: android.quitar(paquete),
+                             f"{nombre} se quitó.", recargar=True)
+
+    @Slot()
+    def androidPedirId(self) -> None:
+        def listo(numero: str) -> None:
+            self._poner(self.androidCambio, androidFase="", androidPaso="", androidId=numero)
+
+        if self._v["androidFase"]:
+            return
+        self._poner(self.androidCambio, androidFase="abriendo", androidPaso="Leyendo el número de Android…")
+        self._lanzar(android.id_google, listo,
+                     lambda e: (self._poner(self.androidCambio, androidFase="", androidPaso=""), self._avisar_error(e)),
+                     cola=True)
+
+    @Slot()
+    def androidAbrirRegistro(self) -> None:
+        QDesktopServices.openUrl(QUrl(android.URL_REGISTRO))
+
+    @Slot()
+    def androidYaRegistre(self) -> None:
+        self._accion_android("abriendo", "Guardando…", android.registrado,
+                             "Listo. Si la Play Store aún no te deja entrar, espera unos minutos y ábrela otra vez.",
+                             recargar=True)
+
     def _refrescar_instaladas(self) -> None:
         fl = self._motor.flatpak
 
@@ -617,6 +710,9 @@ class Puente(QObject):
 
     @Slot(str, int, str)
     def _al_progresar(self, app_id: str, pct: int, texto: str) -> None:
+        if app_id == "android":
+            self._poner(self.androidCambio, androidPct=max(0, min(100, pct)), androidPaso=texto)
+            return
         est = self._v["estados"].get(app_id)
         if not est or est["fase"] == "abriendo":
             return

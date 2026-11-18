@@ -29,7 +29,8 @@ ApplicationWindow {
         var pagina = nombre === "inicio" ? cInicio
                    : nombre === "categoria" ? cCategoria
                    : nombre === "busqueda" ? cBusqueda
-                   : nombre === "instaladas" ? cInstaladas : cActualizaciones
+                   : nombre === "instaladas" ? cInstaladas
+                   : nombre === "android" ? cAndroid : cActualizaciones
         if (nombre === "categoria")
             tienda.abrirCategoria(arg)
         if (nombre === "actualizaciones")
@@ -119,6 +120,7 @@ ApplicationWindow {
     Component { id: cDetalle; PaginaDetalle {} }
     Component { id: cInstaladas; PaginaInstaladas {} }
     Component { id: cActualizaciones; PaginaActualizaciones {} }
+    Component { id: cAndroid; PaginaAndroid {} }
 
     BarraLateral {
         id: lateral

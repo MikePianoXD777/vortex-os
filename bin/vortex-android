@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+# Juegos de Android en Vortexine's OS (4.0), con Waydroid: Android en un contenedor, con la Play Store.
+# Lo usa la sección «Juegos de Android» de Vortexine's Shop; también se puede usar a mano.
+#
+#   vortex-android estado              JSON: si está listo, si corre, si es NVIDIA, si falta registrar
+#   vortex-android preparar            la primera vez (pide tu contraseña una vez): instala Waydroid,
+#                                      baja Android con la Play Store y lo deja listo
+#   vortex-android iniciar             arranca Android (solo mientras lo usas)
+#   vortex-android tienda [PAQUETE]    abre la Play Store (en ese juego, si das su paquete)
+#   vortex-android buscar TEXTO        busca en la Play Store
+#   vortex-android abrir PAQUETE       abre un juego instalado
+#   vortex-android quitar PAQUETE      lo desinstala
+#   vortex-android apps                JSON con tus juegos y apps de Android
+#   vortex-android id-google           el número para registrar el «dispositivo» en Google
+#   vortex-android parar               apaga Android y suelta su memoria
+#
+# Para no gastar RAM: el contenedor de Waydroid no arranca con el sistema (gastaba ~25 MB sin usarse).
+# «iniciar» lo prende (una regla de polkit deja hacerlo sin contraseña) y un vigilante lo apaga solo
+# cuando cierras el último juego de Android (a los 3 minutos sin ventanas de Android).
+set -uo pipefail
+
+WAYDROID="${VORTEX_ANDROID_WAYDROID:-waydroid}"
+ESTADO_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/vortex/android"
+VAR=/var/lib/waydroid
+# waydroid_script (casualsnek, GPL-3.0) pone la traducción de ARM (libhoudini en Intel, libndk en AMD):
+# sin ella, la Play Store dice que casi todos los juegos «no son compatibles con tu dispositivo».
+SCRIPT_REPO=https://github.com/casualsnek/waydroid_script
+SCRIPT_COMMIT=${VORTEX_ANDROID_SCRIPT_COMMIT:-main}
+
+aviso() { printf 'vortex-android: %s\n' "$*" >&2; }
+json_txt() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+
+nvidia() { [[ -e /proc/driver/nvidia/version ]] || lspci -nn 2>/dev/null | grep -qiE '(vga|3d).*nvidia'; }
+intel_cpu() { grep -qm1 GenuineIntel /proc/cpuinfo; }
+preparado() { [[ -f "$VAR/images/system.img" && -f "$VAR/waydroid.cfg" ]]; }
+corriendo() { "$WAYDROID" status 2>/dev/null | grep -qE 'Session:\s*RUNNING'; }
+contenedor_activo() { systemctl is-active --quiet waydroid-container.service; }
+
+cmd_estado() {
+  local inst=false prep=false corr=false nv=false reg=false
+  command -v "$WAYDROID" >/dev/null && inst=true
+  preparado && prep=true
+  $inst && corriendo && corr=true
+  nvidia && nv=true
+  [[ -e "$ESTADO_DIR/registrado" ]] && reg=true
+  printf '{"instalado": %s, "preparado": %s, "corriendo": %s, "nvidia": %s, "registrado": %s}\n' \
+    "$inst" "$prep" "$corr" "$nv" "$reg"
+}
+
+# --- Preparar (como root, con pkexec) ---
+
+cmd_preparar() {
+  if [[ $EUID -ne 0 ]]; then
+    exec pkexec "$(readlink -f "$0")" preparar-root "$USER"
+  fi
+  aviso "usa «vortex-android preparar» (sin sudo)"; exit 1
+}
+
+cmd_preparar_root() {
+  local usuario="${1:-}"
+  [[ $EUID -eq 0 ]] || { aviso "esto corre como root"; exit 1; }
+  echo "PASO 1/5 Instalando Waydroid"
+  pacman -S --needed --noconfirm waydroid python-requests python-tqdm >/dev/null || { aviso "no pude instalar Waydroid"; exit 1; }
+  echo "PASO 2/5 Bajando Android con la Play Store (unos 1,2 GB)"
+  if [[ ! -f "$VAR/images/system.img" ]]; then
+    "$WAYDROID" init -s GAPPS || { aviso "no pude bajar Android"; exit 1; }
+  fi
+  echo "PASO 3/5 Ajustando la tarjeta de video"
+  # Con NVIDIA (driver propio) Waydroid no tiene aceleración: se dibuja por software (SwiftShader), si no,
+  # Android se queda en negro. Con AMD e Intel usa la GPU.
+  if nvidia; then
+    cfg_prop ro.hardware.gralloc default
+    cfg_prop ro.hardware.egl swiftshader
+  fi
+  # Ventanas sueltas: cada juego en su propia ventana (y así el vigilante sabe si queda alguno abierto).
+  cfg_prop persist.waydroid.multi_windows true
+  "$WAYDROID" upgrade --offline >/dev/null 2>&1 || true
+  echo "PASO 4/5 Traducción de juegos de celular (ARM)"
+  traduccion_arm || aviso "no pude poner la traducción de ARM: algunos juegos no saldrán en la Play Store"
+  echo "PASO 5/5 Últimos detalles"
+  # El contenedor solo cuando se usa: sin arrancar con el sistema, y los usuarios de la sesión lo pueden
+  # prender y apagar sin contraseña.
+  systemctl disable --now waydroid-container.service >/dev/null 2>&1 || true
+  install -Dm644 /dev/stdin /etc/polkit-1/rules.d/50-vortex-waydroid.rules <<'REGLA'
+// Vortexine's OS: «vortex-android iniciar/parar» prende y apaga el contenedor de Waydroid sin contraseña.
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "waydroid-container.service" &&
+        (action.lookup("verb") == "start" || action.lookup("verb") == "stop") &&
+        subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});
+REGLA
+  # «waydroid shell» (para el número de Google) pide root: solo ese comando, sin contraseña.
+  install -Dm644 /dev/stdin /etc/polkit-1/rules.d/51-vortex-waydroid-id.rules <<'REGLA'
+// Vortexine's OS: leer el número de registro de Google de Android (vortex-android id-google).
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/local/bin/vortex-android" &&
+        action.lookup("command_line").indexOf("id-google-root") !== -1 &&
+        subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});
+REGLA
+  [[ -n "$usuario" ]] && echo "LISTO"
+}
+
+cfg_prop() {
+  local clave="$1" valor="$2" cfg="$VAR/waydroid.cfg"
+  [[ -f "$cfg" ]] || return 0
+  grep -q '^\[properties\]' "$cfg" || printf '\n[properties]\n' >>"$cfg"
+  if grep -q "^$clave *=" "$cfg"; then
+    sed -i "s|^$clave *=.*|$clave = $valor|" "$cfg"
+  else
+    sed -i "/^\[properties\]/a $clave = $valor" "$cfg"
+  fi
+}
+
+traduccion_arm() {
+  local dir=/var/lib/vortex/waydroid_script cual
+  intel_cpu && cual=libhoudini || cual=libndk
+  if [[ ! -d "$dir/.git" ]]; then
+    rm -rf "$dir"; mkdir -p "$(dirname "$dir")"
+    git clone -q "$SCRIPT_REPO" "$dir" || return 1
+  fi
+  git -C "$dir" fetch -q origin && git -C "$dir" checkout -q "$SCRIPT_COMMIT" 2>/dev/null || true
+  # Sus dependencias van en un venv aparte (no se mezclan con las del sistema).
+  [[ -x "$dir/venv/bin/python" ]] || python3 -m venv "$dir/venv" || return 1
+  "$dir/venv/bin/pip" install -q -r "$dir/requirements.txt" || return 1
+  "$dir/venv/bin/python" "$dir/main.py" install "$cual"
+}
+
+# --- Usar ---
+
+cmd_iniciar() {
+  preparado || { aviso "primero: vortex-android preparar"; exit 1; }
+  contenedor_activo || systemctl start waydroid-container.service || { aviso "no pude prender el contenedor"; exit 1; }
+  if ! corriendo; then
+    setsid -f "$WAYDROID" session start >/dev/null 2>&1
+    for _ in $(seq 1 90); do corriendo && break; sleep 1; done
+    corriendo || { aviso "Android no arrancó"; exit 1; }
+  fi
+  mkdir -p "$ESTADO_DIR"
+  # Un solo vigilante.
+  if ! { [[ -f "$ESTADO_DIR/vigilante.pid" ]] && kill -0 "$(cat "$ESTADO_DIR/vigilante.pid")" 2>/dev/null; }; then
+    setsid -f "$(readlink -f "$0")" vigilar >/dev/null 2>&1
+  fi
+}
+
+# Apaga Android cuando no queda ninguna ventana suya por 3 minutos. Revisa cada 30 s, y solo mientras
+# Android está prendido.
+cmd_vigilar() {
+  mkdir -p "$ESTADO_DIR"
+  echo $$ >"$ESTADO_DIR/vigilante.pid"
+  local sin_ventanas=0
+  sleep 60
+  while corriendo; do
+    if hyprctl clients -j 2>/dev/null | grep -qiE '"class": *"(waydroid|Waydroid)'; then
+      sin_ventanas=0
+    else
+      sin_ventanas=$((sin_ventanas + 30))
+      ((sin_ventanas >= 180)) && { cmd_parar; break; }
+    fi
+    sleep 30
+  done
+  rm -f "$ESTADO_DIR/vigilante.pid"
+}
+
+cmd_parar() {
+  "$WAYDROID" session stop >/dev/null 2>&1 || true
+  systemctl stop waydroid-container.service >/dev/null 2>&1 || true
+}
+
+intent() { "$WAYDROID" app intent android.intent.action.VIEW "$1" >/dev/null; }
+
+cmd_tienda() {
+  local paquete="${1:-}"
+  cmd_iniciar || exit 1
+  if [[ -n "$paquete" ]]; then
+    [[ "$paquete" =~ ^[A-Za-z0-9_.]+$ ]] || { aviso "paquete inválido"; exit 1; }
+    intent "market://details?id=$paquete"
+  else
+    "$WAYDROID" app launch com.android.vending >/dev/null
+  fi
+}
+
+cmd_buscar() {
+  local texto="${*:-}"
+  [[ -n "$texto" ]] || { cmd_tienda; return; }
+  cmd_iniciar || exit 1
+  intent "market://search?q=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$texto")&c=apps"
+}
+
+cmd_abrir() {
+  local paquete="${1:?falta el paquete}"
+  [[ "$paquete" =~ ^[A-Za-z0-9_.]+$ ]] || { aviso "paquete inválido"; exit 1; }
+  cmd_iniciar || exit 1
+  "$WAYDROID" app launch "$paquete" >/dev/null
+}
+
+cmd_quitar() {
+  local paquete="${1:?falta el paquete}"
+  [[ "$paquete" =~ ^[A-Za-z0-9_.]+$ ]] || { aviso "paquete inválido"; exit 1; }
+  cmd_iniciar || exit 1
+  "$WAYDROID" app remove "$paquete" >/dev/null
+}
+
+# Las apps que instalaste (sin las de Android y Google que trae la imagen).
+cmd_apps() {
+  if ! corriendo; then
+    # Sin Android prendido: lo que Waydroid dejó en el lanzador (sus .desktop).
+    python3 - "${XDG_DATA_HOME:-$HOME/.local/share}/applications" <<'PY'
+import json, re, sys
+from pathlib import Path
+salida = []
+for f in sorted(Path(sys.argv[1]).glob("waydroid.*.desktop")):
+    paquete = f.name[len("waydroid."):-len(".desktop")]
+    nombre = next((l.split("=", 1)[1] for l in f.read_text(errors="ignore").splitlines() if l.startswith("Name=")), paquete)
+    icono = next((l.split("=", 1)[1] for l in f.read_text(errors="ignore").splitlines() if l.startswith("Icon=")), "")
+    salida.append({"paquete": paquete, "nombre": nombre, "icono": icono})
+SISTEMA = re.compile(r"^(com\.android\.|org\.lineageos\.|com\.google\.android\.(?!apps\.youtube)|org\.chromium\.|com\.android\.vending$)")
+print(json.dumps([a for a in salida if not SISTEMA.match(a["paquete"])], ensure_ascii=False))
+PY
+    return
+  fi
+  "$WAYDROID" app list 2>/dev/null | python3 -c '
+import json, re, sys
+apps, actual = [], {}
+for linea in sys.stdin:
+    linea = linea.strip()
+    if linea.startswith("Name:"):
+        if actual: apps.append(actual)
+        actual = {"nombre": linea[5:].strip()}
+    elif linea.startswith("packageName:"):
+        actual["paquete"] = linea[12:].strip()
+if actual: apps.append(actual)
+SISTEMA = re.compile(r"^(com\.android\.|org\.lineageos\.|com\.google\.android\.(?!apps\.youtube)|org\.chromium\.|com\.android\.vending$)")
+print(json.dumps([dict(a, icono="") for a in apps if a.get("paquete") and not SISTEMA.match(a["paquete"])], ensure_ascii=False))'
+}
+
+# El número de registro (GSF ID) que Google pide en https://www.google.com/android/uncertified para que
+# la Play Store funcione en un Android que no viene de fábrica en un teléfono.
+cmd_id_google() {
+  cmd_iniciar || exit 1
+  local id
+  id="$(pkexec "$(readlink -f "$0")" id-google-root 2>/dev/null)" || { aviso "no pude leer el número"; exit 1; }
+  [[ -n "$id" ]] || { aviso "Android todavía no tiene número: abre la Play Store una vez y vuelve a intentar"; exit 1; }
+  echo "$id"
+}
+
+cmd_id_google_root() {
+  [[ $EUID -eq 0 ]] || exit 1
+  "$WAYDROID" shell -- sh -c "sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select value from main where name = 'android_id';\"" 2>/dev/null | tr -dc '0-9'
+  echo
+}
+
+cmd_registrado() { mkdir -p "$ESTADO_DIR" && touch "$ESTADO_DIR/registrado"; }
+
+case "${1:-estado}" in
+  estado) cmd_estado ;;
+  preparar) cmd_preparar ;;
+  preparar-root) shift; cmd_preparar_root "$@" ;;
+  iniciar) cmd_iniciar ;;
+  vigilar) cmd_vigilar ;;
+  parar) cmd_parar ;;
+  tienda) shift; cmd_tienda "$@" ;;
+  buscar) shift; cmd_buscar "$@" ;;
+  abrir) shift; cmd_abrir "$@" ;;
+  quitar) shift; cmd_quitar "$@" ;;
+  apps) cmd_apps ;;
+  id-google) cmd_id_google ;;
+  id-google-root) cmd_id_google_root ;;
+  registrado) cmd_registrado ;;
+  -h | --help | ayuda) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) aviso "no conozco «$1» (vortex-android ayuda)"; exit 1 ;;
+esac

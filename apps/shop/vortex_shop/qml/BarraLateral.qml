@@ -1,4 +1,4 @@
-// Barra lateral: logo y nombre, Inicio, Categorías (las que dé el catálogo) y, abajo,
+// Barra lateral: logo y nombre, Inicio, Juegos de Android, Categorías (las que dé el catálogo) y, abajo,
 // Instaladas y Actualizaciones (con su contador).
 import QtQuick
 import QtQuick.Controls.Basic
@@ -54,9 +54,23 @@ Rectangle {
         onClicked: Nav.seccion("inicio", "")
     }
 
+    ItemLateral {
+        id: androidItem
+        anchors.top: inicio.bottom
+        anchors.topMargin: 2
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 12
+        anchors.rightMargin: 13
+        icono: "android"
+        texto: "Juegos de Android"
+        seleccionado: raiz.seccion === "android"
+        onClicked: Nav.seccion("android", "")
+    }
+
     Text {
         id: etiquetaCategorias
-        anchors.top: inicio.bottom
+        anchors.top: androidItem.bottom
         anchors.topMargin: 18
         x: 26
         text: "Categorías"
