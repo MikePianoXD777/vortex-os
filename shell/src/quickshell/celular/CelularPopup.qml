@@ -5,6 +5,8 @@ import Quickshell.Io
 import "../"
 import "../reusables"
 
+// Vortex 4.0: también sirve para una PC con Windows (KDE Connect para Windows, mismo protocolo): sale con su
+// ícono, sin «Hacer sonar», y cada aparato dice si el portapapeles se comparte solo (y se puede apagar).
 // Vortex 1.8: panel «Tu celular» (Super+Shift+P), con KDE Connect. Muestra los celulares (batería,
 // conectado o no) y sus acciones: vincular, hacerlo sonar, mandarle archivos o el portapapeles. Las
 // notificaciones del celular llegan solas al centro de notificaciones (las manda kdeconnectd). KDE
@@ -342,7 +344,7 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: window.s(10)
                                     Text {
-                                        text: tarjeta.d.tipo === "tablet" ? "󰓶" : "󰄜"
+                                        text: tarjeta.d.tipo === "tablet" ? "󰓶" : tarjeta.d.tipo === "laptop" ? "󰌢" : tarjeta.d.tipo === "desktop" ? "󰟀" : "󰄜"
                                         font.family: ThemeBackend.iconFont
                                         font.pixelSize: window.s(24)
                                         color: tarjeta.d.alcanzable ? ThemeBackend.green : ThemeBackend.overlay1
@@ -380,6 +382,18 @@ Item {
                                     }
                                 }
 
+                                // 4.0: lo que copias en uno se pega en el otro, sin hacer nada
+                                Text {
+                                    visible: tarjeta.d.vinculado && tarjeta.d.alcanzable
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: tarjeta.d.auto ? window.t("clip_on", "Clipboard shared: what you copy here can be pasted there, and the other way around.")
+                                                         : window.t("clip_off", "Clipboard not shared on its own: use \"Send clipboard\" when you need it.")
+                                    font.family: ThemeBackend.fontFamily
+                                    font.pixelSize: window.s(12)
+                                    color: tarjeta.d.auto ? ThemeBackend.green : ThemeBackend.subtext0
+                                }
+
                                 Flow {
                                     Layout.fillWidth: true
                                     spacing: window.s(6)
@@ -393,7 +407,7 @@ Item {
                                         onPulsado: window.accion("vincular", tarjeta.d.id)
                                     }
                                     Boton {
-                                        visible: tarjeta.d.vinculado && tarjeta.d.alcanzable
+                                        visible: tarjeta.d.vinculado && tarjeta.d.alcanzable && tarjeta.d.tipo !== "desktop" && tarjeta.d.tipo !== "laptop"
                                         icono: "󰂞"
                                         texto: window.t("ring", "Ring")
                                         onPulsado: window.accion("sonar", tarjeta.d.id)
@@ -409,6 +423,12 @@ Item {
                                         icono: "󰅍"
                                         texto: window.t("send_clipboard", "Send clipboard")
                                         onPulsado: window.accion("portapapeles", tarjeta.d.id)
+                                    }
+                                    Boton {
+                                        visible: tarjeta.d.vinculado && tarjeta.d.alcanzable
+                                        icono: "󰆏"
+                                        texto: tarjeta.d.auto ? window.t("clip_stop", "Stop sharing it") : window.t("clip_start", "Share it on its own")
+                                        onPulsado: window.accion("compartir", tarjeta.d.id)
                                     }
                                     Boton {
                                         visible: tarjeta.d.vinculado
