@@ -177,3 +177,4 @@ os-prober
 ckbcomp
 qrencode
 wtype
+ydotool

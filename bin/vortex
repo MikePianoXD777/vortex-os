@@ -1447,6 +1447,7 @@ PAQUETES_NUEVOS=(
   python-gobject # 2.8.1: vortex-bt-agente (emparejar por Bluetooth)
   cachyos-rate-mirrors # 2.9.2: espejos cercanos (espejos_cercanos)
   smartmontools # 4.0: vortex-disco salud (avisa si un disco empieza a fallar)
+  ydotool grim # 4.0: Miku hace clic por ti (con tu permiso) y enseña el punto en un recorte
 )
 paquetes_nuevos() {
   local p faltan=()
