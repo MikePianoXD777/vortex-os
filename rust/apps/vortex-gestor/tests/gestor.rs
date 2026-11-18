@@ -123,6 +123,14 @@ fn foco_scopes_nice_juego_presion_y_salida() {
     m.hypr
         .evento(&["openwindow>>ccc3,1,steam_app_570,Dota 2", "activewindowv2>>ccc3"]);
     esperar("el juego enfocado", || m.est("foco_pid=6001"));
+    esperar("el detector de tirones de Dota", || {
+        m.en_log("tirones-llamado", "steam_app_570")
+    });
+    assert!(
+        m.linea_exacta("tirones-llamado", "medir 6001 steam_app_570")
+            && m.linea_exacta("guardados-llamado", "antes steam_app_570 6001"),
+        "el juego abrió antes de enfocarse: los ayudantes esperan al foco y reciben su pid, no 0"
+    );
     assert!(
         m.linea_exacta("vortex.log", "modo-juego on"),
         "juego: vortex modo-juego on"
@@ -140,7 +148,10 @@ fn foco_scopes_nice_juego_presion_y_salida() {
         m.est("modo_juego=propio") && m.est("juegos=1")
     });
     esperar("la nota del juego", || m.en_log("aviso-juego", "steam_app_570"));
-    assert!(m.linea_exacta("aviso-juego", "--juego steam_app_570 0"));
+    assert!(
+        m.linea_exacta("aviso-juego", "--juego steam_app_570 6001"),
+        "el aviso de memoria del juego también recibe su pid (antes, 0)"
+    );
 
     // Presión de memoria: el shell suelta memoria y se comprime lo de fondo (no el juego).
     m.psi_memoria();

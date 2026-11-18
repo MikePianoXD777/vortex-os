@@ -292,6 +292,8 @@ SC_JUEGO="$CGR$RAIZ/app.slice/app-vortex-steam_app_570-6001.scope"
 activa 6001 ccc3 steam_app_570
 evento "openwindow>>ccc3,1,steam_app_570,Dota 2" "activewindowv2>>ccc3"
 esperar "grep -q '^foco_pid=6001' '$EST'"
+esperar "grep -q steam_app_570 '$T/tirones-llamado' 2>/dev/null"
+probar "el juego abrió antes de enfocarse: los ayudantes reciben su pid, no 0" "grep -qx 'medir 6001 steam_app_570' '$T/tirones-llamado' && grep -qx 'antes steam_app_570 6001' '$T/guardados-llamado'"
 probar "juego: vortex modo-juego on" "grep -qx 'modo-juego on' '$T/vortex.log'"
 probar "juego: fondo animado en pausa" "grep -q 'call wallpaper setPlayback all pause' '$T/qs.log'"
 probar "juego: su propio scope" "[[ -d '$SC_JUEGO' && \$(cat '$SC_JUEGO/cpu.weight') == 500 ]]"

@@ -631,9 +631,14 @@ fn leer_todo(r: &Rutas, cg: Option<&Path>) -> Lectura {
 }
 
 /// Lo que estuvo parado el juego entre dos lecturas. «full» (todo el juego esperando) es lo que se nota en
-/// pantalla; del sistema se toma el mayor de los dos, porque si el juego comparte cgroup (con Steam), su «full»
-/// puede no subir aunque el juego esté parado.
-fn diferencia(a: &Lectura, b: &Lectura, con_cg: bool) -> Paso {
+/// pantalla.
+/// - Con un cgroup **propio** (el scope `app-vortex-*` que le da el gestor, o el de su Flatpak) solo cuenta el
+///   suyo: el sistema puede estar ahogado mientras el gestor protege al juego, y eso no es un tirón (en la VM,
+///   18/11: 10 s de «full» en todo el sistema y 0 en el juego).
+/// - Si comparte cgroup (con Steam, por ejemplo), su «full» puede no subir aunque el juego esté parado: se toma
+///   el mayor entre el suyo y el del sistema.
+/// - Sin cgroup, el del sistema.
+fn diferencia(a: &Lectura, b: &Lectura, con_cg: bool, propio: bool) -> Paso {
     let d = |x: u64, y: u64| y.saturating_sub(x);
     let (cg_mem, cg_io, cg_cpu) = if con_cg {
         (
@@ -644,12 +649,24 @@ fn diferencia(a: &Lectura, b: &Lectura, con_cg: bool) -> Paso {
     } else {
         (0, 0, 0)
     };
+    let (sis_mem, sis_io) = if con_cg && propio {
+        (0, 0)
+    } else {
+        (d(a.sis_mem.full, b.sis_mem.full), d(a.sis_io.full, b.sis_io.full))
+    };
     Paso {
-        memoria: cg_mem.max(d(a.sis_mem.full, b.sis_mem.full)),
-        disco: cg_io.max(d(a.sis_io.full, b.sis_io.full)),
+        memoria: cg_mem.max(sis_mem),
+        disco: cg_io.max(sis_io),
         cpu: cg_cpu,
         swap: d(a.swap, b.swap),
     }
+}
+
+/// ¿Es un cgroup solo del juego? El scope que le da el gestor (`app-vortex-…`) o el de su Flatpak.
+fn es_propio(cg: &Path) -> bool {
+    cg.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("app-vortex-") || n.starts_with("app-flatpak-"))
 }
 
 /// El cgroup del juego, si tiene sus presiones (no la raíz).
@@ -727,7 +744,8 @@ pub fn medir(r: &Rutas, pid: u32, clase: &str) -> u8 {
             temp = temp_cpu(&r.hwmon);
         }
         let ahora_l = leer_todo(r, cg.as_deref());
-        let p = diferencia(&antes, &ahora_l, cg.is_some());
+        let propio = cg.as_deref().is_some_and(es_propio);
+        let p = diferencia(&antes, &ahora_l, cg.is_some(), propio);
         antes = ahora_l;
         det.paso(
             u64::try_from(reloj.elapsed().as_millis()).unwrap_or(u64::MAX),
@@ -988,6 +1006,41 @@ mod pruebas {
             ]
         );
         assert!(d.eventos[4].culpable.is_empty());
+    }
+
+    #[test]
+    fn el_sistema_ahogado_no_es_tiron_si_el_juego_tiene_su_cgroup() {
+        let psi = |full| Psi { some: full, full };
+        let a = Lectura::default();
+        let b = Lectura {
+            sis_mem: psi(200_000),
+            cg_mem: psi(0),
+            ..Lectura::default()
+        };
+        assert_eq!(
+            diferencia(&a, &b, true, true).memoria,
+            0,
+            "cgroup propio: solo el suyo"
+        );
+        assert_eq!(
+            diferencia(&a, &b, true, false).memoria,
+            200_000,
+            "cgroup compartido: el mayor"
+        );
+        assert_eq!(
+            diferencia(&a, &b, false, false).memoria,
+            200_000,
+            "sin cgroup: el del sistema"
+        );
+        let c = Lectura {
+            sis_mem: psi(200_000),
+            cg_mem: psi(90_000),
+            ..Lectura::default()
+        };
+        assert_eq!(diferencia(&a, &c, true, true).memoria, 90_000);
+        assert!(es_propio(Path::new("/x/app-vortex-steam_app_480-1.scope")));
+        assert!(es_propio(Path::new("/x/app-flatpak-org.vinegarhq.Sober-1.scope")));
+        assert!(!es_propio(Path::new("/x/app-hyprland-steam-1.scope")));
     }
 
     fn informe(eventos: Vec<Evento>) -> Informe {

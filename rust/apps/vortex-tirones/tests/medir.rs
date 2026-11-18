@@ -107,6 +107,23 @@ fn un_tiron_por_la_memoria_con_su_culpable() {
 }
 
 #[test]
+fn el_sistema_ahogado_no_cuenta_si_el_juego_estaba_bien() {
+    let (t, _cg) = preparar();
+    let r = t.path();
+    let mut hijo = medir(r);
+    esperar_candado(r);
+    // Todo el sistema 300 ms parado, pero el scope del juego (el gestor lo protege) en 0: no hubo tirón.
+    fs::write(r.join("proc/pressure/memory"), psi(300_000)).unwrap();
+    std::thread::sleep(Duration::from_millis(150));
+    let salida = orden(r, &["terminar", "--desde", "0"]).output().unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&salida.stdout),
+        "Sin tirones por la memoria, el disco o el procesador\n"
+    );
+    assert!(hijo.wait().unwrap().success());
+}
+
+#[test]
 fn termina_solo_cuando_se_cierra_el_juego_y_sin_tirones() {
     let (t, _cg) = preparar();
     let r = t.path();

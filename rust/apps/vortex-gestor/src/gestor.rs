@@ -113,6 +113,8 @@ pub struct Gestor {
     juego_pid: BTreeSet<u32>,
     /// dirección de la ventana de un juego → su pid
     juego_de: BTreeMap<String, u32>,
+    /// La clase del juego que abrió la partida mientras no se sabe su pid (ver `lanzar_ayudantes`).
+    ayudantes_pendientes: Option<String>,
     nice_orig: BTreeMap<String, i32>,
     nice_vistos: BTreeSet<String>,
     nice_raiz: Option<u32>,
@@ -168,6 +170,7 @@ impl Gestor {
             juego_cg: BTreeSet::new(),
             juego_pid: BTreeSet::new(),
             juego_de: BTreeMap::new(),
+            ayudantes_pendientes: None,
             nice_orig: BTreeMap::new(),
             nice_vistos: BTreeSet::new(),
             nice_raiz: None,
@@ -673,6 +676,23 @@ impl Gestor {
         if self.fondo("pause") {
             self.fondo_pausado = true;
         }
+        // Los ayudantes necesitan el pid del juego. Si la partida empezó por «openwindow», todavía no se sabe (llega
+        // con el foco, un instante después): esperan a ese foco. Antes se les pasaba 0 y medían a ciegas.
+        if pid > 1 {
+            self.lanzar_ayudantes(clase, pid);
+        } else {
+            self.ayudantes_pendientes = Some(clase.to_string());
+        }
+        // El modo juego manda: el modo IA se quita (después de poner el del juego, para que los efectos y el
+        // fondo no vuelvan entre uno y otro) y regresa callado cuando se cierre el juego.
+        if self.ia_activa {
+            self.ia_callado = true;
+            self.terminar_ia("abriste un juego: manda el modo juego");
+        }
+    }
+
+    /// Una vez por partida, con el pid del juego que la empezó.
+    fn lanzar_ayudantes(&mut self, clase: &str, pid: u32) {
         // 3.0: si al juego le queda poca memoria, ofrece cerrar lo que más gasta (lo decide vortex-memoria).
         let memoria = self.r.memoria.clone();
         self.l
@@ -685,16 +705,11 @@ impl Gestor {
         let tirones = self.r.tirones.clone();
         self.l
             .segundo_plano(&tirones, &["medir".into(), pid.to_string(), clase.into()]);
-        // El modo juego manda: el modo IA se quita (después de poner el del juego, para que los efectos y el
-        // fondo no vuelvan entre uno y otro) y regresa callado cuando se cierre el juego.
-        if self.ia_activa {
-            self.ia_callado = true;
-            self.terminar_ia("abriste un juego: manda el modo juego");
-        }
     }
 
     fn terminar_juego(&mut self) {
         log("ya no hay juegos abiertos: todo como estaba");
+        self.ayudantes_pendientes = None;
         // Solo se quita si lo puso el gestor y sigue puesto (con Super+G se pudo quitar antes).
         if self.modo_propio && self.r.marca_juego.exists() {
             let vortex = self.r.vortex.clone();
@@ -1056,6 +1071,11 @@ impl Gestor {
             if !dir.is_empty() {
                 self.juego_de.insert(dir.to_string(), pid);
                 self.agregar_juego(dir, clase);
+            }
+            if pid > 1
+                && let Some(c) = self.ayudantes_pendientes.take()
+            {
+                self.lanzar_ayudantes(&c, pid);
             }
         }
         // El primer foco llega después de las ventanas que ya estaban abiertas: si el gestor anterior dejó
