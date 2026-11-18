@@ -74,6 +74,19 @@ fn home() -> PathBuf {
     PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
 }
 
+/// Comprueba si un comando ejecutable existe en alguna carpeta del PATH.
+fn tiene_comando(cmd: &str) -> bool {
+    if let Some(path) = std::env::var_os("PATH") {
+        for p in std::env::split_paths(&path) {
+            let ruta = p.join(cmd);
+            if ruta.is_file() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 // ---------------------------------------------------------------------------------------------------
 // Pasos implementados.
 
@@ -231,9 +244,13 @@ fn ventanas() -> Vec<Value> {
 /// PASO 10. El nombre de la app como sale en el lanzador. Python: `nombre_de()`.
 fn nombre_de(clase: &str) -> String {
     let xdg_data_home = std::env::var("XDG_DATA_HOME")
-        .unwrap_or_else(|_| home().join(".local/share").to_string_lossy().into_owned());
-    let xdg_data_dirs =
-        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".to_string());
+        .ok()
+        .filter(|d| !d.is_empty())
+        .unwrap_or_else(|| home().join(".local/share").to_string_lossy().into_owned());
+    let xdg_data_dirs = std::env::var("XDG_DATA_DIRS")
+        .ok()
+        .filter(|d| !d.is_empty())
+        .unwrap_or_else(|| "/usr/local/share:/usr/share".to_string());
     let mut carpetas = vec![xdg_data_home];
     carpetas.extend(xdg_data_dirs.split(':').map(|s| s.to_string()));
     carpetas.push("/var/lib/flatpak/exports/share".to_string());
@@ -474,12 +491,7 @@ fn al_jugar(args: &[String]) -> i32 {
         return 0;
     }
 
-    if !std::process::Command::new("sh")
-        .args(["-c", "command -v notify-send"])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
+    if !tiene_comando("notify-send") {
         return 0;
     }
 
@@ -490,8 +502,10 @@ fn al_jugar(args: &[String]) -> i32 {
         format!("Cerrar las {}", apps.len())
     };
 
-    let accion = Command::new("notify-send")
+    let accion = Command::new("timeout")
         .args([
+            "120",
+            "notify-send",
             "-a",
             "Vortexine's OS",
             "-i",
@@ -529,17 +543,14 @@ fn avisar(ver: bool) -> i32 {
         return 0;
     }
 
-    if !std::process::Command::new("sh")
-        .args(["-c", "command -v notify-send"])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
+    if !tiene_comando("notify-send") {
         return 0;
     }
 
-    let mut cmd = Command::new("notify-send");
+    let mut cmd = Command::new("timeout");
     cmd.args([
+        "1800",
+        "notify-send",
         "-a",
         "Vortexine's OS",
         "-i",
