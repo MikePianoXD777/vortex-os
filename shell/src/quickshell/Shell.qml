@@ -88,9 +88,11 @@ ShellRoot {
     WellbeingLimitOverlay {}
     PopoutManager {}
 
+    // 4.0: con «source» el archivo ni se lee mientras esté apagado (de fábrica el dock y las acciones
+    // rápidas lo están); con «sourceComponent: Dock {}» se compilaba todo igual al arrancar.
     Loader {
         active: dockEnabled
-        sourceComponent: Dock {}
+        source: active ? Qt.resolvedUrl("dock/Dock.qml") : ""
     }
 
     Idle {}
@@ -108,7 +110,7 @@ ShellRoot {
     }
     Loader {
         active: !performanceMode && quickactionsEnabled && !perfilBajo
-        sourceComponent: Floating {}
+        source: active ? Qt.resolvedUrl("quickactions/Floating.qml") : ""
     }
 
     // Vortex 1.8: modo laptop. Al desenchufar o enchufar la laptop, «vortex bateria on|off» (bin/vortex):

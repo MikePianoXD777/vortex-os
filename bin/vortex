@@ -377,9 +377,12 @@ cmd_fondos_auto() {
       exec 9>"${XDG_RUNTIME_DIR:-/tmp}/vortex-fondos-auto.lock"
       flock -n 9 || exit 0
       local pasados=0 m
+      # 4.0: si están apagados (lo de fábrica) no se queda nadie esperando: antes era un bash vivo
+      # toda la sesión (4–6 MB) que despertaba cada minuto. Ajustes lo vuelve a arrancar al prenderlos.
+      (($(minutos_fondos) > 0)) || exit 0
       while sleep 60; do
         m="$(minutos_fondos)"
-        if ((m <= 0)); then pasados=0; continue; fi
+        ((m > 0)) || exit 0
         ((++pasados >= m)) || continue
         pasados=0
         cambiar_fondo_al_azar
@@ -1988,7 +1991,9 @@ avisos_pendientes() {
     mkdir -p "$AVISOS_ESTADO"
     {
       if command -v checkupdates >/dev/null; then
-        checkupdates 2>/dev/null | awk '{print "sistema " $1}'
+        # 4.0: su copia de las bases de pacman va a ~/.cache y no a /tmp, que es RAM (tmpfs): eran
+        # ~15 MB ocupados toda la sesión. Es caché: si se borra, la vuelve a armar.
+        CHECKUPDATES_DB="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/checkup-db" checkupdates 2>/dev/null | awk '{print "sistema " $1}'
       fi
       if command -v flatpak >/dev/null; then
         flatpak remote-ls --updates --user --columns=application 2>/dev/null | sed 's/^/app /'

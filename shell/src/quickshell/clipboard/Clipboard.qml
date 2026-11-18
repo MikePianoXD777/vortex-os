@@ -148,20 +148,20 @@ PanelWindow {
         id: clipBoxModel
     }
 
-    Process {
+    // 4.0: en vez de otro «wl-paste --watch» vivo toda la sesión (ya hay uno de texto y otro de imagen que
+    // guardan en cliphist), se vigila el archivo del historial: cambia justo cuando cliphist guarda algo.
+    // preload: false y sin reload(): solo importa el aviso de cambio, no se lee el archivo.
+    FileView {
         id: clipWatcher
-        running: true
-        // Vortex: wl-paste directo, con setpriv --pdeathsig para que muera si el shell
-        // muere de golpe. Antes un sh lo cuidaba con un bucle «sleep 1» (un proceso
-        // residente más y un fork por segundo para siempre).
-        command: ["setpriv", "--pdeathsig", "TERM", "wl-paste", "--watch", "echo", "1"]
-        stdout: SplitParser {
-            onRead: (data) => {
-                if (clipboardWindow.isVisible) {
-                    clipWatchDebounce.restart();
-                } else {
-                    clipboardWindow.isDirty = true;
-                }
+        printErrors: false
+        preload: false
+        watchChanges: true
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/cliphist/db"
+        onFileChanged: {
+            if (clipboardWindow.isVisible) {
+                clipWatchDebounce.restart();
+            } else {
+                clipboardWindow.isDirty = true;
             }
         }
     }

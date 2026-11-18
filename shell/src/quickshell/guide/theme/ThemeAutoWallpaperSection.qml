@@ -63,6 +63,9 @@ SettingsBlob {
                 a.minutes = section.opciones[index] || 0;
                 Config.setSetting("autoWallpaper", a);
                 section.rev++;
+                // 4.0: el que cambia el fondo solo corre mientras esté prendido (tiene su candado: si
+                // ya corre, el nuevo sale solo).
+                if (a.minutes > 0) Quickshell.execDetached(["vortex", "fondos-auto", "correr"]);
             }
         }
     }

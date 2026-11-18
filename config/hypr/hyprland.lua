@@ -65,7 +65,9 @@ local function comando_shell()
     -- glibc y aquí no hacen nada.)
     -- 2.9.1: Qt ya no despierta los portales al arrancar el shell (siguen levantándose cuando una app los
     -- pide). Solo aquí: las apps no lo heredan.
-    local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0'"
+    -- 4.0: narenas:2. jemalloc hacía 4 arenas por núcleo (64 en un i7 de 16 hilos) y cada una guarda sus
+    -- bloques a medio llenar; con el caché por hilo, 2 arenas no agregan esperas.
+    local memoria = "MALLOC_CONF='background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0,narenas:2'"
         .. " QT_NO_XDG_DESKTOP_PORTAL=1"
     -- 3.5.2: con NVIDIA, el driver pierde un poco de memoria por cada cuadro que el shell presenta con
     -- «explicit sync» (libnvidia-eglcore; ~1 KB por cuadro): con el fondo animado y el visualizador
@@ -99,7 +101,8 @@ require("config/env")
 hl.env = env_original
 -- No se carga config/autostart: activa EasyEffects en cada inicio de sesión.
 hl.on("hyprland.start", function()
-    hl.exec_cmd("wl-paste --type text --watch cliphist store")
+    -- 4.0: el texto lo guarda en cliphist vortex-enlace (un solo escucha de texto); si falta, el de siempre.
+    hl.exec_cmd("command -v vortex-enlace >/dev/null || exec wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd(comando_shell())
     -- Primer inicio: pone el primer fondo de Vortex si todavía no hay ninguno.
@@ -210,7 +213,9 @@ if diseno_solido then
             gaps_in = 6, gaps_out = 12, border_size = 1,
             col = { active_border = "rgba(ffffffd9)", inactive_border = "rgba(2a2a2aff)" },
         },
-        decoration = { rounding = 20, shadow = { enabled = false } },
+        -- Sin desenfoque: en el diseño sólido nada lo usa, y Hyprland igual guardaba el fondo desenfocado
+        -- (~8 MB y trabajo de GPU). Si la persona prende desenfoque o liquid glass, diseno_solido es falso.
+        decoration = { rounding = 20, shadow = { enabled = false }, blur = { enabled = false } },
     })
 else
     hl.window_rule({ match = { fullscreen = false }, opacity = "0.95 override" })

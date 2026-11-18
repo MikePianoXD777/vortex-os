@@ -5,7 +5,7 @@ Videos (mp4, hasta 1080p) o de Música (mp3 con portada y datos), con su avance 
 No avisa en modo juego ni dos veces por el mismo enlace. Lo arranca Hyprland al entrar (y vortex actualizar).
 
   vortex-enlace                     escucha el portapapeles (wl-paste --watch); si ya escucha, sale
-  vortex-enlace revisar             lee lo copiado de la entrada y, si es un video, ofrece bajarlo
+  vortex-enlace revisar             guarda lo copiado en cliphist y, si es un video, ofrece bajarlo
   vortex-enlace bajar video|audio URL
 """
 from __future__ import annotations
@@ -90,7 +90,16 @@ def escuchar() -> None:
 
 
 def revisar() -> None:
-    texto = sys.stdin.read(4096)
+    datos = sys.stdin.buffer.read()
+    # 4.0: este mismo escucha guarda el texto en el historial del portapapeles (antes había otro
+    # «wl-paste --watch cliphist store» solo para eso). cliphist respeta CLIPBOARD_STATE (lo que un
+    # gestor de contraseñas marca como sensible), que llega por el entorno.
+    try:
+        subprocess.run(["cliphist", "store"], input=datos, timeout=10, check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    texto = datos[:4096].decode("utf-8", "ignore")
     nombre = sitio(texto)
     if not nombre or jugando():
         return
