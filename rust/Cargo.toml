@@ -17,6 +17,7 @@ members = [
     "apps/vortex-runner",
     "apps/vortex-runner/qt",
     "apps/vortex-enlace",
+    "apps/vortex-memoria",
     "apps/vortex-connect",
     "apps/vortex-connect/qt",
     "apps/vortex-shared",
