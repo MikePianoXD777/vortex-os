@@ -288,8 +288,31 @@ fn bajar(tipo: &str, url: &str) {
             .unwrap_or(0)
     );
     let final_path = std::env::temp_dir().join(temp_nombre);
-    if let Ok(f) = std::fs::File::create(&final_path) {
-        drop(f);
+    // (Claude) create_new: si ya existe algo con ese nombre (otro usuario de la PC pudo dejar ahí un enlace
+    // a otro archivo), no lo abre; y 0o600, que nadie más lo lea. Es lo que hace mkstemp en el Python.
+    if OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&final_path)
+        .is_err()
+    {
+        aviso(
+            &format!(
+                "No se pudo bajar {}",
+                if tipo == "audio" {
+                    "la canción"
+                } else {
+                    "el video"
+                }
+            ),
+            "No pude crear un archivo temporal.",
+            &[],
+            "",
+            None,
+            0,
+        );
+        return;
     }
 
     let final_str = final_path.to_string_lossy();
@@ -514,7 +537,9 @@ fn main() {
         ["bajar", tipo @ ("video" | "audio"), url] => bajar(tipo, url),
         ["sitio", url] => println!("{}", sitio(url).unwrap_or("None")),
         _ => {
-            eprintln!("uso: vortex-enlace-rs [revisar | ofrecer SITIO URL | bajar video|audio URL]");
+            eprintln!(
+                "uso: vortex-enlace-rs [revisar | ofrecer SITIO URL | bajar video|audio URL | sitio URL]"
+            );
             std::process::exit(2);
         }
     }
