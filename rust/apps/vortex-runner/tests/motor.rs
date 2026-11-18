@@ -23,7 +23,7 @@ fn utf16(s: &str, con_cero: bool) -> Vec<u8> {
 }
 
 fn alinear(v: &mut Vec<u8>) {
-    while v.len() % 4 != 0 {
+    while !v.len().is_multiple_of(4) {
         v.push(0);
     }
 }
@@ -84,7 +84,10 @@ fn dir(entradas: &[(u32, u32, bool)]) -> Vec<u8> {
 }
 
 /// El árbol de recursos de una sección .rsrc que empieza en `rva`.
-fn arbol(tipos: &[(u32, Vec<(u32, Vec<u8>)>)], rva: u32) -> Vec<u8> {
+/// (tipo, [(id, datos)])
+type Tipos = Vec<(u32, Vec<(u32, Vec<u8>)>)>;
+
+fn arbol(tipos: &Tipos, rva: u32) -> Vec<u8> {
     // Posiciones: raíz, carpetas de tipo, carpetas de id (idioma), entradas de datos, bloques de datos.
     let raiz_tam = 16 + 8 * tipos.len();
     let mut pos_tipo = Vec::new();
@@ -146,7 +149,7 @@ fn arbol(tipos: &[(u32, Vec<(u32, Vec<u8>)>)], rva: u32) -> Vec<u8> {
 
 /// Un .exe PE32+ mínimo con una sola sección de recursos.
 fn pe_falso(r: &Recursos) -> Vec<u8> {
-    let mut tipos: Vec<(u32, Vec<(u32, Vec<u8>)>)> = Vec::new();
+    let mut tipos: Tipos = Vec::new();
     if !r.iconos.is_empty() {
         let mut grupo = vec![0, 0, 1, 0];
         grupo.extend((r.iconos.len() as u16).to_le_bytes());
