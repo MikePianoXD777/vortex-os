@@ -1,29 +1,29 @@
 // Fastfetch del saludo de la terminal de Vortexine's OS (config/terminal/saludo.sh).
-// Los colores son los del logo: morado, lavanda y azul.
+// Colores del diseño nuevo (4.0): blanco y grises, como la paleta negra del shell.
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
   "logo": {
     "type": "file",
-    "color": { "1": "#46E6FF", "2": "#70A9FF", "3": "#9A6BFF" },
+    "color": { "1": "#FFFFFF", "2": "#D4D4D4", "3": "#9A9A9A" },
     "padding": { "top": 1, "left": 2, "right": 3 }
   },
   "display": {
     "separator": "  ",
-    "color": { "separator": "#a78bfa", "output": "#e5e1ff" }
+    "color": { "separator": "#5c5c5c", "output": "#e0e0e0" }
   },
   "modules": [
     "break",
-    { "type": "title", "format": "{1}@{2}", "color": { "user": "#a78bfa", "at": "#7c6cf0", "host": "#a78bfa" } },
+    { "type": "title", "format": "{1}@{2}", "color": { "user": "#ffffff", "at": "#7a7a7a", "host": "#ffffff" } },
     "break",
-    { "type": "os", "key": "󱄅 os    ", "keyColor": "#a78bfa" },
-    { "type": "kernel", "key": " kernel", "keyColor": "#9d8cf8" },
-    { "type": "wm", "key": " wm    ", "keyColor": "#9389f5" },
-    { "type": "cpu", "key": " cpu   ", "keyColor": "#8a86f3" },
-    { "type": "gpu", "key": "󰢮 gpu   ", "keyColor": "#8183f1" },
-    { "type": "memory", "key": "󰘚 ram   ", "keyColor": "#7c6cf0" },
-    { "type": "disk", "key": "󰋊 disco ", "folders": "/", "keyColor": "#7c80ee" },
-    { "type": "shell", "key": " shell ", "keyColor": "#787dec" },
-    { "type": "uptime", "key": "󰅐 activo", "keyColor": "#747ae9" },
+    { "type": "os", "key": "󱄅 os    ", "keyColor": "#ffffff" },
+    { "type": "kernel", "key": " kernel", "keyColor": "#f0f0f0" },
+    { "type": "wm", "key": " wm    ", "keyColor": "#e0e0e0" },
+    { "type": "cpu", "key": " cpu   ", "keyColor": "#d0d0d0" },
+    { "type": "gpu", "key": "󰢮 gpu   ", "keyColor": "#c0c0c0" },
+    { "type": "memory", "key": "󰘚 ram   ", "keyColor": "#b0b0b0" },
+    { "type": "disk", "key": "󰋊 disco ", "folders": "/", "keyColor": "#a0a0a0" },
+    { "type": "shell", "key": " shell ", "keyColor": "#909090" },
+    { "type": "uptime", "key": "󰅐 activo", "keyColor": "#808080" },
     "break",
     { "type": "colors", "symbol": "circle" }
   ]

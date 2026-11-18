@@ -1240,8 +1240,89 @@ diseno_mezcla() {
       | .theme = ((.theme // {}) + {activePreset: "Obsidian", matugen: false, colors: $o[0].colors, fontFamily: "Inter", titleFont: "Unbounded"})
       | if ((.dock.apps // []) | map(.desktop_id // "") | sort) == ["kitty", "ski"] then .dock.apps = [] else . end' \
     "$ajustes" >"$tmp" 2>/dev/null
-  [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes" && touch "$marca"
+  [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes" && touch "$marca" && apps_mezcla
   rm -f "$tmp"
+}
+
+# Las apps también se visten con la paleta del diseño nuevo (4.0), que si no la terminal, Thunar y las
+# carpetas se veían igual que antes:
+# - el tema GTK de Serpantinum se prende (además de kitty) y del gtk.css se quitan los @define-color viejos
+#   (matugen de antes) y los @import de thunar.css y colors.css, que traen colores fijos y le ganan;
+# - las carpetas pasan a gris con un tema de íconos del usuario («Vortex», hereda de Papirus-Dark), sin
+#   tocar /usr ni pedir sudo.
+# Lo de antes queda en ~/.config/vortex/antes-mezcla/ y «vortex diseno anterior» lo regresa.
+apps_mezcla() {
+  local ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json" cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+  local antes="$CONF/antes-mezcla" apps=/usr/share/serpantinum/src/assets/matugen/apps tmp v f
+  mkdir -p "$antes"
+  # Primero el gtk.css (antes de prender GTK, que el shell le agrega su @import en cuanto cambian los ajustes).
+  for v in gtk-3.0 gtk-4.0; do
+    f="$cfg/$v/gtk.css"
+    [[ -f "$f" ]] && grep -q -e '^@define-color' -e '^@import' "$f" || continue
+    [[ -e "$antes/$v-gtk.css" ]] || cp -p "$f" "$antes/$v-gtk.css"
+    sed -i -e '/^@define-color/d' -e '/^@import/{/serpantinum/!d}' "$f"
+  done
+  # Los temas de apps que Serpantinum ya prende solo (kitty) más GTK; si la persona eligió los suyos, se respetan.
+  if [[ "$(jq -r '.theme.apps // null | type' "$ajustes" 2>/dev/null)" == null ]]; then
+    local lista=() a
+    for a in "$apps"/*/app.json; do
+      [[ "$(jq -r '.default' "$a" 2>/dev/null)" == true ]] && lista+=("$(basename "$(dirname "$a")")")
+    done
+    lista+=(gtk)
+    tmp="$(mktemp "$(dirname "$ajustes")/.settings_vortex_XXXXXX")" || return 0
+    jq --args '.theme.apps = $ARGS.positional' "${lista[@]}" <"$ajustes" >"$tmp" 2>/dev/null \
+      && [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes"
+    rm -f "$tmp"
+  fi
+  iconos_mezcla
+  if [[ ! -e "$antes/icon-theme" ]]; then
+    v="$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null)"
+    [[ -n "$v" && "$v" != "'Vortex'" ]] && printf '%s\n' "$v" >"$antes/icon-theme"
+  fi
+  [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/icons/Vortex" ]] \
+    && gsettings set org.gnome.desktop.interface icon-theme Vortex 2>/dev/null
+  python3 /usr/share/serpantinum/src/scripts/theming/apptheme.py apply >/dev/null 2>&1 || true
+}
+
+# Tema de íconos «Vortex»: Papirus-Dark con las carpetas grises (lo mismo que hace papirus-folders, pero
+# con enlaces en la carpeta del usuario).
+iconos_mezcla() {
+  local base=/usr/share/icons/Papirus destino="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Vortex" d n f dirs=()
+  [[ -d "$base" && -d /usr/share/icons/Papirus-Dark ]] || return 0
+  rm -rf "$destino"; mkdir -p "$destino"
+  for d in "$base"/*/places; do
+    [[ -L "$(dirname "$d")" ]] && continue
+    n="$(basename "$(dirname "$d")")"
+    mkdir -p "$destino/$n/places"
+    for f in "$d"/folder-grey*.svg "$d"/user-grey*.svg; do
+      [[ -e "$f" ]] || continue
+      f="$(basename "$f")"
+      ln -sf "$d/$f" "$destino/$n/places/${f/-grey/}"
+    done
+    # En Papirus «Público» apunta a un ícono verde aparte (folder-image-people), no a la carpeta del color.
+    [[ -e "$d/folder-grey-public.svg" ]] && ln -sf "$d/folder-grey-public.svg" "$destino/$n/places/folder-publicshare.svg"
+    dirs+=("$n/places")
+  done
+  {
+    printf '[Icon Theme]\nName=Vortex\nComment=Papirus-Dark con carpetas grises (Vortexine'"'"'s OS)\nInherits=Papirus-Dark,breeze-dark,hicolor\n'
+    printf 'Directories=%s\n\n' "$(IFS=,; echo "${dirs[*]}")"
+    # Cada carpeta lleva la misma sección que en Papirus (tamaño, contexto y tipo).
+    for n in "${dirs[@]}"; do
+      awk -v s="[$n]" '$0 == s {p = 1; print; next} /^\[/ {p = 0} p' "$base/index.theme"
+      echo
+    done
+  } >"$destino/index.theme"
+  gtk-update-icon-cache -q -f "$destino" 2>/dev/null || true
+}
+
+# «vortex diseno anterior»: las apps vuelven como estaban.
+apps_anterior() {
+  local antes="$CONF/antes-mezcla" cfg="${XDG_CONFIG_HOME:-$HOME/.config}" v
+  for v in gtk-3.0 gtk-4.0; do
+    [[ -f "$antes/$v-gtk.css" ]] && cp -p "$antes/$v-gtk.css" "$cfg/$v/gtk.css"
+  done
+  [[ -s "$antes/icon-theme" ]] && gsettings set org.gnome.desktop.interface icon-theme "$(tr -d "'" <"$antes/icon-theme")" 2>/dev/null
+  rm -rf "$antes"
 }
 
 diseno_actual() {
@@ -1261,7 +1342,8 @@ cmd_diseno() {
       jq --slurpfile p "$previo" 'reduce ("bar", "theme", "dock") as $k (.; if $p[0][$k] == null then del(.[$k]) else .[$k] = $p[0][$k] end)' \
         "$ajustes" >"$tmp" && [[ -s "$tmp" ]] && cat "$tmp" >"$ajustes"
       rm -f "$tmp"
-      bien "Regresé la barra, el tema y el dock de antes del diseño nuevo" ;;
+      apps_anterior
+      bien "Regresé la barra, el tema, el dock y las apps de antes del diseño nuevo" ;;
     *) aviso "usa: vortex diseno [estado|mezcla|anterior]"; exit 1 ;;
   esac
 }

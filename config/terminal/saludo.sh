@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Saludo de la terminal de Vortexine's OS: el nombre en morado y, debajo, fastfetch con el logo de Vortex
+# Saludo de la terminal de Vortexine's OS: el nombre en blanco y, debajo, fastfetch con el logo de Vortex
 # y los componentes de la PC. En kitty (la terminal de Vortex) el logo es la imagen; en otras, una espiral
 # de texto. Lo llaman ~/.bashrc y la función fish_greeting (los dejan puestos install/usuario.sh y
 # «vortex actualizar»). A mano: «vortex saludo».
 aqui="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-printf '\e[1;38;2;167;139;250m'
+printf '\e[1;38;2;255;255;255m'
 cat <<'LETRERO'
 
   █   █            █            ▀           █         ▄▀▀▀▄ ▄▀▀▀▀
