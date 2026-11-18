@@ -56,11 +56,21 @@ cmd_de_pid() { # PID
   printf '%q ' "${a[@]}"
 }
 
-# La carpeta de una terminal: la de su primer proceso hijo (la shell), no la de la terminal misma
+# «1 app», «3 apps»; «1 app nueva», «3 apps nuevas».
+apps_de() { if (($1 == 1)); then echo "1 app${2:+ $2}"; else echo "$1 apps${2:+ ${2}s}"; fi; }
+
+# La carpeta de una terminal: la de su shell (un proceso hijo), no la de la terminal misma. El primer hijo no
+# siempre es la shell: el de kitty es «kitten», su ayudante (probado en la VM, 17/11).
 carpeta_de() { # PID
-  local hijo
-  hijo="$(cat "$PROC/$1/task/$1/children" 2>/dev/null | awk '{print $1}')"
-  readlink "$PROC/${hijo:-$1}/cwd" 2>/dev/null
+  local hijo primero="" c
+  for hijo in $(cat "$PROC/$1"/task/*/children 2>/dev/null); do
+    [[ -n "$primero" ]] || primero="$hijo"
+    c="$(cat "$PROC/$hijo/comm" 2>/dev/null)"
+    case "$c" in
+      bash | zsh | fish | sh | dash | nu | elvish | xonsh | tmux* | zellij) primero="$hijo"; break ;;
+    esac
+  done
+  readlink "$PROC/${primero:-$1}/cwd" 2>/dev/null
 }
 
 guardar() {
@@ -100,8 +110,8 @@ guardar() {
   jq -n --arg nombre "$nombre" --arg fecha "$(date +%F)" --argjson v "$entradas" \
     '{nombre: $nombre, guardada: $fecha, ventanas: $v}' >"$(archivo "$nombre")"
   accion >/dev/null 2>&1 || true
-  echo "Guardé «$nombre»: $n apps."
-  aviso "Sesión «$nombre» guardada" "$n apps y su escritorio. Ábrela cuando quieras desde el lanzador: «Sesión: $nombre»."
+  echo "Guardé «$nombre»: $(apps_de "$n")."
+  aviso "Sesión «$nombre» guardada" "$(apps_de "$n") y su escritorio. Ábrela cuando quieras desde el lanzador: «Sesión: $nombre»."
 }
 
 # Una línea de Lua con un texto adentro, sin que nada de lo que tenga lo rompa
@@ -139,9 +149,10 @@ abrir() {
     sleep "$PAUSA"
   done < <(jq -r '.ventanas[] | [.clase, .comando, .carpeta, (.escritorio | tostring)] | join("\u001f")' "$f")
   local extra=""
-  ((ya)) && extra=" ($ya ya estaban abiertas y las pasé a su escritorio)"
-  echo "Abrí «$nombre»: $lanzadas apps nuevas$extra."
-  aviso "Sesión «$nombre»" "Abriendo $lanzadas apps en sus escritorios$extra."
+  ((ya == 1)) && extra=" (1 ya estaba abierta y la pasé a su escritorio)"
+  ((ya > 1)) && extra=" ($ya ya estaban abiertas y las pasé a su escritorio)"
+  echo "Abrí «$nombre»: $(apps_de "$lanzadas" nueva)$extra."
+  aviso "Sesión «$nombre»" "Abriendo $(apps_de "$lanzadas") en sus escritorios$extra."
 }
 
 lista() {
@@ -149,7 +160,7 @@ lista() {
   [[ -d "$DATOS" ]] || { echo "No tienes sesiones guardadas. Abre tus apps y corre: vortex-sesiones guardar «Escuela»"; return 0; }
   for f in "$DATOS"/*.json; do
     [[ -f "$f" ]] || continue
-    jq -r '"\(.nombre)  (\(.ventanas | length) apps, guardada \(.guardada))"' "$f"
+    jq -r '"\(.nombre)  (\(.ventanas | length) \(if (.ventanas | length) == 1 then "app" else "apps" end), guardada \(.guardada))"' "$f"
   done
 }
 

@@ -28,7 +28,10 @@ chmod +x "$T/bin/"*
 export PATH="$T/bin:$PATH" HOME="$T/home" XDG_DATA_HOME="$T/datos" VORTEX_PROC="$T/proc" VORTEX_SESIONES_PAUSA=0 HYPRLAND_INSTANCE_SIGNATURE=falso
 # una terminal (kitty, con una shell dentro que está en una carpeta), un editor con .desktop, algo sin .desktop y un juego
 printf 'kitty\0' >"$T/proc/100/cmdline"
-echo 101 >"$T/proc/100/task/100/children"
+# Como kitty de verdad: el primer hijo es «kitten» (su ayudante, en la carpeta de inicio) y luego la shell.
+echo "102 101" >"$T/proc/100/task/100/children"
+mkdir -p "$T/proc/102"; echo kitten >"$T/proc/102/comm"; ln -s "$T/home" "$T/proc/102/cwd"
+echo bash >"$T/proc/101/comm"
 ln -s "$T/carpeta con espacio" "$T/proc/101/cwd"
 printf '/opt/raro/miapp\0--modo\0con espacio\0' >"$T/proc/200/cmdline"
 printf 'steam\0' >"$T/proc/300/cmdline"
