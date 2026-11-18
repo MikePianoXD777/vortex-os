@@ -14,14 +14,22 @@ guardas. Lo que no tiene ventana se mira con «Ver qué más usa» (el administr
 """
 from __future__ import annotations
 
-import json
 import os
-import re
-import time
-import shutil
-import subprocess
 import sys
-from pathlib import Path
+
+# 4.0: si está la versión en Rust (paquete vortex-rust; la escribió Mike), se usa esa: este aviso sale justo
+# cuando falta memoria, y en Rust arranca al instante y casi no gasta. (El gestor ya llama directo al binario.)
+# VORTEX_MEMORIA_PYTHON=1 obliga a usar este (para las pruebas o si el de Rust falla); VORTEX_RUST_BIN cambia la carpeta.
+_RUST = os.path.join(os.environ.get("VORTEX_RUST_BIN", "/usr/lib/vortex"), "vortex-memoria-rs")
+if not os.environ.get("VORTEX_MEMORIA_PYTHON") and os.access(_RUST, os.X_OK):
+    os.execv(_RUST, [_RUST, *sys.argv[1:]])
+
+import json  # noqa: E402
+import re  # noqa: E402
+import time  # noqa: E402
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 PROC = Path(os.environ.get("VORTEX_MEMORIA_PROC", "/proc"))
 MINIMO_KB = 300 * 1024   # con menos que esto, cerrarla no arregla nada: no se ofrece

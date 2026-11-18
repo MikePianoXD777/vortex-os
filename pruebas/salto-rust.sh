@@ -13,7 +13,7 @@ mkdir -p "$tmp/lib" "$tmp/bin"
 printf '#!/bin/sh\necho "python $*"\n' >"$tmp/bin/python3"
 chmod +x "$tmp/bin/python3"
 
-for a in task-manager runner video shop app-installer connect shared tareas enlace; do
+for a in task-manager runner video shop app-installer connect shared tareas enlace memoria; do
   echo "vortex-$a"
   lanzador="apps/vortex-$a/vortex-$a"
   [[ -f "$lanzador" ]] || lanzador="apps/$a/vortex-$a"
@@ -27,15 +27,25 @@ for a in task-manager runner video shop app-installer connect shared tareas enla
     salida_py="vortex-$a (Vortex 2.5)*"
     mkdir -p "$py"
   fi
+  # vortex-memoria no tiene orden de «uso»: con --ver solo dice qué avisaría (nunca manda el aviso), y con un
+  # /proc vacío no lee nada de esta PC.
+  arg="--hola"
+  if [[ "$a" == memoria ]]; then
+    lanzador="bin/vortex-memoria"
+    py="$tmp/sin-python"
+    salida_py="Quedan 0 MB.*"
+    arg="--ver"
+    mkdir -p "$py" "$tmp/proc-vacio"
+  fi
   var="VORTEX_$(echo "$a" | tr 'a-z-' 'A-Z_')_PYTHON"
   printf '#!/bin/sh\necho "rust $*"\n' >"$tmp/lib/vortex-$a-rs"
   chmod +x "$tmp/lib/vortex-$a-rs"
-  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
-  [[ "$r" == "rust --hola" ]] && bien "con el binario de Rust, salta a él (y le pasa los argumentos)" || mal "no saltó a Rust: $r"
-  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" env "$var=1" "$lanzador" --hola 2>&1)"
+  r="$(PATH="$py:$PATH" VORTEX_MEMORIA_PROC="$tmp/proc-vacio" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" "$arg" 2>&1)"
+  [[ "$r" == "rust $arg" ]] && bien "con el binario de Rust, salta a él (y le pasa los argumentos)" || mal "no saltó a Rust: $r"
+  r="$(PATH="$py:$PATH" VORTEX_MEMORIA_PROC="$tmp/proc-vacio" VORTEX_RUST_BIN="$tmp/lib" env "$var=1" "$lanzador" "$arg" 2>&1)"
   [[ "$r" == $salida_py ]] && bien "$var=1 obliga a usar la de Python" || mal "$var=1 no forzó Python: $r"
   rm "$tmp/lib/vortex-$a-rs"
-  r="$(PATH="$py:$PATH" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" --hola 2>&1)"
+  r="$(PATH="$py:$PATH" VORTEX_MEMORIA_PROC="$tmp/proc-vacio" VORTEX_RUST_BIN="$tmp/lib" "$lanzador" "$arg" 2>&1)"
   [[ "$r" == $salida_py ]] && bien "sin el binario de Rust, sigue con la de Python" || mal "sin Rust no usó Python: $r"
 done
 
@@ -80,7 +90,7 @@ r="$(gestor VORTEX_RUST_BIN="$tmp/lib" bin/vortex-gestor)"
 
 echo "Paquete vortex-rust"
 grep -q 'vortex-shared-motor' packaging/vortex-rust/PKGBUILD && bien "instala vortex-shared-motor" || mal "no instala vortex-shared-motor"
-for a in task-manager runner video shop app-installer connect shared tareas usb enlace; do
+for a in task-manager runner video shop app-installer connect shared tareas usb enlace memoria; do
   grep -q "vortex-$a-rs" packaging/vortex-rust/PKGBUILD && bien "instala vortex-$a-rs" || mal "no instala vortex-$a-rs"
 done
 

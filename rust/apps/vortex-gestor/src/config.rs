@@ -183,6 +183,20 @@ fn var(nombre: &str, defecto: &str) -> String {
         .unwrap_or_else(|| defecto.to_string())
 }
 
+/// El aviso de poca memoria: el binario de Rust si está instalado (sale justo cuando falta memoria, y así no
+/// arranca un Python solo para saltar a él), o `vortex-memoria` (el script) si no. `VORTEX_MEMORIA_PYTHON=1`
+/// fuerza el de Python; `VORTEX_RUST_BIN` cambia la carpeta, como en los lanzadores.
+fn memoria_por_defecto() -> String {
+    use std::os::unix::fs::PermissionsExt;
+    let rust = PathBuf::from(var("VORTEX_RUST_BIN", "/usr/lib/vortex")).join("vortex-memoria-rs");
+    let ejecutable = std::fs::metadata(&rust).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+    if ejecutable && std::env::var_os("VORTEX_MEMORIA_PYTHON").is_none_or(|v| v.is_empty()) {
+        rust.to_string_lossy().into_owned()
+    } else {
+        "vortex-memoria".to_string()
+    }
+}
+
 impl Rutas {
     pub fn del_entorno(uid: u32) -> Rutas {
         let home = std::env::var("HOME").unwrap_or_default();
@@ -207,7 +221,7 @@ impl Rutas {
                 .filter(|v| !v.is_empty()),
             vortex: var("VORTEX_GESTOR_VORTEX", "vortex"),
             qs: var("VORTEX_GESTOR_QS", "quickshell"),
-            memoria: var("VORTEX_GESTOR_MEMORIA", "vortex-memoria"),
+            memoria: var("VORTEX_GESTOR_MEMORIA", &memoria_por_defecto()),
             disco: var("VORTEX_GESTOR_DISCO", "vortex-disco"),
             guardados: var("VORTEX_GESTOR_GUARDADOS", "vortex-guardados"),
             nvsmi: var("VORTEX_GESTOR_NVIDIA_SMI", "nvidia-smi"),

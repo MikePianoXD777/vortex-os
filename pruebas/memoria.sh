@@ -6,6 +6,8 @@
 set -uo pipefail
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VM="${VM:-$AQUI/bin/vortex-memoria}"   # VM=… para probar otra versión (la de Rust)
+# Sin VM, se prueba el de Python aunque esté instalado el de Rust (bin/vortex-memoria saltaría a él).
+[[ "$VM" == "$AQUI/bin/vortex-memoria" ]] && export VORTEX_MEMORIA_PYTHON=1
 T="$(mktemp -d "${TMPDIR:-/tmp}/vortex-memoria.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 FALLOS=0
