@@ -13,9 +13,6 @@
 //! Cada función de abajo es una del Python, con el mismo nombre. Abre `bin/vortex-memoria` al lado y ve
 //! pasándolas una por una, EN ORDEN (los pasos 1 a 5 tienen pruebas chiquitas). Lee primero la GUIA.md.
 
-// Mientras haya huecos sin llenar, Rust se queja de cosas sin usar. Cuando termines, BORRA esta línea.
-#![allow(unused)]
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
@@ -78,21 +75,30 @@ fn home() -> PathBuf {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Tus pasos.
+// Pasos implementados.
 
 /// PASO 1. Los KB en texto: «1.5 GB» si son 104858 KB o más, si no «300 MB». Python: `gb()`.
-/// Pista: `format!("{:.1} GB", kb as f64 / 1048576.0)`.
 fn gb(kb: u64) -> String {
-    todo!("paso 1")
+    if kb >= 104_858 {
+        format!("{:.1} GB", kb as f64 / 1_048_576.0)
+    } else {
+        format!("{} MB", kb / 1_024)
+    }
 }
 
 /// PASO 2. El número que va después de «Clave:» en un texto como el de /proc/meminfo o /proc/PID/status
-/// («MemAvailable:    600000 kB» → 600000), o 0 si no está. Python lo hace dentro de `disponible_kb()`,
-/// `total_kb()` y `uso_kb()`; aquí es UNA función que sirve para las tres (la vas a usar otra vez en el
-/// paso 7). Pista: `.lines()`, `linea.strip_prefix(clave)` y luego `.strip_prefix(':')`,
-/// `.split_whitespace().next()` y `.parse::<u64>()`.
+/// («MemAvailable:    600000 kB» → 600000), o 0 si no está.
 fn leer_clave(texto: &str, clave: &str) -> u64 {
-    todo!("paso 2")
+    for line in texto.lines() {
+        if let Some(rest) = line.strip_prefix(clave)
+            && let Some(rest) = rest.strip_prefix(':')
+            && let Some(num_str) = rest.split_whitespace().next()
+            && let Ok(val) = num_str.parse::<u64>()
+        {
+            return val;
+        }
+    }
+    0
 }
 
 /// Un número de /proc/meminfo (ya hecho: usa tu paso 2).
@@ -101,113 +107,476 @@ fn meminfo(clave: &str) -> u64 {
     leer_clave(&texto, clave)
 }
 
-/// PASO 3. ¿Le queda poca memoria al juego? Python: `justa_para_jugar()`. Una línea.
-/// Pista: `(total as f64 * JUEGO_PARTE) as u64` y `JUEGO_MAX_KB.min(...)`.
+/// PASO 3. ¿Le queda poca memoria al juego? Python: `justa_para_jugar()`.
 fn justa_para_jugar(queda: u64, total: u64) -> bool {
-    todo!("paso 3")
+    if queda == 0 {
+        return false;
+    }
+    let limite = JUEGO_MAX_KB.min((total as f64 * JUEGO_PARTE) as u64);
+    queda < limite
 }
 
 /// PASO 4. «Discord», «Discord y Chrome», «Discord, Chrome y Spotify». Python: `juntar()`.
-/// Pista: `nombres[..nombres.len() - 1].join(", ")` y `nombres.last()`.
 fn juntar(nombres: &[String]) -> String {
-    todo!("paso 4")
+    match nombres.len() {
+        0 => String::new(),
+        1 => nombres[0].clone(),
+        _ => {
+            let mut result = nombres[..nombres.len() - 1].join(", ");
+            result.push_str(" y ");
+            result.push_str(&nombres[nombres.len() - 1]);
+            result
+        }
+    }
 }
 
-/// PASO 5. Los dos textos de los avisos. Python: `texto_aviso()` y `texto_juego()`.
-/// `Option<&App>` es «una app, o ninguna»: se abre con `match app { Some(a) => ..., None => ... }`.
+/// PASO 5a. El texto del aviso normal. Python: `texto_aviso()`.
 fn texto_aviso(app: Option<&App>, queda: u64) -> String {
-    todo!("paso 5a")
+    let mut s = format!("Quedan {}.", gb(queda));
+    match app {
+        Some(a) => {
+            s.push_str(&format!(" {} es lo que más usa: {}.", a.nombre, gb(a.kb)));
+        }
+        None => {
+            s.push_str(" Mira qué la está usando antes de que algo se cierre solo.");
+        }
+    }
+    s
 }
 
+/// PASO 5b. El texto del aviso al jugar. Python: `texto_juego()`.
 fn texto_juego(juego: &str, apps: &[App], queda: u64) -> String {
-    // Pista para la suma: `apps.iter().map(|a| a.kb).sum::<u64>()`.
-    // Y para los nombres: `apps.iter().map(|a| a.nombre.clone()).collect::<Vec<String>>()`.
-    todo!("paso 5b")
+    let total_kb: u64 = apps.iter().map(|a| a.kb).sum();
+    let nombres: Vec<String> = apps.iter().map(|a| a.nombre.clone()).collect();
+    let apps_str = juntar(&nombres);
+    format!(
+        "Cierra {} y {} tendrá unos {} más (ahora le quedan {}). Así va con menos tirones.",
+        apps_str,
+        juego,
+        gb(total_kb),
+        gb(queda)
+    )
 }
 
-/// PASO 6. El cgroup de un proceso: la última parte de la línea de `/proc/PID/cgroup` si es
-/// «app-….scope»; si no, «pid:PID». Python: `grupo_de()`.
-/// Pista: `.trim().rsplit('/').next()` da lo que va después de la última `/`.
+/// PASO 6. El cgroup de un proceso. Python: `grupo_de()`.
 fn grupo_de(pid: u32) -> String {
-    todo!("paso 6")
+    let ruta = proc_dir().join(pid.to_string()).join("cgroup");
+    let contenido = std::fs::read_to_string(ruta).unwrap_or_default();
+    let hoja = contenido.trim().rsplit('/').next().unwrap_or("").to_string();
+    if hoja.starts_with("app-") && hoja.ends_with(".scope") {
+        hoja
+    } else {
+        format!("pid:{pid}")
+    }
 }
 
-/// PASO 7. Lo que de verdad usa un proceso: suma de RssAnon, RssShmem y VmSwap de `/proc/PID/status`.
-/// Python: `uso_kb()`. Lee el archivo una vez y usa tu `leer_clave` tres veces.
+/// PASO 7. Lo que de verdad usa un proceso: suma de RssAnon, RssShmem y VmSwap. Python: `uso_kb()`.
 fn uso_kb(pid: u32) -> u64 {
-    todo!("paso 7")
+    let ruta = proc_dir().join(pid.to_string()).join("status");
+    let texto = std::fs::read_to_string(ruta).unwrap_or_default();
+    leer_clave(&texto, "RssAnon") + leer_clave(&texto, "RssShmem") + leer_clave(&texto, "VmSwap")
 }
 
 /// PASO 8. Cuánto usa cada grupo, sumando sus procesos (solo los tuyos). Python: `usos_por_grupo()`.
-/// Pista: `std::fs::read_dir(proc_dir())` da las entradas; `entrada.file_name().to_str()` el nombre; si
-/// `nombre.parse::<u32>()` sale bien es un proceso. El dueño: `entrada.metadata().map(|m| m.uid()).ok()`, que da `Some(uid)` (con
-/// `use std::os::unix::fs::MetadataExt;`). Para sumar en el mapa:
-/// `*usos.entry(grupo).or_insert(0) += uso_kb(pid);`
 fn usos_por_grupo() -> HashMap<String, u64> {
-    todo!("paso 8")
+    use std::os::unix::fs::MetadataExt;
+    let uid = mi_uid();
+    let mut usos: HashMap<String, u64> = HashMap::new();
+    let Ok(entradas) = std::fs::read_dir(proc_dir()) else {
+        return usos;
+    };
+    for entrada in entradas.flatten() {
+        let nombre = entrada.file_name();
+        let Some(nombre_str) = nombre.to_str() else {
+            continue;
+        };
+        let Ok(pid) = nombre_str.parse::<u32>() else {
+            continue;
+        };
+        let Ok(meta) = entrada.metadata() else {
+            continue;
+        };
+        if meta.uid() != uid {
+            continue;
+        }
+        let grupo = grupo_de(pid);
+        *usos.entry(grupo).or_insert(0) += uso_kb(pid);
+    }
+    usos
 }
 
-/// PASO 9. Las ventanas abiertas (`hyprctl clients -j`), sin las de pid ≤ 1 ni las que no están
-/// `mapped`. Python: `ventanas()`. Cada ventana es un `Value` de serde_json: `v["pid"].as_u64()`,
-/// `v["class"].as_str()`, `v["mapped"].as_bool().unwrap_or(true)`.
+/// PASO 9. Las ventanas abiertas (`hyprctl clients -j`). Python: `ventanas()`.
 fn ventanas() -> Vec<Value> {
-    todo!("paso 9")
+    let Ok(salida) = Command::new("hyprctl").args(["clients", "-j"]).output() else {
+        return Vec::new();
+    };
+    let Ok(texto) = std::str::from_utf8(&salida.stdout) else {
+        return Vec::new();
+    };
+    let Ok(lista) = serde_json::from_str::<Value>(texto) else {
+        return Vec::new();
+    };
+    let Some(arr) = lista.as_array() else {
+        return Vec::new();
+    };
+    arr.iter()
+        .filter(|v| {
+            v.get("pid").and_then(|p| p.as_u64()).unwrap_or(0) > 1
+                && v.get("mapped").and_then(|m| m.as_bool()).unwrap_or(true)
+        })
+        .cloned()
+        .collect()
 }
 
-/// PASO 10. El nombre de la app como sale en el lanzador (`com.discordapp.Discord` → «Discord»),
-/// buscando en los .desktop. Python: `nombre_de()`. Es el más largo de leer, pero son puros `for`.
-/// Pista para la última línea (cuando no lo encuentra): `clase.rsplit('.').next()`, `.replace('-', " ")`
-/// y para la mayúscula: la primera letra con `.to_uppercase()` y el resto con `.to_lowercase()`.
+/// PASO 10. El nombre de la app como sale en el lanzador. Python: `nombre_de()`.
 fn nombre_de(clase: &str) -> String {
-    todo!("paso 10")
+    let xdg_data_home = std::env::var("XDG_DATA_HOME")
+        .unwrap_or_else(|_| home().join(".local/share").to_string_lossy().into_owned());
+    let xdg_data_dirs =
+        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".to_string());
+    let mut carpetas = vec![xdg_data_home];
+    carpetas.extend(xdg_data_dirs.split(':').map(|s| s.to_string()));
+    carpetas.push("/var/lib/flatpak/exports/share".to_string());
+    carpetas.push(
+        home()
+            .join(".local/share/flatpak/exports/share")
+            .to_string_lossy()
+            .into_owned(),
+    );
+
+    let buscada = clase.to_lowercase();
+    for carpeta in &carpetas {
+        let dir = std::path::Path::new(carpeta).join("applications");
+        let entradas = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entrada in entradas.flatten() {
+            let ruta = entrada.path();
+            if ruta.extension().and_then(|e| e.to_str()) != Some("desktop") {
+                continue;
+            }
+            let texto = match std::fs::read_to_string(&ruta) {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut nombre = String::new();
+            let mut wm = String::new();
+            for linea in texto.lines() {
+                if linea.starts_with('[') && linea != "[Desktop Entry]" {
+                    break;
+                }
+                if linea.starts_with("Name=") && nombre.is_empty() {
+                    nombre = linea[5..].trim().to_string();
+                } else if let Some(stripped) = linea.strip_prefix("StartupWMClass=") {
+                    wm = stripped.trim().to_lowercase();
+                }
+            }
+            let stem = ruta
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if !nombre.is_empty() && (stem == buscada || wm == buscada) {
+                return nombre;
+            }
+        }
+    }
+    // No lo encontró: usa la última parte de la clase
+    let base = clase.rsplit('.').next().unwrap_or("Esa app");
+    let base = base.replace('-', " ");
+    let base = base.trim();
+    if base.is_empty() {
+        return "Esa app".to_string();
+    }
+    let mut chars = base.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+    }
 }
 
-/// PASO 11. Las apps con ventana, agrupadas por cgroup, en el orden en que salen sus ventanas.
-/// Python: `apps_con_ventana()`. Aquí devuelve una lista (`Vec<App>`) en vez de un diccionario: busca
-/// si ya está su grupo con `apps.iter_mut().find(|a| a.grupo == grupo)`; si sí, le agregas la dirección;
-/// si no, haces `apps.push(App { ... })`.
+/// PASO 11. Las apps con ventana, agrupadas por cgroup. Python: `apps_con_ventana()`.
 fn apps_con_ventana() -> Vec<App> {
-    todo!("paso 11")
+    let usos = usos_por_grupo();
+    let mut apps: Vec<App> = Vec::new();
+    for v in ventanas() {
+        let pid = v["pid"].as_u64().unwrap_or(0) as u32;
+        let clase = v["class"].as_str().unwrap_or("").to_string();
+        let direccion = v["address"].as_str().unwrap_or("").to_string();
+        let grupo = grupo_de(pid);
+        let kb = usos.get(&grupo).copied().unwrap_or(0);
+        if let Some(app) = apps.iter_mut().find(|a| a.grupo == grupo) {
+            app.direcciones.push(direccion);
+        } else {
+            apps.push(App {
+                grupo,
+                clase,
+                kb,
+                direcciones: vec![direccion],
+                nombre: String::new(),
+            });
+        }
+    }
+    apps
 }
 
 /// PASO 12a. La app con ventana que más usa (si usa al menos MINIMO_KB). Python: `la_que_mas_usa()`.
-/// OJO: si dos empatan, Python se queda con la PRIMERA y el `max_by_key` de Rust con la ÚLTIMA. Hazlo con
-/// un `for` que solo cambie de app cuando la nueva use MÁS (no igual).
+/// OJO: en empate, Python se queda con la PRIMERA (igual que este for con >).
 fn la_que_mas_usa() -> Option<App> {
-    todo!("paso 12a")
+    let apps = apps_con_ventana();
+    let mut mayor: Option<App> = None;
+    for app in apps {
+        let es_mas = match &mayor {
+            None => true,
+            Some(m) => app.kb > m.kb,
+        };
+        if es_mas {
+            mayor = Some(app);
+        }
+    }
+    let mut app = mayor?;
+    if app.kb < MINIMO_KB || app.clase.is_empty() {
+        return None;
+    }
+    app.nombre = nombre_de(&app.clase);
+    Some(app)
 }
 
-/// PASO 12b. Las que más gastan al jugar, sin el juego ni los lanzadores, hasta 3. Python:
-/// `para_cerrar_al_jugar()`. Para ordenar de mayor a menor: `elegidas.sort_by(|a, b| b.kb.cmp(&a.kb));`
-/// y para quedarte con 3: `elegidas.truncate(JUEGO_APPS);`. La regex: `regex::Regex::new(LANZADORES)`.
+/// PASO 12b. Las que más gastan al jugar, sin el juego ni los lanzadores, hasta 3.
+/// Python: `para_cerrar_al_jugar()`.
 fn para_cerrar_al_jugar(clase_juego: &str, pid_juego: u32) -> Vec<App> {
-    todo!("paso 12b")
+    let Ok(re) = regex::Regex::new(LANZADORES) else {
+        return Vec::new();
+    };
+    let grupo_juego = if pid_juego > 1 {
+        Some(grupo_de(pid_juego))
+    } else {
+        None
+    };
+    let mut elegidas: Vec<App> = apps_con_ventana()
+        .into_iter()
+        .filter(|app| {
+            let clase = &app.clase;
+            if clase.is_empty() {
+                return false;
+            }
+            if grupo_juego.as_deref() == Some(app.grupo.as_str()) {
+                return false;
+            }
+            if clase.to_lowercase() == clase_juego.to_lowercase() {
+                return false;
+            }
+            if re.is_match(clase) {
+                return false;
+            }
+            app.kb >= MINIMO_KB
+        })
+        .collect();
+    elegidas.sort_by_key(|a| std::cmp::Reverse(a.kb));
+    elegidas.truncate(JUEGO_APPS);
+    for app in &mut elegidas {
+        app.nombre = nombre_de(&app.clase);
+    }
+    elegidas
 }
 
 /// PASO 13. El nombre del juego. Python: `nombre_juego()`.
 fn nombre_juego(clase: &str, pid: u32) -> String {
-    todo!("paso 13")
+    if clase.is_empty() {
+        return "tu juego".to_string();
+    }
+    let es_steam = regex::Regex::new(r"(?i)^steam_app_\d+$")
+        .map(|re| re.is_match(clase))
+        .unwrap_or(false);
+    if es_steam || clase.to_lowercase().ends_with(".exe") {
+        for v in ventanas() {
+            let v_pid = v["pid"].as_u64().unwrap_or(0) as u32;
+            let v_clase = v["class"].as_str().unwrap_or("");
+            let titulo = v["title"].as_str().unwrap_or("").trim().to_string();
+            if (v_pid == pid || v_clase == clase) && !titulo.is_empty() {
+                return titulo.chars().take(40).collect();
+            }
+        }
+        return "tu juego".to_string();
+    }
+    nombre_de(clase)
 }
 
-/// PASO 14. Le manda órdenes a Hyprland: la primera que entienda. Python: `despachar()` y `cerrar()`.
-/// (Hyprland 0.57 ya no entiende la sintaxis vieja; por eso se prueba primero la de Lua: `hl.dsp...`.)
+/// PASO 14a. Le manda órdenes a Hyprland: la primera que entienda. Python: `despachar()`.
 fn despachar(ordenes: &[String]) {
-    todo!("paso 14a")
+    for orden in ordenes {
+        let ok = Command::new("hyprctl")
+            .arg("dispatch")
+            .arg(orden)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if ok {
+            return;
+        }
+    }
 }
 
+/// PASO 14b. Cierra las apps dadas. Python: `cerrar()`.
 fn cerrar(apps: &[App]) {
-    todo!("paso 14b")
+    for app in apps {
+        for d in &app.direcciones {
+            despachar(&[
+                format!("hl.dsp.window.close({{ window = \"address:{d}\" }})"),
+                format!("closewindow address:{d}"),
+            ]);
+        }
+    }
 }
 
-/// PASO 15. El aviso al abrir un juego. Python: `al_jugar()`. Devuelve el código de salida (0).
-/// Para esperar: `std::thread::sleep(std::time::Duration::from_secs_f64(espera_s()))`.
+/// PASO 15. El aviso al abrir un juego. Python: `al_jugar()`.
 fn al_jugar(args: &[String]) -> i32 {
-    todo!("paso 15")
+    let ver = args.iter().any(|a| a == "--ver");
+    let args_sin_ver: Vec<&str> = args
+        .iter()
+        .filter(|a| *a != "--ver")
+        .map(|a| a.as_str())
+        .collect();
+    let clase = args_sin_ver.first().copied().unwrap_or("");
+    let pid: u32 = args_sin_ver.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+
+    if !ver && espera_s() > 0.0 {
+        std::thread::sleep(std::time::Duration::from_secs_f64(espera_s()));
+    }
+
+    if pid > 1 && !proc_dir().join(pid.to_string()).exists() {
+        return 0; // el juego ya se cerró mientras esperábamos
+    }
+
+    let queda = meminfo("MemAvailable");
+    let total = meminfo("MemTotal");
+    if !justa_para_jugar(queda, total) {
+        if ver {
+            println!("Le alcanza: quedan {}.", gb(queda));
+        }
+        return 0;
+    }
+
+    let apps = para_cerrar_al_jugar(clase, pid);
+    if apps.is_empty() {
+        if ver {
+            println!("Quedan {}, pero no hay nada que valga la pena cerrar.", gb(queda));
+        }
+        return 0;
+    }
+
+    let juego = nombre_juego(clase, pid);
+    let texto = texto_juego(&juego, &apps, queda);
+
+    if ver {
+        println!("{texto}");
+        return 0;
+    }
+
+    if !std::process::Command::new("sh")
+        .args(["-c", "command -v notify-send"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        return 0;
+    }
+
+    let nombres: Vec<String> = apps.iter().map(|a| a.nombre.clone()).collect();
+    let boton = if apps.len() < 3 {
+        format!("Cerrar {}", juntar(&nombres))
+    } else {
+        format!("Cerrar las {}", apps.len())
+    };
+
+    let accion = Command::new("notify-send")
+        .args([
+            "-a",
+            "Vortexine's OS",
+            "-i",
+            "applications-games",
+            "-u",
+            "normal",
+            "-t",
+            "30000",
+            "-A",
+            &format!("cerrar={boton}"),
+            "-A",
+            "no=Así está bien",
+            "Tu juego va justo de memoria",
+            &texto,
+        ])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_default();
+    let accion = accion.trim();
+
+    if accion == "cerrar" {
+        cerrar(&apps);
+    }
+    0
 }
 
-/// PASO 16. El aviso normal (lo que hace `main()` en Python después del `--juego`).
+/// PASO 16. El aviso normal. Python: `main()` (tras el --juego).
 fn avisar(ver: bool) -> i32 {
-    todo!("paso 16")
+    let app = la_que_mas_usa();
+    let queda = meminfo("MemAvailable");
+
+    if ver {
+        println!("{}", texto_aviso(app.as_ref(), queda));
+        return 0;
+    }
+
+    if !std::process::Command::new("sh")
+        .args(["-c", "command -v notify-send"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        return 0;
+    }
+
+    let mut cmd = Command::new("notify-send");
+    cmd.args([
+        "-a",
+        "Vortexine's OS",
+        "-i",
+        "dialog-warning",
+        "-u",
+        "critical",
+        "-A",
+        "default=Ver",
+    ]);
+    if let Some(ref a) = app {
+        cmd.args(["-A", &format!("cerrar=Cerrar {}", a.nombre)]);
+    }
+    cmd.args([
+        "-A",
+        "ver=Ver qué más usa",
+        "Te estás quedando sin memoria",
+        &texto_aviso(app.as_ref(), queda),
+    ]);
+
+    let accion = cmd
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .unwrap_or_default();
+    let accion = accion.trim();
+
+    if accion == "cerrar" {
+        if let Some(a) = app {
+            cerrar(&[a]);
+        }
+    } else if accion == "ver" || accion == "default" {
+        despachar(&[
+            "hl.dsp.exec_cmd(\"vortex-task-manager\")".to_string(),
+            "exec vortex-task-manager".to_string(),
+        ]);
+    }
+    0
 }
 
 fn main() {
