@@ -40,6 +40,10 @@ alternar_portapapeles() { # ID
   else
     printf '[General]\nautoShare=%s\n' "$nuevo" >>"$f"
   fi
+  # 4.0: kdeconnectd guarda el valor al cargar el complemento y solo lo vuelve a leer con esta señal (la misma
+  # que manda su propia ventana de ajustes). Sin ella, apagarlo aquí no surtía efecto hasta reiniciarlo: el
+  # panel decía «apagado» y el portapapeles se seguía mandando.
+  busctl --user emit "/kdeconnect/$1/kdeconnect_clipboard" org.kde.kdeconnect.config configChanged >/dev/null 2>&1 || true
 }
 
 estado() {

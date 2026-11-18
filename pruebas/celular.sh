@@ -34,6 +34,7 @@ FIN
 cat >"$T/bin/busctl" <<'FIN'
 #!/bin/sh
 ruta="$4"; nombre="$6"
+[ "$2" = emit ] && { echo "busctl $*" >>"$REGISTRO_BUSCTL"; exit 0; }
 case "${ruta##*/devices/}:$nombre" in
   abc123:name) echo 's "Pixel 7"' ;;
   abc123:type) echo 's "smartphone"' ;;
@@ -102,9 +103,12 @@ celular sonar 'x; rm -rf /' 2>/dev/null
 echo "== portapapeles compartido y PC con Windows (4.0)"
 auto() { celular estado | jq -r --arg id "$1" '.dispositivos[] | select(.id == $id) | .auto'; }
 [[ "$(auto abc123)" == true ]] && bien "por defecto el portapapeles se comparte solo (como KDE Connect)" || mal "auto por defecto: $(auto abc123)"
+export REGISTRO_BUSCTL="$T/registro-busctl"
 celular compartir abc123
 [[ "$(auto abc123)" == false ]] && grep -qx 'autoShare=false' "$T/home/.config/kdeconnect/abc123/kdeconnect_clipboard/config" &&
   bien "«Dejar de compartirlo solo» escribe autoShare=false en su config" || mal "apagar: $(auto abc123)"
+grep -qx 'busctl --user emit /kdeconnect/abc123/kdeconnect_clipboard org.kde.kdeconnect.config configChanged' "$REGISTRO_BUSCTL" 2>/dev/null &&
+  bien "y le avisa a kdeconnectd (configChanged), para que lo apague ya y no hasta reiniciarlo" || mal "sin aviso a kdeconnectd: $(cat "$REGISTRO_BUSCTL" 2>/dev/null)"
 [[ "$(auto xyz789)" == true ]] && bien "y solo cambia ese aparato" || mal "otro aparato cambió"
 celular compartir abc123
 [[ "$(auto abc123)" == true ]] && bien "volver a pulsar lo enciende" || mal "encender: $(auto abc123)"
