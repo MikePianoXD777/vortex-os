@@ -226,6 +226,11 @@ pub fn vaciar(lista: &[(PathBuf, PathBuf)]) {
 
 // ====================================================================== correr
 
+/// `~/.cache` a partir de `~/.cache/vortex` (y lo mismo con `~/.local/share`).
+fn xdg(de_vortex: PathBuf) -> PathBuf {
+    de_vortex.parent().map(Path::to_path_buf).unwrap_or(de_vortex)
+}
+
 fn hoy() -> i64 {
     (SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -278,7 +283,8 @@ pub fn principal(args: &[String]) -> i32 {
         }
     };
     let home = vortex_core::rutas::home();
-    let cache = vortex_core::rutas::cache();
+    // Las de vortex-core terminan en «/vortex»: aquí hacen falta las carpetas XDG de arriba.
+    let cache = xdg(vortex_core::rutas::cache());
     let antes = SystemTime::now() - Duration::from_secs(DIAS * 86_400);
 
     let mut libre = 0;
@@ -298,7 +304,7 @@ pub fn principal(args: &[String]) -> i32 {
             libre += borrar_carpetas(&lista);
         }
     }
-    let papelera = vortex_core::rutas::datos().join("Trash");
+    let papelera = xdg(vortex_core::rutas::datos()).join("Trash");
     let (vieja, peso_vieja) = papelera_vieja(&papelera, hoy());
     if solo_ver {
         println!(

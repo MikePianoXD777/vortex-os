@@ -253,7 +253,12 @@ pub fn traducir(url: &str, modelo: &str, texto: &str, a: Destino) -> Result<Stri
 
 /// El modelo que elegiste en Vortexine's Local AI (su config), si hay.
 fn modelo_de_local_ai() -> Option<String> {
-    let c = vortex_core::rutas::datos().join("vortex-local-ai/config.json");
+    // `rutas::datos()` es `~/.local/share/vortex`: la de Local AI está al lado.
+    let datos = vortex_core::rutas::datos();
+    let c = datos
+        .parent()
+        .unwrap_or(&datos)
+        .join("vortex-local-ai/config.json");
     let v: Value = serde_json::from_str(&std::fs::read_to_string(c).ok()?).ok()?;
     ["modelo", "modelo_chat", "ultimo_modelo"]
         .iter()

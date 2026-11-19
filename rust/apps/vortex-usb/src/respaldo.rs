@@ -39,7 +39,10 @@ pub struct Copia {
 
 /// Las carpetas de fábrica: Documentos, Imágenes y Escritorio (las de XDG, con su nombre de verdad).
 pub fn carpetas_de_fabrica(home: &Path) -> Vec<String> {
-    let dirs = fs::read_to_string(vortex_core::rutas::config().join("user-dirs.dirs")).unwrap_or_default();
+    // `rutas::config()` es `~/.config/vortex`: user-dirs.dirs está un nivel arriba.
+    let config = vortex_core::rutas::config();
+    let dirs =
+        fs::read_to_string(config.parent().unwrap_or(&config).join("user-dirs.dirs")).unwrap_or_default();
     ["XDG_DOCUMENTS_DIR", "XDG_PICTURES_DIR", "XDG_DESKTOP_DIR"]
         .iter()
         .zip(["Documentos", "Imágenes", "Escritorio"])
