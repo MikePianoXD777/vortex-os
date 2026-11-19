@@ -1144,6 +1144,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-camera-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "vortex-camera",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-connect"
 version = "1.0.0"
 dependencies = [
