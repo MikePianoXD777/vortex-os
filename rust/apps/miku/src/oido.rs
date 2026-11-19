@@ -56,11 +56,17 @@ fn frases_fantasma() -> &'static Regex {
 /// Nivel en dB de un tramo de 16 bits. Preénfasis y[n] = x[n] - 0,95·x[n-1]: el ruido de fondo es sobre todo
 /// grave y su nivel oscila ±8 dB; así queda estable y la voz sigue ~24 dB por encima.
 pub fn nivel_db(tramo: &[u8]) -> f64 {
-    let a: Vec<f64> = tramo.chunks_exact(2).map(|b| f64::from(i16::from_le_bytes([b[0], b[1]]))).collect();
+    let a: Vec<f64> = tramo
+        .chunks_exact(2)
+        .map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])))
+        .collect();
     if a.len() < 2 {
         return -120.0;
     }
-    let e: f64 = (1..a.len()).map(|i| (a[i] - 0.95 * a[i - 1]).powi(2)).sum::<f64>() / (a.len() - 1) as f64;
+    let e: f64 = (1..a.len())
+        .map(|i| (a[i] - 0.95 * a[i - 1]).powi(2))
+        .sum::<f64>()
+        / (a.len() - 1) as f64;
     10.0 * (e / (32768.0_f64 * 32768.0) + 1e-12).log10()
 }
 
@@ -102,7 +108,11 @@ pub fn envolver_wav(pcm: &[u8], tasa: u32) -> Vec<u8> {
 /// Lo que whisper devolvió, sin marcas ni frases inventadas; vacío si no dijiste nada.
 pub fn limpiar(salida: &str) -> String {
     let texto = salida.split_whitespace().collect::<Vec<_>>().join(" ");
-    let texto = marcas().replace_all(&texto, " ").split_whitespace().collect::<Vec<_>>().join(" ");
+    let texto = marcas()
+        .replace_all(&texto, " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     let limpio = texto.trim_matches(|c: char| " .,;:-¡!¿?…".contains(c));
     if limpio.chars().count() < 2 || frases_fantasma().is_match(limpio) {
         return String::new();
@@ -111,8 +121,20 @@ pub fn limpiar(salida: &str) -> String {
 }
 
 /// Corre un programa con entrada binaria y tiempo límite: (código, salida estándar).
-fn correr_con_entrada(cli: &Path, args: &[String], entrada: Vec<u8>, timeout: Duration, cwd: &Path) -> std::io::Result<(i32, Vec<u8>)> {
-    let mut h = Command::new(cli).args(args).current_dir(cwd).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+fn correr_con_entrada(
+    cli: &Path,
+    args: &[String],
+    entrada: Vec<u8>,
+    timeout: Duration,
+    cwd: &Path,
+) -> std::io::Result<(i32, Vec<u8>)> {
+    let mut h = Command::new(cli)
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
     let mut e = h.stdin.take().unwrap();
     std::thread::spawn(move || {
         let _ = e.write_all(&entrada);
@@ -138,23 +160,58 @@ fn correr_con_entrada(cli: &Path, args: &[String], entrada: Vec<u8>, timeout: Du
 }
 
 /// Pasa audio crudo (16 kHz, 16 bits, mono) a texto con el programa y el modelo dados.
-pub fn transcribir_con(cli: &Path, modelo: &Path, pcm: &[u8], hilos: usize, cwd: &Path, timeout: Duration) -> Result<String, ErrorOido> {
+pub fn transcribir_con(
+    cli: &Path,
+    modelo: &Path,
+    pcm: &[u8],
+    hilos: usize,
+    cwd: &Path,
+    timeout: Duration,
+) -> Result<String, ErrorOido> {
     // -otxt hace que imprima el texto por stdout cuando la entrada es stdin (-f -). El cwd es la carpeta en
     // memoria del usuario: si whisper llegara a escribir algo, no sería en su carpeta de trabajo.
-    let args: Vec<String> = ["-m", &modelo.to_string_lossy(), "-l", "es", "-t", &hilos.to_string(), "-bs", "1", "-bo", "1", "-np", "-nt", "-otxt", "-f", "-"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let args: Vec<String> = [
+        "-m",
+        &modelo.to_string_lossy(),
+        "-l",
+        "es",
+        "-t",
+        &hilos.to_string(),
+        "-bs",
+        "1",
+        "-bo",
+        "1",
+        "-np",
+        "-nt",
+        "-otxt",
+        "-f",
+        "-",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
     match correr_con_entrada(cli, &args, envolver_wav(pcm, RATE as u32), timeout, cwd) {
-        Err(e) => Err(ErrorOido(format!("No pude transcribir lo que dijiste ({:?}).", e.kind()))),
-        Ok((c, _)) if c != 0 => Err(ErrorOido("No pude transcribir lo que dijiste (whisper falló).".into())),
+        Err(e) => Err(ErrorOido(format!(
+            "No pude transcribir lo que dijiste ({:?}).",
+            e.kind()
+        ))),
+        Ok((c, _)) if c != 0 => Err(ErrorOido(
+            "No pude transcribir lo que dijiste (whisper falló).".into(),
+        )),
         Ok((_, s)) => Ok(limpiar(&String::from_utf8_lossy(&s))),
     }
 }
 
 pub fn transcribir(rutas: &Rutas, pcm: &[u8]) -> Result<String, ErrorOido> {
     let (cli, modelo) = encontrar_whisper(rutas)?;
-    transcribir_con(&cli, &modelo, pcm, crate::rutas::hilos(), &rutas.runtime, Duration::from_secs(90))
+    transcribir_con(
+        &cli,
+        &modelo,
+        pcm,
+        crate::rutas::hilos(),
+        &rutas.runtime,
+        Duration::from_secs(90),
+    )
 }
 
 /// Una escucha a la vez. `escuchar()` bloquea hasta tener tu frase (córrelo en un hilo).
@@ -172,7 +229,16 @@ pub struct Oido {
 
 impl Oido {
     pub fn nuevo(silencio: f64, espera: f64) -> Self {
-        Self { silencio, espera, maximo: 30.0, margen_db: 10.0, fuente: None, cortar: AtomicBool::new(false), cancelar: AtomicBool::new(false), pid: AtomicU32::new(0) }
+        Self {
+            silencio,
+            espera,
+            maximo: 30.0,
+            margen_db: 10.0,
+            fuente: None,
+            cortar: AtomicBool::new(false),
+            cancelar: AtomicBool::new(false),
+            pid: AtomicU32::new(0),
+        }
     }
 
     /// «Ya acabé» (clic en el micrófono).
@@ -196,15 +262,47 @@ impl Oido {
     fn abrir_fuente(&self) -> Result<std::process::Child, ErrorOido> {
         let cmd: Vec<String> = if let Some(f) = &self.fuente {
             f.clone()
-        } else if let Some(p) = std::env::var("VORTEX_MIKU_ENTRADA").ok().filter(|p| !p.is_empty()) {
-            ["ffmpeg", "-v", "quiet", "-re", "-i", &p, "-f", "s16le", "-ar", "16000", "-ac", "1", "-"].iter().map(|s| s.to_string()).collect()
+        } else if let Some(p) = std::env::var("VORTEX_MIKU_ENTRADA")
+            .ok()
+            .filter(|p| !p.is_empty())
+        {
+            [
+                "ffmpeg", "-v", "quiet", "-re", "-i", &p, "-f", "s16le", "-ar", "16000", "-ac", "1", "-",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
         } else if sistema::cual("pw-record").is_some() {
             let n = ((self.maximo + self.espera + 2.0) * RATE as f64) as i64;
-            ["pw-record", "--raw", "--rate", "16000", "--channels", "1", "--format", "s16", "--latency", "20ms", "-n", &n.to_string(), "-"].iter().map(|s| s.to_string()).collect()
+            [
+                "pw-record",
+                "--raw",
+                "--rate",
+                "16000",
+                "--channels",
+                "1",
+                "--format",
+                "s16",
+                "--latency",
+                "20ms",
+                "-n",
+                &n.to_string(),
+                "-",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
         } else {
-            return Err(ErrorOido("No encuentro pw-record (PipeWire) para usar el micrófono. Puedes escribirme.".into()));
+            return Err(ErrorOido(
+                "No encuentro pw-record (PipeWire) para usar el micrófono. Puedes escribirme.".into(),
+            ));
         };
-        let h = Command::new(&cmd[0]).args(&cmd[1..]).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn();
+        let h = Command::new(&cmd[0])
+            .args(&cmd[1..])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn();
         let h = h.map_err(|_| ErrorOido("No pude abrir el micrófono. Puedes escribirme.".into()))?;
         self.pid.store(h.id(), Ordering::SeqCst);
         Ok(h)
@@ -213,7 +311,22 @@ impl Oido {
     /// Graba hasta que dejes de hablar. Devuelve el PCM de tu frase, o `None` si nadie habló o se canceló.
     /// `al_nivel(0..1)` se llama ~25 veces por segundo con el volumen del micrófono (para el indicador);
     /// `al_hablar()` una vez, cuando empieza a oír voz.
-    pub fn escuchar(&self, al_nivel: &dyn Fn(f64), al_hablar: Option<&dyn Fn()>) -> Result<Option<Vec<u8>>, ErrorOido> {
+    pub fn escuchar(
+        &self,
+        al_nivel: &dyn Fn(f64),
+        al_hablar: Option<&dyn Fn()>,
+    ) -> Result<Option<Vec<u8>>, ErrorOido> {
+        self.escuchar_con(self.espera, al_nivel, al_hablar)
+    }
+
+    /// Lo mismo, con otra espera (cuánto aguarda a que empieces a hablar): la primera vez y el seguimiento
+    /// no esperan igual.
+    pub fn escuchar_con(
+        &self,
+        espera: f64,
+        al_nivel: &dyn Fn(f64),
+        al_hablar: Option<&dyn Fn()>,
+    ) -> Result<Option<Vec<u8>>, ErrorOido> {
         self.cortar.store(false, Ordering::SeqCst);
         self.cancelar.store(false, Ordering::SeqCst);
         let mut pw = self.abrir_fuente()?;
@@ -245,7 +358,7 @@ impl Oido {
             let d = match rx.recv_timeout(Duration::from_millis(200)) {
                 Ok(d) => d,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
-                    if t_pared.elapsed().as_secs_f64() > self.espera + self.maximo + 5.0 {
+                    if t_pared.elapsed().as_secs_f64() > espera + self.maximo + 5.0 {
                         break; // el flujo se paró
                     }
                     continue;
@@ -296,7 +409,7 @@ impl Oido {
                         if let Some(f) = al_hablar {
                             f();
                         }
-                    } else if t as f64 * ms > self.espera {
+                    } else if t as f64 * ms > espera {
                         nadie = true;
                         break 'fuera;
                     }
@@ -311,7 +424,9 @@ impl Oido {
                         sobre = 0;
                         seguidos_silencio += 1;
                     }
-                    if seguidos_silencio as f64 * ms >= self.silencio || (t - inicio_t) as f64 * ms >= self.maximo {
+                    if seguidos_silencio as f64 * ms >= self.silencio
+                        || (t - inicio_t) as f64 * ms >= self.maximo
+                    {
                         break 'fuera;
                     }
                 }
@@ -341,11 +456,16 @@ mod pruebas {
         let n = (seg * RATE as f64) as usize;
         let mut v = Vec::with_capacity(n * 2);
         for i in 0..n {
-            *semilla = semilla.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            *semilla = semilla
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let ruido = ((*semilla >> 33) as f64 / (1u64 << 31) as f64) * 2.0 - 1.0;
             let x = if tono {
                 let f = i as f64 / RATE as f64;
-                amplitud * ((2.0 * std::f64::consts::PI * 700.0 * f).sin() + 0.5 * (2.0 * std::f64::consts::PI * 1800.0 * f).sin()) / 1.5
+                amplitud
+                    * ((2.0 * std::f64::consts::PI * 700.0 * f).sin()
+                        + 0.5 * (2.0 * std::f64::consts::PI * 1800.0 * f).sin())
+                    / 1.5
             } else {
                 amplitud * ruido
             };
@@ -371,7 +491,12 @@ mod pruebas {
         let voz = tramo_audio(0.02, 8000.0, true, &mut s);
         assert!(nivel_db(&voz) > nivel_db(&ruido) + 30.0);
         // Un zumbido grave de la misma fuerza cuenta mucho menos que la voz (el preénfasis).
-        let zumbido: Vec<u8> = (0..TRAMO).flat_map(|i| (((i as f64 / 16000.0 * 2.0 * std::f64::consts::PI * 60.0).sin() * 8000.0) as i16).to_le_bytes()).collect();
+        let zumbido: Vec<u8> = (0..TRAMO)
+            .flat_map(|i| {
+                (((i as f64 / 16000.0 * 2.0 * std::f64::consts::PI * 60.0).sin() * 8000.0) as i16)
+                    .to_le_bytes()
+            })
+            .collect();
         assert!(nivel_db(&zumbido) < nivel_db(&voz) - 8.0);
     }
 
@@ -385,7 +510,10 @@ mod pruebas {
         let o = con_fuente(dir.path(), "habla.raw", &pcm);
         let empezo = std::sync::atomic::AtomicBool::new(false);
         let hablo = || empezo.store(true, Ordering::SeqCst);
-        let r = o.escuchar(&|_| {}, Some(&hablo)).unwrap().expect("tenía que oírte");
+        let r = o
+            .escuchar(&|_| {}, Some(&hablo))
+            .unwrap()
+            .expect("tenía que oírte");
         assert!(empezo.load(Ordering::SeqCst));
         let seg = r.len() as f64 / 2.0 / RATE as f64;
         // 0,4 s antes de la voz + 1 s de voz + ~0,3 s de cola (se corta tras 1 s de silencio y deja 0,3 s).
@@ -409,14 +537,21 @@ mod pruebas {
         pcm.extend(tramo_audio(0.02, 8000.0, true, &mut s)); // un clic de teclado
         pcm.extend(tramo_audio(3.0, 30.0, false, &mut s));
         let o = con_fuente(dir.path(), "clic.raw", &pcm);
-        assert_eq!(o.escuchar(&|_| {}, None).unwrap(), None, "100 ms seguidos hacen falta");
+        assert_eq!(
+            o.escuchar(&|_| {}, None).unwrap(),
+            None,
+            "100 ms seguidos hacen falta"
+        );
     }
 
     #[test]
     fn sin_micro_dice_que_pasa() {
         let mut o = Oido::nuevo(1.0, 1.0);
         o.fuente = Some(vec!["/no/existe/pw-record".into()]);
-        assert_eq!(o.escuchar(&|_| {}, None).unwrap_err().0, "No pude abrir el micrófono. Puedes escribirme.");
+        assert_eq!(
+            o.escuchar(&|_| {}, None).unwrap_err().0,
+            "No pude abrir el micrófono. Puedes escribirme."
+        );
     }
 
     #[test]
@@ -445,7 +580,12 @@ mod pruebas {
         let malo = dir.path().join("malo");
         std::fs::write(&malo, "#!/bin/sh\nexit 3\n").unwrap();
         crate::sistema::permisos(&malo, 0o755).unwrap();
-        assert!(transcribir_con(&malo, &modelo, &[0u8; 64], 1, dir.path(), Duration::from_secs(5)).unwrap_err().0.contains("whisper falló"));
+        assert!(
+            transcribir_con(&malo, &modelo, &[0u8; 64], 1, dir.path(), Duration::from_secs(5))
+                .unwrap_err()
+                .0
+                .contains("whisper falló")
+        );
     }
 
     #[test]

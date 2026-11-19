@@ -43,7 +43,12 @@ pub const SOY_MAYOR: &str = "Soy mayor de 18 años";
 /// Apagar el modo compañera retira el permiso y desmarca la casilla.
 pub fn apagado() -> Map<String, Value> {
     let mut m = Map::new();
-    for k in ["companera", "companera_consentimiento", "companera_sin_cuenta", "companera_mayor"] {
+    for k in [
+        "companera",
+        "companera_consentimiento",
+        "companera_sin_cuenta",
+        "companera_mayor",
+    ] {
         m.insert(k.into(), json!(false));
     }
     m
@@ -67,15 +72,23 @@ pub fn asomada(nombre: &str, sin_aviso: bool) -> String {
     };
     format!(
         "[Asomada del modo compañera: {contexto}.] Usa ver_camara con motivo «companera» una sola vez y luego dile algo corto (una o dos frases) sobre lo que ves. {PERSONA}{}",
-        if tono(nombre) == "suave" { TONO_SUAVE } else { TONO_CARINOSA }
+        if tono(nombre) == "suave" {
+            TONO_SUAVE
+        } else {
+            TONO_CARINOSA
+        }
     )
 }
 
 pub fn frase_aviso(nombre: &str, sin_aviso: bool) -> &'static str {
     match (tono(nombre), sin_aviso) {
-        ("suave", false) => "Hola. Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no».",
+        ("suave", false) => {
+            "Hola. Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no»."
+        }
         ("suave", true) => "Hola. Me asomo a ver cómo vas y tomo una foto.",
-        (_, false) => "¡Hola! ¡Qué gusto verte! Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no».",
+        (_, false) => {
+            "¡Hola! ¡Qué gusto verte! Me asomo a ver cómo vas: en 5 segundos tomo una foto. Si no quieres, dime «no»."
+        }
         (_, true) => "¡Hola! ¡Qué gusto verte! Me asomo a ver cómo vas y tomo una foto.",
     }
 }
@@ -103,7 +116,11 @@ pub fn es_no(texto: &str) -> bool {
 
 /// «apagar», «dia» o «rato» si la frase es una de las que mandan sobre el modo compañera; si no, "".
 pub fn frase_de_control(texto: &str) -> &'static str {
-    controles().iter().find(|(_, p)| !texto.is_empty() && p.is_match(texto)).map(|(n, _)| *n).unwrap_or("")
+    controles()
+        .iter()
+        .find(|(_, p)| !texto.is_empty() && p.is_match(texto))
+        .map(|(n, _)| *n)
+        .unwrap_or("")
 }
 
 fn escribir(ruta: &Path, texto: &str) -> std::io::Result<()> {
@@ -124,15 +141,35 @@ pub struct Companera {
 
 impl Companera {
     pub fn real() -> Self {
-        let run = std::env::var("QS_RUN_DIR").ok().filter(|v| !v.is_empty()).map(PathBuf::from).unwrap_or_else(|| {
-            PathBuf::from(std::env::var("XDG_RUNTIME_DIR").ok().filter(|v| !v.is_empty()).unwrap_or_else(|| "/nonexistent".into())).join("serpantinum")
-        });
-        Self { estado: vortex_core::rutas::estado(), config: vortex_core::rutas::config(), bloqueo: run.join("lock/locked"), ahora_fija: None }
+        let run = std::env::var("QS_RUN_DIR")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(
+                    std::env::var("XDG_RUNTIME_DIR")
+                        .ok()
+                        .filter(|v| !v.is_empty())
+                        .unwrap_or_else(|| "/nonexistent".into()),
+                )
+                .join("serpantinum")
+            });
+        Self {
+            estado: vortex_core::rutas::estado(),
+            config: vortex_core::rutas::config(),
+            bloqueo: run.join("lock/locked"),
+            ahora_fija: None,
+        }
     }
 
     /// Todo en una carpeta (las pruebas).
     pub fn de_prueba(base: &Path) -> Self {
-        Self { estado: base.join("estado"), config: base.join("config"), bloqueo: base.join("run/lock/locked"), ahora_fija: None }
+        Self {
+            estado: base.join("estado"),
+            config: base.join("config"),
+            bloqueo: base.join("run/lock/locked"),
+            ahora_fija: None,
+        }
     }
 
     pub fn ahora(&self) -> FechaHora {
@@ -148,7 +185,10 @@ impl Companera {
     }
 
     pub fn leer_estado(&self) -> Map<String, Value> {
-        match std::fs::read_to_string(self.ruta_estado()).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+        match std::fs::read_to_string(self.ruta_estado())
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        {
             Some(Value::Object(m)) => m,
             _ => Map::new(),
         }
@@ -160,7 +200,11 @@ impl Companera {
     }
 
     pub fn veces_hoy(&self, ahora: &FechaHora, e: &Map<String, Value>) -> i64 {
-        if e.get("dia").and_then(Value::as_str) == Some(&ahora.fecha_iso()) { e.get("veces").and_then(Value::as_i64).unwrap_or(0) } else { 0 }
+        if e.get("dia").and_then(Value::as_str) == Some(&ahora.fecha_iso()) {
+            e.get("veces").and_then(Value::as_i64).unwrap_or(0)
+        } else {
+            0
+        }
     }
 
     /// Se asomó (aunque luego le digas que no): cuenta para el intervalo y el tope del día.
@@ -177,7 +221,11 @@ impl Companera {
     pub fn callar(&self, como: &str) -> FechaHora {
         let ahora = self.ahora();
         let hasta = if como == "dia" {
-            if ahora.hora < SILENCIO_HASTA { ahora.con_hora(SILENCIO_HASTA, 0) } else { ahora.mas_segundos(86_400).con_hora(SILENCIO_HASTA, 0) }
+            if ahora.hora < SILENCIO_HASTA {
+                ahora.con_hora(SILENCIO_HASTA, 0)
+            } else {
+                ahora.mas_segundos(86_400).con_hora(SILENCIO_HASTA, 0)
+            }
         } else {
             ahora.mas_segundos(CALLADA_MIN * 60)
         };
@@ -244,13 +292,32 @@ impl Companera {
         if lineas.len() > LINEAS_BITACORA - 1 {
             lineas.drain(..lineas.len() - (LINEAS_BITACORA - 1));
         }
-        let corto: String = evento.trim().lines().next().unwrap_or("").chars().take(200).collect();
-        lineas.push(format!("{} {:02}:{:02} · {corto}", ahora.fecha_iso(), ahora.hora, ahora.minuto));
+        let corto: String = evento
+            .trim()
+            .lines()
+            .next()
+            .unwrap_or("")
+            .chars()
+            .take(200)
+            .collect();
+        lineas.push(format!(
+            "{} {:02}:{:02} · {corto}",
+            ahora.fecha_iso(),
+            ahora.hora,
+            ahora.minuto
+        ));
         let _ = escribir(&self.ruta_bitacora(), &(lineas.join("\n") + "\n"));
     }
 
     pub fn leer_bitacora(&self) -> Vec<String> {
-        std::fs::read_to_string(self.ruta_bitacora()).map(|t| t.lines().filter(|l| !l.trim().is_empty()).map(String::from).collect()).unwrap_or_default()
+        std::fs::read_to_string(self.ruta_bitacora())
+            .map(|t| {
+                t.lines()
+                    .filter(|l| !l.trim().is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub fn borrar_bitacora(&self) {
@@ -263,7 +330,12 @@ mod pruebas {
     use super::*;
 
     fn cfg_activa() -> Config {
-        Config { companera: true, companera_consentimiento: true, camara: true, ..Config::default() }
+        Config {
+            companera: true,
+            companera_consentimiento: true,
+            camara: true,
+            ..Config::default()
+        }
     }
 
     fn en(base: &Path, ahora: &str) -> Companera {
@@ -274,7 +346,15 @@ mod pruebas {
 
     #[test]
     fn lo_que_dices_en_la_cuenta() {
-        for si in ["no", "No, gracias", "¡nel!", "ahorita no", "espera un momento", "cancela", "déjame en paz"] {
+        for si in [
+            "no",
+            "No, gracias",
+            "¡nel!",
+            "ahorita no",
+            "espera un momento",
+            "cancela",
+            "déjame en paz",
+        ] {
             assert!(es_no(si), "{si}");
         }
         for no in ["claro", "sí, tómala", "", "nunca había visto eso"] {
@@ -305,8 +385,14 @@ mod pruebas {
         assert_eq!(c.motivo_para_no(&cfg, None), "pausa");
         std::fs::remove_file(c.config.join("claude-pausa")).unwrap();
         // De noche no.
-        assert_eq!(en(d.path(), "2026-11-19T23:10").motivo_para_no(&cfg, None), "horas-de-silencio");
-        assert_eq!(en(d.path(), "2026-11-19T08:59").motivo_para_no(&cfg, None), "horas-de-silencio");
+        assert_eq!(
+            en(d.path(), "2026-11-19T23:10").motivo_para_no(&cfg, None),
+            "horas-de-silencio"
+        );
+        assert_eq!(
+            en(d.path(), "2026-11-19T08:59").motivo_para_no(&cfg, None),
+            "horas-de-silencio"
+        );
         // Pantalla bloqueada.
         std::fs::create_dir_all(c.bloqueo.parent().unwrap()).unwrap();
         std::fs::write(&c.bloqueo, "").unwrap();
@@ -319,13 +405,19 @@ mod pruebas {
         let cfg = cfg_activa();
         let c = en(d.path(), "2026-11-19T10:00");
         c.contar_asomada();
-        assert_eq!(en(d.path(), "2026-11-19T10:30").motivo_para_no(&cfg, None), "muy-pronto");
+        assert_eq!(
+            en(d.path(), "2026-11-19T10:30").motivo_para_no(&cfg, None),
+            "muy-pronto"
+        );
         assert_eq!(en(d.path(), "2026-11-19T10:46").motivo_para_no(&cfg, None), "");
         for h in ["10:46", "11:40", "12:30", "13:20", "14:10"] {
             en(d.path(), &format!("2026-11-19T{h}")).contar_asomada();
         }
         assert_eq!(c.leer_estado()["veces"], 6);
-        assert_eq!(en(d.path(), "2026-11-19T20:00").motivo_para_no(&cfg, None), "tope-del-dia");
+        assert_eq!(
+            en(d.path(), "2026-11-19T20:00").motivo_para_no(&cfg, None),
+            "tope-del-dia"
+        );
         // Otro día, vuelve a contar desde cero.
         assert_eq!(en(d.path(), "2026-11-20T10:00").motivo_para_no(&cfg, None), "");
     }
@@ -336,10 +428,16 @@ mod pruebas {
         let cfg = cfg_activa();
         let c = en(d.path(), "2026-11-19T15:00");
         assert_eq!(c.callar("rato").iso_segundos(), "2026-11-19T17:00:00");
-        assert_eq!(en(d.path(), "2026-11-19T16:59").motivo_para_no(&cfg, None), "callada");
+        assert_eq!(
+            en(d.path(), "2026-11-19T16:59").motivo_para_no(&cfg, None),
+            "callada"
+        );
         assert_eq!(en(d.path(), "2026-11-19T17:01").motivo_para_no(&cfg, None), "");
         assert_eq!(c.callar("dia").iso_segundos(), "2026-11-20T09:00:00");
-        assert_eq!(en(d.path(), "2026-11-20T08:00").callar("dia").iso_segundos(), "2026-11-20T09:00:00");
+        assert_eq!(
+            en(d.path(), "2026-11-20T08:00").callar("dia").iso_segundos(),
+            "2026-11-20T09:00:00"
+        );
         assert_eq!(en(d.path(), "2026-11-20T10:00").motivo_para_no(&cfg, None), "");
     }
 
@@ -348,7 +446,10 @@ mod pruebas {
         let d = tempfile::tempdir().unwrap();
         let c = en(d.path(), "2026-11-19T15:07");
         c.anotar("Foto con la cámara\nsegunda línea que no se guarda");
-        assert_eq!(c.leer_bitacora(), vec!["2026-11-19 15:07 · Foto con la cámara".to_string()]);
+        assert_eq!(
+            c.leer_bitacora(),
+            vec!["2026-11-19 15:07 · Foto con la cámara".to_string()]
+        );
         for i in 0..520 {
             c.anotar(&format!("evento {i}"));
         }
@@ -364,11 +465,28 @@ mod pruebas {
     #[test]
     fn la_asomada_lleva_su_persona() {
         let a = asomada("carinosa", false);
-        assert!(a.contains("ver_camara con motivo «companera»") && a.contains("Línea de la Vida") && a.contains("Tono cariñoso"));
-        assert!(asomada("suave", true).contains("sin cuenta atrás") && asomada("suave", true).contains("Tono suave"));
+        assert!(
+            a.contains("ver_camara con motivo «companera»")
+                && a.contains("Línea de la Vida")
+                && a.contains("Tono cariñoso")
+        );
+        assert!(
+            asomada("suave", true).contains("sin cuenta atrás")
+                && asomada("suave", true).contains("Tono suave")
+        );
         assert_eq!(tono("rara"), "carinosa");
         assert!(frase_aviso("suave", false).starts_with("Hola."));
-        assert!(sin_cuenta(&Config { companera_sin_cuenta: true, companera_mayor: true, ..cfg_activa() }));
-        assert!(!sin_cuenta(&Config { companera_sin_cuenta: true, ..cfg_activa() }), "sin la mayoría de edad no vale");
+        assert!(sin_cuenta(&Config {
+            companera_sin_cuenta: true,
+            companera_mayor: true,
+            ..cfg_activa()
+        }));
+        assert!(
+            !sin_cuenta(&Config {
+                companera_sin_cuenta: true,
+                ..cfg_activa()
+            }),
+            "sin la mayoría de edad no vale"
+        );
     }
 }

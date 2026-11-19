@@ -109,7 +109,12 @@ impl FechaHora {
 
     /// Esta misma fecha a otra hora del día.
     pub fn con_hora(&self, hora: u32, minuto: u32) -> Self {
-        Self { hora, minuto, segundo: 0, ..*self }
+        Self {
+            hora,
+            minuto,
+            segundo: 0,
+            ..*self
+        }
     }
 
     /// «dd/mm/AAAA».
@@ -136,7 +141,14 @@ pub fn desde_segundos_pared(s: i64) -> FechaHora {
     let dia = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let mes = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     let anio = (yoe + era * 400 + i64::from(mes <= 2)) as i32;
-    FechaHora { anio, mes, dia, hora: (resto / 3600) as u32, minuto: (resto % 3600 / 60) as u32, segundo: (resto % 60) as u32 }
+    FechaHora {
+        anio,
+        mes,
+        dia,
+        hora: (resto / 3600) as u32,
+        minuto: (resto % 3600 / 60) as u32,
+        segundo: (resto % 60) as u32,
+    }
 }
 
 #[allow(unsafe_code)] // localtime_r de libc: no hay otra forma de saber la zona sin una crate
@@ -230,7 +242,13 @@ mod pruebas {
         let f = FechaHora::leer("2026-11-19T23:30:15").unwrap();
         assert_eq!(f.mas_segundos(45 * 60).iso_segundos(), "2026-11-20T00:15:15");
         assert_eq!(desde_segundos_pared(f.segundos()), f);
-        assert_eq!(FechaHora::leer("2028-02-28T12:00").unwrap().mas_segundos(86_400).fecha_iso(), "2028-02-29");
+        assert_eq!(
+            FechaHora::leer("2028-02-28T12:00")
+                .unwrap()
+                .mas_segundos(86_400)
+                .fecha_iso(),
+            "2028-02-29"
+        );
         assert_eq!(f.con_hora(9, 0).iso_segundos(), "2026-11-19T09:00:00");
     }
 }
