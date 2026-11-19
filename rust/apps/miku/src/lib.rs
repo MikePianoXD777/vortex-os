@@ -18,6 +18,7 @@ pub mod grabacion;
 pub mod http;
 pub mod ia;
 pub mod mcp;
+pub mod momentos;
 pub mod oido;
 pub mod permiso_web;
 pub mod rutas;
