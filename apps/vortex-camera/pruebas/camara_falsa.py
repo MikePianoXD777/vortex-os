@@ -1,5 +1,7 @@
 """Una cámara de mentiras para las pruebas: un servidor RTSP mínimo que manda la imagen de prueba de
-ffmpeg (testsrc, H.264) a quien la pida, con usuario y contraseña (Basic), como una Imou.
+ffmpeg (testsrc, H.264) a quien la pida, con usuario y contraseña. Pide Digest con la misma cabecera que
+una Imou de verdad (`Digest realm="Login to …",nonce="…"`, sin qop ni espacio tras la coma); con
+digest=False pide Basic, como algunas Dahua viejas.
 
     python3 pruebas/camara_falsa.py 8554 admin CODIGO     # y se ve con: ffplay rtsp://admin:CODIGO@127.0.0.1:8554/cam/realmonitor?channel=1&subtype=1
 
@@ -9,7 +11,9 @@ Solo entiende lo que usan ffmpeg y Qt: OPTIONS, DESCRIBE, SETUP (por TCP interca
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -19,8 +23,9 @@ import time
 
 
 class CamaraFalsa:
-    def __init__(self, puerto: int = 0, usuario: str = "admin", codigo: str = "L2C3D4E5"):
-        self.usuario, self.codigo = usuario, codigo
+    def __init__(self, puerto: int = 0, usuario: str = "admin", codigo: str = "L2C3D4E5", digest: bool = True):
+        self.usuario, self.codigo, self.digest = usuario, codigo, digest
+        self.realm = "Login to 9A0B1C2D3E4F5A6B"
         self.rutas: list[str] = []
         self._clientes: list[socket.socket] = []
         self._candado = threading.Lock()
@@ -88,7 +93,7 @@ class CamaraFalsa:
 
     def _atender(self, c: socket.socket) -> None:
         buffer = b""
-        esperado = "Basic " + base64.b64encode(f"{self.usuario}:{self.codigo}".encode()).decode()
+        nonce = os.urandom(8).hex()
         try:
             while self._vivo:
                 while b"\r\n\r\n" not in buffer:
@@ -110,8 +115,10 @@ class CamaraFalsa:
                 if metodo == "OPTIONS":
                     self._responder(c, cseq, "200 OK", {"Public": "OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN"})
                     continue
-                if h.get("authorization") != esperado:
-                    self._responder(c, cseq, "401 Unauthorized", {"WWW-Authenticate": 'Basic realm="Login to camara"'})
+                if not self._autorizado(metodo, h.get("authorization", ""), nonce):
+                    desafio = (f'Digest realm="{self.realm}",nonce="{nonce}"' if self.digest
+                               else f'Basic realm="{self.realm}"')
+                    self._responder(c, cseq, "401 Unauthorized", {"WWW-Authenticate": desafio})
                     continue
                 if metodo == "DESCRIBE":
                     self.rutas.append(ruta.split("@")[-1] if "://" not in ruta else ruta.split("/", 3)[-1])
@@ -140,6 +147,18 @@ class CamaraFalsa:
                 if c in self._clientes:
                     self._clientes.remove(c)
             c.close()
+
+    def _autorizado(self, metodo: str, cabecera: str, nonce: str) -> bool:
+        if not self.digest:
+            return cabecera == "Basic " + base64.b64encode(f"{self.usuario}:{self.codigo}".encode()).decode()
+        if not cabecera.startswith("Digest "):
+            return False
+        f = dict(re.findall(r'(\w+)="?([^",]*)"?', cabecera))
+        if f.get("username") != self.usuario or f.get("realm") != self.realm or f.get("nonce") != nonce:
+            return False
+        ha1 = hashlib.md5(f"{self.usuario}:{self.realm}:{self.codigo}".encode()).hexdigest()
+        ha2 = hashlib.md5(f"{metodo}:{f.get('uri', '')}".encode()).hexdigest()
+        return f.get("response") == hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest()
 
     def _responder(self, c: socket.socket, cseq: str, estado: str, cabeceras: dict, cuerpo: str = "") -> None:
         texto = f"RTSP/1.0 {estado}\r\nCSeq: {cseq}\r\n"

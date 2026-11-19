@@ -1,6 +1,9 @@
 // Un cuadro del mosaico: el video en vivo de una cámara (el subflujo, el ligero; el principal si es el
 // único cuadro), con su nombre abajo y el punto rojo si se está grabando. Doble clic la abre en grande;
-// clic derecho, el menú. Vacío, ofrece poner una cámara. Si se cae, se reintenta solo cada 8 segundos.
+// clic derecho, el menú. Vacío, ofrece poner una cámara. Solo se conecta cuando el puente ya revisó que
+// la cámara contesta y acepta el código: las Dahua/Imou bloquean el usuario tras varios intentos
+// fallidos, así que con el código malo no se reintenta (hasta que la edites). Si el video se cae
+// estando en línea, se reintenta solo cada 8 segundos.
 import QtQuick
 import QtQuick.Controls.Basic
 import QtMultimedia
@@ -17,8 +20,8 @@ Rectangle {
     signal quitarDeAqui(int pos)
 
     readonly property var info: { cam.camaras; return camId ? cam.camara(camId) : ({}) }
-    readonly property string url: { cam.camaras; return camId !== "" && activo ? cam.urlVivo(camId, principal) : "" }
     readonly property string estado: cam.estados[camId] || ""
+    readonly property string url: { cam.camaras; return camId !== "" && activo && estado === "en_linea" ? cam.urlVivo(camId, principal) : "" }
     readonly property bool grabando: cam.grabando[camId] === true
     readonly property bool conVideo: player.hasVideo && player.playbackState === MediaPlayer.PlayingState
                                      && player.mediaStatus !== MediaPlayer.LoadingMedia
@@ -78,8 +81,9 @@ Rectangle {
             visible: raiz.height > 90
             text: raiz.camId === "" ? (cam.camaras.length ? "Poner una cámara" : "")
                 : raiz.estado === "sin_ip" ? "Sin IP · edítala"
-                : raiz.estado === "codigo" ? "Código incorrecto · edítala"
+                : raiz.estado === "codigo" ? "No aceptó el código · edítala"
                 : raiz.fallo || raiz.estado === "sin_conexion" ? "Sin señal · reintentando"
+                : raiz.estado === "" || raiz.estado === "revisando" ? "Revisando…"
                 : "Conectando…"
             color: Tema.tenue
             font.pixelSize: raiz.width > 260 ? 13 : 11
@@ -161,7 +165,7 @@ Rectangle {
             onTriggered: cam.alternarGrabar(raiz.camId)
         }
         OpcionMenu { text: "Cambiar de cámara…"; icono: "camara"; onTriggered: raiz.elegirCamara(raiz.pos) }
-        OpcionMenu { text: "Volver a conectar"; icono: "girar"; onTriggered: raiz.reproducir() }
+        OpcionMenu { text: "Volver a conectar"; icono: "girar"; onTriggered: { cam.reintentar(raiz.camId); raiz.reproducir() } }
         OpcionMenu { text: "Quitar de este cuadro"; icono: "cerrar"; onTriggered: raiz.quitarDeAqui(raiz.pos) }
     }
 }

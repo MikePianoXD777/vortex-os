@@ -4,8 +4,10 @@ Las Imou/Dahua contestan a la búsqueda DHIP: un paquete UDP al puerto 37810 (a 
 broadcast) con {"method": "DHDiscover.search"}. Cada cámara responde con su número de serie, IP, modelo
 y MAC, así que con el número de serie de la etiqueta se sabe cuál es cuál aunque cambie de IP.
 
-Si la red no deja pasar esa búsqueda (algunos módems la bloquean), `escanear` prueba el puerto 37777
-(el de Dahua) y el 554 (RTSP) en tu red /24: encuentra la IP, pero no el número de serie.
+Si no contesta nadie (el firewall de la PC tira las respuestas al grupo y al broadcast, porque no
+salen de la IP a la que se preguntó; algunos módems también las bloquean), `buscar_todo` escanea el
+puerto 37777 (el de Dahua) y el 554 (RTSP) en tu red /24 y le hace la misma pregunta a cada IP que
+contestó, directo: así sí pasa el firewall y se sabe el número de serie.
 
 Las cámaras de otras casas (por Tailscale) no salen en ninguna búsqueda: se escribe su IP a mano.
 """
@@ -167,6 +169,18 @@ def probar_rtsp(ip: str, puerto: int, ruta: str, usuario: str, clave: str, esper
     if codigo in (401, 403):
         return "codigo"
     return "error" if codigo else "sin_conexion"
+
+
+def buscar_todo(segundos: float = 2.5) -> list[dict]:
+    """Primero la búsqueda al grupo; si nadie contesta, escanear y preguntar a cada IP directo."""
+    halladas = buscar(segundos)
+    if halladas:
+        return halladas
+    ips = escanear()
+    if not ips:
+        return []
+    directas = {c["ip"]: c for c in buscar(segundos, destinos=[(c["ip"], PUERTO_DHIP) for c in ips])}
+    return [directas.get(c["ip"], c) for c in ips]
 
 
 def escanear(puertos: tuple[int, ...] = (37777, 554), espera: float = 0.4) -> list[dict]:

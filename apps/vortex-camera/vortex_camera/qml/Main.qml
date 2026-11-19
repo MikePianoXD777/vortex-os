@@ -184,7 +184,7 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                     text: (fila.grabando ? "● Grabando · " : "")
                                         + (fila.estado === "en_linea" ? "En línea" : fila.estado === "sin_conexion" ? "Sin conexión"
-                                           : fila.estado === "sin_ip" ? "Sin IP" : fila.estado === "codigo" ? "Código incorrecto" : "Revisando…")
+                                           : fila.estado === "sin_ip" ? "Sin IP" : fila.estado === "codigo" ? "No aceptó el código" : "Revisando…")
                                     color: fila.grabando ? Tema.peligro : Tema.tenue
                                     font.pixelSize: 11
                                     elide: Text.ElideRight

@@ -89,6 +89,12 @@ class Puente(QObject):
         c = self._almacen.camara(ident)
         return c.publica() if c else {}
 
+    @Slot(str, result=str)
+    def codigoGuardado(self, ident: str) -> str:
+        """Solo para el ojito de «Editar»: comparar con la etiqueta lo que quedó guardado."""
+        c = self._almacen.camara(ident)
+        return c.codigo if c else ""
+
     # --- video ---
 
     @Slot(str, bool, result=str)
@@ -121,7 +127,7 @@ class Puente(QObject):
         if not limpio.get("nombre"):
             return limpio, "Ponle un nombre a la cámara."
         if nueva and not limpio.get("codigo"):
-            return limpio, "Falta el código de seguridad: viene en la etiqueta de la cámara."
+            return limpio, "Falta el código de seguridad (viene en la etiqueta) o, en las Imou viejas, la contraseña que se le puso en Imou Life."
         if not nueva and not limpio.get("codigo"):
             limpio.pop("codigo", None)                # en blanco al editar: se queda el que tenía
         if not limpio.get("ip") and not limpio_serie(limpio.get("serie", "")):
@@ -145,7 +151,7 @@ class Puente(QObject):
         if not c.ip:
             self._buscar(silencioso=False, nueva=c.id)
         else:
-            self._revisar([c.id])
+            self._revisar([c.id], forzar=True)
         return ""
 
     @Slot(str, "QVariantMap", result=str)
@@ -159,7 +165,7 @@ class Puente(QObject):
         self.camarasCambio.emit()
         self.ventanasCambio.emit()          # para que los cuadros vuelvan a pedir su URL
         if c.ip:
-            self._revisar([c.id])
+            self._revisar([c.id], forzar=True)
         else:
             self._buscar(silencioso=False, nueva=c.id)
         return ""
@@ -187,10 +193,10 @@ class Puente(QObject):
         self.busquedaCambio.emit()
 
         def trabajo() -> list[dict]:
-            halladas = descubrir.buscar()
-            if not halladas and not silencioso:
-                halladas = descubrir.escanear()
-            return halladas
+            # Al abrir (silencioso) solo hace falta si hay cámaras con número de serie, para corregir su IP.
+            if silencioso and not any(c.serie for c in self._almacen.camaras):
+                return []
+            return descubrir.buscar_todo()
 
         def listo(halladas: list[dict]) -> None:
             self._buscando = False
@@ -206,7 +212,7 @@ class Puente(QObject):
             if cambiaron:
                 self.camarasCambio.emit()
                 self.ventanasCambio.emit()
-                self._revisar(cambiaron)
+                self._revisar(cambiaron, forzar=True)
             if nueva:
                 c = self._almacen.camara(nueva)
                 if c is not None and not c.ip:
@@ -229,14 +235,24 @@ class Puente(QObject):
     def revisarEstados(self) -> None:
         self._revisar([c.id for c in self._almacen.camaras])
 
-    def _revisar(self, ids: list[str]) -> None:
+    @Slot(str)
+    def reintentar(self, ident: str) -> None:
+        """«Volver a intentar» a mano, aunque no haya aceptado el código."""
+        self._revisar([ident], forzar=True)
+
+    def _revisar(self, ids: list[str], forzar: bool = False) -> None:
+        """¿Contesta y acepta el código? Las Dahua/Imou bloquean el usuario tras varios intentos
+        fallidos: a una que ya no aceptó el código no se le vuelve a preguntar sola (solo al editarla
+        o con «Volver a intentar»)."""
         camaras = [c for c in (self._almacen.camara(i) for i in ids) if c is not None]
+        if not forzar:
+            camaras = [c for c in camaras if self._estados.get(c.id) != "codigo"]
         if not camaras:
             return
         for c in camaras:
             if not c.ip:
                 self._estados[c.id] = "sin_ip"
-            elif c.id not in self._estados or self._estados[c.id] == "sin_ip":
+            elif forzar or c.id not in self._estados or self._estados[c.id] == "sin_ip":
                 self._estados[c.id] = "revisando"
         self.estadosCambio.emit()
         con_ip = [(c.id, c.ip, c.puerto, f"/cam/realmonitor?channel={c.canal}&subtype=1", c.usuario, c.codigo)
@@ -319,14 +335,15 @@ class Puente(QObject):
         c = self._almacen.camara(ident)
         if c is None or not c.ip or direccion not in ptz.DIRECCIONES:
             return
+        antes = c.ptz    # `trabajo` cambia c.ptz en el hilo: se compara con lo que había
 
         def listo(metodo: str) -> None:
-            if c.ptz != metodo:
+            if antes != metodo:
                 self._almacen.actualizar(ident, {"ptz": metodo})
                 self.camarasCambio.emit()
 
         def fallo(e: BaseException) -> None:
-            if c.ptz == "":    # nunca había funcionado: se marca para esconder las flechas
+            if antes == "":    # nunca había funcionado: se marca para esconder las flechas
                 self._almacen.actualizar(ident, {"ptz": "no"})
                 self.camarasCambio.emit()
                 self.aviso.emit(f"«{c.nombre}» no se deja mover desde la PC.", True)

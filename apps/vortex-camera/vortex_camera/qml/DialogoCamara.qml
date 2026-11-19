@@ -100,9 +100,14 @@ Popup {
                 Entrada {
                     id: codigo
                     Layout.fillWidth: true
-                    etiqueta: "Código de seguridad"
+                    etiqueta: "Código de seguridad o contraseña"
                     placeholderText: raiz.editando ? "Igual que antes" : "L2C3D4E5"
                     secreto: true
+                    ayuda: "El de la etiqueta (SC); las Imou viejas sin SC usan la contraseña que se le puso al agregarla "
+                         + "en Imou Life. Ojo: 0 (cero) y O, 1 (uno) e I se parecen; con el ojito lo ves "
+                         + "en una letra donde no se confunden."
+                    // Editando, el ojito enseña el que quedó guardado para compararlo con la etiqueta.
+                    onMostrarChanged: if (mostrar && raiz.editando && text === "") text = cam.codigoGuardado(raiz.camId)
                     onAceptado: raiz.guardar()
                 }
             }

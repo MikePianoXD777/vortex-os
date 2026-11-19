@@ -1,5 +1,5 @@
 // Campo de texto en píldora con su etiqueta arriba (los formularios). «secreto» lo esconde y le pone
-// el ojito para verlo.
+// el ojito para verlo; ya visible va en letra de máquina, donde 0 y O, 1 e I no se confunden.
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
@@ -35,6 +35,8 @@ ColumnLayout {
         selectionColor: Tema.realceFuerte
         selectedTextColor: Tema.texto
         font.pixelSize: 14
+        font.family: raiz.secreto && raiz.mostrar ? "monospace" : ""
+        font.letterSpacing: raiz.secreto && raiz.mostrar ? 2 : 0
         echoMode: raiz.secreto && !raiz.mostrar ? TextInput.Password : TextInput.Normal
         onAccepted: raiz.aceptado()
         inputMethodHints: raiz.secreto ? Qt.ImhSensitiveData | Qt.ImhNoPredictiveText : Qt.ImhNone

@@ -15,9 +15,10 @@ Rectangle {
     signal verGrabaciones(string id)
 
     readonly property var info: { cam.camaras; return camId ? cam.camara(camId) : ({}) }
-    readonly property string url: { cam.camaras; return camId !== "" && activo ? cam.urlVivo(camId, true) : "" }
-    readonly property bool grabando: cam.grabando[camId] === true
     readonly property string estado: cam.estados[camId] || ""
+    // Como en el mosaico: solo con la cámara en línea (con el código malo no se insiste: se bloquea).
+    readonly property string url: { cam.camaras; return camId !== "" && activo && estado === "en_linea" ? cam.urlVivo(camId, true) : "" }
+    readonly property bool grabando: cam.grabando[camId] === true
     readonly property bool conVideo: player.hasVideo && player.playbackState === MediaPlayer.PlayingState
                                      && player.mediaStatus !== MediaPlayer.LoadingMedia
                                      && player.mediaStatus !== MediaPlayer.StalledMedia
@@ -63,7 +64,7 @@ Rectangle {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: raiz.estado === "sin_ip" ? "Esta cámara no tiene IP: edítala para escribirla."
-                : raiz.estado === "codigo" ? "La cámara no aceptó el código de seguridad: edítala para corregirlo."
+                : raiz.estado === "codigo" ? "La cámara no aceptó el código. Revísalo en Editar; si está bien, espera un rato: tras varios intentos fallidos se bloquea."
                 : raiz.fallo || raiz.estado === "sin_conexion" ? "Sin señal. Reintentando…" : "Conectando…"
             color: Tema.suave
             font.pixelSize: 14
@@ -142,7 +143,7 @@ Rectangle {
                 onClicked: cam.alternarGrabar(raiz.camId)
             }
             Boton { tipo: "fantasma"; icono: "historial"; text: "Grabaciones"; onClicked: raiz.verGrabaciones(raiz.camId) }
-            Boton { tipo: "fantasma"; icono: "girar"; text: "Reconectar"; onClicked: raiz.reproducir() }
+            Boton { tipo: "fantasma"; icono: "girar"; text: "Reconectar"; onClicked: { cam.reintentar(raiz.camId); raiz.reproducir() } }
         }
     }
 

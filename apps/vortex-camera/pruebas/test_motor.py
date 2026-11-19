@@ -147,6 +147,26 @@ class PruebaDescubrir(unittest.TestCase):
         self.assertEqual(halladas, [{"serie": "9A0B1C2D", "ip": "192.168.1.77", "modelo": "IPC-K42",
                                      "mac": "aa:bb:cc:00:11:22", "version": ""}])
 
+    def test_si_nadie_contesta_al_grupo_pregunta_directo(self):
+        llamadas = []
+        antes = (descubrir.buscar, descubrir.escanear)
+
+        def buscar(segundos=2.5, destinos=None):
+            llamadas.append(destinos)
+            if destinos is None:
+                return []            # el firewall tiró las respuestas al grupo
+            return [{"serie": "7E04ABC", "ip": "192.168.1.7", "modelo": "IPC-S22F", "mac": "", "version": ""}]
+
+        descubrir.buscar = buscar
+        descubrir.escanear = lambda: [{"serie": "", "ip": "192.168.1.7", "modelo": "", "mac": "", "version": ""},
+                                      {"serie": "", "ip": "192.168.1.9", "modelo": "", "mac": "", "version": ""}]
+        try:
+            halladas = descubrir.buscar_todo()
+        finally:
+            descubrir.buscar, descubrir.escanear = antes
+        self.assertEqual(llamadas, [None, [("192.168.1.7", 37810), ("192.168.1.9", 37810)]])
+        self.assertEqual([(c["serie"], c["ip"]) for c in halladas], [("7E04ABC", "192.168.1.7"), ("", "192.168.1.9")])
+
     def test_interpretar_ignora_lo_propio(self):
         self.assertIsNone(descubrir.interpretar(descubrir.paquete_busqueda()))
         self.assertIsNone(descubrir.interpretar(b"DHIP{roto"))
@@ -176,6 +196,26 @@ class PruebaConCamaraFalsa(unittest.TestCase):
         puerto_libre = libre.getsockname()[1]
         libre.close()
         self.assertEqual(descubrir.probar_rtsp("127.0.0.1", puerto_libre, ruta, "admin", "x", 1), "sin_conexion")
+
+    def test_basic_de_las_dahua_viejas(self):
+        vieja = CamaraFalsa(digest=False)
+        try:
+            ruta = "/cam/realmonitor?channel=1&subtype=1"
+            self.assertEqual(descubrir.probar_rtsp("127.0.0.1", vieja.puerto, ruta, "admin", vieja.codigo), "ok")
+            self.assertEqual(descubrir.probar_rtsp("127.0.0.1", vieja.puerto, ruta, "admin", "MALO"), "codigo")
+        finally:
+            vieja.cerrar()
+
+    def test_codigo_con_simbolos(self):
+        # Una contraseña cambiada en Imou Life puede llevar @, :, / o #: en la URL van escapados.
+        rara = CamaraFalsa(codigo="Ab#1@x:y/Z%")
+        try:
+            c = Camara.desde({"id": "x", "nombre": "R", "codigo": rara.codigo, "ip": "127.0.0.1", "puerto": rara.puerto})
+            ruta = "/cam/realmonitor?channel=1&subtype=1"
+            self.assertEqual(descubrir.probar_rtsp("127.0.0.1", rara.puerto, ruta, "admin", rara.codigo), "ok")
+            self.assertGreater(grabar.foto(c.url_vivo(), Path(self.dir.name), "R").stat().st_size, 1000)
+        finally:
+            rara.cerrar()
 
     def test_autorizacion_digest(self):
         cab = descubrir._autorizacion('Digest realm="Login to 9A0B", nonce="abc"', "DESCRIBE", "rtsp://h/x", "admin", "L2C")
@@ -290,6 +330,22 @@ class PruebaPtz(unittest.TestCase):
         self.cam.ptz = "cgi"
         ptz.parar(self.cam, "arriba")
         self.assertEqual(_Onvif.vistos, [("/cgi-bin/ptz.cgi", "start", "Up"), ("/cgi-bin/ptz.cgi", "stop", "Up")])
+
+    def test_el_puente_recuerda_como_se_mueve(self):
+        # Antes `trabajo` cambiaba c.ptz en el hilo y `listo` ya no veía la diferencia: nunca se guardaba.
+        from PySide6.QtCore import QCoreApplication, QTimer
+        from vortex_camera.puente import Puente
+        app = QCoreApplication.instance() or QCoreApplication([])
+        with tempfile.TemporaryDirectory() as d:
+            alm = Almacen(d)
+            c = alm.agregar({"nombre": "PTZ", "codigo": _Onvif.clave, "ip": self.cam.ip})
+            p = Puente(None, alm, revisar=False)
+            p.moverPtz(c.id, "derecha")
+            p.pararPtz(c.id, "derecha")
+            QTimer.singleShot(1500, app.quit)
+            app.exec()
+            self.assertEqual(Almacen(d).camara(c.id).ptz, "onvif")
+            self.assertEqual([v[1] for v in _Onvif.vistos], ["GetProfiles", "ContinuousMove", "Stop"])
 
     def test_clave_mala(self):
         self.cam.codigo = "MALO"
