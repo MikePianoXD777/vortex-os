@@ -263,6 +263,26 @@ pub fn texto_bandas(bandas: &[Banda]) -> String {
         .join(",")
 }
 
+/// Qué le falta al ecualizador para cambiar el sonido de verdad («» si nada): sin lsp-plugins-lv2, EasyEffects
+/// carga el preset pero deja pasar el audio tal cual (1.7.3).
+pub fn problema() -> String {
+    let Some(s) = script().filter(|_| !en_mpv()) else {
+        return String::new();
+    };
+    let Ok(o) = Command::new("bash").arg(s).arg("motor").output() else {
+        return String::new();
+    };
+    match String::from_utf8_lossy(&o.stdout).trim() {
+        "sin-easyeffects" => {
+            "Falta EasyEffects: el ecualizador no puede cambiar el sonido. Corre «vortex actualizar».".into()
+        }
+        "sin-plugins" => "A EasyEffects le faltan sus plugins (lsp-plugins-lv2): el ecualizador no cambia el sonido. \
+                          Corre «vortex actualizar»."
+            .into(),
+        _ => String::new(),
+    }
+}
+
 fn correr(args: &[&str]) -> bool {
     let Some(s) = script() else {
         return false;

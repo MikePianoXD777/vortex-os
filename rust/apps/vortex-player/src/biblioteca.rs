@@ -1232,6 +1232,28 @@ impl Biblioteca {
             .collect::<Result<_, _>>()?)
     }
 
+    /// Anota una escucha a partir de la canción como la ve la ventana (`{ruta, titulo, artista}`).
+    pub fn anotar_escucha_json(&self, c: &Value, segundos: f64, cuando: Option<f64>) -> Result<(), ErrorBiblioteca> {
+        let ruta = c.get("ruta").and_then(Value::as_str).unwrap_or_default();
+        let titulo = c
+            .get("titulo")
+            .and_then(Value::as_str)
+            .filter(|t| !t.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| Path::new(ruta).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default());
+        self.db.execute(
+            "INSERT INTO escuchas VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                cuando.filter(|c| *c != 0.0).unwrap_or_else(ahora_epoch),
+                ruta,
+                titulo,
+                c.get("artista").and_then(Value::as_str).unwrap_or_default(),
+                segundos
+            ],
+        )?;
+        Ok(())
+    }
+
     /// Las rutas de todo lo que hay (para saber qué ids de YouTube ya tienes).
     pub fn todas_las_rutas(&self) -> Result<Vec<String>, ErrorBiblioteca> {
         let mut st = self.db.prepare("SELECT ruta FROM canciones")?;

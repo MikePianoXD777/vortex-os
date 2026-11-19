@@ -107,6 +107,11 @@ pub fn local(t: f64) -> Local {
     sistema::local(t)
 }
 
+/// Las `hora:minuto` de ese día, en la hora de aquí (para las pruebas y el despertador).
+pub fn marca_local(anio: i32, mes: u32, dia: u32, hora: u32, minuto: u32) -> f64 {
+    sistema::medianoche(anio, mes, i64::from(dia)) + f64::from(hora * 3600 + minuto * 60)
+}
+
 /// «2026-11-19» (el `%Y-%m-%d` de Python), en la hora de aquí.
 pub fn dia_texto(t: f64) -> String {
     let l = local(t);
