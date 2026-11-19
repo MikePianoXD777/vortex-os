@@ -446,6 +446,12 @@ Vortexine's OS es gratis y lo seguirá siendo. Si te gusta y quieres que siga cr
 café en **[Ko-fi](https://ko-fi.com/blackneus)** ☕. Cada donación ayuda a dedicarle más tiempo a nuevas
 funciones y a Vortex Player. Si no puedes donar, también ayuda mucho darle ⭐ al repo y compartir el video.
 
+## Políticas de uso
+
+**Si modificas tu sistema a fondo** (los archivos de Vortexine's en `/usr/share`, sus paquetes o sus comandos),
+**a mano o con una IA, te quedas sin actualizaciones ni soporte.** Personalizar desde Ajustes o `~/.config`
+no cuenta. Los detalles, y cómo volver a la versión oficial, están en [POLITICAS-DE-USO.md](POLITICAS-DE-USO.md).
+
 ## Licencia
 
 MIT, salvo `shell/`, que es Serpantinum de [@ilyamiro](https://github.com/ilyamiro) con licencia
