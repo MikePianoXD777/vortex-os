@@ -20,25 +20,29 @@
 #     /usr/bin/vortex-gestor salta a este binario si existe; con VORTEX_GESTOR_BASH=1 se fuerza el bash.
 #   - vortex-camera-rs: Vortexine's Camera (cxx-qt, los mismos QML). Su lanzador (el que deja «vortex camara
 #     instalar») salta a este si existe; VORTEX_CAMERA_PYTHON=1 fuerza la de Python.
+#   - vortex-player-rs: Vortex Player (cxx-qt, los mismos QML del paquete vortex-player). Su lanzador
+#     (/usr/bin/vortex-player) salta a este si existe; VORTEX_PLAYER_PYTHON=1 fuerza la de Python.
 #   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=10
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared y Camera)"
+pkgrel=11
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera y Player)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
 depends=('gcc-libs' 'glibc' 'dbus' 'libnotify' 'qt6-base' 'qt6-declarative' 'qt6-svg')
-optdepends=('vortex-video: los QML y el reproductor de Vortex Video (qt6-multimedia)')
+optdepends=('vortex-video: los QML y el reproductor de Vortex Video (qt6-multimedia)'
+            'vortex-player: los QML de Vortex Player (y mpv, ffmpeg, yt-dlp)')
 makedepends=('cargo' 'qt6-base' 'qt6-declarative')
 options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
-         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt)
+         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt
+         vortex-player-qt)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -65,6 +69,10 @@ check() {
     if command -v ffmpeg >/dev/null && command -v python3 >/dev/null; then
         cargo test --release --frozen -p vortex-camera
     fi
+    # El motor del Player (mpv, MPRIS en un bus propio, Discord, la nube con un Google falso).
+    if command -v mpv >/dev/null; then
+        cargo test --release --frozen -p vortex-player
+    fi
 }
 
 package() {
@@ -78,7 +86,7 @@ package() {
     install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
     install -Dm755 "$b/vortex-gestor-rs" "$pkgdir/usr/lib/vortex/vortex-gestor-rs"
     install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
-    for a in task-manager runner video shop app-installer connect shared camera; do
+    for a in task-manager runner video shop app-installer connect shared camera player; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done
     # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).

@@ -13,7 +13,7 @@ mkdir -p "$tmp/lib" "$tmp/bin"
 printf '#!/bin/sh\necho "python $*"\n' >"$tmp/bin/python3"
 chmod +x "$tmp/bin/python3"
 
-for a in task-manager runner video shop app-installer connect shared camera tareas enlace memoria; do
+for a in task-manager runner video shop app-installer connect shared camera player tareas enlace memoria; do
   echo "vortex-$a"
   lanzador="apps/vortex-$a/vortex-$a"
   [[ -f "$lanzador" ]] || lanzador="apps/$a/vortex-$a"
@@ -90,7 +90,7 @@ r="$(gestor VORTEX_RUST_BIN="$tmp/lib" bin/vortex-gestor)"
 
 echo "Paquete vortex-rust"
 grep -q 'vortex-shared-motor' packaging/vortex-rust/PKGBUILD && bien "instala vortex-shared-motor" || mal "no instala vortex-shared-motor"
-for a in task-manager runner video shop app-installer connect shared camera tareas usb enlace memoria; do
+for a in task-manager runner video shop app-installer connect shared camera player tareas usb enlace memoria; do
   grep -q "vortex-$a-rs" packaging/vortex-rust/PKGBUILD && bien "instala vortex-$a-rs" || mal "no instala vortex-$a-rs"
 done
 

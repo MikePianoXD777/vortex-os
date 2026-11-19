@@ -1,6 +1,6 @@
 [package]
 name = "vortex-player"
-description = "Vortex Player en Rust (en construcción: la app de Python sigue siendo la oficial)"
+description = "Vortex Player en Rust: el motor (biblioteca, reproductor, descargas, letras, nube, Discord, MPRIS)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,6 @@ repository.workspace = true
 [lib]
 name = "vortex_player"
 path = "src/lib.rs"
-
-[[bin]]
-name = "vortex-player-rs"
-path = "src/main.rs"
 
 [dependencies]
 rand.workspace = true

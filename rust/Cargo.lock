@@ -1254,6 +1254,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-player-qt"
+version = "1.7.3"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "libc",
+ "rand",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-player",
+]
+
+[[package]]
 name = "vortex-runner"
 version = "1.0.0"
 dependencies = [

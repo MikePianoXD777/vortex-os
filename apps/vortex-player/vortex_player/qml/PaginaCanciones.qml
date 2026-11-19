@@ -54,11 +54,12 @@ Item {
 
         // --- encabezado ---
         Rectangle {
+            id: encabezado
             Layout.fillWidth: true
             implicitHeight: 210
             readonly property color tono: raiz.colorPortada ? raiz.colorPortada : Qt.rgba(Tema.azul.r, Tema.azul.g, Tema.azul.b, 0.22)
             gradient: Gradient {
-                GradientStop { position: 0; color: parent.tono; Behavior on color { ColorAnimation { duration: 500 } } }
+                GradientStop { position: 0; color: encabezado.tono; Behavior on color { ColorAnimation { duration: 500 } } }
                 GradientStop { position: 1; color: "transparent" }
             }
             RowLayout {

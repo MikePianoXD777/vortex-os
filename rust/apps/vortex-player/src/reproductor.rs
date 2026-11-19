@@ -704,6 +704,11 @@ impl Reproductor {
         String::new()
     }
 
+    /// Si hace falta llamar a `tic` (el temporizador o una canción que no se pudo tocar).
+    pub fn necesita_tic(&self) -> bool {
+        self.dormir_activo() || self.terminar_en > 0.0
+    }
+
     pub fn dormir_activo(&self) -> bool {
         self.dormir_hasta > 0.0 || self.dormir_al_final
     }

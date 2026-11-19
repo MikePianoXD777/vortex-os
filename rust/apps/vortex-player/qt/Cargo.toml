@@ -1,0 +1,31 @@
+[package]
+name = "vortex-player-qt"
+description = "Vortex Player en Rust: la ventana (cxx-qt, los mismos QML) sobre el motor vortex-player"
+version = "1.7.3"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-player = { path = ".." }
+vortex-core.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+libc.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[[bin]]
+name = "vortex-player-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true

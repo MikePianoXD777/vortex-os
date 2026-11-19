@@ -30,6 +30,7 @@ members = [
     "apps/vortex-tirones",
     "apps/vortex-camera",
     "apps/vortex-camera/qt",
+    "apps/vortex-player/qt",
 ]
 
 [workspace.package]
