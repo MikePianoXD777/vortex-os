@@ -2,6 +2,14 @@
 # Vortex 4.0: la entrada directa al prender la PC (greetd [initial_session]). Entra a la sesión sin pantalla
 # de login aparte y el shell arranca bloqueado (shell/src/quickshell/lock/Lock.qml, marca de abajo): la
 # contraseña se pone en el bloqueo de Vortex Shell.
+# Si la última vez elegiste otro escritorio en el login (KDE, GNOME…), no se entra directo: se sale y greetd
+# muestra el inicio de sesión, con ese escritorio ya elegido (los otros no saben arrancar bloqueados).
+r="${VORTEX_INICIO_RAIZ:-}"   # para las pruebas
+ultima="$(cat "$r/var/cache/vortex-greeter/sesion-${USER:-$(id -un)}" 2>/dev/null)"
+if [ -n "$ultima" ] && [ "$ultima" != vortex ] &&
+   { [ -e "$r/usr/share/wayland-sessions/$ultima.desktop" ] || [ -e "$r/usr/share/xsessions/$ultima.desktop" ]; }; then
+  exit 0
+fi
 d="${XDG_RUNTIME_DIR:-/tmp}"
 : >"$d/vortex-bloquear-al-entrar"
 exec "$(dirname "$0")/entrar"

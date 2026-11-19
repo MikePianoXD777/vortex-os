@@ -53,7 +53,7 @@ options=('!lto')
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt vortex-local-ai-qt
-         vortex-player-qt vortex-miku vortex-miku-qt vortex-traducir vortex-limpieza)
+         vortex-player-qt vortex-miku vortex-miku-qt vortex-traducir vortex-limpieza vortex-escritorio)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -103,6 +103,7 @@ package() {
     install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
     install -Dm755 "$b/vortex-traducir" "$pkgdir/usr/bin/vortex-traducir"
     install -Dm755 "$b/vortex-limpieza" "$pkgdir/usr/bin/vortex-limpieza"
+    install -Dm755 "$b/vortex-escritorio" "$pkgdir/usr/bin/vortex-escritorio"
     for a in task-manager runner video shop app-installer connect shared camera local-ai player; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done

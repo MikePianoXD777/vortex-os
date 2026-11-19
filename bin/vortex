@@ -78,6 +78,7 @@ Uso: vortex <comando>
   partidas                             tus últimas partidas: cuánto jugaste, FPS y temperaturas (al
                                        salir de un juego sale el resumen solo)
   tirones                              los tirones de tu última partida: cuándo, cuánto y por qué
+  escritorio [instalar|quitar NOMBRE]  otros escritorios (kde, gnome, cosmic, xfce); se eligen en el login
                                        (memoria, disco, procesador o calor; se miden solos)
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
@@ -1522,6 +1523,16 @@ greetd_config() {
   printf '\n[initial_session]\ncommand = "/usr/share/vortex/greeter/entrar-bloqueado"\nuser = "%s"\n' "$usuario"
 }
 
+# El servicio del gestor lo pone la ISO en /etc/systemd/user; los cambios (4.0: que no arranque con otros
+# escritorios) llegan así a las instalaciones de antes.
+servicio_gestor() {
+  local nuevo="$VORTEX_DIR/config/systemd/vortex-gestor.service" destino=/etc/systemd/user/vortex-gestor.service
+  [[ -f "$nuevo" && -f "$destino" ]] || return 0
+  cmp -s "$nuevo" "$destino" && return 0
+  sudo install -Dm644 "$nuevo" "$destino" || { aviso "no pude actualizar $destino"; return 0; }
+  systemctl --user daemon-reload 2>/dev/null || true
+}
+
 pantalla_inicio() {
   local r="${VORTEX_INICIO_RAIZ:-}" g="$VORTEX_DIR/config/greeter" f cambio=0
   [[ -d "$g" ]] || return 0
@@ -1752,6 +1763,7 @@ cmd_actualizar() {
   fondos_nuevos
   proteger_apps
   wifi_mediatek
+  servicio_gestor
   pantalla_inicio
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
@@ -2349,6 +2361,9 @@ case "${1:-ayuda}" in
   tirones)
     command -v vortex-tirones >/dev/null || { aviso "falta vortex-tirones (viene en el paquete vortex-rust)"; exit 1; }
     exec vortex-tirones ver ;;
+  escritorio | escritorios) shift
+    command -v vortex-escritorio >/dev/null || { aviso "falta vortex-escritorio (viene en el paquete vortex-rust)"; exit 1; }
+    exec vortex-escritorio "$@" ;;
   guardados) shift; exec "$VORTEX_DIR/bin/vortex-guardados" "$@" ;;
   sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   cerrar-app) shift; exec "$VORTEX_DIR/bin/vortex-cerrar-app" "$@" ;;
