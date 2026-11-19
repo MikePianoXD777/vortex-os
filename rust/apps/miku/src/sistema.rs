@@ -113,6 +113,86 @@ pub fn candado(ruta: &Path) -> Option<std::fs::File> {
     Some(f)
 }
 
+/// Como `candado`, pero espera su turno (el comando `vortex-miku`: dos pulsaciones seguidas no abren dos Mikus).
+/// El candado se suelta al cerrar el archivo.
+pub fn candado_esperando(ruta: &Path) -> Option<std::fs::File> {
+    use std::os::fd::AsRawFd;
+    let f = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(ruta)
+        .ok()?;
+    // SAFETY: flock sobre un descriptor que acabamos de abrir.
+    (unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) } == 0).then_some(f)
+}
+
+/// ¿Son el mismo archivo (mismo dispositivo e inodo)? Como `os.path.samefile`.
+pub fn mismo_archivo(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    match (std::fs::metadata(a), std::fs::metadata(b)) {
+        (Ok(x), Ok(y)) => x.dev() == y.dev() && x.ino() == y.ino(),
+        _ => false,
+    }
+}
+
+static INTERRUMPIDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+extern "C" fn al_sigint(_: libc::c_int) {
+    INTERRUMPIDO.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Que Ctrl+C no mate el proceso: solo levanta la bandera que devuelve (para cortar una descarga con calma).
+pub fn bandera_de_interrupcion() -> &'static std::sync::atomic::AtomicBool {
+    // SAFETY: el manejador solo escribe un AtomicBool, que es seguro dentro de una señal.
+    unsafe {
+        libc::signal(libc::SIGINT, al_sigint as *const () as libc::sighandler_t);
+    }
+    &INTERRUMPIDO
+}
+
+/// Pide un texto sin mostrarlo al escribir (una clave), como `getpass`: del terminal (/dev/tty) y, si no hay,
+/// de la entrada estándar. Vacío si no hay nada que leer.
+pub fn leer_secreto(aviso: &str) -> String {
+    use std::io::{BufRead, Write};
+    use std::os::fd::AsRawFd;
+    let Ok(tty) = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+    else {
+        let mut l = String::new();
+        let _ = std::io::stdin().lock().read_line(&mut l);
+        return l.trim().to_string();
+    };
+    let fd = tty.as_raw_fd();
+    // SAFETY: termios es una estructura de C que tcgetattr llena por completo antes de usarla.
+    let antes = unsafe {
+        let mut t: libc::termios = std::mem::zeroed();
+        (libc::tcgetattr(fd, &mut t) == 0).then_some(t)
+    };
+    if let Some(mut t) = antes {
+        t.c_lflag &= !libc::ECHO;
+        // SAFETY: `t` es la estructura que llenó tcgetattr, con un solo bit cambiado.
+        unsafe {
+            libc::tcsetattr(fd, libc::TCSAFLUSH, &t);
+        }
+    }
+    let mut salida = &tty;
+    let _ = write!(salida, "{aviso}");
+    let _ = salida.flush();
+    let mut l = String::new();
+    let _ = std::io::BufReader::new(&tty).read_line(&mut l);
+    if let Some(t) = antes {
+        // SAFETY: devuelve el terminal a como estaba.
+        unsafe {
+            libc::tcsetattr(fd, libc::TCSAFLUSH, &t);
+        }
+        let _ = writeln!(salida);
+    }
+    l.trim().to_string()
+}
+
 #[cfg(test)]
 mod pruebas_candado {
     #[test]

@@ -197,7 +197,7 @@ def parte_modulo() -> None:
 
 def miku(*args, ahora: str = MEDIODIA) -> subprocess.CompletedProcess:
     env = dict(os.environ, VORTEX_MIKU_AHORA=ahora)
-    return subprocess.run([sys.executable, str(RAIZ / "vortex-miku"), *args], capture_output=True, text=True,
+    return subprocess.run([sys.executable, str(RAIZ / "vortex-miku-python"), *args], capture_output=True, text=True,
                           env=env, timeout=60)
 
 
@@ -315,7 +315,7 @@ def parte_comando() -> None:
                  ["companera", "sin-cuenta", "on", "--soy-mayor"], ["companera", "sin-cuenta", "off"],
                  ["companera", "tono", "suave"], ["companera", "borrar-bitacora"], ["camara", "on"], ["camara", "off"]):
         env = dict(os.environ, VORTEX_MIKU_AHORA=MEDIODIA, VORTEX_MIKU_DESDE_IA="1")
-        r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku"), *args], capture_output=True, text=True,
+        r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku-python"), *args], capture_output=True, text=True,
                            env=env, timeout=60)
         probar(f"desde la IA, «{' '.join(args)}» se niega", r.returncode == 1 and "la persona" in r.stderr,
                r.stdout + r.stderr)
@@ -323,7 +323,7 @@ def parte_comando() -> None:
     probar("…y no cambió la configuración, ni la bitácora, ni abrió ventanas", config.cargar_crudo() == antes_cfg
            and companera.leer_bitacora() == antes_bit and len(abiertas()) == antes_ab)
     env = dict(os.environ, VORTEX_MIKU_DESDE_IA="1")
-    r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku"), "companera", "bitacora"], capture_output=True,
+    r = subprocess.run([sys.executable, str(RAIZ / "vortex-miku-python"), "companera", "bitacora"], capture_output=True,
                        text=True, env=env, timeout=60)
     probar("…pero sí puede leer la bitácora", r.returncode == 0)
     config.guardar(companera.APAGADO)
@@ -631,7 +631,7 @@ def parte_correr_comando() -> None:
 
     config.guardar(dict(config.DEFECTOS, internet=False))
     antes = config.cargar_crudo()
-    vm = f"{sys.executable} {RAIZ / 'vortex-miku'}"
+    vm = f"{sys.executable} {RAIZ / 'vortex-miku-python'}"
     ataques = [
         "vortex-miku companera acepto", "vortex-miku companera sin-cuenta on --soy-mayor",
         "vortex-miku compañera on", "vortex-miku camara on", "vortex-miku cámara on",

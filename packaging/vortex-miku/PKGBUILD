@@ -1,5 +1,7 @@
 # Miku, la asistente de voz de Vortexine's OS (SUPER + O), empaquetada desde apps/miku/ de este repo:
-#   - el comando /usr/bin/vortex-miku y la app (Python + PySide6) en /usr/share/vortex-miku;
+#   - el comando /usr/bin/vortex-miku (un lanzador mínimo: salta a vortex-miku-rs del paquete vortex-rust si está
+#     instalado) y la app (Python + PySide6) en /usr/share/vortex-miku, con vortex-miku-python (el comando de siempre, que
+#     atiende «natural» y «elevenlabs» y es el respaldo si no está vortex-rust);
 #   - el 3D con three.js y @pixiv/three-vrm (MIT), que se bajan aquí con versión fija y sha256 y se
 #     dejan en /usr/share/vortex-miku/web/vendor (no van en git);
 #   - las licencias de todo en /usr/share/licenses/vortex-miku/.
@@ -11,7 +13,7 @@
 #   cd packaging/vortex-miku && makepkg -si
 pkgname=vortex-miku
 pkgver=2.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Miku, la asistente de voz de Vortexine's OS: 3D, voz y oído locales, y Claude como cerebro (SUPER + O)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -67,8 +69,10 @@ package() {
     # recompilaría todo en cada arranque.
     python -m compileall -q -s "$pkgdir" -p / "$share/miku"
 
-    # El comando: la app lo reconoce instalado porque no hay miku/app.py junto a él.
+    # El comando: un lanzador mínimo (salta a /usr/lib/vortex/vortex-miku-rs, de vortex-rust, si existe). El de Python
+    # va en /usr/share/vortex-miku, junto a miku/app.py: así sabe dónde está la app (RAIZ).
     install -Dm755 "$origen/vortex-miku" "$pkgdir/usr/bin/vortex-miku"
+    install -Dm755 "$origen/vortex-miku-python" "$share/vortex-miku-python"
     # El ícono: la barra (íconos de los escritorios) lo busca por el app_id «vortex-miku».
     install -Dm644 "$origen/icono/vortex-miku.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/vortex-miku.svg"
     # 4.0: el clic de Miku (ydotool) crea un ratón virtual en /dev/uinput. El paquete ydotool lo deja solo al grupo

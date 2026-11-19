@@ -15,6 +15,10 @@ path = "src/lib.rs"
 name = "miku-aux"
 path = "src/bin/miku-aux.rs"
 
+[[bin]]
+name = "vortex-miku-rs"
+path = "src/bin/vortex-miku-rs.rs"
+
 [dependencies]
 vortex-core.workspace = true
 serde_json.workspace = true
