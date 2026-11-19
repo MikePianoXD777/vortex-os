@@ -1,0 +1,28 @@
+[package]
+name = "vortex-miku"
+description = "Miku en Rust: el motor sin Qt (sentimientos, cerebro, IA, acciones con permiso, oído, cámara y grabación)"
+version = "4.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "vortex_miku"
+path = "src/lib.rs"
+
+[[bin]]
+name = "miku-aux"
+path = "src/bin/miku-aux.rs"
+
+[dependencies]
+vortex-core.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1242,6 +1242,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-miku"
+version = "4.0.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-player"
 version = "0.1.0"
 dependencies = [
