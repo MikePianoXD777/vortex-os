@@ -116,6 +116,7 @@ USER=ana VORTEX_INICIO_RAIZ="$T/r" XDG_RUNTIME_DIR="$T" "$T/g/entrar-bloqueado"
 probar "si ese escritorio ya no está, entra a Vortex Shell" "[[ -e '$T/entro' && -e '$T/vortex-bloquear-al-entrar' ]]"
 ENT="$AQUI/config/greeter/entrar"
 probar "entrar pasa el escritorio elegido a vortex-escritorio" "grep -q 'exec vortex-escritorio entrar \"\$1\"' '$ENT'"
+probar "entrar detiene lo que quedó de una sesión gráfica cortada" "grep -q 'systemctl --user stop graphical-session.target' '$ENT'"
 probar "el login lista los escritorios y recuerda el de cada quien" \
   "grep -q 'vortex-escritorio\", \"sesiones' '$AQUI/config/greeter/shell.qml' && grep -q '/sesion-' '$AQUI/config/greeter/shell.qml'"
 probar "el gestor no arranca con otros escritorios" \
