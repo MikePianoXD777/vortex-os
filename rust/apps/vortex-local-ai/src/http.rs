@@ -1,14 +1,20 @@
-//! Un cliente HTTP/1.1 mínimo y sin crates (solo `http://`): lo que Ollama necesita. Contesta JSON de una
+//! Un cliente HTTP/1.1 mínimo y sin crates: lo que Ollama necesita. Contesta JSON de una
 //! vez o línea por línea (streaming, para bajar modelos y para el chat), entiende `Content-Length`,
 //! `Transfer-Encoding: chunked` y las respuestas que se cierran al terminar (HTTP/1.0).
 //!
 //! Cancelar corta de verdad: las lecturas esperan como mucho 100 ms, así que un servidor callado no
 //! aguanta el «cancelar» hasta el siguiente trozo (lo mismo que hace la de Python cortando el socket).
+//!
+//! `https://` (un Ollama detrás de un proxy con certificado) va por `openssl s_client`, que viene en todo
+//! Arch: verifica el certificado con las autoridades del sistema y el nombre del servidor, y el resto es
+//! el mismo HTTP por su entrada y su salida. Así no hace falta un crate de TLS.
 
-use std::io::{ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 /// La señal de cancelar (el `threading.Event` de Python): se comparte entre hilos.
@@ -80,9 +86,121 @@ pub enum ErrHttp {
     Raro,
 }
 
-fn conectar(d: &Destino, espera: Duration) -> Result<TcpStream, ErrHttp> {
-    if d.https {
+/// La conexión: un socket directo o el `openssl s_client` del https.
+enum Conexion {
+    Tcp(TcpStream),
+    Tls(Tls),
+}
+
+/// `openssl s_client`: se le escribe por su entrada y un hilo pasa su salida por un canal, para que leer
+/// espere como mucho 100 ms (como el socket).
+struct Tls {
+    hijo: Child,
+    entrada: ChildStdin,
+    salida: Receiver<Vec<u8>>,
+    /// Lo que llegó y todavía no se leyó.
+    resto: Vec<u8>,
+}
+
+impl Drop for Tls {
+    fn drop(&mut self) {
+        let _ = self.hijo.kill();
+        let _ = self.hijo.wait();
+    }
+}
+
+impl Read for Conexion {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Conexion::Tcp(s) => s.read(buf),
+            Conexion::Tls(t) => {
+                if t.resto.is_empty() {
+                    match t.salida.recv_timeout(Duration::from_millis(100)) {
+                        Ok(v) => t.resto = v,
+                        Err(RecvTimeoutError::Timeout) => return Err(ErrorKind::WouldBlock.into()),
+                        // El hilo terminó: openssl cerró (el servidor colgó o falló el certificado).
+                        Err(RecvTimeoutError::Disconnected) => return Ok(0),
+                    }
+                }
+                let n = buf.len().min(t.resto.len());
+                buf[..n].copy_from_slice(&t.resto[..n]);
+                t.resto.drain(..n);
+                Ok(n)
+            }
+        }
+    }
+}
+
+impl Write for Conexion {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Conexion::Tcp(s) => s.write(buf),
+            Conexion::Tls(t) => t.entrada.write(buf),
+        }
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Conexion::Tcp(s) => s.flush(),
+            Conexion::Tls(t) => t.entrada.flush(),
+        }
+    }
+}
+
+/// El programa de openssl (`VORTEX_OPENSSL` para las pruebas).
+fn openssl() -> String {
+    std::env::var("VORTEX_OPENSSL")
+        .ok()
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| "openssl".into())
+}
+
+fn conectar_tls(d: &Destino) -> Result<Conexion, ErrHttp> {
+    // El nombre va sin corchetes para SNI y para comprobar el certificado; `-connect` los quiere con ellos.
+    let destino = if d.host.contains(':') {
+        format!("[{}]:{}", d.host, d.puerto)
+    } else {
+        format!("{}:{}", d.host, d.puerto)
+    };
+    let mut hijo = Command::new(openssl())
+        .args(["s_client", "-quiet", "-connect", &destino])
+        .args(["-servername", &d.host, "-verify_hostname", &d.host])
+        // Sin `-verify`, s_client solo informa un certificado malo y sigue: así corta.
+        .args(["-verify", "9", "-verify_return_error"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| ErrHttp::Conexion)?;
+    let (Some(entrada), Some(mut salida)) = (hijo.stdin.take(), hijo.stdout.take()) else {
+        let _ = hijo.kill();
+        let _ = hijo.wait();
         return Err(ErrHttp::Conexion);
+    };
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut buf = vec![0u8; 16 * 1024];
+        loop {
+            match salida.read(&mut buf) {
+                Ok(0) | Err(_) => return,
+                Ok(n) => {
+                    if tx.send(buf[..n].to_vec()).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    Ok(Conexion::Tls(Tls {
+        hijo,
+        entrada,
+        salida: rx,
+        resto: Vec::new(),
+    }))
+}
+
+fn conectar(d: &Destino, espera: Duration) -> Result<Conexion, ErrHttp> {
+    if d.https {
+        return conectar_tls(d);
     }
     let direccion = (d.host.as_str(), d.puerto)
         .to_socket_addrs()
@@ -94,7 +212,7 @@ fn conectar(d: &Destino, espera: Duration) -> Result<TcpStream, ErrHttp> {
     s.set_write_timeout(Some(espera)).map_err(|_| ErrHttp::Conexion)?;
     s.set_read_timeout(Some(Duration::from_millis(100)))
         .map_err(|_| ErrHttp::Conexion)?;
-    Ok(s)
+    Ok(Conexion::Tcp(s))
 }
 
 /// Lo que va quedando de un trozo («chunk») del cuerpo.
@@ -112,7 +230,7 @@ enum Trozo {
 /// Una respuesta con el cuerpo todavía llegando.
 pub struct Respuesta {
     pub estado: u16,
-    s: TcpStream,
+    s: Conexion,
     crudo: Vec<u8>,
     cuerpo: Vec<u8>,
     chunked: bool,
