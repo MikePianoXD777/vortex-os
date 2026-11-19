@@ -210,6 +210,14 @@ Item {
                 MouseArea {
                     id: wsPillMouse
                     anchors.fill: parent
+                    // 4.0.2: el clic también cuenta en el hueco entre escritorios y en todo el alto de la isla
+                    // (antes solo la pastilla de 18 px: «a veces el clic no cambia de escritorio»).
+                    readonly property real extraHueco: (numbersFaceRoot.layoutSpacing) / 2
+                    readonly property real extraAlto: widget ? widget.s(12) : 12
+                    anchors.leftMargin: numbersFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.rightMargin: numbersFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.topMargin: numbersFaceRoot.isVertical ? -extraHueco : -extraAlto
+                    anchors.bottomMargin: numbersFaceRoot.isVertical ? -extraHueco : -extraAlto
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {

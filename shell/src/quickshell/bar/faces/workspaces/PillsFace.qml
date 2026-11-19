@@ -195,6 +195,14 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     anchors.fill: parent
+                    // 4.0.2: el clic también cuenta en el hueco entre escritorios y en todo el alto de la isla
+                    // (antes solo la pastilla de 18 px: «a veces el clic no cambia de escritorio»).
+                    readonly property real extraHueco: (wsLayout.spacing) / 2
+                    readonly property real extraAlto: widget ? widget.s(12) : 12
+                    anchors.leftMargin: pillsFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.rightMargin: pillsFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.topMargin: pillsFaceRoot.isVertical ? -extraHueco : -extraAlto
+                    anchors.bottomMargin: pillsFaceRoot.isVertical ? -extraHueco : -extraAlto
                     onClicked: {
                         if (widget) widget.focusWorkspace(wsPill.index);
                     }

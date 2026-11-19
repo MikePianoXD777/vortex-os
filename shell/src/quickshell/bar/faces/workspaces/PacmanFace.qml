@@ -236,6 +236,14 @@ Item {
                 MouseArea {
                     id: pelletMouse
                     anchors.fill: parent
+                    // 4.0.2: el clic también cuenta en el hueco entre escritorios y en todo el alto de la isla
+                    // (antes solo la pastilla de 18 px: «a veces el clic no cambia de escritorio»).
+                    readonly property real extraHueco: (pacmanFaceRoot.slotSpacing) / 2
+                    readonly property real extraAlto: widget ? widget.s(12) : 12
+                    anchors.leftMargin: pacmanFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.rightMargin: pacmanFaceRoot.isVertical ? -extraAlto : -extraHueco
+                    anchors.topMargin: pacmanFaceRoot.isVertical ? -extraHueco : -extraAlto
+                    anchors.bottomMargin: pacmanFaceRoot.isVertical ? -extraHueco : -extraAlto
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
