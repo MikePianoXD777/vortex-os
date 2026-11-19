@@ -6,6 +6,7 @@ pub mod acciones;
 pub mod asistente;
 pub mod base64;
 pub mod camara;
+pub mod cli;
 pub mod cerebro;
 pub mod cerebro_abierto;
 pub mod companera;

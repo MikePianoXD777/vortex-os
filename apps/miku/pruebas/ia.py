@@ -232,13 +232,13 @@ ver(len(imgs) == 3 and imgs[0]["image_url"]["url"].startswith("data:image/jpeg;b
 
 print("== vortex-miku ia")
 env = dict(os.environ, VORTEX_MIKU_RAIZ=str(MIKU))
-r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku"), "ia", "openai", "gpt-prueba"], capture_output=True, text=True,
+r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku-python"), "ia", "openai", "gpt-prueba"], capture_output=True, text=True,
                    env=env, stdin=subprocess.DEVNULL)
 cfg = config.cargar()
 ver(r.returncode == 0 and cfg["ia"] == "openai" and cfg["ia_modelo"] == "gpt-prueba", f"ia openai MODELO lo guarda ({r.stdout.strip()[:60]})")
-r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku"), "ia", "otra", "no-es-url", "m"], capture_output=True, text=True, env=env)
+r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku-python"), "ia", "otra", "no-es-url", "m"], capture_output=True, text=True, env=env)
 ver(r.returncode == 2, "ia otra sin URL válida da error de uso")
-r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku"), "ia"], capture_output=True, text=True, env=env)
+r = subprocess.run([sys.executable, "-I", str(MIKU / "vortex-miku-python"), "ia"], capture_output=True, text=True, env=env)
 ver(r.returncode == 0 and r.stdout.startswith("ia=openai"), "ia (estado) dice cuál está")
 
 servidor.shutdown()

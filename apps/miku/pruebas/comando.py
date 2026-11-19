@@ -23,7 +23,7 @@ from pathlib import Path
 trabajo = Path(sys.argv[1]).resolve()
 modelos = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else None
 raiz = Path(__file__).resolve().parent.parent
-COMANDO = str(raiz / "vortex-miku")
+COMANDO = str(raiz / "vortex-miku-python")
 
 shutil.rmtree(trabajo, ignore_errors=True)
 home = trabajo / "home"

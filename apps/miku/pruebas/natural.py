@@ -144,7 +144,7 @@ def respaldo(app) -> None:
 
 def cargar_comando():
     """El comando vortex-miku (un script sin .py) como módulo, para cambiarle la GPU, pip y la descarga."""
-    cargador = importlib.machinery.SourceFileLoader("vortex_miku_prueba", str(RAIZ / "vortex-miku"))
+    cargador = importlib.machinery.SourceFileLoader("vortex_miku_prueba", str(RAIZ / "vortex-miku-python"))
     m = importlib.util.module_from_spec(importlib.util.spec_from_loader(cargador.name, cargador))
     cargador.exec_module(m)
     return m
