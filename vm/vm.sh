@@ -10,6 +10,7 @@
 #   vm/vm.sh clic X Y     clic en ese punto (con VORTEX_VM_VIDEO=2d se ve con «captura»)
 #   vm/vm.sh tecla N...   teclas con nombres de QEMU (ret, tab, meta_l-d...)
 #   vm/vm.sh escribir T   escribe un texto (letras, números y símbolos comunes, teclado US)
+#   vm/vm.sh usb IMG      conecta en caliente una memoria USB (imagen raw); usb-quitar la desconecta
 #   vm/vm.sh apagar       apaga la VM y espera (hasta 60 s) a que QEMU termine
 #   vm/vm.sh matar        corta la VM de golpe si no se apaga
 #   vm/vm.sh borrar       borra el disco para empezar de cero
@@ -88,6 +89,9 @@ qemu_comun() {
     -nic "user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$PUERTO-:22"
     "${VIDEO[@]}"
     -device virtio-keyboard -device virtio-tablet
+    # Un controlador USB fijo: q35 no deja agregarlo en caliente, pero a él sí se le conectan memorias
+    # USB en caliente (vm/vm.sh usb IMAGEN / usb-quitar), para probar el montador.
+    -device qemu-xhci,id=xhci
     -audiodev "$AUDIO,id=sonido" -device ich9-intel-hda -device hda-output,audiodev=sonido
     -monitor "unix:$VM/monitor.sock,server,nowait"
     # QMP: para mandar clics y teclas con coordenadas exactas (vm/vm.sh clic X Y).
@@ -235,6 +239,15 @@ case "${1:-}" in
       t="$(nombre_tecla "${texto:i:1}")" || { echo "No sé escribir «${texto:i:1}»" >&2; exit 1; }
       monitor "sendkey $t"; sleep 0.08
     done
+    ;;
+  usb)
+    # vm/vm.sh usb IMAGEN: conecta una memoria USB (una imagen raw) en caliente.
+    img="$(realpath "${2:?falta la imagen}")"
+    monitor "drive_add 0 if=none,id=memoria-usb,file=$img,format=raw"
+    monitor "device_add usb-storage,bus=xhci.0,drive=memoria-usb,id=memoria-usb"
+    ;;
+  usb-quitar)
+    monitor "device_del memoria-usb"
     ;;
   apagar)
     corriendo || exit 0
