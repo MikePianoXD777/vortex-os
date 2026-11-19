@@ -18,14 +18,16 @@
 #   - vortex-gestor-rs: el gestor de recursos (foco, scopes, modo juego, modo IA, presión de memoria), sin Qt, en un
 #     solo proceso: reemplaza al bash bin/vortex-gestor y a su ayudante en C vortex-eventos. El script
 #     /usr/bin/vortex-gestor salta a este binario si existe; con VORTEX_GESTOR_BASH=1 se fuerza el bash.
+#   - vortex-camera-rs: Vortexine's Camera (cxx-qt, los mismos QML). Su lanzador (el que deja «vortex camara
+#     instalar») salta a este si existe; VORTEX_CAMERA_PYTHON=1 fuerza la de Python.
 #   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=9
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect y Shared)"
+pkgrel=10
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared y Camera)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -36,7 +38,7 @@ options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
-         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt)
+         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -59,6 +61,10 @@ check() {
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
     cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones
+    # El motor de Camera se prueba contra una cámara falsa de verdad (RTSP con ffmpeg y python3).
+    if command -v ffmpeg >/dev/null && command -v python3 >/dev/null; then
+        cargo test --release --frozen -p vortex-camera
+    fi
 }
 
 package() {
@@ -72,7 +78,7 @@ package() {
     install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
     install -Dm755 "$b/vortex-gestor-rs" "$pkgdir/usr/lib/vortex/vortex-gestor-rs"
     install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
-    for a in task-manager runner video shop app-installer connect shared; do
+    for a in task-manager runner video shop app-installer connect shared camera; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done
     # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).
@@ -83,5 +89,9 @@ package() {
         install -d "$pkgdir/usr/share/vortex-$a-rs/qml"
         cp -r "$r/apps/vortex-$a/qt/qml/." "$pkgdir/usr/share/vortex-$a-rs/qml/"
     done
+    # Camera no viene de fábrica («vortex camara instalar»): su lanzador le pasa sus propios QML; esta copia
+    # es por si se abre el binario solo.
+    install -d "$pkgdir/usr/share/vortex-camera-rs/qml"
+    cp -r "$r/../apps/vortex-camera/vortex_camera/qml/." "$pkgdir/usr/share/vortex-camera-rs/qml/"
     find "$pkgdir/usr/share" -type f -exec chmod 644 {} +
 }
