@@ -9,7 +9,6 @@ use serde_json::json;
 use tempfile::TempDir;
 use vortex_core::paleta;
 use vortex_player::biblioteca::{Biblioteca, ME_GUSTA, Orden};
-use vortex_player::discord::DatosActividad;
 use vortex_player::ecualizador::{self, Banda};
 use vortex_player::nube::{CancionNube, Local, PlaylistNube};
 use vortex_player::{audio, discord, letras, nube};
@@ -252,16 +251,13 @@ fn discord_marcos_y_actividad() {
     let (m2, _) = discord::leer_marcos(&unido);
     assert_eq!(m2, vec![(3, json!({"b": 2}))]);
 
-    let act = discord::actividad(DatosActividad {
-        ruta: "/música/Bohemia [dQw4w9WgXcQ].opus",
-        titulo: "Bohemia",
-        artista: "Queen",
-        album: "Opera",
-        posicion: 10.0,
-        duracion: 100.0,
-        velocidad: 1.0,
-        ahora_seg: 1000.0,
-    });
+    let act = discord::actividad(
+        &json!({"ruta": "/música/Bohemia [dQw4w9WgXcQ].opus", "titulo": "Bohemia", "artista": "Queen", "album": "Opera"}),
+        10.0,
+        100.0,
+        1.0,
+        1000.0,
+    );
     assert_eq!(act["type"], 2);
     assert_eq!(act["details"], "Bohemia");
     assert_eq!(act["state"], "Queen");
