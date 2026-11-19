@@ -4,6 +4,7 @@
 //! la app de Python) se queda delgada y solo llama a este motor. Qué hay que igualar: ver README.md.
 
 pub mod audio;
+pub mod avance;
 pub mod biblioteca;
 pub mod calidad;
 pub mod cola;
