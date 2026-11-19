@@ -132,10 +132,25 @@ Scope {
             pam.configDirectory
         ]
         onExited: (exitCode) => {
-            if (exitCode !== 0) return;
-            pam.config = "serpantinum";
-            fpPam.config = "serpantinum";
-            root.defaultPamConfig = "serpantinum";
+            if (exitCode === 0) {
+                pam.config = "serpantinum";
+                fpPam.config = "serpantinum";
+                root.defaultPamConfig = "serpantinum";
+            }
+            // Ya con la config de PAM elegida: ¿se entró desde el arranque?
+            alEntrar.running = true;
+        }
+    }
+
+    // Vortex 4.0: el login es el bloqueo del shell. Al prender la PC, greetd entra directo a la sesión y
+    // deja la marca «vortex-bloquear-al-entrar» (config/greeter/entrar): el shell arranca bloqueado y la
+    // contraseña se pone aquí, sin una pantalla de login aparte. La marca se borra al leerla, así que
+    // reiniciar el shell después no vuelve a bloquear.
+    Process {
+        id: alEntrar
+        command: ["sh", "-c", "f=\"${XDG_RUNTIME_DIR:-/tmp}/vortex-bloquear-al-entrar\"; [ -e \"$f\" ] && rm -f \"$f\" && echo si"]
+        stdout: StdioCollector {
+            onStreamFinished: if (this.text.trim() === "si") root.lockStatic()
         }
     }
 

@@ -1,0 +1,85 @@
+# Vortexine's OS 4.0: la animación de arranque. Negro de verdad, el logo blanco que aparece suave y tres
+# puntos que respiran debajo. Si el disco está cifrado, pide la contraseña con el mismo diseño del login.
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+cx = Window.GetX() + Window.GetWidth() / 2;
+cy = Window.GetY() + Window.GetHeight() / 2;
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetPosition(cx - logo.image.GetWidth() / 2, cy - logo.image.GetHeight() / 2 - 20, 10);
+logo.sprite.SetOpacity(0);
+
+punto_img = Image("punto.png");
+for (i = 0; i < 3; i++) {
+    punto[i] = Sprite(punto_img);
+    punto[i].SetPosition(cx - 26 + i * 22, cy + logo.image.GetHeight() / 2 + 30, 10);
+    punto[i].SetOpacity(0);
+}
+
+campo.image = Image("campo.png");
+campo.sprite = Sprite(campo.image);
+campo.sprite.SetPosition(cx - campo.image.GetWidth() / 2, cy + logo.image.GetHeight() / 2 + 40, 20);
+campo.sprite.SetOpacity(0);
+
+pidiendo = 0;
+cuadro = 0;
+
+fun refrescar() {
+    cuadro++;
+    # El logo aparece en ~0,8 s (Plymouth dibuja a ~50 cuadros por segundo).
+    o = cuadro / 40;
+    if (o > 1) o = 1;
+    logo.sprite.SetOpacity(o);
+    for (i = 0; i < 3; i++) {
+        if (pidiendo) {
+            punto[i].SetOpacity(0);
+        } else {
+            f = (cuadro - i * 9) / 60 * 2 * Math.Pi;
+            v = 0.2 + 0.6 * (0.5 + 0.5 * Math.Sin(f));
+            punto[i].SetOpacity(v * o);
+        }
+    }
+}
+Plymouth.SetRefreshFunction(refrescar);
+
+# --- Contraseña del disco cifrado ---
+fun pedir_clave(texto, puntos) {
+    pidiendo = 1;
+    campo.sprite.SetOpacity(1);
+    if (texto == "") texto = "Contraseña del disco";
+    etiqueta.image = Image.Text(texto, 0.7, 0.7, 0.7, 1, "Sans 12");
+    etiqueta.sprite = Sprite(etiqueta.image);
+    etiqueta.sprite.SetPosition(cx - etiqueta.image.GetWidth() / 2, cy + logo.image.GetHeight() / 2 + 14, 21);
+    for (i = 0; i < 40; i++) {
+        if (bala[i]) bala[i].SetOpacity(0);
+    }
+    n = puntos;
+    if (n > 24) n = 24;
+    for (i = 0; i < n; i++) {
+        if (!bala[i]) bala[i] = Sprite(punto_img);
+        bala[i].SetPosition(cx - campo.image.GetWidth() / 2 + 22 + i * 14, cy + logo.image.GetHeight() / 2 + 40 + campo.image.GetHeight() / 2 - 5, 22);
+        bala[i].SetOpacity(1);
+    }
+}
+Plymouth.SetDisplayPasswordFunction(pedir_clave);
+
+fun normal() {
+    pidiendo = 0;
+    campo.sprite.SetOpacity(0);
+    if (etiqueta.sprite) etiqueta.sprite.SetOpacity(0);
+    for (i = 0; i < 40; i++) {
+        if (bala[i]) bala[i].SetOpacity(0);
+    }
+}
+Plymouth.SetDisplayNormalFunction(normal);
+
+# Mensajes del sistema (por ejemplo, «revisando el disco»), en gris y abajo.
+fun mensaje(texto) {
+    aviso.image = Image.Text(texto, 0.55, 0.55, 0.55, 1, "Sans 11");
+    aviso.sprite = Sprite(aviso.image);
+    aviso.sprite.SetPosition(cx - aviso.image.GetWidth() / 2, Window.GetY() + Window.GetHeight() - 60, 10);
+}
+Plymouth.SetMessageFunction(mensaje);

@@ -1,10 +1,11 @@
-# Vortexine's OS: pantalla de inicio en texto (tuigreet). Recuerda el último usuario.
-# La sesión arranca con stdin a /dev/null (greetd la lanza con «sh -c»): si heredara
-# /dev/tty1, cualquier programa del inicio que pregunte algo se quedaría esperando
-# para siempre una respuesta del teclado.
+# Vortexine's OS 4.0: al prender la PC se entra directo a Vortex Shell y la contraseña se pone en su
+# pantalla de bloqueo ([initial_session], la agrega «vortex actualizar» o el instalador con tu usuario).
+# Al cerrar sesión sale la pantalla de inicio gráfica (vortex-greeter); si esa falla, la de texto
+# (tuigreet). La sesión arranca con stdin a /dev/null (config/greeter/entrar): si heredara /dev/tty1,
+# cualquier programa del inicio que pregunte algo se quedaría esperando para siempre una respuesta.
 [terminal]
 vt = 1
 
 [default_session]
-command = "tuigreet --time --remember --remember-session --asterisks --cmd \"start-hyprland </dev/null\""
+command = "/usr/local/bin/vortex-greeter"
 user = "greeter"

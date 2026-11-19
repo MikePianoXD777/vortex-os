@@ -5,7 +5,7 @@
 #   cd packaging/vortex-shell && makepkg -si
 pkgname=vortex-shell
 pkgver=2.5.1
-pkgrel=24
+pkgrel=25
 pkgdesc="Shell de Vortexine's OS (Serpantinum con parches de Vortex)"
 arch=('any')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -61,9 +61,12 @@ package() {
     ln -s ../share/serpantinum/bin/serpantinum "$pkgdir/usr/bin/serpantinum"
     ln -s ../share/serpantinum/bin/serpantinumd "$pkgdir/usr/bin/serpantinumd"
 
-    # Pantalla de bloqueo: contraseña del sistema (sin lector de huellas).
+    # Pantalla de bloqueo: contraseña del sistema (sin lector de huellas). 4.0: el bloqueo también es el
+    # login (greetd entra directo y el shell arranca bloqueado), así que al desbloquear se abre el llavero
+    # (pam_gnome_keyring en auth: con el llavero ya corriendo, lo abre con la misma contraseña).
     install -Dm644 /dev/stdin "$pkgdir/etc/pam.d/serpantinum" <<'EOF'
 auth        include      system-auth
+-auth       optional     pam_gnome_keyring.so
 account     include      system-auth
 EOF
 

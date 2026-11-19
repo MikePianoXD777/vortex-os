@@ -169,7 +169,8 @@ hl.config({
     general = { allow_tearing = true },
     -- allow_session_lock_restore: sin esto Hyprland rechaza el bloqueo nuevo si el shell murió con
     -- la pantalla bloqueada y Super+Alt+L (recuperar el bloqueo) no puede hacer nada.
-    misc = { font_family = "Sans", allow_session_lock_restore = true },
+    -- background_color: 4.0, negro mientras el shell arranca (antes se veía un gris de Hyprland un segundo).
+    misc = { font_family = "Sans", allow_session_lock_restore = true, background_color = 0x000000 },
 })
 
 -- Teclado del sistema (lo guarda el instalador; Serpantinum fija «us»).

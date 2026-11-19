@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# vortex-greeter: la pantalla de inicio de Vortexine's OS 4.0 (la lanza greetd como el usuario «greeter»).
+#
+# Arranca un Hyprland mínimo con el login de Quickshell (/usr/share/vortex/greeter). Cuando la persona
+# entra, el login le pasa la sesión a greetd y se cierra; greetd arranca el escritorio.
+#
+# Si algo falla (no hay Hyprland o Quickshell, la gráfica no arranca, el login se cae), sigue la pantalla
+# de texto de siempre (tuigreet): nunca te quedas sin poder entrar.
+dir=/usr/share/vortex/greeter
+rc_archivo="${XDG_RUNTIME_DIR:-/tmp}/vortex-greeter.rc"
+
+texto() {
+  exec tuigreet --time --remember --remember-session --asterisks --cmd "$dir/entrar"
+}
+
+[[ -e /etc/vortex/greeter-texto ]] && texto   # quien prefiera la de texto (o para salir de un apuro)
+command -v Hyprland >/dev/null && command -v quickshell >/dev/null && [[ -r "$dir/shell.qml" ]] || texto
+
+rm -f "$rc_archivo"
+# El usuario «greeter» tiene / de casa: Qt, Mesa y Quickshell guardan su caché aquí (lo crea «vortex
+# actualizar»). Y el idioma del sistema para la fecha.
+if [[ -d /var/cache/vortex-greeter && -w /var/cache/vortex-greeter ]]; then
+  export HOME=/var/cache/vortex-greeter
+  export XDG_CACHE_HOME="$HOME/.cache" XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_STATE_HOME="$HOME/.local/state"
+fi
+if [[ -z "${LANG:-}" && -r /etc/locale.conf ]]; then
+  LANG="$(sed -n 's/^LANG=//p' /etc/locale.conf | tr -d '"')" && export LANG
+fi
+# Un registro corto por si hay que ver qué pasó (se reemplaza en cada arranque).
+log="${XDG_RUNTIME_DIR:-/tmp}/vortex-greeter.log"
+Hyprland --config "$dir/hyprland.lua" >"$log" 2>&1 </dev/null
+rc="$(cat "$rc_archivo" 2>/dev/null)"
+# 0: alguien entró y greetd ya tiene su sesión lista.
+[[ "$rc" == 0 ]] && exit 0
+texto

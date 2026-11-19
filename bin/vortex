@@ -1450,6 +1450,7 @@ PAQUETES_NUEVOS=(
   cachyos-rate-mirrors # 2.9.2: espejos cercanos (espejos_cercanos)
   smartmontools # 4.0: vortex-disco salud (avisa si un disco empieza a fallar)
   ydotool grim # 4.0: Miku hace clic por ti (con tu permiso) y enseña el punto en un recorte
+  plymouth # 4.0: la animación de arranque (logo de Vortexine's sobre negro)
 )
 paquetes_nuevos() {
   local p faltan=()
@@ -1527,6 +1528,104 @@ proteger_apps() {
     { sudo install -Dm644 "$origen" "$destino" && sudo sysctl -q -p "$destino"; } ||
       aviso "no pude poner al día $destino"
   fi
+}
+
+# ---- Inicio de la PC (4.0) -----------------------------------------------------------------------------
+# Al prender se entra directo a Vortex Shell, que arranca bloqueado: la contraseña se pone en su pantalla de
+# bloqueo (greetd [initial_session] con config/greeter/entrar-bloqueado). Quien eligió entrar sin
+# contraseña (un [initial_session] que ya estaba) se queda así. Al cerrar sesión sale el login gráfico
+# (vortex-greeter) y, si ese falla, el de texto. Además, la animación de arranque de Vortexine's (Plymouth).
+# Solo pide sudo si hay algo que cambiar. VORTEX_INICIO_RAIZ: solo para las pruebas (otra raíz en vez de /).
+greetd_config() {
+  local usuario="$1" actual="$2" auto_usuario
+  cat "$VORTEX_DIR/config/sistema/greetd.toml"
+  # Un [initial_session] que no es el nuestro: era «entrar sin contraseña». Se respeta (sin bloquear).
+  if [[ -f "$actual" ]] && grep -q '^\[initial_session\]' "$actual" && ! grep -q 'entrar-bloqueado' "$actual"; then
+    auto_usuario="$(sed -n '/^\[initial_session\]/,/^\[/ s/^user *= *"\(.*\)"/\1/p' "$actual" | head -1)"
+    if [[ "$auto_usuario" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+      printf '\n[initial_session]\ncommand = "/usr/share/vortex/greeter/entrar"\nuser = "%s"\n' "$auto_usuario"
+      return
+    fi
+  fi
+  printf '\n[initial_session]\ncommand = "/usr/share/vortex/greeter/entrar-bloqueado"\nuser = "%s"\n' "$usuario"
+}
+
+pantalla_inicio() {
+  local r="${VORTEX_INICIO_RAIZ:-}" g="$VORTEX_DIR/config/greeter" f cambio=0
+  [[ -d "$g" ]] || return 0
+  [[ "$USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { aviso "nombre de usuario raro ($USER): no cambio el inicio"; return 0; }
+  # 1. El login gráfico (lo lee el usuario «greeter»: va fuera de tu carpeta).
+  for f in shell.qml hyprland.lua logo.svg entrar entrar-bloqueado; do
+    cmp -s "$g/$f" "$r/usr/share/vortex/greeter/$f" || cambio=1
+  done
+  cmp -s "$g/vortex-greeter" "$r/usr/local/bin/vortex-greeter" || cambio=1
+  if ((cambio)); then
+    { sudo install -Dm644 -t "$r/usr/share/vortex/greeter" "$g/shell.qml" "$g/hyprland.lua" "$g/logo.svg" &&
+      sudo install -Dm755 -t "$r/usr/share/vortex/greeter" "$g/entrar" "$g/entrar-bloqueado" &&
+      sudo install -Dm755 "$g/vortex-greeter" "$r/usr/local/bin/vortex-greeter"; } ||
+      { aviso "no pude instalar la pantalla de inicio"; return 0; }
+  fi
+  # Dónde recuerda el login el último usuario que entró.
+  if [[ ! -d "$r/var/cache/vortex-greeter" ]] && getent passwd greeter >/dev/null; then
+    sudo install -d -o greeter -g greeter -m 755 "$r/var/cache/vortex-greeter" 2>/dev/null || true
+  fi
+  # 2. greetd: lo lee al arrancar, así que vale desde el próximo inicio (no cierra tu sesión).
+  local destino="$r/etc/greetd/config.toml" nuevo
+  nuevo="$(greetd_config "$USER" "$destino")"
+  if [[ "$nuevo" != "$(cat "$destino" 2>/dev/null)" ]]; then
+    printf '%s\n' "$nuevo" | sudo install -Dm644 /dev/stdin "$destino" || aviso "no pude poner al día $destino"
+  fi
+  plymouth_vortex
+}
+
+# La animación de arranque: el logo sobre negro. Pone el tema, el hook de Plymouth en el initramfs y
+# «splash» en GRUB solo si falta cada cosa (CachyOS ya trae Plymouth; las de la ISO no).
+plymouth_vortex() {
+  local r="${VORTEX_INICIO_RAIZ:-}" t="$VORTEX_DIR/config/plymouth/vortex" d f cambio=0 rehacer=0 conf
+  d="$r/usr/share/plymouth/themes/vortex"
+  [[ -d "$t" ]] && command -v plymouth-set-default-theme >/dev/null || return 0
+  for f in "$t"/*; do cmp -s "$f" "$d/${f##*/}" || cambio=1; done
+  if ((cambio)); then
+    sudo install -Dm644 -t "$d" "$t"/* || { aviso "no pude instalar la animación de arranque"; return 0; }
+    rehacer=1
+  fi
+  if [[ "$(plymouth-set-default-theme 2>/dev/null)" != vortex ]]; then
+    sudo plymouth-set-default-theme vortex && rehacer=1
+  fi
+  # El HOOKS que vale es el último que se define (mkinitcpio.conf y luego mkinitcpio.conf.d/*.conf).
+  conf=""
+  for f in "$r/etc/mkinitcpio.conf" "$r"/etc/mkinitcpio.conf.d/*.conf; do
+    [[ -f "$f" ]] && grep -q '^HOOKS=' "$f" && conf="$f"
+  done
+  if [[ -n "$conf" ]] && ! grep -Eq '^HOOKS=.*[( ]plymouth[ )]' "$conf"; then
+    # Justo después de systemd o udev: antes del cifrado, para que la contraseña del disco salga bonita.
+    sudo sed -i -E '/^HOOKS=/ s/([( ])(systemd|udev)([ )])/\1\2 plymouth\3/' "$conf" && rehacer=1
+  fi
+  if ((rehacer)) && [[ -z "$r" ]]; then
+    sudo mkinitcpio -P >/dev/null 2>&1 || aviso "no pude rehacer el initramfs (mkinitcpio -P)"
+  fi
+  f="$r/etc/default/grub"
+  if [[ -f "$f" ]] && ! grep -Eq "^GRUB_CMDLINE_LINUX_DEFAULT=.*[\"' ]splash[\"' ]" "$f"; then
+    sudo sed -i -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=['\"])/\1splash /" "$f" &&
+      [[ -z "$r" && -f /boot/grub/grub.cfg ]] && { sudo grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1 ||
+        aviso "no pude rehacer la config de GRUB"; }
+  fi
+  # systemd-boot (las instalaciones de la ISO): «splash» en cada entrada y en /etc/kernel/cmdline (con el que
+  # se rehacen). La ESP solo la lee root, por eso el sudo; solo si hay un systemd-boot.
+  local b e
+  for b in "$r/boot" "$r/efi"; do
+    # Con la ESP en /boot, /boot es solo de root (vfat con umask 0077): ahí sí hace falta sudo para verla.
+    [[ -d "$b/loader" ]] || { [[ -d "$b" && ! -x "$b" ]] && sudo test -d "$b/loader"; } || continue
+    while IFS= read -r e; do
+      sudo grep -Eq '^options.*(^|[[:space:]])splash([[:space:]]|$)' "$e" ||
+        sudo sed -i -E 's/^(options[[:space:]]+)/\1splash /' "$e" || aviso "no pude poner splash en $e"
+    done < <(sudo find "$b/loader/entries" -maxdepth 1 -name '*.conf' 2>/dev/null)
+  done
+  f="$r/etc/kernel/cmdline"
+  if [[ -f "$f" ]] && ! grep -Eq '(^|[[:space:]])splash([[:space:]]|$)' "$f"; then
+    sudo sed -i -E '1 s/^/splash /' "$f" || true
+  fi
+  return 0
 }
 
 # ---- Novedades (2.7) --------------------------------------------------------------------------------
@@ -1675,6 +1774,7 @@ cmd_actualizar() {
   fondos_nuevos
   proteger_apps
   wifi_mediatek
+  pantalla_inicio
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
@@ -2228,6 +2328,7 @@ case "${1:-ayuda}" in
   sesiones | sesion) shift; exec "$VORTEX_DIR/bin/vortex-sesiones" "$@" ;;
   cerrar-app) shift; exec "$VORTEX_DIR/bin/vortex-cerrar-app" "$@" ;;
   reiniciar-shell) reiniciar_shell ;;
+  inicio-sistema) pantalla_inicio ;;   # 4.0: lo usa el instalador (install/20-sistema.sh)
   arreglar) shift
     case "${1:-}" in puerto | arranque) exec "$VORTEX_DIR/bin/vortex-arreglar" "$@" ;; esac
     if (($#)); then exec "$VORTEX_DIR/bin/vortex-arreglar" arreglar "$@"; else exec "$VORTEX_DIR/bin/vortex-arreglar"; fi ;;

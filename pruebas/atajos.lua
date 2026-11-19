@@ -192,7 +192,7 @@ local esperado = {
     ["CTRL + SUPER + SHIFT + Right"] = "window.move({workspace=+1})",
     ["SUPER + ALT + S"] = "special:special", ["CTRL + SUPER + SHIFT + Down"] = "e+0",
     ["ALT + TAB"] = "cycle_next", ["CTRL + ALT + TAB"] = "group.next", ["SUPER + Comma"] = "group.toggle",
-    ["SUPER + U"] = "out_of_group", ["SUPER + SHIFT + Comma"] = "lock_active",
+    ["SUPER + U"] = "out_of_group", ["SUPER + SHIFT + Comma"] = "group.lock({action=toggle})",
     ["Print"] = "vortex-captura", ["SUPER + Print"] = "vortex-captura pantalla",
     ["ALT + Sys_Req"] = "vortex-captura ventana", ["SUPER + SHIFT + S"] = "vortex-captura",
     ["CTRL + ALT + R"] = "--record --full", ["SUPER + ALT + R"] = "--record --full",

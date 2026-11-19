@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Vortexine's OS
+Description=El logo de Vortexine's OS sobre negro (4.0)
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/vortex
+ScriptFile=/usr/share/plymouth/themes/vortex/vortex.script

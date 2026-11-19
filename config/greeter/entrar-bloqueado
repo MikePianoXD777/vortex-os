@@ -1,0 +1,7 @@
+#!/bin/sh
+# Vortex 4.0: la entrada directa al prender la PC (greetd [initial_session]). Entra a la sesión sin pantalla
+# de login aparte y el shell arranca bloqueado (shell/src/quickshell/lock/Lock.qml, marca de abajo): la
+# contraseña se pone en el bloqueo de Vortex Shell.
+d="${XDG_RUNTIME_DIR:-/tmp}"
+: >"$d/vortex-bloquear-al-entrar"
+exec "$(dirname "$0")/entrar"

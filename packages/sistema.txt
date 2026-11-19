@@ -7,4 +7,5 @@ scx-tools              # scxctl para cambiar de planificador
 zram-generator
 networkmanager
 greetd
-greetd-tuigreet        # pantalla de inicio en modo texto: ~3 MB frente a ~150 MB de SDDM
+greetd-tuigreet        # pantalla de inicio en modo texto (la de respaldo del login gráfico de la 4.0)
+plymouth               # 4.0: la animación de arranque

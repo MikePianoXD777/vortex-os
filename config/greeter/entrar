@@ -1,0 +1,8 @@
+#!/bin/sh
+# La sesión que arranca greetd después del login (gráfico o de texto). Una sola palabra, para que
+# funcione igual si greetd la pasa por «sh -c» o la ejecuta directo. La entrada a /dev/null: si la sesión
+# heredara la terminal, un programa del inicio que pregunte algo se quedaría esperando para siempre.
+if command -v vortex-sesion >/dev/null 2>&1; then
+  exec vortex-sesion </dev/null
+fi
+exec start-hyprland </dev/null

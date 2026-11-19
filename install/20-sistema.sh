@@ -109,13 +109,16 @@ for d in /sys/bus/pci/devices/* /sys/bus/sdio/devices/*; do
 done
 escribir_sistema /etc/scx_loader.toml <"$VORTEX_DIR/config/sistema/scx_loader.toml"
 
-# --- Pantalla de inicio: greetd + tuigreet ---
+# --- Pantalla de inicio (4.0): directo a Vortex Shell, que arranca bloqueado ---
+# Con «iniciar sesión automáticamente» se entra sin contraseña; si no, la contraseña se pone en el
+# bloqueo del shell. «vortex inicio-sistema» instala el login gráfico (al cerrar sesión), la animación de
+# arranque (Plymouth) y completa la config de greetd (respeta el [initial_session] de aquí abajo).
 greetd_conf="$(cat "$VORTEX_DIR/config/sistema/greetd.toml")"
 if ((VORTEX_AUTOLOGIN)); then
-  # Primera sesión de cada arranque sin contraseña; al cerrar sesión vuelve tuigreet.
-  printf -v greetd_conf '%s\n\n[initial_session]\ncommand = "start-hyprland"\nuser = "%s"' "$greetd_conf" "$USER"
+  printf -v greetd_conf '%s\n\n[initial_session]\ncommand = "/usr/share/vortex/greeter/entrar"\nuser = "%s"' "$greetd_conf" "$USER"
 fi
 escribir_sistema /etc/greetd/config.toml <<<"$greetd_conf"
+"$VORTEX_DIR/bin/vortex" inicio-sistema || aviso "no pude instalar la pantalla de inicio de la 4.0"
 dm_actual="$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null || true)"
 if [[ -z "$dm_actual" || "$dm_actual" == greetd.service || "$dm_actual" == display-manager.service ]]; then
   srun systemctl enable greetd.service

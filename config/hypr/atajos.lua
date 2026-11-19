@@ -381,7 +381,8 @@ atajo("CTRL + ALT + TAB", hl.dsp.group.next(), { repeating = true })
 atajo("CTRL + SHIFT + ALT + TAB", hl.dsp.group.prev(), { repeating = true })
 atajo("SUPER + Comma", hl.dsp.group.toggle())
 atajo("SUPER + U", hl.dsp.window.move({ out_of_group = true }))
-atajo("SUPER + SHIFT + Comma", hl.dsp.group.lock_active())
+-- 4.0: «lock_active» está obsoleto en Hyprland 0.57 (salía un aviso amarillo arriba a la derecha).
+atajo("SUPER + SHIFT + Comma", hl.dsp.group.lock({ action = "toggle" }))
 
 -- Mover la ventana con las flechas (enfocar con Super+flechas es de Serpantinum). En
 -- Serpantinum mover era Ctrl+Super+flechas (izq./der. ahora cambian de escritorio) y
