@@ -12,9 +12,9 @@ navigation: widget
 strings:
   productName: "Vortexine's OS"
   shortProductName: "Vortexine's"
-  version: "4.0.0"
+  version: "4.0.1"
   shortVersion: "1.7"
-  versionedName: "Vortexine's OS 4.0.0"
+  versionedName: "Vortexine's OS 4.0.1"
   shortVersionedName: "Vortexine's 1.6"
   bootloaderEntryName: "Vortexine's OS"
   productUrl: "https://github.com/MikePianoXD777/vortex-os"

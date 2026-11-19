@@ -1701,6 +1701,20 @@ espejos_cercanos() {
   mkdir -p "$AVISOS_ESTADO" && : >"$marca"
 }
 
+# Construye e instala uno de los paquetes propios (se corre en su carpeta de packaging/). Un archivo suelto
+# en su carpeta de /usr/share (lo dejó una copia a mano o un cambio local, sin paquete que lo tenga) hacía
+# fallar a pacman con «archivos en conflicto» (4.0, con vortex-miku): esa carpeta es del paquete, así que
+# ahí se sobrescribe. Fuera de ella pacman sigue cuidando como siempre.
+construir_propio() {
+  local pkg="$1" f hechos=()
+  makepkg -sf --noconfirm --nocheck || return 1
+  while IFS= read -r f; do
+    [[ -f "$f" && "$f" != *-debug-* ]] && hechos+=("$f")
+  done < <(makepkg --packagelist)
+  ((${#hechos[@]})) || return 1
+  sudo pacman -U --noconfirm --overwrite "/usr/share/$pkg/*" "${hechos[@]}"
+}
+
 cmd_actualizar() {
   if [[ "${1:-}" != --ya-traido ]]; then
     # 4.0: actualizar gasta red y disco; con un juego abierto lo notas en los FPS. Se pregunta (en la terminal).
@@ -1730,7 +1744,9 @@ cmd_actualizar() {
   # Vortexine Restore: un punto con tu configuración de antes de actualizar (si cambió algo).
   [[ -x "$VORTEX_DIR/bin/vortex-restore" ]] && "$VORTEX_DIR/bin/vortex-restore" auto actualizar || true
   espejos_cercanos
-  paru -Syu
+  # 4.0.1: con «set -e», un paquete del sistema o de AUR que no se instalaba cortaba todo aquí: Vortexine's
+  # se quedaba en la versión de antes sin decir por qué. Se avisa y se sigue con lo nuestro.
+  paru -Syu || aviso "no se pudieron actualizar algunos paquetes del sistema (arriba dice cuál); sigo con lo de Vortexine's"
   version_sistema
   # Con el gestor de ventanas «kde», la barra de título se compila otra vez si Hyprland cambió y el dock
   # hace de barra de tareas (también si se eligió kde en la 1.7.5, que no lo encendía).
@@ -1784,7 +1800,9 @@ cmd_actualizar() {
         tar -C "$VORTEX_DIR" --exclude=./.git -cf - . | tar -C "$base" -xf - ||
         { aviso "no pude copiar el código para construir $pkg"; continue; }
     fi
-    (cd "$base/packaging/$pkg" && makepkg -sif --noconfirm) || aviso "no se pudo actualizar $pkg"
+    # Sin check(): las pruebas son para quien programa; en tu PC una que dependa de la máquina tumbaba
+    # la instalación (y vortex-rust tardaba el doble compilándolas).
+    (cd "$base/packaging/$pkg" && construir_propio "$pkg") || aviso "no se pudo actualizar $pkg"
     rm -rf "$base/packaging/$pkg/"{pkg,src} "$base/packaging/$pkg/"*.pkg.tar.*
     # Mientras pacman reemplaza los archivos del shell, Hyprland puede recargar su config justo
     # cuando faltan (y quedarse en modo de emergencia, sin atajos): se recarga al terminar.
