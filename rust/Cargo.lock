@@ -1219,6 +1219,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-limpieza"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-local-ai"
 version = "0.1.0"
 dependencies = [
@@ -1385,11 +1393,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-traducir"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-usb"
 version = "0.1.0"
 dependencies = [
  "libc",
  "tempfile",
+ "vortex-core",
 ]
 
 [[package]]

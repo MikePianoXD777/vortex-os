@@ -132,6 +132,10 @@
         "desc": "Tuyo",
         "in_use": "Es el que suena",
         "use": "Usar"
+      },
+      "focus": {
+        "title": "Silenciar mientras te concentras",
+        "desc": "Con un editor, un PDF o un video en pantalla completa, las notificaciones esperan en el panel"
       }
     },
     "idle": {
@@ -318,6 +322,10 @@
       "fps": {
         "title": "Contador de FPS en los juegos",
         "desc": "Los FPS, la GPU y la CPU en la esquina de tus juegos (MangoHud). Shift derecho + F12 lo esconde. Vuelve a abrir Steam después de cambiarlo"
+      },
+      "bienvenida": {
+        "title": "Bienvenida al entrar",
+        "desc": "Una tarjeta con el clima, tus tareas de hoy y tu música"
       }
     },
     "display": {
@@ -1670,6 +1678,11 @@
       "battery": {
         "title": "Batería"
       }
+    },
+    "focus": {
+      "one": "Mientras te concentrabas llegó 1 notificación",
+      "many": "Mientras te concentrabas llegaron %1 notificaciones",
+      "where": "Te esperan en el panel de notificaciones."
     }
   },
   "quickactions": {
@@ -2872,5 +2885,11 @@
   },
   "common": {
     "select": "Seleccionar..."
+  },
+  "bienvenida": {
+    "morning": "Buenos días",
+    "afternoon": "Buenas tardes",
+    "evening": "Buenas noches",
+    "music": "¿Seguir con tu música?"
   }
 }

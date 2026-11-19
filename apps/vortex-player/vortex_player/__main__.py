@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QTimer, QUrl
 from PySide6.QtGui import QFont, QGuiApplication, QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtQml import QQmlApplicationEngine
@@ -50,10 +50,13 @@ def _enfocar_en_hyprland() -> None:
 
 
 def recibir(puente: Puente, args: list[str]) -> None:
-    """Enlaces → a bajar; archivos o carpetas → a la biblioteca."""
+    """Enlaces → a bajar; archivos o carpetas → a la biblioteca. «--seguir» (4.0, la bienvenida del
+    escritorio): sigue sonando donde te quedaste, ya restaurada la sesión."""
     archivos = []
     for a in args:
-        if a.startswith(("http://", "https://", "spotify:")) or a.startswith(("music.youtube", "youtu", "open.spotify")):
+        if a == "--seguir":
+            QTimer.singleShot(0, puente.r.seguir)
+        elif a.startswith(("http://", "https://", "spotify:")) or a.startswith(("music.youtube", "youtu", "open.spotify")):
             puente.bajar(a)
         elif a:
             archivos.append(a)
@@ -141,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     plataforma.preparar()
     app = crear_aplicacion(argv)
-    args = [a for a in argv[1:] if not a.startswith("-")]
+    args = [a for a in argv[1:] if not a.startswith("-") or a == "--seguir"]
     nombre = f"{APP_ID}-{plataforma.usuario()}"
     humo = "--prueba-humo" in argv   # no le habla a la ventana que tengas abierta
     if not humo and _avisar_a_la_abierta(nombre, args):

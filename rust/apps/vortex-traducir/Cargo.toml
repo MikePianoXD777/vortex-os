@@ -1,0 +1,22 @@
+[package]
+name = "vortex-traducir"
+description = "Traduce lo que tienes seleccionado con la IA local (4.0): Super+Alt+T"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-traducir"
+path = "src/main.rs"
+
+[dependencies]
+serde_json.workspace = true
+vortex-core.workspace = true
+
+[lints]
+workspace = true

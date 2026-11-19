@@ -131,6 +131,10 @@
         "desc": "Yours",
         "in_use": "In use",
         "use": "Use"
+      },
+      "focus": {
+        "title": "Silence while you focus",
+        "desc": "With an editor, a PDF or a video in fullscreen, notifications wait in the panel"
       }
     },
     "idle": {
@@ -317,6 +321,10 @@
       "fps": {
         "title": "FPS counter in games",
         "desc": "FPS, GPU and CPU in the corner of your games (MangoHud). Right Shift + F12 hides it. Reopen Steam after changing it"
+      },
+      "bienvenida": {
+        "title": "Welcome when you sign in",
+        "desc": "A card with the weather, your tasks for today and your music"
       }
     },
     "display": {
@@ -1617,6 +1625,11 @@
       "battery": {
         "title": "Battery"
       }
+    },
+    "focus": {
+      "one": "1 notification arrived while you focused",
+      "many": "%1 notifications arrived while you focused",
+      "where": "They're waiting in the notification panel."
     }
   },
   "quickactions": {
@@ -2857,5 +2870,11 @@
     "saved_obsidian": "Saved in your Obsidian (Tareas.md)",
     "saved_file": "Saved in Documents/Tareas.md",
     "open": "Open"
+  },
+  "bienvenida": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening",
+    "music": "Continue with your music?"
   }
 }

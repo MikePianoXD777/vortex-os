@@ -39,7 +39,7 @@ fn main() {
         println!("{NOMBRE} {VERSION} (Rust)");
         return;
     }
-    let args: Vec<String> = todos.into_iter().filter(|a| !a.starts_with('-')).collect();
+    let args: Vec<String> = todos.into_iter().filter(|a| !a.starts_with('-') || a == "--seguir").collect();
     let prueba = std::env::var_os("VORTEX_PLAYER_PRUEBA").is_some_and(|v| !v.is_empty());
     // Una sola ventana: si ya hay una abierta (de Rust o de Python), le pasa lo que recibió y sale.
     if !prueba && instancia::avisar_a_la_abierta(&instancia::ruta(), &args) {

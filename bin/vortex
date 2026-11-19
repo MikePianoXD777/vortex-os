@@ -489,6 +489,7 @@ cmd_primer_inicio() {
   aviso_atajos
   restore_al_iniciar
   disco_salud_al_iniciar
+  limpieza_semanal_al_iniciar
   bt_agente_al_iniciar
   asociar_app_installer
   command -v vortex-sesiones >/dev/null && { vortex-sesiones accion || true; }   # 4.0: las entradas del lanzador
@@ -1770,6 +1771,11 @@ cmd_actualizar() {
   # checkupdates (para el aviso de actualizaciones) viene en pacman-contrib, que la ISO no traía.
   pacman -Q pacman-contrib >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pacman-contrib ||
     aviso "no pude instalar pacman-contrib (el aviso de actualizaciones no verá los del sistema)"
+  # 4.0: la caché de pacman se limpia sola cada semana (paccache.timer, de pacman-contrib: deja las 3
+  # últimas versiones de cada paquete). Lo de tu usuario lo limpia vortex-limpieza (limpieza_semanal_al_iniciar).
+  systemctl is-enabled -q paccache.timer 2>/dev/null || sudo systemctl enable --now paccache.timer >/dev/null 2>&1 ||
+    aviso "no pude encender la limpieza semanal de la caché de pacman"
+  limpieza_semanal_al_iniciar
   avisos_primera_vez
   fondos_nuevos
   proteger_apps
@@ -2030,6 +2036,40 @@ RandomizedDelaySec=30min
 WantedBy=timers.target
 UNIDAD
   (systemctl --user daemon-reload && systemctl --user enable --now vortex-disco-salud.timer) >/dev/null 2>&1 || true
+}
+
+# La limpieza de la semana (4.0, vortex-limpieza de vortex-rust): cachés viejas, Flatpak sin usar y, preguntando,
+# la papelera vieja. Un temporizador semanal (Persistent: si la PC estaba apagada, al prender); nada corre entre
+# una vez y otra. Se escribe y enciende si falta.
+limpieza_semanal_al_iniciar() {
+  [[ -e /etc/vortex/live ]] && return 0
+  command -v vortex-limpieza >/dev/null || return 0
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  [[ -f "$d/vortex-limpieza.timer" ]] && return 0
+  mkdir -p "$d"
+  cat >"$d/vortex-limpieza.service" <<'UNIDAD'
+[Unit]
+Description=Vortexine: la limpieza de la semana (cachés viejas)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/vortex-limpieza semanal
+Nice=19
+IOSchedulingClass=idle
+UNIDAD
+  cat >"$d/vortex-limpieza.timer" <<'UNIDAD'
+[Unit]
+Description=Vortexine: la limpieza de la semana
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=2h
+
+[Install]
+WantedBy=timers.target
+UNIDAD
+  (systemctl --user daemon-reload && systemctl --user enable --now vortex-limpieza.timer) >/dev/null 2>&1 || true
 }
 
 # El agente de Bluetooth (bin/vortex-bt-agente): sin él, BlueZ no empareja de verdad. Se escribe y enciende si falta;

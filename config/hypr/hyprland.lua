@@ -374,6 +374,8 @@ hl.bind("SUPER + F1", hl.dsp.event("serpantinum:toggle keybinds"))
 
 -- Vortex 1.8: copiar el texto de una zona de la pantalla (OCR, bin/vortex-texto). T de «texto».
 hl.bind("SUPER + SHIFT + T", hl.dsp.exec_cmd("vortex-texto"))
+-- 4.0: traducir lo que tienes seleccionado con la IA local (vortex-traducir, Rust). T de «traducir».
+hl.bind("SUPER + ALT + T", hl.dsp.exec_cmd("vortex-traducir"))
 -- Vortex 2.7: dictar en cualquier app (bin/vortex-dictar); otra vez corta. D de «dictar».
 hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("vortex-dictar"))
 

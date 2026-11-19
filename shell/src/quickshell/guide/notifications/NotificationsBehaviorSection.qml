@@ -31,6 +31,26 @@ SettingsBlob {
 
     SettingsRow {
         rootObj: section.tab.rootObj
+        icon: "󰽥"
+        title: I18n.t("guide.notifications.focus.title", "Silence while you focus")
+        description: I18n.t("guide.notifications.focus.desc", "With an editor, a PDF or a video in fullscreen, notifications wait in the panel")
+
+        Toggle {
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            checked: section.tab.concentracion
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function(c) {
+                section.tab.concentracion = c;
+                section.tab.updateNotifSetting("concentracion", c);
+            }
+        }
+    }
+
+    SettingsRow {
+        rootObj: section.tab.rootObj
         icon: "󰋑"
         title: I18n.t("guide.notifications.empty_graphic.title")
         description: I18n.t("guide.notifications.empty_graphic.desc")

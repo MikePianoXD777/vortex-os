@@ -26,4 +26,23 @@ SettingsBlob {
             }
         }
     }
+
+    SettingsRow {
+        rootObj: section.tab.rootObj
+        icon: "󰖨"
+        title: I18n.t("guide.general.bienvenida.title", "Welcome when you sign in")
+        description: I18n.t("guide.general.bienvenida.desc", "A card with the weather, your tasks for today and your music")
+
+        Toggle {
+            checked: section.tab.bienvenida
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function(c) {
+                section.tab.bienvenida = c;
+                section.tab.updateGeneralSettings();
+            }
+        }
+    }
 }

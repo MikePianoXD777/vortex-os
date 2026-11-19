@@ -355,6 +355,11 @@ impl Puente {
     pub fn recibir(mut self: Pin<&mut Self>, args: Vec<String>) {
         let mut archivos = Vec::new();
         for a in args {
+            // 4.0: la bienvenida del escritorio («¿seguir con tu música?»): suena donde te quedaste.
+            if a == "--seguir" {
+                con_rep(|r| r.seguir());
+                continue;
+            }
             let enlace = ["http://", "https://", "spotify:", "music.youtube", "youtu", "open.spotify"]
                 .iter()
                 .any(|p| a.starts_with(p));

@@ -290,7 +290,10 @@ fn una_sola_copia_por_sesion() {
     let _ = primera.kill();
     let _ = primera.wait();
     assert!(escuchando, "la primera copia no se quedó escuchando");
-    assert!(salida.is_some_and(|s| s.success()), "la segunda copia no salió sola");
+    assert!(
+        salida.is_some_and(|s| s.success()),
+        "la segunda copia no salió sola"
+    );
 }
 
 /// Sin udisksctl no hay con qué montar: sale de inmediato, sin escuchar nada.

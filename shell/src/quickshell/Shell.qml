@@ -76,7 +76,29 @@ ShellRoot {
         onTriggered: Quickshell.execDetached(["sh", "-c", "command -v vortex-miku >/dev/null && exec vortex-miku sentir revisar"])
     }
     Bar {}
-    Lock {}
+    Lock {
+        onDesbloqueoAlEntrar: bienvenida.mostrar()
+    }
+
+    // 4.0: la bienvenida al prender (bienvenida/Bienvenida.qml). Solo existe los 7 s que se ve: con
+    // «source» ni se lee el archivo hasta entonces. «quickshell ipc call bienvenida mostrar» la enseña.
+    Loader {
+        id: bienvenida
+        active: false
+        source: active ? Qt.resolvedUrl("bienvenida/Bienvenida.qml") : ""
+        function mostrar() {
+            if (Config.getSetting("general", {}).bienvenida === false) return;
+            active = true;
+        }
+        Connections {
+            target: bienvenida.item
+            function onTerminar() { bienvenida.active = false; }
+        }
+    }
+    IpcHandler {
+        target: "bienvenida"
+        function mostrar(): void { bienvenida.mostrar(); }
+    }
     WidgetRedactor {}
     LockRedactor {}
 

@@ -16,6 +16,9 @@ Scope {
     property bool isUnlocking: false
     property int resumeRevision: 0
     property int shownSurfaces: 0
+    // 4.0: al desbloquear el bloqueo del arranque sale la bienvenida (bienvenida/Bienvenida.qml).
+    property bool bienvenidaPendiente: false
+    signal desbloqueoAlEntrar()
 
     property int connectedScreenCount: 1
     property bool fingerprintAvailable: false
@@ -150,7 +153,10 @@ Scope {
         id: alEntrar
         command: ["sh", "-c", "f=\"${XDG_RUNTIME_DIR:-/tmp}/vortex-bloquear-al-entrar\"; [ -e \"$f\" ] && rm -f \"$f\" && echo si"]
         stdout: StdioCollector {
-            onStreamFinished: if (this.text.trim() === "si") root.lockStatic()
+            onStreamFinished: if (this.text.trim() === "si") {
+                root.bienvenidaPendiente = true;
+                root.lockStatic();
+            }
         }
     }
 
@@ -458,6 +464,10 @@ Scope {
         if (root.freezeTimestamp !== "") {
             Quickshell.execDetached(["bash", "-c", "rm -f " + Caching.getRunDir("screenshot") + "/lock_freeze_*_" + root.freezeTimestamp + ".png"]);
             root.freezeTimestamp = "";
+        }
+        if (root.bienvenidaPendiente) {
+            root.bienvenidaPendiente = false;
+            root.desbloqueoAlEntrar();
         }
     }
 

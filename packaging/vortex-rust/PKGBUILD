@@ -24,16 +24,19 @@
 #     (/usr/bin/vortex-player) salta a este si existe; VORTEX_PLAYER_PYTHON=1 fuerza la de Python.
 #   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
+#   - vortex-traducir (4.0, solo en Rust): Super+Alt+T traduce lo seleccionado con la IA local (Ollama).
+#   - vortex-limpieza (4.0, solo en Rust): la limpieza de la semana (temporizador de usuario que deja «vortex»).
+#   - vortex-usb-rs también respalda a una memoria marcada «Usar para respaldos» (4.0).
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=11
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera y Player)"
+pkgrel=12
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, traducir y limpieza)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
-depends=('gcc-libs' 'glibc' 'dbus' 'libnotify' 'qt6-base' 'qt6-declarative' 'qt6-svg')
+depends=('gcc-libs' 'glibc' 'dbus' 'libnotify' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'curl' 'wl-clipboard')
 optdepends=('vortex-video: los QML y el reproductor de Vortex Video (qt6-multimedia)'
             'vortex-player: los QML de Vortex Player (y mpv, ffmpeg, yt-dlp)')
 makedepends=('cargo' 'qt6-base' 'qt6-declarative')
@@ -42,7 +45,7 @@ options=('!lto')
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt
-         vortex-player-qt)
+         vortex-player-qt vortex-traducir vortex-limpieza)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -64,7 +67,7 @@ check() {
     cd "$(_raiz)"
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
-    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones
+    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones -p vortex-traducir -p vortex-limpieza
     # El motor de Camera se prueba contra una cámara falsa de verdad (RTSP con ffmpeg y python3).
     if command -v ffmpeg >/dev/null && command -v python3 >/dev/null; then
         cargo test --release --frozen -p vortex-camera
@@ -86,6 +89,8 @@ package() {
     install -Dm755 "$b/vortex-shared-motor" "$pkgdir/usr/lib/vortex/vortex-shared-motor"
     install -Dm755 "$b/vortex-gestor-rs" "$pkgdir/usr/lib/vortex/vortex-gestor-rs"
     install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
+    install -Dm755 "$b/vortex-traducir" "$pkgdir/usr/bin/vortex-traducir"
+    install -Dm755 "$b/vortex-limpieza" "$pkgdir/usr/bin/vortex-limpieza"
     for a in task-manager runner video shop app-installer connect shared camera player; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done

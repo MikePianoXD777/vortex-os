@@ -18,6 +18,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 mod netlink;
+pub mod respaldo;
 
 const APP: &str = "Vortexine's OS";
 
@@ -182,6 +183,11 @@ fn montar_y_avisar(dispositivo: &str, etiqueta: &str, modelo: &str) {
         avisar(&format!("No pude abrir «{nombre}»"), Some(motivo));
         return;
     }
+    // 4.0: una memoria de respaldo se respalda sola al conectarla.
+    if Path::new(&punto).join(respaldo::MARCA).is_file() {
+        respaldar(dispositivo, &nombre, &punto);
+        return;
+    }
     let mut c = programa("notify-send");
     c.args([
         "-a",
@@ -192,6 +198,8 @@ fn montar_y_avisar(dispositivo: &str, etiqueta: &str, modelo: &str) {
         "abrir=Abrir",
         "-A",
         "expulsar=Expulsar",
+        "-A",
+        "respaldo=Usar para respaldos",
     ])
     .arg("Memoria conectada")
     .arg(format!("«{nombre}» ({})", tamano(dispositivo)));
@@ -200,17 +208,135 @@ fn montar_y_avisar(dispositivo: &str, etiqueta: &str, modelo: &str) {
         .map(|(_, s)| s)
         .unwrap_or_default();
     match accion.as_str() {
+        "respaldo" => {
+            let home = vortex_core::rutas::home();
+            let carpetas = respaldo::carpetas_de_fabrica(&home);
+            let marca = Path::new(&punto).join(respaldo::MARCA);
+            if std::fs::write(&marca, respaldo::texto_de_marca(&carpetas)).is_err() {
+                avisar(
+                    &format!("No pude usar «{nombre}» para respaldos"),
+                    Some("La memoria no deja escribir (¿está protegida o llena?)."),
+                );
+                return;
+            }
+            respaldar(dispositivo, &nombre, &punto);
+        }
+        otra => despues_del_aviso(otra, dispositivo, &nombre, &punto),
+    }
+}
+
+/// Lo que pidieron con los botones del aviso.
+fn despues_del_aviso(accion: &str, dispositivo: &str, nombre: &str, punto: &str) {
+    match accion {
         "abrir" => {
             let mut c = programa("xdg-open");
-            c.arg(&punto);
+            c.arg(punto);
             if !sin_salida(c) {
                 let mut c = programa("thunar");
-                c.arg(&punto);
+                c.arg(punto);
                 let _ = sin_salida(c);
             }
         }
-        "expulsar" => expulsar(dispositivo, &nombre),
+        "expulsar" => expulsar(dispositivo, nombre),
         _ => {}
+    }
+}
+
+/// «1,2 GB», «340 MB», «12 KB».
+pub fn tamano_bytes(b: u64) -> String {
+    let t = if b >= 1_000_000_000 {
+        format!("{:.1} GB", b as f64 / 1e9)
+    } else if b >= 1_000_000 {
+        format!("{} MB", b / 1_000_000)
+    } else {
+        format!("{} KB", b.div_ceil(1000))
+    };
+    t.replace('.', ",")
+}
+
+/// Cierra un aviso (el panel de avisos del shell no redibuja uno reemplazado con `-r`).
+fn cerrar_aviso(id: &str) {
+    let mut c = programa("gdbus");
+    c.args([
+        "call",
+        "--session",
+        "--dest",
+        "org.freedesktop.Notifications",
+        "--object-path",
+        "/org/freedesktop/Notifications",
+        "--method",
+        "org.freedesktop.Notifications.CloseNotification",
+        id,
+    ]);
+    let _ = sin_salida(c);
+}
+
+/// Copia a la memoria lo nuevo de las carpetas de su marca y avisa al empezar y al terminar.
+fn respaldar(dispositivo: &str, nombre: &str, punto: &str) {
+    let home = vortex_core::rutas::home();
+    let marca = std::fs::read_to_string(Path::new(punto).join(respaldo::MARCA)).unwrap_or_default();
+    let mut carpetas = respaldo::leer_marca(&marca);
+    if carpetas.is_empty() {
+        carpetas = respaldo::carpetas_de_fabrica(&home);
+    }
+    let raiz = respaldo::raiz_en(Path::new(punto));
+    let (lista, iguales) = respaldo::plan(&home, &carpetas, &raiz);
+    let mut id = String::new();
+    if !lista.is_empty() {
+        let total: u64 = lista.iter().map(|c| c.bytes).sum();
+        let mut c = programa("notify-send");
+        c.args(["-a", APP, "-i", "drive-removable-media", "-p"])
+            .arg("Respaldando tus archivos")
+            .arg(format!(
+                "Copiando {} ({}) a «{nombre}». Te aviso al terminar: no la saques mientras.",
+                if lista.len() == 1 {
+                    "1 archivo".to_string()
+                } else {
+                    format!("{} archivos", lista.len())
+                },
+                tamano_bytes(total)
+            ));
+        id = salida_de(c)
+            .map(|(_, s)| s.trim().to_string())
+            .unwrap_or_default();
+    }
+    let r = respaldo::copiar_todo(
+        &lista,
+        iguales,
+        std::time::Duration::from_secs(3600),
+        &mut |_, _| {},
+    );
+    // Que lo copiado quede escrito de verdad antes de decir «listo».
+    let _ = sin_salida({
+        let mut c = programa("sync");
+        c.arg("-f").arg(punto);
+        c
+    });
+    if !id.is_empty() {
+        cerrar_aviso(&id);
+    }
+    let (titulo, cuerpo) = respaldo::texto_del_final(&r, nombre, &tamano_bytes);
+    let mut c = programa("notify-send");
+    c.args([
+        "-a",
+        APP,
+        "-i",
+        "drive-removable-media",
+        "-A",
+        "expulsar=Expulsar",
+        "-A",
+        "abrir=Ver el respaldo",
+    ])
+    .arg(titulo)
+    .arg(cuerpo);
+    let accion = salida_de(c)
+        .filter(|(bien, _)| *bien)
+        .map(|(_, s)| s)
+        .unwrap_or_default();
+    let abrir = raiz.to_string_lossy().into_owned();
+    match accion.as_str() {
+        "abrir" => despues_del_aviso("abrir", dispositivo, nombre, &abrir),
+        otra => despues_del_aviso(otra, dispositivo, nombre, punto),
     }
 }
 

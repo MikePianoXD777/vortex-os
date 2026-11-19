@@ -111,7 +111,50 @@ PanelWindow {
     // 4.0: mientras hay una partida los avisos normales no salen encima del juego (van al panel de avisos);
     // solo los urgentes. «vortex modo-juego on/off» lo cambia por IPC (notificaciones jugando true|false).
     property bool jugando: false
-    readonly property bool callado: dndEnabled || jugando
+    readonly property bool callado: dndEnabled || jugando || concentrado
+
+    // 4.0: modo concentración solo. Con un editor, Obsidian, un PDF, la oficina o un video en pantalla
+    // completa los avisos normales esperan en el panel (los urgentes sí salen). Al salir, uno solo te
+    // dice cuántos llegaron. Se apaga en Ajustes → Notificaciones («concentracion»: false).
+    readonly property var appsConcentracion: ["code", "code-oss", "vscodium", "codium", "cursor", "zed", "dev.zed.zed",
+        "jetbrains", "obsidian", "org.gnome.papers", "org.gnome.evince", "evince", "okular", "org.kde.okular",
+        "zathura", "org.pwmt.zathura", "xreader", "libreoffice", "soffice", "onlyoffice", "wps", "kate", "org.kde.kate",
+        "mpv", "vlc", "celluloid", "io.github.celluloid_player.celluloid", "org.gnome.totem", "vortex-video",
+        "firefox", "brave", "chromium", "google-chrome", "zen-browser", "app.zen_browser.zen", "librewolf", "vivaldi", "microsoft-edge"]
+    property bool concentracionActiva: {
+        let n = Config.getSetting("notifications", {});
+        return !(n && n.concentracion === false);
+    }
+    readonly property bool concentrado: {
+        if (!concentracionActiva || !isFullscreenActive || jugando) return false;
+        let c = String(CurrentFocus.appClass || "").toLowerCase();
+        for (let i = 0; i < appsConcentracion.length; i++) {
+            let a = appsConcentracion[i];
+            if (c.indexOf(a) === 0) return true;   // «jetbrains-idea», «libreoffice-writer»…
+        }
+        return false;
+    }
+    property int perdidasConcentrado: 0
+
+    Connections {
+        target: NotificationManager
+        function onPopupAdded(uid, notif) {
+            if (popupWindow.concentrado && !popupWindow.dndEnabled && notif && notif.urgency !== 2) popupWindow.perdidasConcentrado++;
+        }
+    }
+
+    onConcentradoChanged: {
+        if (concentrado) {
+            perdidasConcentrado = 0;
+        } else if (perdidasConcentrado > 0) {
+            let n = perdidasConcentrado;
+            perdidasConcentrado = 0;
+            Quickshell.execDetached(["notify-send", "-a", "Vortexine's OS", "-i", "notifications",
+                n === 1 ? I18n.t("notifications.focus.one", "1 notification arrived while you focused")
+                        : I18n.t("notifications.focus.many", "%1 notifications arrived while you focused").arg(n),
+                I18n.t("notifications.focus.where", "They're waiting in the notification panel.")]);
+        }
+    }
 
     IpcHandler {
         target: "notificaciones"
@@ -141,6 +184,7 @@ PanelWindow {
         function onSettingsLoaded() {
             let n = Config.getSetting("notifications", { "dnd": false, "position": "top right" });
             popupWindow.dndEnabled = Boolean(n && n.dnd);
+            popupWindow.concentracionActiva = !(n && n.concentracion === false);
             popupWindow.position = (n && n.position !== undefined) ? n.position : "top right";
             popupWindow.horizontalPosition = (n && n.horizontalPosition !== undefined) ? n.horizontalPosition : 95;
             popupWindow.verticalPosition = (n && n.verticalPosition !== undefined) ? n.verticalPosition : 5;

@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 libc.workspace = true
+vortex-core.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

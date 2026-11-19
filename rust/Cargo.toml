@@ -31,6 +31,8 @@ members = [
     "apps/vortex-camera",
     "apps/vortex-camera/qt",
     "apps/vortex-player/qt",
+    "apps/vortex-traducir",
+    "apps/vortex-limpieza",
 ]
 
 [workspace.package]
