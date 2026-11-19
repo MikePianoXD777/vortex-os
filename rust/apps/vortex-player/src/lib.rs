@@ -15,6 +15,7 @@ pub mod discord;
 pub mod ecualizador;
 pub mod fecha;
 pub mod letras;
+pub mod mpris;
 pub mod mpv;
 pub mod nube;
 pub mod red;
