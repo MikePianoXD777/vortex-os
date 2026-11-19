@@ -2,16 +2,6 @@
 # La sesión que arranca greetd después del login (gráfico o de texto). Una sola palabra, para que
 # funcione igual si greetd la pasa por «sh -c» o la ejecuta directo. La entrada a /dev/null: si la sesión
 # heredara la terminal, un programa del inicio que pregunte algo se quedaría esperando para siempre.
-# 4.0: con un argumento (el que elegiste en el login: plasma, gnome…) arranca ese escritorio
-# (vortex-escritorio); sin nada o con «vortex», Vortex Shell.
-# Lo que quedó de una sesión gráfica que se cortó de golpe (Plasma corre como servicios del usuario y
-# sobrevive a su sesión) se detiene antes de arrancar la nueva; si no, la nueva no arranca o carga con eso.
-if systemctl --user -q is-active graphical-session.target 2>/dev/null; then
-  systemctl --user stop graphical-session.target 2>/dev/null
-fi
-if [ -n "$1" ] && [ "$1" != vortex ] && command -v vortex-escritorio >/dev/null 2>&1; then
-  exec vortex-escritorio entrar "$1" </dev/null
-fi
 if command -v vortex-sesion >/dev/null 2>&1; then
   exec vortex-sesion </dev/null
 fi

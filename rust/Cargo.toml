@@ -34,7 +34,6 @@ members = [
     "apps/vortex-player/qt",
     "apps/vortex-traducir",
     "apps/vortex-limpieza",
-    "apps/vortex-escritorio",
     "apps/miku",
     "apps/miku/qt",
     "apps/miku/voz",

@@ -3,9 +3,7 @@
 // sólido. En cada monitor va el reloj; el login, en el principal (un clic en otro monitor lo pasa ahí).
 //
 // El flujo con greetd: createSession(usuario) → greetd pide la contraseña (authMessage) → respond() →
-// readyToLaunch → launch(["…/entrar", sesión]) y Quickshell se cierra; greetd arranca el escritorio.
-// 4.0: si hay otros escritorios instalados (vortex escritorio instalar kde…), abajo a la izquierda se elige
-// cuál; se recuerda el último de cada persona en /var/cache/vortex-greeter/sesion-<usuario>.
+// readyToLaunch → launch(["…/entrar"]) y Quickshell se cierra; greetd arranca el escritorio.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -30,15 +28,6 @@ ShellRoot {
     property int elegido: 0
     readonly property var usuario: usuarios.length ? usuarios[Math.min(elegido, usuarios.length - 1)] : null
     property string ultimoNombre: ""
-
-    // Los escritorios: Vortex Shell y los que haya instalados (vortex-escritorio sesiones).
-    property var sesiones: [{ id: "vortex", tipo: "wayland", escritorios: "", nombre: "Vortex Shell" }]
-    property string sesionId: "vortex"
-    readonly property var sesion: {
-        for (const x of sesiones) if (x.id === sesionId) return x;
-        return sesiones[0];
-    }
-    property bool eligiendoSesion: false
 
     // listo | revisando | pregunta (PAM pide algo más) | entrando
     property string estado: "listo"
@@ -70,48 +59,6 @@ ShellRoot {
         path: raiz.estadoDir + "/ultimo"
         printErrors: false
         onLoaded: { raiz.ultimoNombre = text().trim(); raiz.elegirUltimo(); }
-    }
-
-    Process {
-        id: listaSesiones
-        command: ["vortex-escritorio", "sesiones"]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let l = [raiz.sesiones[0]];
-                for (const linea of text.split("\n")) {
-                    const c = linea.split("\t");
-                    if (c.length < 4 || c[0] === "" || c[0] === "vortex") continue;
-                    l.push({ id: c[0], tipo: c[1], escritorios: c[2], nombre: c[3] });
-                }
-                raiz.sesiones = l;
-                raiz.leerSesion();
-            }
-        }
-    }
-    // El último escritorio de la persona elegida (cambia de archivo al cambiar de persona).
-    FileView {
-        id: sesionGuardada
-        path: raiz.usuario ? raiz.estadoDir + "/sesion-" + raiz.usuario.nombre : ""
-        printErrors: false
-        onLoaded: raiz.leerSesion()
-        onLoadFailed: raiz.sesionId = "vortex"
-    }
-    function leerSesion() {
-        let id = "vortex";
-        try { id = sesionGuardada.text().trim() || "vortex"; } catch (e) {}
-        sesionId = sesiones.some(x => x.id === id) ? id : "vortex";
-    }
-    function elegirSesion(id) {
-        sesionId = id;
-        eligiendoSesion = false;
-    }
-    // Lo que pone un gestor de inicio de sesión para ese escritorio (Vortex Shell no necesita nada).
-    function variablesSesion() {
-        if (sesion.id === "vortex") return [];
-        let v = ["XDG_SESSION_TYPE=" + sesion.tipo, "XDG_SESSION_DESKTOP=" + sesion.id];
-        if (sesion.escritorios !== "") v.push("XDG_CURRENT_DESKTOP=" + sesion.escritorios);
-        return v;
     }
 
     function leerUsuarios(t) {
@@ -205,7 +152,6 @@ ShellRoot {
             raiz.estado = "entrando";
             raiz.mensaje = "";
             if (raiz.usuario) ultimo.setText(raiz.usuario.nombre + "\n");
-            if (raiz.usuario && raiz.sesiones.length > 1) sesionGuardada.setText(raiz.sesion.id + "\n");
             salida.start();
         }
     }
@@ -214,7 +160,7 @@ ShellRoot {
     Timer {
         id: salida
         interval: 420
-        onTriggered: Greetd.launch([raiz.dir + "/entrar", raiz.sesion.id], raiz.variablesSesion(), true)
+        onTriggered: Greetd.launch([raiz.dir + "/entrar"], [], true)
     }
 
     Process { id: energia }
@@ -368,7 +314,6 @@ ShellRoot {
                                         raiz.cambiarUsuario(ev.key === Qt.Key_Left ? -1 : 1);
                                         ev.accepted = true;
                                     } else if (ev.key === Qt.Key_Escape) {
-                                        if (raiz.eligiendoSesion) { raiz.eligiendoSesion = false; ev.accepted = true; return; }
                                         campo.text = "";
                                         raiz.limpiar();
                                         ev.accepted = true;
@@ -459,78 +404,8 @@ ShellRoot {
                     Boton { texto: "Reiniciar"; u: ventana.u; onPulsado: raiz.apagar("reboot") }
                     Boton { texto: "Apagar"; u: ventana.u; onPulsado: raiz.apagar("poweroff") }
                 }
-                // El escritorio (solo si hay más de uno): un botón que abre la lista hacia arriba.
-                Column {
-                    id: selector
-                    visible: ventana.esPrincipal && raiz.sesiones.length > 1
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 32 * ventana.u
-                    spacing: 8 * ventana.u
-
-                    Rectangle {
-                        id: lista
-                        width: Math.max(220 * ventana.u, opciones.implicitWidth + 12 * ventana.u)
-                        height: opciones.implicitHeight + 12 * ventana.u
-                        radius: 18 * ventana.u
-                        color: raiz.tarjeta
-                        border.width: 1
-                        border.color: raiz.borde
-                        visible: opacity > 0
-                        opacity: raiz.eligiendoSesion ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                        transform: Translate { y: raiz.eligiendoSesion ? 0 : 8 * ventana.u; Behavior on y { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } } }
-                        Column {
-                            id: opciones
-                            anchors.centerIn: parent
-                            Repeater {
-                                model: raiz.sesiones
-                                Rectangle {
-                                    id: opcion
-                                    required property var modelData
-                                    readonly property bool actual: modelData.id === raiz.sesionId
-                                    width: lista.width - 12 * ventana.u
-                                    implicitWidth: nombreOpcion.implicitWidth + 64 * ventana.u
-                                    height: 40 * ventana.u
-                                    radius: height / 2
-                                    color: zonaOpcion.containsMouse ? "#1E1E1E" : "transparent"
-                                    Text {
-                                        id: nombreOpcion
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 18 * ventana.u
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: opcion.modelData.nombre
-                                        color: opcion.actual || zonaOpcion.containsMouse ? raiz.blanco : raiz.gris
-                                        font.pixelSize: Math.round(14 * ventana.u)
-                                        font.weight: opcion.actual ? Font.DemiBold : Font.Normal
-                                    }
-                                    Rectangle {
-                                        visible: opcion.actual
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 18 * ventana.u
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 7 * ventana.u; height: width; radius: width / 2
-                                        color: raiz.blanco
-                                    }
-                                    MouseArea {
-                                        id: zonaOpcion
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: raiz.elegirSesion(opcion.modelData.id)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Boton {
-                        texto: raiz.sesion.nombre + "  ▾"
-                        u: ventana.u
-                        onPulsado: raiz.eligiendoSesion = !raiz.eligiendoSesion
-                    }
-                }
                 Text {
-                    visible: ventana.esPrincipal && !selector.visible
+                    visible: ventana.esPrincipal
                     anchors.left: parent.left
                     anchors.bottom: parent.bottom
                     anchors.margins: 36 * ventana.u

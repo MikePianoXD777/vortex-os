@@ -104,23 +104,6 @@ chmod +x "$T/g/"*
 XDG_RUNTIME_DIR="$T" "$T/g/entrar-bloqueado"
 probar "deja la marca para que el shell arranque bloqueado" "[[ -e '$T/vortex-bloquear-al-entrar' ]]"
 probar "y entra a la sesión" "[[ -e '$T/entro' ]]"
-# 4.0: si la última vez eligió otro escritorio, no entra directo (sale y greetd muestra el login).
-rm -f "$T/entro" "$T/vortex-bloquear-al-entrar"
-mkdir -p "$T/r/var/cache/vortex-greeter" "$T/r/usr/share/wayland-sessions"
-echo plasma >"$T/r/var/cache/vortex-greeter/sesion-ana"
-: >"$T/r/usr/share/wayland-sessions/plasma.desktop"
-USER=ana VORTEX_INICIO_RAIZ="$T/r" XDG_RUNTIME_DIR="$T" "$T/g/entrar-bloqueado"
-probar "con otro escritorio elegido no entra directo ni bloquea" "[[ ! -e '$T/entro' && ! -e '$T/vortex-bloquear-al-entrar' ]]"
-rm "$T/r/usr/share/wayland-sessions/plasma.desktop"
-USER=ana VORTEX_INICIO_RAIZ="$T/r" XDG_RUNTIME_DIR="$T" "$T/g/entrar-bloqueado"
-probar "si ese escritorio ya no está, entra a Vortex Shell" "[[ -e '$T/entro' && -e '$T/vortex-bloquear-al-entrar' ]]"
-ENT="$AQUI/config/greeter/entrar"
-probar "entrar pasa el escritorio elegido a vortex-escritorio" "grep -q 'exec vortex-escritorio entrar \"\$1\"' '$ENT'"
-probar "entrar detiene lo que quedó de una sesión gráfica cortada" "grep -q 'systemctl --user stop graphical-session.target' '$ENT'"
-probar "el login lista los escritorios y recuerda el de cada quien" \
-  "grep -q 'vortex-escritorio\", \"sesiones' '$AQUI/config/greeter/shell.qml' && grep -q '/sesion-' '$AQUI/config/greeter/shell.qml'"
-probar "el gestor no arranca con otros escritorios" \
-  "grep -q '^ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland' '$AQUI/config/systemd/vortex-gestor.service'"
 LOCK="$AQUI/shell/src/quickshell/lock/Lock.qml"
 probar "el bloqueo del shell lee y borra esa marca, y bloquea" \
   "grep -q 'vortex-bloquear-al-entrar' '$LOCK' && grep -q 'rm -f' '$LOCK' && grep -q 'root.lockStatic()' '$LOCK'"

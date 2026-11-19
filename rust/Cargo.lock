@@ -1327,13 +1327,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vortex-escritorio"
-version = "0.1.0"
-dependencies = [
- "tempfile",
-]
-
-[[package]]
 name = "vortex-gestor"
 version = "0.1.0"
 dependencies = [

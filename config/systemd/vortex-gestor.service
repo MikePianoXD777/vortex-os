@@ -6,8 +6,6 @@ Description=Vortexine's OS: gestor de recursos automático
 Documentation=https://github.com/MikePianoXD777/vortex-os
 PartOf=graphical-session.target
 After=graphical-session.target
-# 4.0: con otro escritorio (KDE, GNOME…) no arranca: ordena las apps según Hyprland.
-ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
 
 [Service]
 Type=simple

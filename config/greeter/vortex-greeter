@@ -10,9 +10,7 @@ dir=/usr/share/vortex/greeter
 rc_archivo="${XDG_RUNTIME_DIR:-/tmp}/vortex-greeter.rc"
 
 texto() {
-  # Con F3 se elige otro escritorio (los de wayland-sessions y xsessions).
-  exec tuigreet --time --remember --remember-session --asterisks --cmd "$dir/entrar" \
-    --sessions /usr/share/wayland-sessions --xsessions /usr/share/xsessions
+  exec tuigreet --time --remember --remember-session --asterisks --cmd "$dir/entrar"
 }
 
 [[ -e /etc/vortex/greeter-texto ]] && texto   # quien prefiera la de texto (o para salir de un apuro)
