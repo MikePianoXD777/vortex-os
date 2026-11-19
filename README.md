@@ -150,7 +150,6 @@ quitaron (Super+F ya no abre Firefox: ahora es pantalla completa y Firefox es Su
 | Super+V / Super+Alt+V | historial del portapapeles (Supr borra la entrada elegida) |
 | Ctrl+Alt+V | volumen y dispositivos de audio |
 | Super+Shift+N / Super+Shift+W / Super+Alt+M | red / fondos / música (paneles que cedieron su atajo de siempre) |
-| Super+Shift+P | tu celular con KDE Connect: sus notificaciones aquí, batería, mandarle archivos o el portapapeles, hacerlo sonar (viene apagado; se enciende desde el panel) |
 | Super+Shift+G | tus juegos: Steam, Heroic y las apps de juegos en un solo lugar, con portadas; buscas y Enter lo abre |
 | Super+Shift+A | esconder/mostrar la barra |
 | Ctrl+Alt+C | borrar todas las notificaciones |

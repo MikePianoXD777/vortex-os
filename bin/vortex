@@ -64,7 +64,6 @@ Uso: vortex <comando>
                                        y pone el primero; sin archivos, los eliges en una ventana
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
-  celular [estado|on|off]              tu celular con KDE Connect (el panel es Super+Shift+P)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
   arreglar puerto N | arranque         quién tiene ocupado un puerto / por qué tarda en encender
   reporte                              crea un archivo con lo que hace falta para saber qué le pasa al equipo (sin tus datos)
@@ -211,34 +210,6 @@ cmd_bateria() {
       ;;
     estado) if [[ -e "$marca" ]]; then echo "ahorro (desenchufada)"; else echo "normal"; fi ;;
     *) aviso "usa: vortex bateria [estado|on|off]"; exit 1 ;;
-  esac
-}
-
-# ---- Tu celular (1.8) ------------------------------------------------------------------------------
-# KDE Connect: notificaciones del celular en la PC, mandarle archivos, el portapapeles, hacerlo sonar.
-# Viene apagado (kdeconnectd ocupa ~50 MB): se enciende desde el panel «Tu celular» (Super+Shift+P) o con
-# «vortex celular on». Encendido, hyprland.lua lo arranca al entrar (marca ~/.config/vortex/celular). Si
-# el cortafuegos (ufw) está activo, se abren los puertos de KDE Connect una vez, con pkexec (pide la
-# contraseña con la ventana del shell).
-cmd_celular() {
-  local marca="$CONF/celular"
-  case "${1:-estado}" in
-    on)
-      command -v kdeconnectd >/dev/null || { aviso "falta KDE Connect (sudo pacman -S kdeconnect)"; exit 1; }
-      mkdir -p "$CONF" && : >"$marca"
-      if command -v ufw >/dev/null && systemctl is-active --quiet ufw 2>/dev/null && [[ ! -e "$marca-ufw" ]]; then
-        if pkexec ufw allow kdeconnect >/dev/null 2>&1; then : >"$marca-ufw"; else
-          aviso "no pude abrir los puertos de KDE Connect en el cortafuegos (a mano: sudo ufw allow kdeconnect)"
-        fi
-      fi
-      pgrep -u "$(id -u)" -x kdeconnectd >/dev/null || setsid kdeconnectd </dev/null >/dev/null 2>&1 &
-      ;;
-    off)
-      rm -f "$marca"
-      pkill -u "$(id -u)" -x kdeconnectd 2>/dev/null || true
-      ;;
-    estado) if [[ -e "$marca" ]]; then echo "encendido"; else echo "apagado"; fi ;;
-    *) aviso "usa: vortex celular [estado|on|off]"; exit 1 ;;
   esac
 }
 
@@ -1438,7 +1409,7 @@ end' >/dev/null 2>&1 || true
 PAQUETES_NUEVOS=(
   udisks2 # 1.8: vortex-usb
   tesseract tesseract-data-spa tesseract-data-eng # 1.8: vortex-texto (copiar texto de la pantalla)
-  kdeconnect zenity # 1.8: tu celular (Super+Shift+P); zenity elige los archivos que se le mandan
+  zenity # 1.8: elegir archivos y carpetas (partidas guardadas, mods, sesiones)
   pacman-contrib # 1.9: paccache, para «Algo no funciona → Disco»
   easyeffects # 1.10: sin él el ecualizador del panel de música no hace nada
   lsp-plugins-lv2 # 3.5.1: los plugins con los que EasyEffects ecualiza (sin ellos, las barras no cambian nada)
@@ -1776,6 +1747,7 @@ cmd_actualizar() {
   systemctl is-enabled -q paccache.timer 2>/dev/null || sudo systemctl enable --now paccache.timer >/dev/null 2>&1 ||
     aviso "no pude encender la limpieza semanal de la caché de pacman"
   limpieza_semanal_al_iniciar
+  quitar_celular_viejo
   avisos_primera_vez
   fondos_nuevos
   proteger_apps
@@ -2041,6 +2013,19 @@ UNIDAD
 # La limpieza de la semana (4.0, vortex-limpieza de vortex-rust): cachés viejas, Flatpak sin usar y, preguntando,
 # la papelera vieja. Un temporizador semanal (Persistent: si la PC estaba apagada, al prender); nada corre entre
 # una vez y otra. Se escribe y enciende si falta.
+# 4.0: «Tu celular» (KDE Connect) ya no viene en Vortexine's. En las PCs que lo encendieron se apaga y se
+# cierra el puerto que se le abrió en el cortafuegos; el paquete kdeconnect se queda (puede que lo uses aparte).
+quitar_celular_viejo() {
+  local marca="$CONF/celular"
+  [[ -e "$marca" || -e "$marca-ufw" ]] || return 0
+  rm -f "$marca"
+  pkill -u "$(id -u)" -x kdeconnectd 2>/dev/null || true
+  if [[ -e "$marca-ufw" ]]; then
+    sudo ufw delete allow kdeconnect >/dev/null 2>&1 || true
+    rm -f "$marca-ufw"
+  fi
+}
+
 limpieza_semanal_al_iniciar() {
   [[ -e /etc/vortex/live ]] && return 0
   command -v vortex-limpieza >/dev/null || return 0
@@ -2381,7 +2366,6 @@ case "${1:-ayuda}" in
   fondo-agregar) shift; cmd_fondo_agregar "$@" ;;
   fondos-auto) shift; cmd_fondos_auto "$@" ;;
   bateria) shift; cmd_bateria "$@" ;;
-  celular) shift; cmd_celular "$@" ;;
   fps) shift; cmd_fps "$@" ;;
   saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).

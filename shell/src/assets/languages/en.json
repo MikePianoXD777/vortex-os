@@ -2063,10 +2063,6 @@
       "name": "Keyboard shortcuts",
       "desc": "Every Vortexine's OS shortcut (Super+F1)"
     },
-    "celular": {
-      "name": "Your phone",
-      "desc": "Your phone's or Windows PC's notifications, files, clipboard and battery (Super+Shift+P)"
-    },
     "juegos": {
       "name": "Your games",
       "desc": "Steam, Heroic and your other games, with covers (Super+Shift+G)",
@@ -2524,33 +2520,6 @@
       "today": "Fog today. High {max}, low {min}.",
       "tomorrow": "Fog tomorrow. High {max}, low {min}."
     }
-  },
-  "celular": {
-    "title": "Your phone",
-    "subtitle": "Phone or Windows PC, with KDE Connect, over your Wi-Fi",
-    "search": "Search",
-    "intro": "See your phone's notifications here, send it files and make it ring when you can't find it. With your phone or a Windows PC, what you copy on one can be pasted on the other.",
-    "step1": "Install KDE Connect on your phone (Play Store or F-Droid) or on your Windows PC (Microsoft Store).",
-    "step2": "Connect it to the same Wi-Fi as this PC.",
-    "step3": "Turn it on here and accept the pairing on the other device.",
-    "turn_on": "Turn on",
-    "turning_on": "Turning on…",
-    "empty": "No devices yet. Open KDE Connect on your phone or Windows PC, on the same Wi-Fi, and it will show up here.",
-    "wants_pair": "Wants to pair",
-    "not_paired": "Not paired",
-    "offline": "Not connected",
-    "connected": "Connected",
-    "accept": "Accept",
-    "pair": "Pair",
-    "ring": "Ring",
-    "send_file": "Send files",
-    "send_clipboard": "Send clipboard",
-    "unpair": "Unpair",
-    "clip_on": "Clipboard shared: what you copy here can be pasted there, and the other way around.",
-    "clip_off": "Clipboard not shared on its own: use \"Send clipboard\" when you need it.",
-    "clip_stop": "Stop sharing it",
-    "clip_start": "Share it on its own",
-    "turn_off": "Turn off KDE Connect"
   },
   "juegos": {
     "title": "Your games",

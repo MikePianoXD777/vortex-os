@@ -14,7 +14,6 @@ local reemplazados = {
     ["SUPER + O"] = true, -- hoy libre en Serpantinum; si algún día lo usa, el atajo es de Miku (el asistente)
     ["SUPER + F1"] = true, -- hoy libre; es la hoja de atajos de Vortex (1.7.7)
     ["SUPER + SHIFT + T"] = true, -- hoy libre; copiar el texto de la pantalla (1.8)
-    ["SUPER + SHIFT + P"] = true, -- hoy libre; el panel «Tu celular» (1.8)
     ["SUPER + SHIFT + G"] = true, -- hoy libre; la biblioteca de juegos (1.8)
 }
 
@@ -119,8 +118,6 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("vortex novedades mostrar")
     -- Vortex 1.8: fondos que cambian solos (si se encendió en Ajustes → Tema; si no, solo duerme).
     hl.exec_cmd("vortex fondos-auto correr")
-    -- Vortex 1.8: tu celular (KDE Connect), solo si se encendió en su panel (Super+Shift+P).
-    hl.exec_cmd("[ -e \"${XDG_CONFIG_HOME:-$HOME/.config}/vortex/celular\" ] && exec kdeconnectd")
     -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
     -- presión de memoria). «vortex gestor apagar» lo deshabilita.
     hl.exec_cmd("systemctl --user -q is-enabled vortex-gestor.service && systemctl --user start vortex-gestor.service")
@@ -379,8 +376,6 @@ hl.bind("SUPER + ALT + T", hl.dsp.exec_cmd("vortex-traducir"))
 -- Vortex 2.7: dictar en cualquier app (bin/vortex-dictar); otra vez corta. D de «dictar».
 hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("vortex-dictar"))
 
--- Vortex 1.8: el panel «Tu celular» (KDE Connect, shell/src/quickshell/celular/). P de «phone».
-hl.bind("SUPER + SHIFT + P", hl.dsp.event("serpantinum:toggle celular"))
 -- Vortex 1.8: la biblioteca de juegos (Steam, Heroic y las apps de juegos, con portadas).
 hl.bind("SUPER + SHIFT + G", hl.dsp.event("serpantinum:toggle juegos"))
 

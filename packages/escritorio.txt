@@ -17,8 +17,7 @@ udisks2                # montar memorias USB sin root (vortex-usb, 1.8)
 tesseract              # copiar el texto de la pantalla (vortex-texto, Super+Shift+T, 1.8)
 tesseract-data-spa
 tesseract-data-eng
-kdeconnect             # tu celular en la PC (Super+Shift+P, 1.8); viene apagado
-zenity                 # elegir archivos para mandar al celular
+zenity                 # elegir archivos y carpetas desde los scripts de Vortex
 pacman-contrib         # paccache: «Algo no funciona → Disco» limpia la caché de pacman (1.9)
 easyeffects            # el ecualizador del panel de música (sin él las barras no cambian el sonido)
 lsp-plugins-lv2        # los plugins con los que EasyEffects ecualiza (sin ellos tampoco)

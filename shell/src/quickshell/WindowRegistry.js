@@ -160,14 +160,6 @@ function getWidgetLauncherEntries(i18n) {
             fontIcon: "󰊴"
         },
         {
-            // Vortex 1.8: tu celular con KDE Connect (Super+Shift+P).
-            id: "celular",
-            name: tr("widgets.celular.name", "Your phone"),
-            description: tr("widgets.celular.desc", "Your phone's notifications, files and battery"),
-            icon: "smartphone",
-            fontIcon: "󰄜"
-        },
-        {
             id: "system",
             name: tr("widgets.system.name", "System Controls"),
             description: tr("widgets.system.desc", "Performance monitor, power, and quick settings"),
@@ -191,19 +183,9 @@ function getLayout(name, mx, my, mw, mh, userScale, barPosition) {
                 "right": { anchor: "bottom-right", mr: 52, mb: 4 } 
             } 
         },
-        // Vortex 1.10: OneDrive (onedrive/OneDrivePopup.qml), donde la red y el celular.
+        // Vortex 1.10: OneDrive (onedrive/OneDrivePopup.qml), donde la red.
         "onedrive": {
             w: 520, h: 560, comp: "onedrive/OneDrivePopup.qml",
-            pos: {
-                "top": { anchor: "top-right", mt: 52, mr: 4 },
-                "bottom": { anchor: "bottom-right", mb: 52, mr: 4 },
-                "left": { anchor: "bottom-left", ml: 52, mb: 4 },
-                "right": { anchor: "bottom-right", mr: 52, mb: 4 }
-            }
-        },
-        // Vortex 1.8: «Tu celular» (celular/CelularPopup.qml), donde la red.
-        "celular": {
-            w: 520, h: 600, comp: "celular/CelularPopup.qml",
             pos: {
                 "top": { anchor: "top-right", mt: 52, mr: 4 },
                 "bottom": { anchor: "bottom-right", mb: 52, mr: 4 },

@@ -183,7 +183,7 @@ dueno_puerto() { # PUERTO
 # Lo que el escritorio y el sistema necesitan: nunca se ofrece cerrarlo.
 protegido() { # NOMBRE
   case "$1" in
-    quickshell* | qs | Hyprland | hyprland* | systemd* | pipewire* | wireplumber | pulseaudio | dbus* | NetworkManager | sshd | kdeconnectd | vortex-*) return 0 ;;
+    quickshell* | qs | Hyprland | hyprland* | systemd* | pipewire* | wireplumber | pulseaudio | dbus* | NetworkManager | sshd | vortex-*) return 0 ;;
   esac
   return 1
 }
