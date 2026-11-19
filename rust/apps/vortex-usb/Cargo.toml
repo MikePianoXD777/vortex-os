@@ -14,6 +14,9 @@ path = "src/lib.rs"
 name = "vortex-usb-rs"
 path = "src/main.rs"
 
+[dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 

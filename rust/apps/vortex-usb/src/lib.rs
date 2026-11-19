@@ -1,6 +1,6 @@
 //! vortex-usb (Vortex 1.8, en Rust desde la 4.0): al conectar una memoria USB o una tarjeta SD, la monta y avisa
 //! con dos botones, como en Windows: «Abrir» (en Archivos) y «Expulsar» (la desmonta y la apaga: ya se puede
-//! sacar sin perder nada). Escucha a udev (`udevadm monitor`) y monta con udisks (`udisksctl`, sin root: polkit
+//! sacar sin perder nada). Escucha a udev (por netlink, como libudev; si no se puede, `udevadm monitor`) y monta con udisks (`udisksctl`, sin root: polkit
 //! se lo deja a la sesión activa). Lo arranca hyprland.lua al entrar; hay una sola copia por sesión.
 //!
 //! Es la misma herramienta que `bin/vortex-usb` (bash) y llama a los mismos programas (udevadm, udisksctl,
@@ -16,6 +16,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+
+mod netlink;
 
 const APP: &str = "Vortexine's OS";
 
@@ -239,6 +241,19 @@ fn par(linea: &str) -> Option<(&str, &str)> {
     }
 }
 
+/// Monta lo que toque de un evento (en su propio hilo, para no frenar a los demás).
+fn atender(p: &Evento, hilos: &mut Vec<JoinHandle<()>>) {
+    if debe_montar(p) {
+        let (d, e, m) = (
+            p["DEVNAME"].clone(),
+            p.get("ID_FS_LABEL").cloned().unwrap_or_default(),
+            p.get("ID_MODEL").cloned().unwrap_or_default(),
+        );
+        hilos.retain(|h| !h.is_finished());
+        hilos.push(thread::spawn(move || montar_y_avisar(&d, &e, &m)));
+    }
+}
+
 /// Lee bloques «CLAVE=valor» separados por una línea vacía y monta lo que toque (cada uno en su hilo, para
 /// no frenar a los demás). Al llegar al final espera a que terminen todos.
 pub fn leer_eventos(entrada: impl Read) {
@@ -247,15 +262,7 @@ pub fn leer_eventos(entrada: impl Read) {
     let mut p = Evento::new();
     let mut linea = Vec::new();
     let manejar = |p: &mut Evento, hilos: &mut Vec<JoinHandle<()>>| {
-        if debe_montar(p) {
-            let (d, e, m) = (
-                p["DEVNAME"].clone(),
-                p.get("ID_FS_LABEL").cloned().unwrap_or_default(),
-                p.get("ID_MODEL").cloned().unwrap_or_default(),
-            );
-            hilos.retain(|h| !h.is_finished());
-            hilos.push(thread::spawn(move || montar_y_avisar(&d, &e, &m)));
-        }
+        atender(p, hilos);
         p.clear();
     };
     loop {
@@ -289,7 +296,7 @@ fn en_path(programa: &str) -> bool {
 }
 
 fn escuchar() -> u8 {
-    if !en_path("udevadm") || !en_path("udisksctl") {
+    if !en_path("udisksctl") {
         return 0;
     }
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
@@ -303,6 +310,21 @@ fn escuchar() -> u8 {
     // Una sola copia por sesión (el candado se suelta solo al terminar el proceso).
     let Ok(candado) = candado else { return 0 };
     if candado.try_lock().is_err() {
+        return 0;
+    }
+    // 4.0: directo de udev, sin un `udevadm monitor` de ~5 MB al lado. Si no se puede, como antes.
+    if let Ok(u) = netlink::Udev::abrir() {
+        let mut buf = vec![0u8; 8192];
+        let mut hilos: Vec<JoinHandle<()>> = Vec::new();
+        loop {
+            match u.recibir(&mut buf) {
+                Ok(Some(e)) => atender(&e, &mut hilos),
+                Ok(None) => {}
+                Err(_) => break,
+            }
+        }
+    }
+    if !en_path("udevadm") {
         return 0;
     }
     let Ok(mut udev) = Command::new("udevadm")
