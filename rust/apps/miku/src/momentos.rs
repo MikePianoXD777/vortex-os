@@ -37,7 +37,10 @@ pub const ANCHO_MINIATURA: i64 = 384;
 pub const TIEMPO_CLAUDE: u64 = 240;
 
 pub fn carpeta_tareas() -> PathBuf {
-    std::env::var_os("VORTEX_MIKU_TAREAS").filter(|v| !v.is_empty()).map(PathBuf::from).unwrap_or_else(|| vortex_core::rutas::home().join("Miku/tareas"))
+    std::env::var_os("VORTEX_MIKU_TAREAS")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| vortex_core::rutas::home().join("Miku/tareas"))
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +71,11 @@ pub struct Registro(pub PathBuf);
 impl Registro {
     pub fn escribir(&self, texto: &str) {
         let a = fecha::ahora();
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&self.0) {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.0)
+        {
             let _ = writeln!(f, "{:02}:{:02}:{:02} {texto}", a.hora, a.minuto, a.segundo);
         }
     }
@@ -78,7 +85,14 @@ impl Registro {
 
 pub fn sondear(video: &Path) -> Result<Info, String> {
     let r = Command::new("ffprobe")
-        .args(["-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height,avg_frame_rate", "-of", "json"])
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=codec_type,width,height,avg_frame_rate",
+            "-of",
+            "json",
+        ])
         .arg(video)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
@@ -96,7 +110,11 @@ pub fn sondear(video: &Path) -> Result<Info, String> {
         _ => 30.0,
     };
     Ok(Info {
-        duracion: datos["format"]["duration"].as_str().and_then(|d| d.parse().ok()).or(datos["format"]["duration"].as_f64()).unwrap_or(0.0),
+        duracion: datos["format"]["duration"]
+            .as_str()
+            .and_then(|d| d.parse().ok())
+            .or(datos["format"]["duration"].as_f64())
+            .unwrap_or(0.0),
         ancho: v["width"].as_i64().unwrap_or(1920),
         alto: v["height"].as_i64().unwrap_or(1080),
         fps: if (1.0..=1000.0).contains(&fps) { fps } else { 30.0 },
@@ -108,7 +126,15 @@ pub fn sondear(video: &Path) -> Result<Info, String> {
 pub fn sonido(video: &Path, n: usize) -> Vec<f64> {
     let tasa = 8000usize;
     let por_ventana = (tasa as f64 * VENTANA) as usize;
-    let mut h = match Command::new("ffmpeg").args(["-v", "error", "-i"]).arg(video).args(["-vn", "-ac", "1", "-ar", &tasa.to_string(), "-f", "s16le", "-"]).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn() {
+    let mut h = match Command::new("ffmpeg")
+        .args(["-v", "error", "-i"])
+        .arg(video)
+        .args(["-vn", "-ac", "1", "-ar", &tasa.to_string(), "-f", "s16le", "-"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
         Ok(h) => h,
         Err(_) => return vec![-90.0; n],
     };
@@ -127,7 +153,12 @@ pub fn sonido(video: &Path, n: usize) -> Vec<f64> {
             break;
         }
         let m = leidos / 2;
-        let suma: f64 = b[..m * 2].chunks_exact(2).map(|c| f64::from(i16::from_le_bytes([c[0], c[1]])).powi(2)).sum();
+        let suma: f64 = b[..m * 2]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| f64::from(i16::from_le_bytes(*c)).powi(2))
+            .sum();
         let rms = (suma / m as f64).sqrt();
         niveles.push(20.0 * (rms.max(1.0) / 32768.0).log10());
         if leidos < b.len() {
@@ -141,11 +172,23 @@ pub fn sonido(video: &Path, n: usize) -> Vec<f64> {
 
 /// Cambio de escena (0-1) de cada ventana: lo que pasa rápido en pantalla.
 pub fn movimiento(video: &Path, n: usize) -> Vec<f64> {
-    let filtro = format!("fps={},scale=160:-2,select='gte(scene\\,0)',metadata=print:key=lavfi.scene_score:file=-", 1.0 / VENTANA);
-    let r = Command::new("ffmpeg").args(["-v", "error", "-hwaccel", "auto", "-i"]).arg(video).args(["-an", "-vf", &filtro, "-f", "null", "-"]).stdin(Stdio::null()).stderr(Stdio::null()).output();
+    let filtro = format!(
+        "fps={},scale=160:-2,select='gte(scene\\,0)',metadata=print:key=lavfi.scene_score:file=-",
+        1.0 / VENTANA
+    );
+    let r = Command::new("ffmpeg")
+        .args(["-v", "error", "-hwaccel", "auto", "-i"])
+        .arg(video)
+        .args(["-an", "-vf", &filtro, "-f", "null", "-"])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output();
     let mut valores = vec![0.0; n];
     let Ok(r) = r else { return valores };
-    let (pts, score) = (Regex::new(r"pts_time:([\d.]+)").unwrap(), Regex::new(r"^lavfi\.scene_score=([\d.]+)").unwrap());
+    let (pts, score) = (
+        Regex::new(r"pts_time:([\d.]+)").unwrap(),
+        Regex::new(r"^lavfi\.scene_score=([\d.]+)").unwrap(),
+    );
     let mut t: Option<f64> = None;
     for l in String::from_utf8_lossy(&r.stdout).lines() {
         if let Some(c) = pts.captures(l) {
@@ -173,7 +216,9 @@ fn normal(v: &[f64]) -> Vec<f64> {
     if techo - piso < 1e-9 {
         return vec![0.0; v.len()];
     }
-    v.iter().map(|x| ((x - piso) / (techo - piso)).clamp(0.0, 1.0)).collect()
+    v.iter()
+        .map(|x| ((x - piso) / (techo - piso)).clamp(0.0, 1.0))
+        .collect()
 }
 
 fn suavizar(v: &[f64], radio: usize) -> Vec<f64> {
@@ -193,10 +238,20 @@ fn redondear(x: f64, d: i32) -> f64 {
 pub fn candidatos(video: &Path, info: &Info) -> Vec<Candidato> {
     let duracion = info.duracion;
     if duracion <= CORTO {
-        return vec![Candidato { n: 1, inicio: 0.0, fin: duracion, pico: duracion / 2.0, ..Default::default() }];
+        return vec![Candidato {
+            n: 1,
+            inicio: 0.0,
+            fin: duracion,
+            pico: duracion / 2.0,
+            ..Default::default()
+        }];
     }
     let n = ((duracion / VENTANA).ceil() as usize).max(1);
-    let voz = if info.audio { normal(&suavizar(&sonido(video, n), 2)) } else { vec![0.0; n] };
+    let voz = if info.audio {
+        normal(&suavizar(&sonido(video, n), 2))
+    } else {
+        vec![0.0; n]
+    };
     let mov = normal(&suavizar(&movimiento(video, n), 4));
     let puntos: Vec<f64> = voz.iter().zip(&mov).map(|(a, b)| 0.65 * a + 0.35 * b).collect();
     let mut orden: Vec<usize> = (0..n).collect();
@@ -206,7 +261,10 @@ pub fn candidatos(video: &Path, info: &Info) -> Vec<Candidato> {
         if elegidos.len() >= MAX_CANDIDATOS || puntos[i] <= 0.0 {
             break;
         }
-        if elegidos.iter().all(|j| (i as f64 - *j as f64).abs() * VENTANA >= SEPARACION) {
+        if elegidos
+            .iter()
+            .all(|j| (i as f64 - *j as f64).abs() * VENTANA >= SEPARACION)
+        {
             elegidos.push(i);
         }
     }
@@ -232,14 +290,28 @@ pub fn candidatos(video: &Path, info: &Info) -> Vec<Candidato> {
 
 /// Tira de 3 cuadros: antes, en el pico y después.
 fn miniatura(video: &Path, c: &Candidato, destino: &Path) -> Option<PathBuf> {
-    let tiempos = [c.inicio.max(c.pico - 6.0), c.pico, (c.fin - 0.1).min(c.pico + 3.0)];
+    let tiempos = [
+        c.inicio.max(c.pico - 6.0),
+        c.pico,
+        (c.fin - 0.1).min(c.pico + 3.0),
+    ];
     let mut cmd = Command::new("ffmpeg");
     cmd.args(["-v", "error", "-y"]);
     for t in tiempos {
         cmd.args(["-ss", &format!("{:.2}", t.max(0.0)), "-i"]).arg(video);
     }
-    let filtro = format!("{};[m0][m1][m2]hstack=3", (0..3).map(|k| format!("[{k}:v]scale={ANCHO_MINIATURA}:-2,setsar=1[m{k}]")).collect::<Vec<_>>().join(";"));
-    cmd.args(["-filter_complex", &filtro, "-frames:v", "1", "-q:v", "5"]).arg(destino).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    let filtro = format!(
+        "{};[m0][m1][m2]hstack=3",
+        (0..3)
+            .map(|k| format!("[{k}:v]scale={ANCHO_MINIATURA}:-2,setsar=1[m{k}]"))
+            .collect::<Vec<_>>()
+            .join(";")
+    );
+    cmd.args(["-filter_complex", &filtro, "-frames:v", "1", "-q:v", "5"])
+        .arg(destino)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     (cmd.status().ok()?.success() && destino.is_file()).then(|| destino.to_path_buf())
 }
 
@@ -251,7 +323,11 @@ fn tiempo(t: f64) -> String {
     let t = t as i64;
     let (m, s) = (t / 60, t % 60);
     let (h, m) = (m / 60, m % 60);
-    if h > 0 { format!("{h}:{m:02}:{s:02}") } else { format!("{m}:{s:02}") }
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
 }
 
 fn contenido_ia(cands: &[Candidato], estilo_claude: bool) -> Vec<Value> {
@@ -286,7 +362,11 @@ fn elegir_con_ia(cands: &[Candidato], tarea: &Path, log: &Registro) -> Option<Ve
         log.escribir(&format!("sin {} ({mensaje}): me quedo con los picos", p.nombre));
         return None;
     }
-    let texto = match ia.completar(&p, &json!([{"role": "user", "content": contenido_ia(cands, false)}]), TIEMPO_CLAUDE) {
+    let texto = match ia.completar(
+        &p,
+        &json!([{"role": "user", "content": contenido_ia(cands, false)}]),
+        TIEMPO_CLAUDE,
+    ) {
         Ok(t) => t,
         Err(e) => {
             log.escribir(&format!("{} no respondió: {e}", p.nombre));
@@ -303,14 +383,37 @@ fn elegir_con_claude(cands: &[Candidato], tarea: &Path, log: &Registro) -> Optio
         log.escribir("sin Claude: me quedo con los picos");
         return None;
     };
-    let entrada = format!("{}\n", json!({"type": "user", "message": {"role": "user", "content": contenido_ia(cands, true)}}));
+    let entrada = format!(
+        "{}\n",
+        json!({"type": "user", "message": {"role": "user", "content": contenido_ia(cands, true)}})
+    );
     let (fuera, pone) = cerebro::entorno_claude();
     let mut c = Command::new(&claude);
-    c.args(["-p", "--model", "sonnet", "--effort", "low", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--restricted", "--tools", "", "--strict-mcp-config", "--permission-mode", "dontAsk", "--disable-slash-commands", "--max-turns", "1"])
-        .current_dir(tarea)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+    c.args([
+        "-p",
+        "--model",
+        "sonnet",
+        "--effort",
+        "low",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--restricted",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--permission-mode",
+        "dontAsk",
+        "--disable-slash-commands",
+        "--max-turns",
+        "1",
+    ])
+    .current_dir(tarea)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null());
     for v in fuera {
         c.env_remove(v);
     }
@@ -324,7 +427,9 @@ fn elegir_con_claude(cands: &[Candidato], tarea: &Path, log: &Registro) -> Optio
     };
     let mut texto = String::new();
     for l in salida.lines() {
-        let Ok(m) = serde_json::from_str::<Value>(l) else { continue };
+        let Ok(m) = serde_json::from_str::<Value>(l) else {
+            continue;
+        };
         if m["type"] == "result" {
             texto = m["result"].as_str().unwrap_or("").to_string();
             borrar_sesion(m["session_id"].as_str(), tarea);
@@ -364,9 +469,19 @@ fn correr_con_limite(mut c: Command, entrada: &[u8], limite: Duration) -> Result
 
 /// Como Miku (`Cerebro::olvidar`), no deja la conversación guardada en ~/.claude.
 fn borrar_sesion(sesion: Option<&str>, cwd: &Path) {
-    let Some(s) = sesion.filter(|s| s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-')) else { return };
-    let base = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from).unwrap_or_else(|| vortex_core::rutas::home().join(".claude")).join("projects");
-    let nombre: String = cwd.to_string_lossy().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect();
+    let Some(s) = sesion.filter(|s| s.len() == 36 && s.chars().all(|c| c.is_ascii_hexdigit() || c == '-'))
+    else {
+        return;
+    };
+    let base = std::env::var_os("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| vortex_core::rutas::home().join(".claude"))
+        .join("projects");
+    let nombre: String = cwd
+        .to_string_lossy()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
     let carpeta = base.join(nombre);
     let _ = std::fs::remove_file(carpeta.join(format!("{s}.jsonl")));
     let _ = std::fs::remove_dir_all(carpeta.join(s));
@@ -374,15 +489,31 @@ fn borrar_sesion(sesion: Option<&str>, cwd: &Path) {
 }
 
 fn limpio(v: &Value, tope: usize) -> String {
-    let t = v.as_str().map(String::from).unwrap_or_else(|| if v.is_null() { String::new() } else { v.to_string() });
-    t.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(tope).collect()
+    let t = v
+        .as_str()
+        .map(String::from)
+        .unwrap_or_else(|| if v.is_null() { String::new() } else { v.to_string() });
+    t.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(tope)
+        .collect()
 }
 
 pub fn leer_eleccion(texto: &str, cands: &[Candidato], log: &Registro) -> Option<Vec<Candidato>> {
-    let json_txt = Regex::new(r"(?s)\{.*\}").unwrap().find(texto).map(|m| m.as_str().to_string());
-    let momentos = json_txt.and_then(|t| serde_json::from_str::<Value>(&t).ok()).and_then(|v| v["momentos"].as_array().cloned());
+    let json_txt = Regex::new(r"(?s)\{.*\}")
+        .unwrap()
+        .find(texto)
+        .map(|m| m.as_str().to_string());
+    let momentos = json_txt
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| v["momentos"].as_array().cloned());
     let Some(momentos) = momentos else {
-        log.escribir(&format!("respuesta de la IA que no entiendo: {:?}", texto.chars().take(200).collect::<String>()));
+        log.escribir(&format!(
+            "respuesta de la IA que no entiendo: {:?}",
+            texto.chars().take(200).collect::<String>()
+        ));
         return None;
     };
     let (mut salida, mut vistos): (Vec<Candidato>, Vec<usize>) = (vec![], vec![]);
@@ -392,7 +523,9 @@ pub fn leer_eleccion(texto: &str, cands: &[Candidato], log: &Registro) -> Option
             Value::String(s) => s.trim().parse().ok(),
             _ => None,
         };
-        let Some(n) = n.filter(|n| *n > 0).map(|n| n as usize) else { continue };
+        let Some(n) = n.filter(|n| *n > 0).map(|n| n as usize) else {
+            continue;
+        };
         if let Some(c) = cands.iter().find(|c| c.n == n)
             && !vistos.contains(&n)
         {
@@ -448,14 +581,21 @@ fn pista(nombre: &str, tipo: &str, clips: Vec<Value>) -> Value {
 pub fn proyecto(video: &Path, destino: &Path, info: &Info, momentos: &[Candidato]) -> Value {
     let real = std::fs::canonicalize(video).unwrap_or_else(|_| video.to_path_buf());
     let carpeta = std::fs::canonicalize(destino.parent().unwrap_or(Path::new("."))).unwrap_or_default();
-    let fuente = real.strip_prefix(&carpeta).map(|r| r.to_string_lossy().into_owned()).unwrap_or_else(|_| real.to_string_lossy().into_owned());
+    let fuente = real
+        .strip_prefix(&carpeta)
+        .map(|r| r.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| real.to_string_lossy().into_owned());
     let (mut videos, mut audios, mut marcas, mut pos) = (vec![], vec![], vec![], 0.0f64);
     for m in momentos {
         let dur = redondear(m.fin - m.inicio, 3);
         if dur <= 0.0 {
             continue;
         }
-        let enlace = if info.audio { identificador() } else { String::new() };
+        let enlace = if info.audio {
+            identificador()
+        } else {
+            String::new()
+        };
         let base = json!({"tipo": "clip", "source": fuente, "start": redondear(pos, 3), "duration": dur, "in_point": m.inicio, "name": m.titulo, "link": enlace});
         let con = |extra: Value| {
             let mut b = base.clone();
@@ -469,7 +609,9 @@ pub fn proyecto(video: &Path, destino: &Path, info: &Info, momentos: &[Candidato
         if info.audio {
             audios.push(con(json!({"fade_in": 0.15, "fade_out": 0.15})));
         }
-        marcas.push(json!({"time": redondear(pos, 3), "name": m.titulo, "color": "#e8c15a", "note": m.por_que}));
+        marcas.push(
+            json!({"time": redondear(pos, 3), "name": m.titulo, "color": "#e8c15a", "note": m.por_que}),
+        );
         pos += dur;
     }
     let id = identificador();
@@ -480,7 +622,11 @@ pub fn proyecto(video: &Path, destino: &Path, info: &Info, momentos: &[Candidato
 }
 
 fn guardar(datos: &Value, destino: &Path) -> std::io::Result<()> {
-    let tmp = destino.with_file_name(format!(".{}.{}.tmp", destino.file_name().unwrap_or_default().to_string_lossy(), std::process::id()));
+    let tmp = destino.with_file_name(format!(
+        ".{}.{}.tmp",
+        destino.file_name().unwrap_or_default().to_string_lossy(),
+        std::process::id()
+    ));
     std::fs::write(&tmp, serde_json::to_string_pretty(datos).unwrap_or_default())?;
     std::fs::rename(tmp, destino)
 }
@@ -496,8 +642,13 @@ fn avisar(texto: &str, proyecto_vortex: Option<&Path>) {
     if proyecto_vortex.is_some() && studio.is_some() {
         c.args(["-A", "abrir=Abrir en Vortex Studio"]);
     }
-    c.args(["-a", "Miku", "Miku", texto]).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
-    let Ok(salida) = correr_con_limite(c, b"", Duration::from_secs(600)) else { return };
+    c.args(["-a", "Miku", "Miku", texto])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    let Ok(salida) = correr_con_limite(c, b"", Duration::from_secs(600)) else {
+        return;
+    };
     if let (Some(p), Some(s)) = (proyecto_vortex, studio)
         && salida.trim() == "abrir"
     {
@@ -508,32 +659,58 @@ fn avisar(texto: &str, proyecto_vortex: Option<&Path>) {
 fn destino_para(video: &Path) -> PathBuf {
     let carpeta = grabacion::carpeta_videos();
     let _ = std::fs::create_dir_all(&carpeta);
-    carpeta.join(format!("{} - mejores momentos.vortex", video.file_stem().unwrap_or_default().to_string_lossy()))
+    carpeta.join(format!(
+        "{} - mejores momentos.vortex",
+        video.file_stem().unwrap_or_default().to_string_lossy()
+    ))
 }
 
 pub fn trabajar(video: &Path, notificar: bool) -> Result<PathBuf, String> {
-    let video = std::fs::canonicalize(crate::rutas::expandir_tilde(&video.to_string_lossy())).map_err(|e| e.to_string())?;
+    let video = std::fs::canonicalize(crate::rutas::expandir_tilde(&video.to_string_lossy()))
+        .map_err(|e| e.to_string())?;
     let a = fecha::ahora();
-    let tarea = carpeta_tareas().join(format!("{:04}{:02}{:02}-{:02}{:02}{:02}-{}", a.anio, a.mes, a.dia, a.hora, a.minuto, a.segundo, &identificador()[..6]));
+    let tarea = carpeta_tareas().join(format!(
+        "{:04}{:02}{:02}-{:02}{:02}{:02}-{}",
+        a.anio,
+        a.mes,
+        a.dia,
+        a.hora,
+        a.minuto,
+        a.segundo,
+        &identificador()[..6]
+    ));
     std::fs::create_dir_all(&tarea).map_err(|e| e.to_string())?;
     let log = Registro(tarea.join("registro.log"));
-    let nombre = video.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let nombre = video
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     log.escribir(&format!("video: {}", video.display()));
     if notificar {
-        avisar(&format!("Busco los mejores momentos de «{nombre}». Te aviso cuando estén."), None);
+        avisar(
+            &format!("Busco los mejores momentos de «{nombre}». Te aviso cuando estén."),
+            None,
+        );
     }
     let inicio = Instant::now();
     let info = sondear(&video)?;
     log.escribir(&format!("sondeo: {info:?}"));
     let mut cands = candidatos(&video, &info);
     for c in &mut cands {
-        c.miniatura = miniatura(&video, c, &tarea.join(format!("candidato-{:02}.jpg", c.n))).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        c.miniatura = miniatura(&video, c, &tarea.join(format!("candidato-{:02}.jpg", c.n)))
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
     }
     let _ = std::fs::write(
         tarea.join("candidatos.json"),
         serde_json::to_string_pretty(&cands.iter().map(|c| json!({"n": c.n, "inicio": c.inicio, "fin": c.fin, "pico": c.pico, "sonido": c.sonido, "movimiento": c.movimiento, "miniatura": c.miniatura})).collect::<Vec<_>>()).unwrap_or_default(),
     );
-    log.escribir(&format!("{} candidatos en {:.0} s", cands.len(), inicio.elapsed().as_secs_f64()));
+    log.escribir(&format!(
+        "{} candidatos en {:.0} s",
+        cands.len(),
+        inicio.elapsed().as_secs_f64()
+    ));
     let elegidos = if cands.len() > 1 {
         elegir_con_ia(&cands, &tarea, &log).unwrap_or_else(|| sin_ia(&cands))
     } else {
@@ -544,11 +721,25 @@ pub fn trabajar(video: &Path, notificar: bool) -> Result<PathBuf, String> {
     let destino = destino_para(&video);
     guardar(&proyecto(&video, &destino, &info, &elegidos), &destino).map_err(|e| e.to_string())?;
     let resultado = json!({"proyecto": destino, "momentos": elegidos.iter().map(|c| json!({"inicio": c.inicio, "fin": c.fin, "titulo": c.titulo, "por_que": c.por_que})).collect::<Vec<_>>()});
-    let _ = std::fs::write(tarea.join("resultado.json"), serde_json::to_string_pretty(&resultado).unwrap_or_default());
-    log.escribir(&format!("listo: {} ({} momentos)", destino.display(), elegidos.len()));
+    let _ = std::fs::write(
+        tarea.join("resultado.json"),
+        serde_json::to_string_pretty(&resultado).unwrap_or_default(),
+    );
+    log.escribir(&format!(
+        "listo: {} ({} momentos)",
+        destino.display(),
+        elegidos.len()
+    ));
     if notificar {
         let n = elegidos.len();
-        avisar(&format!("Listo: {n} {} de «{nombre}» en «{}».", if n == 1 { "momento" } else { "momentos" }, destino.file_name().unwrap_or_default().to_string_lossy()), Some(&destino));
+        avisar(
+            &format!(
+                "Listo: {n} {} de «{nombre}» en «{}».",
+                if n == 1 { "momento" } else { "momentos" },
+                destino.file_name().unwrap_or_default().to_string_lossy()
+            ),
+            Some(&destino),
+        );
     }
     Ok(destino)
 }
@@ -570,10 +761,19 @@ pub fn principal(args: &[String]) -> i32 {
             return 1;
         }
     }
-    match trabajar(&video, std::env::var("VORTEX_MIKU_SIN_AVISOS").as_deref() != Ok("1")) {
+    match trabajar(
+        &video,
+        std::env::var("VORTEX_MIKU_SIN_AVISOS").as_deref() != Ok("1"),
+    ) {
         Ok(_) => 0,
         Err(e) => {
-            avisar(&format!("No pude armar los mejores momentos de «{}»: {e}", video.file_name().unwrap_or_default().to_string_lossy()), None);
+            avisar(
+                &format!(
+                    "No pude armar los mejores momentos de «{}»: {e}",
+                    video.file_name().unwrap_or_default().to_string_lossy()
+                ),
+                None,
+            );
             eprintln!("momentos: {e}");
             1
         }
@@ -585,7 +785,14 @@ mod pruebas {
     use super::*;
 
     fn c(n: usize, inicio: f64, fin: f64, puntos: f64) -> Candidato {
-        Candidato { n, inicio, fin, pico: (inicio + fin) / 2.0, puntos, ..Default::default() }
+        Candidato {
+            n,
+            inicio,
+            fin,
+            pico: (inicio + fin) / 2.0,
+            puntos,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -594,15 +801,32 @@ mod pruebas {
         let log = Registro(d.path().join("r.log"));
         let cands = vec![c(1, 0.0, 15.0, 1.0), c(2, 40.0, 55.0, 0.5), c(3, 80.0, 95.0, 0.9)];
         let r = leer_eleccion("Claro:\n{\"momentos\": [{\"candidato\": 3, \"titulo\": \"  Gran   jugada \", \"por_que\": \"x\"}, {\"candidato\": \"1\"}, {\"candidato\": 3}, {\"candidato\": 9}, {\"candidato\": \"raro\"}]}", &cands, &log).unwrap();
-        assert_eq!(r.iter().map(|c| (c.n, c.titulo.as_str())).collect::<Vec<_>>(), [(1, "Momento 2"), (3, "Gran jugada")], "en orden, sin repetidos ni inventados");
+        assert_eq!(
+            r.iter().map(|c| (c.n, c.titulo.as_str())).collect::<Vec<_>>(),
+            [(1, "Momento 2"), (3, "Gran jugada")],
+            "en orden, sin repetidos ni inventados"
+        );
         assert!(leer_eleccion("no es json", &cands, &log).is_none());
         assert!(leer_eleccion("{\"momentos\": [{\"candidato\": 9}]}", &cands, &log).is_none());
-        assert!(std::fs::read_to_string(d.path().join("r.log")).unwrap().contains("no entiendo"));
+        assert!(
+            std::fs::read_to_string(d.path().join("r.log"))
+                .unwrap()
+                .contains("no entiendo")
+        );
     }
 
     #[test]
     fn sin_ia_quedan_los_cinco_picos_mas_altos_en_orden() {
-        let cands: Vec<Candidato> = (0..8).map(|i| c(i + 1, i as f64 * 40.0, i as f64 * 40.0 + 15.0, [3.0, 9.0, 1.0, 7.0, 8.0, 2.0, 6.0, 5.0][i])).collect();
+        let cands: Vec<Candidato> = (0..8)
+            .map(|i| {
+                c(
+                    i + 1,
+                    i as f64 * 40.0,
+                    i as f64 * 40.0 + 15.0,
+                    [3.0, 9.0, 1.0, 7.0, 8.0, 2.0, 6.0, 5.0][i],
+                )
+            })
+            .collect();
         let r = sin_ia(&cands);
         assert_eq!(r.iter().map(|c| c.n).collect::<Vec<_>>(), [2, 4, 5, 7, 8]);
         assert_eq!(r[0].titulo, "Momento 1");
@@ -615,7 +839,13 @@ mod pruebas {
         let video = d.path().join("partida.mp4");
         std::fs::write(&video, b"x").unwrap();
         let destino = d.path().join("partida - mejores momentos.vortex");
-        let info = Info { duracion: 120.0, ancho: 1920, alto: 1080, fps: 59.94, audio: true };
+        let info = Info {
+            duracion: 120.0,
+            ancho: 1920,
+            alto: 1080,
+            fps: 59.94,
+            audio: true,
+        };
         let mut a = c(1, 20.0, 35.0, 1.0);
         a.titulo = "Primera".into();
         let mut b = c(2, 60.0, 75.0, 1.0);
@@ -627,15 +857,35 @@ mod pruebas {
         let v1 = &s["tracks"][2]["clips"];
         let a1 = &s["tracks"][3]["clips"];
         assert_eq!(v1.as_array().unwrap().len(), 2);
-        assert_eq!(v1[0]["source"], "partida.mp4", "la ruta va relativa a la carpeta del proyecto");
-        assert_eq!((v1[1]["start"].as_f64().unwrap(), v1[1]["in_point"].as_f64().unwrap()), (15.0, 60.0), "uno a continuación del otro");
+        assert_eq!(
+            v1[0]["source"], "partida.mp4",
+            "la ruta va relativa a la carpeta del proyecto"
+        );
+        assert_eq!(
+            (
+                v1[1]["start"].as_f64().unwrap(),
+                v1[1]["in_point"].as_f64().unwrap()
+            ),
+            (15.0, 60.0),
+            "uno a continuación del otro"
+        );
         assert_eq!(v1[0]["link"], a1[0]["link"], "el audio va enlazado al video");
         assert_eq!(a1[0]["fade_in"], 0.15);
         assert_eq!(s["markers"][1]["name"], "Segunda");
         assert_eq!(p["activa"], s["id"]);
         // Sin pista de audio no hay audio ni enlace.
-        let p = proyecto(&video, &destino, &Info { audio: false, ..info }, &[c(1, 0.0, 10.0, 1.0)]);
-        assert!(p["sequences"][0]["tracks"][3]["clips"].as_array().unwrap().is_empty());
+        let p = proyecto(
+            &video,
+            &destino,
+            &Info { audio: false, ..info },
+            &[c(1, 0.0, 10.0, 1.0)],
+        );
+        assert!(
+            p["sequences"][0]["tracks"][3]["clips"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(p["sequences"][0]["tracks"][2]["clips"][0]["link"], "");
     }
 

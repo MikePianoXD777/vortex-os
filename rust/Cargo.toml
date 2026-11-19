@@ -34,6 +34,7 @@ members = [
     "apps/vortex-traducir",
     "apps/vortex-limpieza",
     "apps/miku",
+    "apps/miku/qt",
 ]
 
 [workspace.package]
@@ -65,6 +66,7 @@ futures-channel = "0.3"
 vortex-runner = { path = "apps/vortex-runner" }
 vortex-video = { path = "apps/vortex-video" }
 vortex-camera = { path = "apps/vortex-camera" }
+vortex-miku = { path = "apps/miku" }
 vortex-task-manager = { path = "apps/vortex-task-manager" }
 libc = "0.2"
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).

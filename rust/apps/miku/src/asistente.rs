@@ -83,6 +83,10 @@ pub enum Senal {
 }
 
 pub type Salida = Arc<dyn Fn(Senal) + Send + Sync>;
+/// El proceso de la voz: (programa, argumentos, entorno).
+pub type ComandoVoz = (PathBuf, Vec<String>, Vec<(String, String)>);
+/// Del audio crudo al texto.
+pub type Transcriptor = Arc<dyn Fn(&[u8]) -> Result<String, ErrorOido> + Send + Sync>;
 pub type FabricaCerebro = Arc<dyn Fn(&Config, bool, AlEvento) -> Arc<dyn CerebroT> + Send + Sync>;
 
 /// Lo que el lanzador le pasa por variables de entorno (en Python se «sacaban» con `os.environ.pop`).
@@ -123,12 +127,12 @@ pub struct Entorno {
     /// Pruebas: nada suena; el WAV se guarda en esta carpeta y se espera lo que duraría / velocidad.
     pub salida_prueba: Option<(PathBuf, f64)>,
     /// Pruebas: el proceso de la voz (programa, argumentos, entorno) en lugar del real.
-    pub comando_voz: Option<(PathBuf, Vec<String>, Vec<(String, String)>)>,
+    pub comando_voz: Option<ComandoVoz>,
     /// Pruebas: el programa que suena el WAV.
     pub reproductor: Option<Vec<String>>,
     /// Pruebas: el oído y cómo se pasa su audio a texto.
     pub oido: Option<Arc<Oido>>,
-    pub transcribir: Option<Arc<dyn Fn(&[u8]) -> Result<String, ErrorOido> + Send + Sync>>,
+    pub transcribir: Option<Transcriptor>,
     /// Pruebas: no bajar nada (los modelos «ya están»).
     pub sin_descargas: bool,
     /// `VORTEX_MIKU_NATURAL_AUTO` y `VORTEX_MIKU_CLI`: instalar la voz natural en segundo plano.

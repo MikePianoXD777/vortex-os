@@ -27,10 +27,16 @@ fn boton(ruta: &Path) -> Boton {
                 let mut lector = BufReader::new(s.try_clone().unwrap());
                 let mut l = String::new();
                 let _ = lector.read_line(&mut l);
-                p.lock().unwrap().push(serde_json::from_str(l.trim()).unwrap_or_default());
+                p.lock()
+                    .unwrap()
+                    .push(serde_json::from_str(l.trim()).unwrap_or_default());
                 let resp = {
                     let mut r = r.lock().unwrap();
-                    if r.is_empty() { json!({"ok": true}) } else { r.remove(0) }
+                    if r.is_empty() {
+                        json!({"ok": true})
+                    } else {
+                        r.remove(0)
+                    }
                 };
                 let mut s = s;
                 let _ = writeln!(s, "{resp}");
@@ -75,24 +81,59 @@ impl Mcp {
         programa(b, "wpctl", &anotar);
         programa(b, "xdg-user-dir", "echo /tmp/miku-carpeta-falsa");
         programa(b, "xdg-mime", "exit 0");
-        programa(b, "wl-copy", &format!("echo \"wl-copy $(cat)\" >> {}", reg.display()));
-        programa(b, "flatpak", &format!("{anotar}\ncase \"$1\" in search) printf 'com.valvesoftware.Steam\\tSteam\\n';; list) printf 'org.gimp.GIMP\\tGIMP\\n';; esac"));
+        programa(
+            b,
+            "wl-copy",
+            &format!("echo \"wl-copy $(cat)\" >> {}", reg.display()),
+        );
+        programa(
+            b,
+            "flatpak",
+            &format!(
+                "{anotar}\ncase \"$1\" in search) printf 'com.valvesoftware.Steam\\tSteam\\n';; list) printf 'org.gimp.GIMP\\tGIMP\\n';; esac"
+            ),
+        );
         programa(b, "gio", &anotar);
         let sock = b.join("autorizar.sock");
         let boton = boton(&sock);
         let mut c = Command::new(env!("CARGO_BIN_EXE_miku-aux"));
-        c.arg("mcp").env_clear().env("PATH", format!("{}:/usr/bin:/bin", b.join("bin").display())).env("HOME", b).env("XDG_RUNTIME_DIR", b).env("XDG_DATA_HOME", b.join("datos"));
+        c.arg("mcp")
+            .env_clear()
+            .env("PATH", format!("{}:/usr/bin:/bin", b.join("bin").display()))
+            .env("HOME", b)
+            .env("XDG_RUNTIME_DIR", b)
+            .env("XDG_DATA_HOME", b.join("datos"));
         if con_socket {
             c.env("VORTEX_MIKU_AUTORIZAR", &sock);
         }
-        let mut hijo = c.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
-        let (entrada, salida) = (hijo.stdin.take().unwrap(), BufReader::new(hijo.stdout.take().unwrap()));
-        Self { dir, hijo, entrada, salida, boton, siguiente: 0 }
+        let mut hijo = c
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let (entrada, salida) = (
+            hijo.stdin.take().unwrap(),
+            BufReader::new(hijo.stdout.take().unwrap()),
+        );
+        Self {
+            dir,
+            hijo,
+            entrada,
+            salida,
+            boton,
+            siguiente: 0,
+        }
     }
 
     fn rpc(&mut self, metodo: &str, params: Value) -> Value {
         self.siguiente += 1;
-        writeln!(self.entrada, "{}", json!({"jsonrpc": "2.0", "id": self.siguiente, "method": metodo, "params": params})).unwrap();
+        writeln!(
+            self.entrada,
+            "{}",
+            json!({"jsonrpc": "2.0", "id": self.siguiente, "method": metodo, "params": params})
+        )
+        .unwrap();
         let mut l = String::new();
         self.salida.read_line(&mut l).unwrap();
         serde_json::from_str(l.trim()).unwrap_or_else(|_| panic!("respuesta rara: {l:?}"))
@@ -102,7 +143,15 @@ impl Mcp {
     fn herramienta(&mut self, nombre: &str, args: Value) -> (String, bool) {
         let r = self.rpc("tools/call", json!({"name": nombre, "arguments": args}));
         let res = &r["result"];
-        let texto = res["content"].as_array().map(|c| c.iter().filter_map(|x| x["text"].as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default();
+        let texto = res["content"]
+            .as_array()
+            .map(|c| {
+                c.iter()
+                    .filter_map(|x| x["text"].as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .unwrap_or_default();
         (texto, res["isError"].as_bool().unwrap_or(false))
     }
 
@@ -142,24 +191,58 @@ fn se_presenta_y_lista_sus_herramientas() {
     assert_eq!(r["result"]["protocolVersion"], "2025-06-18");
     assert_eq!(r["result"]["serverInfo"]["name"], "miku");
     let r = m.rpc("tools/list", json!({}));
-    let mut nombres: Vec<&str> = r["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    let mut nombres: Vec<&str> = r["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
     nombres.sort();
-    assert_eq!(nombres, ["abrir", "ajuste", "clic", "correr_comando", "escribir", "grabar", "instalar_app", "mejores_momentos", "quitar_app", "redactar_correo", "redactar_mensaje", "ver_camara"]);
+    assert_eq!(
+        nombres,
+        [
+            "abrir",
+            "ajuste",
+            "clic",
+            "correr_comando",
+            "escribir",
+            "grabar",
+            "instalar_app",
+            "mejores_momentos",
+            "quitar_app",
+            "redactar_correo",
+            "redactar_mensaje",
+            "ver_camara"
+        ]
+    );
     assert_eq!(m.rpc("nada", json!({}))["error"]["code"], -32601);
 }
 
 #[test]
 fn correr_comando_pide_permiso_y_corre_con_el_codigo_y_la_salida() {
     let mut m = Mcp::nuevo();
-    let (t, e) = m.herramienta("correr_comando", json!({"comando": "echo hola; echo mal >&2; exit 3", "para_que": "probar"}));
+    let (t, e) = m.herramienta(
+        "correr_comando",
+        json!({"comando": "echo hola; echo mal >&2; exit 3", "para_que": "probar"}),
+    );
     assert!(!e);
-    assert!(t.starts_with("Salió con código 3.\nhola") && t.contains("mal"), "{t}");
+    assert!(
+        t.starts_with("Salió con código 3.\nhola") && t.contains("mal"),
+        "{t}"
+    );
     let p = &m.pedidos()[0];
     assert_eq!(p["titulo"], "Correr un comando");
-    assert!(p["detalle"].as_str().unwrap().contains("probar") && p["detalle"].as_str().unwrap().contains("$ echo hola"), "{p}");
+    assert!(
+        p["detalle"].as_str().unwrap().contains("probar")
+            && p["detalle"].as_str().unwrap().contains("$ echo hola"),
+        "{p}"
+    );
     // Sin autorizar, no se corre.
     m.boton.respuestas.lock().unwrap().push(json!({"ok": false}));
-    let (t, _) = m.herramienta("correr_comando", json!({"comando": "touch /tmp/miku-no-debe-existir-xyz"}));
+    let (t, _) = m.herramienta(
+        "correr_comando",
+        json!({"comando": "touch /tmp/miku-no-debe-existir-xyz"}),
+    );
     assert!(t.contains("NO lo autorizó"), "{t}");
     assert!(!Path::new("/tmp/miku-no-debe-existir-xyz").exists());
 }
@@ -167,7 +250,15 @@ fn correr_comando_pide_permiso_y_corre_con_el_codigo_y_la_salida() {
 #[test]
 fn nunca_sudo_ni_tocar_los_permisos_de_miku_y_ni_se_pregunta() {
     let mut m = Mcp::nuevo();
-    for c in ["sudo rm -rf /", "ls && doas reboot", "echo hola | pkexec id", "vortex-miku camara on", "sed -i s/false/true/ ~/.config/vortex/miku.json", "rm ~/.local/state/vortex/miku-bitacora.log", "vortex claude reanudar"] {
+    for c in [
+        "sudo rm -rf /",
+        "ls && doas reboot",
+        "echo hola | pkexec id",
+        "vortex-miku camara on",
+        "sed -i s/false/true/ ~/.config/vortex/miku.json",
+        "rm ~/.local/state/vortex/miku-bitacora.log",
+        "vortex claude reanudar",
+    ] {
         let (t, e) = m.herramienta("correr_comando", json!({"comando": c}));
         assert!(e && (t.contains("sudo") || t.contains("Miku")), "{c}: {t}");
     }
@@ -187,13 +278,21 @@ fn abrir_una_pagina_una_carpeta_y_lo_que_no_existe() {
     // Una carpeta por su nombre en español.
     let carpeta = m.dir.path().join("Descargas");
     std::fs::create_dir_all(&carpeta).unwrap();
-    programa(m.dir.path(), "xdg-user-dir", &format!("echo {}", carpeta.display()));
+    programa(
+        m.dir.path(),
+        "xdg-user-dir",
+        &format!("echo {}", carpeta.display()),
+    );
     let (t, _) = m.herramienta("abrir", json!({"que": "Descargas"}));
     assert!(t.contains(&carpeta.to_string_lossy().to_string()), "{t}");
     m.esperar_llamada(&format!("xdg-open {}", carpeta.display()));
     let (t, e) = m.herramienta("abrir", json!({"que": "una-app-que-no-existe-jamas"}));
     assert!(e && t.contains("No encuentro una app, carpeta o archivo"), "{t}");
-    assert_eq!(m.pedidos().len(), 2, "lo que no existe no molesta a nadie con un permiso");
+    assert_eq!(
+        m.pedidos().len(),
+        2,
+        "lo que no existe no molesta a nadie con un permiso"
+    );
 }
 
 #[test]
@@ -201,8 +300,16 @@ fn abrir_una_app_por_su_nombre_del_desktop() {
     let mut m = Mcp::nuevo();
     let apps = m.dir.path().join("datos/applications");
     std::fs::create_dir_all(&apps).unwrap();
-    std::fs::write(apps.join("miapp.desktop"), "[Desktop Entry]\nType=Application\nName=Mi App Bonita\nName[es]=Mi App Linda\nExec=miapp\n").unwrap();
-    std::fs::write(apps.join("oculta.desktop"), "[Desktop Entry]\nType=Application\nName=Mi App Oculta\nNoDisplay=true\nExec=x\n").unwrap();
+    std::fs::write(
+        apps.join("miapp.desktop"),
+        "[Desktop Entry]\nType=Application\nName=Mi App Bonita\nName[es]=Mi App Linda\nExec=miapp\n",
+    )
+    .unwrap();
+    std::fs::write(
+        apps.join("oculta.desktop"),
+        "[Desktop Entry]\nType=Application\nName=Mi App Oculta\nNoDisplay=true\nExec=x\n",
+    )
+    .unwrap();
     let (t, e) = m.herramienta("abrir", json!({"que": "mi app linda"}));
     assert!(!e && t == "Abrí Mi App Bonita.", "{t}");
     assert_eq!(m.pedidos()[0]["titulo"], "Abrir «Mi App Bonita»");
@@ -216,7 +323,10 @@ fn ajustes_con_sus_valores_y_su_permiso() {
     let mut m = Mcp::nuevo();
     let (t, e) = m.herramienta("ajuste", json!({"tipo": "volumen", "valor": "40"}));
     assert!(!e && t == "Listo: volumen al 40 %.", "{t}");
-    assert!(m.llamadas().contains("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 40%"));
+    assert!(
+        m.llamadas()
+            .contains("wpctl set-volume -l 1.5 @DEFAULT_AUDIO_SINK@ 40%")
+    );
     let (t, _) = m.herramienta("ajuste", json!({"tipo": "volumen", "valor": "silencio"}));
     assert!(t.contains("silenciar el sonido"), "{t}");
     assert!(m.llamadas().contains("wpctl set-mute @DEFAULT_AUDIO_SINK@ 1"));
@@ -235,7 +345,10 @@ fn ajustes_con_sus_valores_y_su_permiso() {
 fn instalar_y_quitar_apps_de_flathub_solo_del_usuario() {
     let mut m = Mcp::nuevo();
     let (t, e) = m.herramienta("instalar_app", json!({"nombre": "Steam"}));
-    assert!(!e && t.contains("Empecé a instalar Steam (com.valvesoftware.Steam)"), "{t}");
+    assert!(
+        !e && t.contains("Empecé a instalar Steam (com.valvesoftware.Steam)"),
+        "{t}"
+    );
     let p = &m.pedidos()[0];
     assert_eq!(p["titulo"], "Instalar «Steam»");
     assert!(p["detalle"].as_str().unwrap().contains("sin contraseña"));
@@ -244,36 +357,70 @@ fn instalar_y_quitar_apps_de_flathub_solo_del_usuario() {
     // Quitar una que sí está.
     let (t, e) = m.herramienta("quitar_app", json!({"nombre": "gimp"}));
     assert!(!e && t == "Listo, quité GIMP.", "{t}");
-    assert!(m.llamadas().contains("flatpak uninstall --user -y --noninteractive org.gimp.GIMP"));
+    assert!(
+        m.llamadas()
+            .contains("flatpak uninstall --user -y --noninteractive org.gimp.GIMP")
+    );
     // Y una que no (las del sistema necesitan contraseña: eso lo hace la persona).
     let (t, e) = m.herramienta("quitar_app", json!({"nombre": "firefox"}));
-    assert!(e && t.contains("No encuentro «firefox» entre tus apps de Flathub"), "{t}");
+    assert!(
+        e && t.contains("No encuentro «firefox» entre tus apps de Flathub"),
+        "{t}"
+    );
 }
 
 #[test]
 fn redactar_mensajes_y_correos_no_envian_nada() {
     let mut m = Mcp::nuevo();
-    let (t, e) = m.herramienta("redactar_mensaje", json!({"app": "whatsapp", "para": "Mamá", "texto": "Llego tarde"}));
-    assert!(!e && t.contains("Copié el mensaje") && t.contains("No se envió nada"), "{t}");
+    let (t, e) = m.herramienta(
+        "redactar_mensaje",
+        json!({"app": "whatsapp", "para": "Mamá", "texto": "Llego tarde"}),
+    );
+    assert!(
+        !e && t.contains("Copié el mensaje") && t.contains("No se envió nada"),
+        "{t}"
+    );
     m.esperar_llamada("wl-copy Llegó tarde".replace("Llegó", "Llego").as_str());
     m.esperar_llamada("xdg-open https://web.whatsapp.com");
     let (t, e) = m.herramienta("redactar_mensaje", json!({"app": "whatsapp", "texto": ""}));
     assert!(e && t.contains("Falta el texto"), "{t}");
     // Sin app de correo, abre Gmail con todo bien escapado.
-    let (t, e) = m.herramienta("redactar_correo", json!({"para": "ana@ejemplo.com", "asunto": "Hola ñandú", "cuerpo": "Línea 1\nLínea 2"}));
-    assert!(!e && t.contains("Gmail en tu navegador") && t.contains("No se envió nada"), "{t}");
+    let (t, e) = m.herramienta(
+        "redactar_correo",
+        json!({"para": "ana@ejemplo.com", "asunto": "Hola ñandú", "cuerpo": "Línea 1\nLínea 2"}),
+    );
+    assert!(
+        !e && t.contains("Gmail en tu navegador") && t.contains("No se envió nada"),
+        "{t}"
+    );
     let l = m.esperar_llamada("mail.google.com");
-    assert!(l.contains("to=ana%40ejemplo.com") && l.contains("su=Hola%20%C3%B1and%C3%BA") && l.contains("body=L%C3%ADnea%201%0AL%C3%ADnea%202"), "{l}");
-    assert!(m.pedidos().iter().any(|p| p["titulo"].as_str().unwrap().starts_with("Dejar listo un correo")));
+    assert!(
+        l.contains("to=ana%40ejemplo.com")
+            && l.contains("su=Hola%20%C3%B1and%C3%BA")
+            && l.contains("body=L%C3%ADnea%201%0AL%C3%ADnea%202"),
+        "{l}"
+    );
+    assert!(
+        m.pedidos()
+            .iter()
+            .any(|p| p["titulo"].as_str().unwrap().starts_with("Dejar listo un correo"))
+    );
 }
 
 #[test]
 fn la_camara_obedece_a_la_ventana_y_sin_ventana_no_hay_nada() {
     let mut m = Mcp::nuevo();
-    m.boton.respuestas.lock().unwrap().push(json!({"ok": false, "mensaje": "La cámara está APAGADA en los ajustes de Miku."}));
+    m.boton
+        .respuestas
+        .lock()
+        .unwrap()
+        .push(json!({"ok": false, "mensaje": "La cámara está APAGADA en los ajustes de Miku."}));
     let (t, e) = m.herramienta("ver_camara", json!({"motivo": "cuarto"}));
     assert!(!e && t == "La cámara está APAGADA en los ajustes de Miku.", "{t}");
-    assert_eq!(m.pedidos()[0], json!({"tipo": "camara", "titulo": "Tomar una foto con la cámara", "detalle": "Una sola foto; no se guarda y no se graba video.", "motivo": "cuarto"}));
+    assert_eq!(
+        m.pedidos()[0],
+        json!({"tipo": "camara", "titulo": "Tomar una foto con la cámara", "detalle": "Una sola foto; no se guarda y no se graba video.", "motivo": "cuarto"})
+    );
     // Un motivo raro cuenta como «otro».
     m.boton.respuestas.lock().unwrap().push(json!({"ok": false}));
     m.herramienta("ver_camara", json!({"motivo": "espiar"}));
@@ -281,7 +428,10 @@ fn la_camara_obedece_a_la_ventana_y_sin_ventana_no_hay_nada() {
     // Sin la ventana de Miku abierta, ninguna acción se hace.
     let mut sin = Mcp::con(false);
     let (t, e) = sin.herramienta("correr_comando", json!({"comando": "echo hola"}));
-    assert!(e && t.contains("No puedo pedir permiso (Miku no está abierta): no hice nada."), "{t}");
+    assert!(
+        e && t.contains("No puedo pedir permiso (Miku no está abierta): no hice nada."),
+        "{t}"
+    );
 }
 
 #[test]

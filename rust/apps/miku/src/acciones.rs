@@ -797,7 +797,7 @@ pub fn redactar_correo(a: &Value) -> R<String> {
         if para.is_empty() { "(sin poner)" } else { para }
     );
     let consulta = urlencode(&[("subject", asunto), ("body", cuerpo)]);
-    let tiene_app = correr(
+    let tiene_app = !correr(
         &["xdg-mime", "query", "default", "x-scheme-handler/mailto"],
         60,
         None,
@@ -805,8 +805,7 @@ pub fn redactar_correo(a: &Value) -> R<String> {
     )?
     .stdout
     .trim()
-    .len()
-        > 0;
+    .is_empty();
     let (url, donde) = if tiene_app {
         (
             format!("mailto:{}?{consulta}", quote(para, "@,")),

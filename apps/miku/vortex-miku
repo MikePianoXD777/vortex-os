@@ -71,6 +71,7 @@ from miku import config, corazon, descargas, elevenlabs, grabacion, ia, rutas, v
 
 APP = Path(os.environ.get("VORTEX_MIKU_APP") or RAIZ / "miku" / "app.py")   # VORTEX_MIKU_APP: pruebas
 MARCA_CMDLINE = "miku/app.py"          # para reconocer nuestro proceso por su línea de órdenes
+MARCA_CMDLINE_RUST = "miku-rs"         # y el de la versión en Rust (paquete vortex-rust)
 
 
 def error(texto: str, codigo: int = 1) -> int:
@@ -120,7 +121,8 @@ def _descendientes(pid: int, tabla=None) -> set[int]:
 
 def _es_miku(pid: int) -> bool:
     try:
-        return MARCA_CMDLINE in Path(f"/proc/{pid}/cmdline").read_text().replace("\0", " ")
+        linea = Path(f"/proc/{pid}/cmdline").read_text().replace("\0", " ")
+        return MARCA_CMDLINE in linea or MARCA_CMDLINE_RUST in linea
     except OSError:
         return False
 
@@ -175,8 +177,17 @@ def lanzar(extra: dict | None = None) -> int:
     registro = open(rutas.runtime() / "vortex-miku.log", "w")
     env = dict(os.environ, **(extra or {}))
     env.setdefault("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1")
+    orden = [sys.executable, "-I", str(APP)]
+    # 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: la misma Miku (persona, web, voz y
+    # configuración de siempre), menos memoria. VORTEX_MIKU_PYTHON=1 obliga a usar la de Python.
+    rust_bin = Path(os.environ.get("VORTEX_RUST_BIN") or "/usr/lib/vortex") / "miku-rs"
+    if not os.environ.get("VORTEX_MIKU_PYTHON") and not os.environ.get("VORTEX_MIKU_APP") and os.access(rust_bin, os.X_OK):
+        orden = [str(rust_bin)]
+        env["VORTEX_MIKU_RAIZ"] = str(RAIZ)
+        env.setdefault("MALLOC_ARENA_MAX", "2")
+        env.setdefault("MALLOC_TRIM_THRESHOLD_", "131072")
     try:
-        p = subprocess.Popen([sys.executable, "-I", str(APP)], stdin=subprocess.DEVNULL, stdout=registro, stderr=registro,
+        p = subprocess.Popen(orden, stdin=subprocess.DEVNULL, stdout=registro, stderr=registro,
                              start_new_session=True, close_fds=True, env=env)
     except OSError as e:
         return error(f"no pude abrir a Miku ({e}).")

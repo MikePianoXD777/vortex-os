@@ -1,0 +1,29 @@
+[package]
+name = "vortex-miku-qt"
+description = "Miku en Rust: la ventana (cxx-qt: el panel de voz y el avatar en QtWebEngine) sobre el motor vortex-miku"
+version = "4.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-miku.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[[bin]]
+name = "miku-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true

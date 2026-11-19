@@ -9,18 +9,61 @@ use std::process::{Command, Output, Stdio};
 const JUGADAS: [i64; 3] = [30, 65, 100];
 
 fn hay(p: &str) -> bool {
-    Command::new(p).arg("-version").stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok()
+    Command::new(p)
+        .arg("-version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok()
 }
 
 fn ffmpeg(args: &[&str]) {
-    let r = Command::new("ffmpeg").args(["-loglevel", "error", "-y"]).args(args).stdin(Stdio::null()).status().unwrap();
+    let r = Command::new("ffmpeg")
+        .args(["-loglevel", "error", "-y"])
+        .args(args)
+        .stdin(Stdio::null())
+        .status()
+        .unwrap();
     assert!(r.success());
 }
 
 fn hacer_video(destino: &Path) {
-    let rojo = JUGADAS.iter().map(|t| format!("between(t,{},{})", t - 2, t + 2)).collect::<Vec<_>>().join("+");
-    let filtro = format!("[0:v]drawbox=c=red:t=fill:enable='{rojo}'[v];[2:a]volume=volume='if({rojo},0.9,0)':eval=frame[s];[1:a][s]amix=inputs=2:normalize=0[a]");
-    ffmpeg(&["-f", "lavfi", "-i", "testsrc2=s=320x180:r=24:d=120", "-f", "lavfi", "-i", "anoisesrc=a=0.02:d=120", "-f", "lavfi", "-i", "sine=f=440:d=120", "-filter_complex", &filtro, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", destino.to_str().unwrap()]);
+    let rojo = JUGADAS
+        .iter()
+        .map(|t| format!("between(t,{},{})", t - 2, t + 2))
+        .collect::<Vec<_>>()
+        .join("+");
+    let filtro = format!(
+        "[0:v]drawbox=c=red:t=fill:enable='{rojo}'[v];[2:a]volume=volume='if({rojo},0.9,0)':eval=frame[s];[1:a][s]amix=inputs=2:normalize=0[a]"
+    );
+    ffmpeg(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=s=320x180:r=24:d=120",
+        "-f",
+        "lavfi",
+        "-i",
+        "anoisesrc=a=0.02:d=120",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=f=440:d=120",
+        "-filter_complex",
+        &filtro,
+        "-map",
+        "[v]",
+        "-map",
+        "[a]",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-c:a",
+        "aac",
+        "-shortest",
+        destino.to_str().unwrap(),
+    ]);
 }
 
 struct Mundo {
@@ -74,16 +117,30 @@ impl Mundo {
             .unwrap()
     }
     fn proyecto(&self, nombre: &str) -> Value {
-        serde_json::from_str(&std::fs::read_to_string(self.videos().join(format!("{nombre} - mejores momentos.vortex"))).unwrap()).unwrap()
+        serde_json::from_str(
+            &std::fs::read_to_string(self.videos().join(format!("{nombre} - mejores momentos.vortex")))
+                .unwrap(),
+        )
+        .unwrap()
     }
 }
 
 fn pista<'a>(p: &'a Value, nombre: &str) -> &'a Vec<Value> {
-    p["sequences"][0]["tracks"].as_array().unwrap().iter().find(|t| t["name"] == nombre).unwrap()["clips"].as_array().unwrap()
+    p["sequences"][0]["tracks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == nombre)
+        .unwrap()["clips"]
+        .as_array()
+        .unwrap()
 }
 
 fn nombres(p: &Value) -> Vec<String> {
-    pista(p, "V1").iter().map(|c| c["name"].as_str().unwrap().to_string()).collect()
+    pista(p, "V1")
+        .iter()
+        .map(|c| c["name"].as_str().unwrap().to_string())
+        .collect()
 }
 
 fn mundo() -> Option<Mundo> {
@@ -109,13 +166,27 @@ fn con_claude_elige_sus_momentos_con_las_miniaturas_y_sin_herramientas() {
     assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
     assert!(m.llamada().exists(), "se llamó a Claude");
 
-    let tarea = std::fs::read_dir(m.dir.path().join("tareas")).unwrap().next().unwrap().unwrap().path();
-    let cands: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(tarea.join("candidatos.json")).unwrap()).unwrap();
+    let tarea = std::fs::read_dir(m.dir.path().join("tareas"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let cands: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(tarea.join("candidatos.json")).unwrap()).unwrap();
     let picos: Vec<f64> = cands.iter().map(|c| c["pico"].as_f64().unwrap()).collect();
     for t in JUGADAS {
-        assert!(picos.iter().any(|p| (p - t as f64).abs() <= 4.0), "falta la jugada de {t} s entre {picos:?}");
+        assert!(
+            picos.iter().any(|p| (p - t as f64).abs() <= 4.0),
+            "falta la jugada de {t} s entre {picos:?}"
+        );
     }
-    assert!(cands.iter().all(|c| Path::new(c["miniatura"].as_str().unwrap()).is_file()), "cada candidato trae su tira");
+    assert!(
+        cands
+            .iter()
+            .all(|c| Path::new(c["miniatura"].as_str().unwrap()).is_file()),
+        "cada candidato trae su tira"
+    );
 
     let argv = std::fs::read_to_string(m.dir.path().join("argv")).unwrap();
     let a: Vec<&str> = argv.lines().collect();
@@ -123,25 +194,54 @@ fn con_claude_elige_sus_momentos_con_las_miniaturas_y_sin_herramientas() {
     assert_eq!(tras("--tools"), "", "sin herramientas");
     assert_eq!(tras("--model"), "sonnet");
     assert!(a.contains(&"--restricted") && a.contains(&"--strict-mcp-config"));
-    let entrada: Value = serde_json::from_str(std::fs::read_to_string(m.dir.path().join("entrada")).unwrap().trim()).unwrap();
-    let imagenes = entrada["message"]["content"].as_array().unwrap().iter().filter(|c| c["type"] == "image").count();
+    let entrada: Value = serde_json::from_str(
+        std::fs::read_to_string(m.dir.path().join("entrada"))
+            .unwrap()
+            .trim(),
+    )
+    .unwrap();
+    let imagenes = entrada["message"]["content"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["type"] == "image")
+        .count();
     assert_eq!(imagenes, cands.len(), "le llegan las miniaturas como imágenes");
 
     let p = m.proyecto("Partida prueba");
     let seq = &p["sequences"][0];
     assert_eq!(p["formato"], 6);
     assert_eq!(p["activa"], seq["id"]);
-    assert_eq!(nombres(&p), ["La primera", "La tercera"], "en orden y sin el que no existe");
+    assert_eq!(
+        nombres(&p),
+        ["La primera", "La tercera"],
+        "en orden y sin el que no existe"
+    );
     let (v1, a1) = (pista(&p, "V1"), pista(&p, "A1"));
     assert_eq!(v1[0]["start"], 0.0);
     assert_eq!(v1[1]["start"], v1[0]["duration"], "uno tras otro");
     assert_eq!(v1[0]["source"], "Partida prueba.mp4");
     assert!(v1[0]["in_point"].as_f64() < v1[1]["in_point"].as_f64());
-    assert_eq!(a1.iter().map(|c| &c["link"]).collect::<Vec<_>>(), v1.iter().map(|c| &c["link"]).collect::<Vec<_>>(), "el audio va enlazado");
+    assert_eq!(
+        a1.iter().map(|c| &c["link"]).collect::<Vec<_>>(),
+        v1.iter().map(|c| &c["link"]).collect::<Vec<_>>(),
+        "el audio va enlazado"
+    );
     assert!(v1.iter().all(|c| !c["link"].as_str().unwrap().is_empty()));
-    let marcas: Vec<(&str, &str)> = seq["markers"].as_array().unwrap().iter().map(|k| (k["name"].as_str().unwrap(), k["note"].as_str().unwrap())).collect();
-    assert_eq!(marcas, [("La primera", "Sonido fuerte"), ("La tercera", "Pantalla roja")]);
-    assert_eq!((seq["width"].as_i64(), seq["height"].as_i64(), seq["fps"].as_f64()), (Some(320), Some(180), Some(24.0)));
+    let marcas: Vec<(&str, &str)> = seq["markers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| (k["name"].as_str().unwrap(), k["note"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        marcas,
+        [("La primera", "Sonido fuerte"), ("La tercera", "Pantalla roja")]
+    );
+    assert_eq!(
+        (seq["width"].as_i64(), seq["height"].as_i64(), seq["fps"].as_f64()),
+        (Some(320), Some(180), Some(24.0))
+    );
 }
 
 #[test]
@@ -165,7 +265,17 @@ fn sin_claude_o_con_una_respuesta_rota_quedan_los_picos() {
 fn un_video_corto_va_entero_y_sin_audio_si_no_lo_tiene() {
     let Some(m) = mundo() else { return };
     let corto = m.videos().join("corto.mp4");
-    ffmpeg(&["-f", "lavfi", "-i", "testsrc2=s=320x180:r=24:d=12", "-c:v", "libx264", "-preset", "ultrafast", corto.to_str().unwrap()]);
+    ffmpeg(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=s=320x180:r=24:d=12",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        corto.to_str().unwrap(),
+    ]);
     let r = m.correr(&corto);
     assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
     let p = m.proyecto("corto");
@@ -180,6 +290,9 @@ fn sin_video_o_sin_argumento_falla_con_codigo() {
     let Some(m) = mundo() else { return };
     let r = m.correr(&m.dir.path().join("no-existe.mp4"));
     assert_eq!(r.status.code(), Some(1));
-    let r = Command::new(env!("CARGO_BIN_EXE_miku-aux")).arg("momentos").output().unwrap();
+    let r = Command::new(env!("CARGO_BIN_EXE_miku-aux"))
+        .arg("momentos")
+        .output()
+        .unwrap();
     assert_eq!(r.status.code(), Some(2));
 }

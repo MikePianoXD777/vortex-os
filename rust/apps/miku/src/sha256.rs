@@ -72,7 +72,7 @@ impl Sha256 {
         self.largo += datos.len() as u64;
         self.pendiente.extend_from_slice(datos);
         let n = self.pendiente.len() / 64 * 64;
-        for b in self.pendiente[..n].chunks_exact(64) {
+        for b in self.pendiente[..n].as_chunks::<64>().0 {
             Self::bloque(&mut self.h, b);
         }
         self.pendiente.drain(..n);
@@ -86,7 +86,7 @@ impl Sha256 {
             cola.push(0);
         }
         cola.extend(bits.to_be_bytes());
-        for b in cola.chunks_exact(64) {
+        for b in cola.as_chunks::<64>().0 {
             Self::bloque(&mut self.h, b);
         }
         self.h.iter().map(|x| format!("{x:08x}")).collect()

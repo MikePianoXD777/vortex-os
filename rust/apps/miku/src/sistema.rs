@@ -92,3 +92,43 @@ pub fn lanzar_aparte(programa: &str, args: &[String]) -> std::io::Result<()> {
 pub fn existe(pid: u32) -> bool {
     Path::new(&format!("/proc/{pid}")).exists()
 }
+
+/// Una sola Miku por usuario: toma el candado exclusivo del archivo (se suelta al cerrar el proceso).
+/// `None` si otra ya lo tiene.
+pub fn candado(ruta: &Path) -> Option<std::fs::File> {
+    use std::io::Write;
+    use std::os::fd::AsRawFd;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(ruta)
+        .ok()?;
+    // SAFETY: flock sobre un descriptor que acabamos de abrir.
+    if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+        return None;
+    }
+    let _ = f.set_len(0);
+    let _ = write!(f, "{}", std::process::id());
+    Some(f)
+}
+
+#[cfg(test)]
+mod pruebas_candado {
+    #[test]
+    fn solo_uno_toma_el_candado() {
+        let d = tempfile::tempdir().unwrap();
+        let r = d.path().join("vivo");
+        let a = super::candado(&r).expect("el primero lo toma");
+        assert!(super::candado(&r).is_none(), "el segundo no");
+        assert_eq!(
+            std::fs::read_to_string(&r).unwrap(),
+            std::process::id().to_string()
+        );
+        drop(a);
+        assert!(
+            super::candado(&r).is_some(),
+            "al soltarlo se puede tomar otra vez"
+        );
+    }
+}

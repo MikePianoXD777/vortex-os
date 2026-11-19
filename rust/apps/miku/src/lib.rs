@@ -17,6 +17,7 @@ pub mod fecha;
 pub mod grabacion;
 pub mod http;
 pub mod ia;
+pub mod interfaz;
 pub mod mcp;
 pub mod momentos;
 pub mod oido;

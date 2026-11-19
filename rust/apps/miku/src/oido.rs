@@ -57,8 +57,10 @@ fn frases_fantasma() -> &'static Regex {
 /// grave y su nivel oscila ±8 dB; así queda estable y la voz sigue ~24 dB por encima.
 pub fn nivel_db(tramo: &[u8]) -> f64 {
     let a: Vec<f64> = tramo
-        .chunks_exact(2)
-        .map(|b| f64::from(i16::from_le_bytes([b[0], b[1]])))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|b| f64::from(i16::from_le_bytes(*b)))
         .collect();
     if a.len() < 2 {
         return -120.0;
@@ -371,7 +373,7 @@ impl Oido {
                 let tramo: Vec<u8> = buf.drain(..BYTES_TRAMO).collect();
                 t += 1;
                 let n = nivel_db(&tramo);
-                if t % 2 == 0 {
+                if t.is_multiple_of(2) {
                     al_nivel(((n + 62.0) / 40.0).clamp(0.0, 1.0));
                 }
                 let Some(mut s) = suelo else {
