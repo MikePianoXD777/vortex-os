@@ -180,6 +180,8 @@ pub struct Descarga {
     pub cancelar: Arc<AtomicBool>,
     pub total: u64,
     pub hecho: u64,
+    /// Pruebas: la lista de paquetes en lugar de la de fábrica (o la de `VORTEX_MIKU_MANIFIESTO`).
+    pub lista: Option<Vec<Paquete>>,
     /// Cuánto se espera entre un intento y otro (las pruebas lo bajan).
     pub pausa: Duration,
     ultimo: Instant,
@@ -203,6 +205,7 @@ impl Descarga {
             cancelar,
             total,
             hecho: 0,
+            lista: None,
             pausa: Duration::from_secs(2),
             ultimo: Instant::now() - Duration::from_secs(1),
         }
@@ -211,7 +214,7 @@ impl Descarga {
     /// Baja todo lo que falte o devuelve el error con un mensaje para mostrar.
     pub fn correr(&mut self) -> Result<(), ErrorDescarga> {
         self.hay_espacio()?;
-        let todos = paquetes();
+        let todos = self.lista.clone().unwrap_or_else(paquetes);
         for id in self.nombres.clone() {
             let Some(p) = todos.iter().find(|p| p.id == id) else {
                 continue;
