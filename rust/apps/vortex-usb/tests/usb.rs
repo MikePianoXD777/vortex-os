@@ -251,12 +251,56 @@ fn dos_memorias_a_la_vez() {
     }
 }
 
-/// Un solo candado: dos copias a la vez no hacen nada la segunda (sin tocar udevadm: PATH sin él).
+/// Un solo candado: mientras una copia escucha (por netlink, sin udevadm), la segunda sale sola y sin error.
 #[test]
-fn sin_udevadm_sale_sin_hacer_nada() {
+fn una_sola_copia_por_sesion() {
     let b = Banco::nuevo(Lanzador::Rust);
+    let lanzar = || {
+        Command::new(env!("CARGO_BIN_EXE_vortex-usb-rs"))
+            .env("PATH", b.t.path().join("bin"))
+            .env("XDG_RUNTIME_DIR", b.t.path())
+            .stdin(Stdio::null())
+            .spawn()
+            .unwrap()
+    };
+    let mut primera = lanzar();
+    // Que alcance a tomar el candado y a quedarse escuchando.
+    let mut escuchando = false;
+    for _ in 0..50 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        if primera.try_wait().unwrap().is_none() && b.t.path().join("vortex-usb.lock").exists() {
+            escuchando = true;
+            break;
+        }
+    }
+    // La segunda tiene que salir sola; si a los 5 s sigue viva, se mata y falla (no se cuelga la prueba).
+    let mut segunda = lanzar();
+    let mut salida = None;
+    for _ in 0..250 {
+        if let Some(s) = segunda.try_wait().unwrap() {
+            salida = Some(s);
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    if salida.is_none() {
+        let _ = segunda.kill();
+        let _ = segunda.wait();
+    }
+    let _ = primera.kill();
+    let _ = primera.wait();
+    assert!(escuchando, "la primera copia no se quedó escuchando");
+    assert!(salida.is_some_and(|s| s.success()), "la segunda copia no salió sola");
+}
+
+/// Sin udisksctl no hay con qué montar: sale de inmediato, sin escuchar nada.
+#[test]
+fn sin_udisksctl_sale_sin_hacer_nada() {
+    let b = Banco::nuevo(Lanzador::Rust);
+    let vacio = b.t.path().join("vacio");
+    fs::create_dir_all(&vacio).unwrap();
     let s = Command::new(env!("CARGO_BIN_EXE_vortex-usb-rs"))
-        .env("PATH", b.t.path().join("bin"))
+        .env("PATH", &vacio)
         .env("XDG_RUNTIME_DIR", b.t.path())
         .status()
         .unwrap();
