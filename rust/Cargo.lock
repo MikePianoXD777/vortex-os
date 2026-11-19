@@ -1132,6 +1132,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-camera"
+version = "1.0.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "uuid",
+ "vortex-core",
+]
+
+[[package]]
 name = "vortex-connect"
 version = "1.0.0"
 dependencies = [

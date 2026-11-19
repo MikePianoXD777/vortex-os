@@ -28,6 +28,7 @@ members = [
     "apps/vortex-shop",
     "apps/vortex-shop/qt",
     "apps/vortex-tirones",
+    "apps/vortex-camera",
 ]
 
 [workspace.package]
@@ -58,6 +59,7 @@ futures-util = { version = "0.3", default-features = false, features = ["std", "
 futures-channel = "0.3"
 vortex-runner = { path = "apps/vortex-runner" }
 vortex-video = { path = "apps/vortex-video" }
+vortex-camera = { path = "apps/vortex-camera" }
 vortex-task-manager = { path = "apps/vortex-task-manager" }
 libc = "0.2"
 # La interfaz es cxx-qt con versión FIJA (=0.10.0: es 0.x y cambia entre versiones; se sube a propósito).
