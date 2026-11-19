@@ -264,15 +264,16 @@ pub fn decir(cx: &Ctx, args: &[String]) -> i32 {
 /// El lanzador de Python con todo lo de la voz natural y ElevenLabs. Va junto al código de Miku
 /// (`vortex-miku-python`); `VORTEX_MIKU_CLI_PY` lo cambia (pruebas).
 fn script_python(cx: &Ctx) -> Option<PathBuf> {
-    std::env::var_os("VORTEX_MIKU_CLI_PY")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .into_iter()
-        .chain([
-            cx.rutas.raiz.join("vortex-miku-python"),
-            "/usr/share/vortex-miku/vortex-miku-python".into(),
-        ])
-        .find(|p| p.is_file())
+    // Con la variable, solo esa (las pruebas no deben encontrar la del sistema).
+    if let Some(v) = std::env::var_os("VORTEX_MIKU_CLI_PY").filter(|v| !v.is_empty()) {
+        return Some(PathBuf::from(v)).filter(|p| p.is_file());
+    }
+    [
+        cx.rutas.raiz.join("vortex-miku-python"),
+        "/usr/share/vortex-miku/vortex-miku-python".into(),
+    ]
+    .into_iter()
+    .find(|p| p.is_file())
 }
 
 /// `natural …` y `elevenlabs …`: se quedan en Python (instalan el entorno con pip y hablan con el llavero).

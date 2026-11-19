@@ -552,6 +552,8 @@ fn natural_y_elevenlabs_se_pasan_a_python_con_su_codigo_de_salida() {
     let mut sin = Caja::nueva();
     let raiz = sin.base.to_string_lossy().into_owned();
     sin.env("VORTEX_MIKU_RAIZ", raiz);
+    let no_hay = sin.base.join("no-hay-vortex-miku-python");
+    sin.env("VORTEX_MIKU_CLI_PY", no_hay.to_string_lossy());
     let (cod, _, err) = sin.correr(&["natural"]);
     assert_eq!(cod, 1);
     assert!(err.contains("necesita la parte de Python de Miku"), "{err}");
