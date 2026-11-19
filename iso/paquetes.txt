@@ -164,6 +164,16 @@ ffmpeg
 # baja la primera vez que eliges «Usar IA local».
 ollama
 ollama-vulkan
+# 4.0: las apps propias (las mismas que arma «vortex actualizar») y vortex-rust: las apps y servicios en
+# Rust (gestor, tareas, USB, Bluetooth, detector de tirones, la voz de Miku…).
+vortex-app-installer
+vortex-player
+vortex-task-manager
+vortex-video
+vortex-shared
+vortex-connect
+vortex-local-ai
+vortex-rust
 
 # --- Solo para el live (vortex-post-instalacion los quita del sistema instalado) ---
 # calamares: el oficial, compilado en [vortex] (iso/paquetes.sh). Lo que sus módulos usan y el

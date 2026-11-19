@@ -26,7 +26,10 @@ RAIZ="$(dirname "$AQUI")"
 # apps (Flathub): en la ISO solo viene ella, las apps se bajan después. Calamares (el instalador
 # gráfico) se compila aquí porque los de CachyOS están enlazados a un boost viejo (no arrancan
 # con el de Arch).
-PROPIOS=(serpantinum-core serpantinum-gamma vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku vortex-miku-internet)
+# 4.0: también las apps propias que hasta la 3.x llegaban solo con «vortex actualizar» (la misma lista que
+# él arma) y vortex-rust (las apps y servicios en Rust).
+PROPIOS=(serpantinum-core serpantinum-gamma vortex-shell vortex-studio vortex-flatpaks vortex-claude vortex-shop vortex-miku vortex-miku-internet
+         vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-local-ai vortex-rust)
 AUR=(calamares shim-signed)
 AUR_URL="${VORTEX_AUR_URL:-https://aur.archlinux.org}"
 
@@ -231,7 +234,9 @@ marca_de() { if solo_any "$1"; then echo "$PACKAGER_GENERICO"; else echo "$PACKA
 # Compila el PKGBUILD de la carpeta $1: lo que es «any» con makepkg_generico (no hay binarios, y
 # sus dependencias pueden ser de CachyOS), lo demás en el chroot de Arch.
 compilar() {
-  if solo_any "$1"; then
+  # vortex-rust lee el código de rust/ del repo ($startdir/../../rust): en el chroot no está. Se arma aquí
+  # con la config genérica (sin target-cpu=native) y revisar_isa comprueba al final que no pida AVX2.
+  if solo_any "$1" || [[ "$(basename "$1")" == vortex-rust ]]; then
     (cd "$1" && makepkg_generico -s --noconfirm --needed -f)
   else
     chroot_listo || return 1
