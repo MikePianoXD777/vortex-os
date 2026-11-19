@@ -186,13 +186,24 @@ impl Banco {
             fabrica,
             factor_tiempo: 0.01,
             salida_prueba: Some((dir.path().join("altavoz"), o.velocidad)),
-            comando_voz: o.voz.then(|| {
+            // Sin voz: una que no carga (como sin modelo). No se deja el comando de verdad: en un equipo con
+            // miku-voz y el modelo bajados, la voz sí cargaría.
+            comando_voz: Some(if o.voz {
                 (
                     which("python3"),
                     vec![
                         "-I".into(),
                         guion.to_string_lossy().into(),
                         rutas.temporales().to_string_lossy().into(),
+                    ],
+                    vec![],
+                )
+            } else {
+                (
+                    which("sh"),
+                    vec![
+                        "-c".into(),
+                        r#"echo '{"error": "La voz no está instalada."}'"#.into(),
                     ],
                     vec![],
                 )
