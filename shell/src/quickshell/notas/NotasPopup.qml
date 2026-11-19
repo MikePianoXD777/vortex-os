@@ -10,6 +10,8 @@ import "../reusables"
 // con el cursor al final, se guarda sola mientras escribes y la vuelves a abrir igual. Vive en
 // Documentos/Nota rápida.md, así que también se encuentra en el explorador y se edita con cualquier
 // editor (al abrir el panel se vuelve a leer).
+// 4.0: «Pasar a Obsidian» (si tienes una bóveda, la misma que lee vortex-tareas): la nota se guarda como una
+// nota nueva en «Notas rápidas/» de tu bóveda, se abre en Obsidian y la nota rápida queda vacía para lo siguiente.
 Item {
     id: window
     visible: false
@@ -36,6 +38,46 @@ Item {
         archivo.setText(editor.text);
         sinGuardar = false;
         guardadoEn = Date.now();
+    }
+
+    property bool pasada: false
+
+    function pasarAObsidian() {
+        let texto = editor.text.trim();
+        if (texto === "" || Tareas.boveda === "" || pasarProc.running) return;
+        guardar();
+        let ahora = new Date();
+        let carpetaB = Tareas.boveda + "/" + t("vault_folder", "Quick notes");
+        let nombre = t("file", "Quick note") + " " + Qt.formatDateTime(ahora, "yyyy-MM-dd HH.mm") + ".md";
+        // Si ya hay una nota con ese nombre (dos en el mismo minuto), «… (2).md». Imprime dónde quedó.
+        pasarProc.command = ["sh", "-c",
+            'f="$2"; n=2; while [ -e "$f" ]; do f="${2%.md} ($n).md"; n=$((n + 1)); done; ' +
+            'mkdir -p "$1" && printf -- "---\\ntags: [nota-rapida]\\n---\\n%s\\n" "$3" > "$f" && printf "%s" "$f"',
+            "sh", carpetaB, carpetaB + "/" + nombre, texto];
+        pasarProc.running = true;
+    }
+
+    Process {
+        id: pasarProc
+        // Solo imprime la ruta si la nota quedó escrita.
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let destino = this.text.trim();
+                if (destino === "") return;
+                // Ya está en tu bóveda: la nota rápida queda vacía para lo siguiente.
+                editor.text = "";
+                window.guardar();
+                window.pasada = true;
+                pasadaTimer.restart();
+                Quickshell.execDetached(["xdg-open", "obsidian://open?path=" + encodeURIComponent(destino)]);
+            }
+        }
+    }
+
+    Timer {
+        id: pasadaTimer
+        interval: 3000
+        onTriggered: window.pasada = false
     }
 
     FileView {
@@ -193,7 +235,7 @@ Item {
                     color: ThemeBackend.text
                 }
                 Text {
-                    text: window.sinGuardar ? window.t("saving", "Saving…") : window.guardadoEn > 0 ? window.t("saved", "Saved") : ""
+                    text: window.pasada ? window.t("moved", "Moved to Obsidian") : window.sinGuardar ? window.t("saving", "Saving…") : window.guardadoEn > 0 ? window.t("saved", "Saved") : ""
                     font.family: ThemeBackend.fontFamily
                     font.pixelSize: window.s(11)
                     color: ThemeBackend.subtext0
@@ -263,6 +305,11 @@ Item {
                 Boton {
                     texto: window.t("copy", "Copy all")
                     onPulsado: Quickshell.execDetached(["wl-copy", "--", editor.text])
+                }
+                Boton {
+                    visible: Tareas.boveda !== "" && editor.text.trim() !== ""
+                    texto: window.t("to_obsidian", "Move to Obsidian")
+                    onPulsado: window.pasarAObsidian()
                 }
                 Boton {
                     texto: window.t("open", "Open in editor")

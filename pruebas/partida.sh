@@ -32,7 +32,7 @@ chmod +x "$T/bin/"*
 # El medidor sigue vivo si tiene el candado
 midiendo() { ! flock -n "$E/partida.lock" true; }
 partida() {
-  HOME="$H" XDG_STATE_HOME="$H/.local/state" PATH="$T/bin:$PATH" VORTEX_HWMON="$T/hwmon" \
+  HOME="$H" XDG_STATE_HOME="$H/.local/state" PATH="$T/bin:$PATH" VORTEX_HWMON="$T/hwmon" VORTEX_PARTIDA_CLIPS="$T/clips" \
     VORTEX_PARTIDA_PASO=0.1 VORTEX_PARTIDA_MINIMO="${MINIMO:-0}" bash "$AQUI/bin/vortex-partida" "$@"
 }
 
@@ -85,6 +85,16 @@ sleep 0.3
 partida terminar >/dev/null
 probar "sin sensores ni MangoHud solo dice cuánto jugaste" "tail -1 '$T/avisos.log' | grep -qx 'Resumen de la partida|Jugaste 0 min'"
 probar "historial muestra las partidas" "partida historial | grep -q 'Hollow Knight'"
+
+echo "== los clips de la partida (4.0)"
+mkdir -p "$T/clips"; touch -d '2 hours ago' "$T/clips/viejo.mp4"
+partida empezar
+sleep 1.1
+touch "$T/clips/Hollow Knight 1.mp4" "$T/clips/Hollow Knight 2.mp4"
+partida terminar >"$T/salida"
+sleep 0.5
+probar "cuenta los clips que guardaste en la partida (no los viejos)" "tail -1 '$T/avisos.log' | grep -q 'Guardaste 2 clips\$'"
+probar "y el resumen sale igual por la salida" "grep -qx 'Guardaste 2 clips' '$T/salida'"
 
 echo
 if ((FALLOS)); then echo "$FALLOS fallaron"; exit 1; fi

@@ -2863,7 +2863,10 @@
     "placeholder": "Escribe lo que sea: se guarda sola.",
     "where": "Se guarda en Documentos",
     "copy": "Copiar todo",
-    "open": "Abrir en el editor"
+    "open": "Abrir en el editor",
+    "to_obsidian": "Pasar a Obsidian",
+    "moved": "Pasada a Obsidian",
+    "vault_folder": "Notas rápidas"
   },
   "tareas": {
     "title": "Tareas",

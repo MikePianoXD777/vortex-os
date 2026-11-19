@@ -2851,7 +2851,10 @@
     "placeholder": "Write whatever: it saves itself.",
     "where": "Saved in Documents",
     "copy": "Copy all",
-    "open": "Open in editor"
+    "open": "Open in editor",
+    "to_obsidian": "Move to Obsidian",
+    "moved": "Moved to Obsidian",
+    "vault_folder": "Quick notes"
   },
   "tareas": {
     "title": "Tasks",

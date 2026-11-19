@@ -10,6 +10,7 @@
 #
 # Las partidas de menos de 2 minutos no avisan (abrir y cerrar un juego no es jugar).
 #
+# 4.0: si guardaste clips (Alt+F10, vortex-clips) durante la partida, el aviso los cuenta y trae «Ver clips».
 # 4.0: si el detector de tirones midió la partida (vortex-tirones, lo arranca el gestor al abrir el juego),
 # el aviso dice también cuántos tirones hubo, por qué (memoria, disco, procesador, calor) y qué hacer.
 set -uo pipefail
@@ -22,6 +23,13 @@ PASO="${VORTEX_PARTIDA_PASO:-5}"
 MINIMO="${VORTEX_PARTIDA_MINIMO:-120}"
 HWMON="${VORTEX_HWMON:-/sys/class/hwmon}"
 TIRONES="${VORTEX_PARTIDA_TIRONES:-vortex-tirones}"
+CLIPS="${VORTEX_PARTIDA_CLIPS:-$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Clips}"
+
+# Cuántos clips se guardaron desde el segundo $1 (los de vortex-clips, en Vídeos/Clips)
+clips_desde() {
+  [[ -d "$CLIPS" ]] || { echo 0; return 0; }
+  find "$CLIPS" -maxdepth 2 -type f \( -name '*.mp4' -o -name '*.mkv' -o -name '*.webm' \) -newermt "@$1" 2>/dev/null | wc -l
+}
 
 # Temperatura de la CPU en °C (Intel: coretemp; AMD: k10temp o zenpower), vacía si no hay sensor
 temp_cpu() {
@@ -141,7 +149,7 @@ juego_que_no_abrio() {
 
 cmd_terminar() {
   [[ -s "$PARTIDA" ]] || return 0
-  local inicio fin seg juego cpu gpu fps="" bajo="" lineas=() tirones=()
+  local inicio fin seg juego cpu gpu fps="" bajo="" lineas=() tirones=() clips=0
   exec 8>"$ESTADO/partida.datos"
   flock 8
   muestra
@@ -164,10 +172,23 @@ cmd_terminar() {
   lineas+=("Jugaste $(duracion "$seg")")
   [[ -n "$fps" ]] && lineas+=("FPS promedio $fps · 1 % bajo $bajo")
   [[ -n "$cpu$gpu" ]] && lineas+=("Máximo: ${cpu:+CPU $cpu °C}${cpu:+${gpu:+ · }}${gpu:+GPU $gpu °C}")
+  clips="$(clips_desde "$inicio")"
+  ((clips == 1)) && lineas+=("Guardaste 1 clip")
+  ((clips > 1)) && lineas+=("Guardaste $clips clips")
   ((${#tirones[@]})) && lineas+=("${tirones[@]}")
-  command -v notify-send >/dev/null &&
-    notify-send -a "Vortexine's OS" -i applications-games "${juego:-Resumen de la partida}" \
-      "$(printf '%s\n' "${lineas[@]}")" >/dev/null 2>&1
+  if command -v notify-send >/dev/null; then
+    if ((clips > 0)); then
+      # Con botón el aviso espera tu clic: va aparte para no frenar el fin del modo juego.
+      (
+        accion="$(notify-send -a "Vortexine's OS" -i applications-games -A clips="Ver clips" \
+          "${juego:-Resumen de la partida}" "$(printf '%s\n' "${lineas[@]}")" 2>/dev/null)"
+        [[ "$accion" == clips ]] && xdg-open "$CLIPS" >/dev/null 2>&1
+      ) </dev/null >/dev/null 2>&1 &
+    else
+      notify-send -a "Vortexine's OS" -i applications-games "${juego:-Resumen de la partida}" \
+        "$(printf '%s\n' "${lineas[@]}")" >/dev/null 2>&1
+    fi
+  fi
   # Miku se entera (sus sentimientos) y, si toca, al rato te dice algo; si sus sentimientos están apagados, nada.
   command -v vortex-miku >/dev/null &&
     (vortex-miku sentir partida "$juego" $((seg / 60)) "${cpu:-0}" "${gpu:-0}" >/dev/null 2>&1 &)
