@@ -38,7 +38,10 @@ temp_cpu() {
 temp_gpu() {
   local h t
   if command -v nvidia-smi >/dev/null; then
-    t="$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc 0-9)"
+    # Los drivers nuevos (620) la dan con decimales («84.06»): se corta en el punto. Antes se le quitaba todo lo
+    # que no fuera número, punto incluido, y salía «8406 grados» en el resumen y en lo que decía Miku.
+    t="$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)"
+    t="$(tr -dc 0-9 <<<"${t%%.*}")"
     [[ -n "$t" ]] && { echo "$t"; return 0; }
   fi
   for h in "$HWMON"/hwmon*; do

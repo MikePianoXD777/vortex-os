@@ -42,7 +42,7 @@ partida empezar
 sleep 0.4
 probar "dos «empezar» seguidos son una sola partida (un solo medidor)" \
   "[[ \$(grep -c '^inicio=' '$E/partida') == 1 ]] && midiendo"
-echo 84000 >"$T/hwmon/hwmon1/temp1_input"; echo 77 >"$T/gpu"
+echo 84000 >"$T/hwmon/hwmon1/temp1_input"; echo 77.47 >"$T/gpu" # el driver 620 da decimales
 sleep 0.4
 echo 70000 >"$T/hwmon/hwmon1/temp1_input"; echo 60 >"$T/gpu"
 sleep 0.4
