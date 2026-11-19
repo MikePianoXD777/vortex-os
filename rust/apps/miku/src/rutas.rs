@@ -27,7 +27,9 @@ pub struct Rutas {
 }
 
 fn variable(nombre: &str) -> Option<PathBuf> {
-    std::env::var_os(nombre).filter(|v| !v.is_empty()).map(PathBuf::from)
+    std::env::var_os(nombre)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 impl Rutas {
@@ -47,7 +49,8 @@ impl Rutas {
             modelo_usuario: datos.join("modelo.vrm"),
             voz: datos.join("voz"),
             oido: datos.join("oido"),
-            marca_internet: variable("VORTEX_MIKU_MARCA_INTERNET").unwrap_or_else(|| "/etc/vortex/miku-internet".into()),
+            marca_internet: variable("VORTEX_MIKU_MARCA_INTERNET")
+                .unwrap_or_else(|| "/etc/vortex/miku-internet".into()),
             cerebro_cwd: datos.join("cerebro"),
             libs_py: variable("VORTEX_MIKU_LIBS").unwrap_or_else(|| "/usr/lib/vortex-miku/python".into()),
             natural: variable("VORTEX_MIKU_NATURAL").unwrap_or_else(|| datos.join("natural")),
@@ -154,14 +157,21 @@ fn buscar_raiz() -> PathBuf {
 
 /// Los núcleos físicos (máximo 8) para la voz y el oído; `VORTEX_MIKU_HILOS` manda.
 pub fn hilos() -> usize {
-    if let Some(n) = std::env::var("VORTEX_MIKU_HILOS").ok().and_then(|v| v.parse::<usize>().ok()) {
+    if let Some(n) = std::env::var("VORTEX_MIKU_HILOS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+    {
         return n.max(1);
     }
     let mut nucleos = std::collections::HashSet::new();
     if let Ok(d) = std::fs::read_dir("/sys/devices/system/cpu") {
         for e in d.flatten() {
             let t = e.path().join("topology");
-            let leer = |n: &str| std::fs::read_to_string(t.join(n)).ok().map(|s| s.trim().to_string());
+            let leer = |n: &str| {
+                std::fs::read_to_string(t.join(n))
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            };
             if let (Some(p), Some(c)) = (leer("physical_package_id"), leer("core_id")) {
                 nucleos.insert((p, c));
             }

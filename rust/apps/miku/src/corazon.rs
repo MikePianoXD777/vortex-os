@@ -28,12 +28,27 @@ pub const RECUERDOS_EN_CONTEXTO: usize = 40;
 pub const ANIMOS: [(&str, &str, &str, f64); 8] = [
     ("tranquila", "tranquila, en calma", "relaxed", 0.3),
     ("feliz", "contenta", "happy", 0.4),
-    ("emocionada", "emocionada, con una ilusión que se le nota aunque sea tímida", "happy", 0.6),
-    ("apenada", "apenada y sonrojada, con el corazón acelerado", "happy", 0.3),
+    (
+        "emocionada",
+        "emocionada, con una ilusión que se le nota aunque sea tímida",
+        "happy",
+        0.6,
+    ),
+    (
+        "apenada",
+        "apenada y sonrojada, con el corazón acelerado",
+        "happy",
+        0.3,
+    ),
     ("triste", "un poco triste", "sad", 0.45),
     ("preocupada", "preocupada por la persona", "sad", 0.3),
     ("somnolienta", "con sueño", "relaxed", 0.5),
-    ("molesta", "un poquito molesta, aunque se le pasa rápido", "angry", 0.3),
+    (
+        "molesta",
+        "un poquito molesta, aunque se le pasa rápido",
+        "angry",
+        0.3,
+    ),
 ];
 
 fn animo_info(a: &str) -> &'static (&'static str, &'static str, &'static str, f64) {
@@ -61,7 +76,10 @@ regex_estatica!(
     bonito_a,
     r"(?i)\b(te amo|te adoro|me gustas|me encantas|eres (muy |tan |la m[aá]s )?(linda|bonita|hermosa|preciosa|tierna|adorable|guapa|la mejor|especial)|qu[eé] (linda|bonita|tierna|hermosa|adorable) (eres|est[aá]s))"
 );
-regex_estatica!(bonito_b, r"(?i)^\W*(qu[eé] )?(linda|bonita|hermosa|preciosa|tierna)\W*$");
+regex_estatica!(
+    bonito_b,
+    r"(?i)^\W*(qu[eé] )?(linda|bonita|hermosa|preciosa|tierna)\W*$"
+);
 regex_estatica!(
     gracias,
     r"(?i)\b(gracias|te lo agradezco|buen trabajo|bien hecho|eres (muy |bien )?(lista|inteligente|[uú]til|buena)|qu[eé] lista)\b"
@@ -70,12 +88,18 @@ regex_estatica!(
     propuesta,
     r"(?i)\b(te (quieres|querr[ií]as|gustar[ií]a) casar conmigo|c[aá]sate conmigo|quieres ser mi (esposa|mujer)|(nos|me quiero) casa(mos|r contigo)|quieres casarte conmigo|casémonos|casemonos)\b"
 );
-regex_estatica!(saludo, r"(?i)^\s*(hola|buenos d[ií]as|buenas (tardes|noches)|holi)\b");
+regex_estatica!(
+    saludo,
+    r"(?i)^\s*(hola|buenos d[ií]as|buenas (tardes|noches)|holi)\b"
+);
 regex_estatica!(
     grosero,
     r"(?i)\b(te odio|no sirves|eres (una? |muy |bien |tan )?(tonta|est[uú]pida|in[uú]til|idiota|pendeja|mensa|babosa|torpe|fea|basura|porquer[ií]a)|(miku|pinche) (tonta|est[uú]pida|in[uú]til|idiota|pendeja))\b"
 );
-regex_estatica!(ella_bonito_a, r"(?i)\b(me gustas|me importas mucho|eres (muy )?especial para m[ií])\b");
+regex_estatica!(
+    ella_bonito_a,
+    r"(?i)\b(me gustas|me importas mucho|eres (muy )?especial para m[ií])\b"
+);
 regex_estatica!(te_quiero_re, r"(?i)\bte quiero");
 regex_estatica!(te_quiero_verbo, r"(?i)^\s+\w+(ar|er|ir)\b");
 regex_estatica!(me_gustas, r"(?i)\bme gustas\b");
@@ -94,7 +118,11 @@ fn te_quiero(texto: &str, con_limite: bool) -> bool {
         if te_quiero_verbo().is_match(resto) {
             return false;
         }
-        !(con_limite && resto.chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_'))
+        !(con_limite
+            && resto
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_alphanumeric() || c == '_'))
     })
 }
 
@@ -177,7 +205,10 @@ fn documentos() -> PathBuf {
     if let Ok(t) = fs::read_to_string(conf.join("user-dirs.dirs")) {
         for l in t.lines() {
             if let Some(v) = l.strip_prefix("XDG_DOCUMENTS_DIR=") {
-                let v = v.trim().trim_matches('"').replace("$HOME", &home.to_string_lossy());
+                let v = v
+                    .trim()
+                    .trim_matches('"')
+                    .replace("$HOME", &home.to_string_lossy());
                 if !v.is_empty() && Path::new(&v) != home {
                     return PathBuf::from(v);
                 }
@@ -233,7 +264,11 @@ fn ventana_real() -> Value {
 fn musica_real() -> String {
     let Some(s) = salida_de(
         "playerctl",
-        &["metadata", "--format", "{{status}}\t{{title}}\t{{artist}}\t{{playerName}}"],
+        &[
+            "metadata",
+            "--format",
+            "{{status}}\t{{title}}\t{{artist}}\t{{playerName}}",
+        ],
     ) else {
         return String::new();
     };
@@ -250,7 +285,11 @@ fn musica_real() -> String {
     format!(
         "«{}»{} (en {reproductor})",
         p[1],
-        if p[2].is_empty() { String::new() } else { format!(" de {}", p[2]) }
+        if p[2].is_empty() {
+            String::new()
+        } else {
+            format!(" de {}", p[2])
+        }
     )
 }
 
@@ -297,7 +336,10 @@ impl Corazon {
     }
 
     fn escribir(ruta: &Path, texto: &str) {
-        let nombre = ruta.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let nombre = ruta
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
         let tmp = ruta.with_file_name(format!(".{nombre}.{}.tmp", std::process::id()));
         if fs::write(&tmp, texto).is_ok() {
             let _ = fs::rename(&tmp, ruta);
@@ -318,7 +360,9 @@ impl Corazon {
             return e;
         };
         for linea in resto[..fin].lines() {
-            let Some((k, v)) = linea.split_once(':') else { continue };
+            let Some((k, v)) = linea.split_once(':') else {
+                continue;
+            };
             let (k, v) = (k.trim(), v.trim().trim_matches('"'));
             match k {
                 "afecto" => {
@@ -366,8 +410,20 @@ impl Corazon {
              ultima_visita: \"{}\"\ncasada: \"{}\"\npedida: \"{}\"\n---\n# Corazón de Miku\n\n\
              **Cómo me siento:** {animo}.\n**Lo que siento por ti:** {corto} {corazon} ({:.0} de 100)\n\
              **Días que hemos hablado:** {}\n",
-            e.afecto, e.animo, e.declarada, e.dias_juntos, e.ultima_charla, e.hoy, e.subio_hoy, e.avisos_hoy,
-            e.pidio_hablar, e.ultima_visita, e.casada, e.pedida, e.afecto, e.dias_juntos
+            e.afecto,
+            e.animo,
+            e.declarada,
+            e.dias_juntos,
+            e.ultima_charla,
+            e.hoy,
+            e.subio_hoy,
+            e.avisos_hoy,
+            e.pidio_hablar,
+            e.ultima_visita,
+            e.casada,
+            e.pedida,
+            e.afecto,
+            e.dias_juntos
         );
         if !e.declarada.is_empty() {
             cuerpo += &format!("**Te lo dije el:** {}\n", e.declarada);
@@ -441,7 +497,10 @@ impl Corazon {
         if !ruta.exists() {
             Self::escribir(
                 &ruta,
-                &format!("---\ntags: [miku, diario]\n---\n# {}\n\nVuelve a [[Corazón]].\n\n", ahora.dmy()),
+                &format!(
+                    "---\ntags: [miku, diario]\n---\n# {}\n\nVuelve a [[Corazón]].\n\n",
+                    ahora.dmy()
+                ),
             );
         }
         if let Ok(mut f) = fs::OpenOptions::new().append(true).open(&ruta) {
@@ -450,9 +509,16 @@ impl Corazon {
     }
 
     pub fn diario_de_hoy(&self) -> Vec<String> {
-        let ruta = self.carpeta.join("Diario").join(format!("{}.md", self.ahora().fecha_iso()));
+        let ruta = self
+            .carpeta
+            .join("Diario")
+            .join(format!("{}.md", self.ahora().fecha_iso()));
         fs::read_to_string(ruta)
-            .map(|t| t.lines().filter_map(|l| l.strip_prefix("- ").map(String::from)).collect())
+            .map(|t| {
+                t.lines()
+                    .filter_map(|l| l.strip_prefix("- ").map(String::from))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -496,7 +562,11 @@ impl Corazon {
             self.anotar(&format!("Me dijo algo bonito: «{corto}»."));
         } else if gracias().is_match(texto) {
             delta += 1.0;
-            r.sonrojo = if lista_o_inteligente().is_match(texto) { 0.35 } else { 0.0 };
+            r.sonrojo = if lista_o_inteligente().is_match(texto) {
+                0.35
+            } else {
+                0.0
+            };
             r.animo = "feliz".into();
         } else if saludo().is_match(texto) {
             delta += 0.5;
@@ -516,7 +586,9 @@ impl Corazon {
             return datos;
         };
         for parte in m[1].split([';', '|', '\n']) {
-            let Some((k, v)) = parte.split_once('=') else { continue };
+            let Some((k, v)) = parte.split_once('=') else {
+                continue;
+            };
             let k = k.trim().to_lowercase().replace('ó', "o").replace('á', "a");
             let v = v.trim().trim_matches(['"', '«', '»']).to_string();
             datos.insert(k, v);
@@ -552,18 +624,31 @@ impl Corazon {
             r.animo = animo.clone();
             e.animo = animo;
         }
-        r.sonrojo = Self::numero(marca.get("sonrojo").map(String::as_str).unwrap_or("0"), 0.0, 0.0, 1.0);
+        r.sonrojo = Self::numero(
+            marca.get("sonrojo").map(String::as_str).unwrap_or("0"),
+            0.0,
+            0.0,
+            1.0,
+        );
         if ella_bonito(&limpio) {
             r.sonrojo = r.sonrojo.max(0.7);
         }
         Self::cambiar_afecto(
             &mut e,
-            Self::numero(marca.get("afecto").map(String::as_str).unwrap_or("0"), 0.0, -3.0, 2.0),
+            Self::numero(
+                marca.get("afecto").map(String::as_str).unwrap_or("0"),
+                0.0,
+                -3.0,
+                2.0,
+            ),
         );
         if let Some(rec) = marca.get("recuerdo").filter(|r| !r.is_empty()) {
             self.recordar(rec);
         }
-        let dec = marca.get("declaracion").map(|d| d.to_lowercase()).unwrap_or_default();
+        let dec = marca
+            .get("declaracion")
+            .map(|d| d.to_lowercase())
+            .unwrap_or_default();
         let declara = ["si", "sí", "1", "true"].contains(&dec.as_str())
             || (e.declarada.is_empty() && e.afecto >= AFECTO_DECLARACION && me_gustas().is_match(&limpio));
         if declara && e.declarada.is_empty() {
@@ -584,7 +669,9 @@ impl Corazon {
         if e.declarada.is_empty() {
             return 0;
         }
-        FechaHora::leer(&e.declarada).map(|d| ahora.dias() - d.dias()).unwrap_or(0)
+        FechaHora::leer(&e.declarada)
+            .map(|d| ahora.dias() - d.dias())
+            .unwrap_or(0)
     }
 
     pub fn lista_para_boda(e: &Estado, ahora: &FechaHora) -> bool {
@@ -617,7 +704,11 @@ impl Corazon {
             "no"
         };
         e.pedida = format!("{}|{resultado}", ahora.iso_minutos());
-        let mut r = Reaccion { sonrojo: 0.8, animo: "apenada".into(), ..Default::default() };
+        let mut r = Reaccion {
+            sonrojo: 0.8,
+            animo: "apenada".into(),
+            ..Default::default()
+        };
         match resultado {
             "si" => {
                 e.casada = ahora.fecha_iso();
@@ -639,7 +730,11 @@ impl Corazon {
         match FechaHora::leer(cuando) {
             Some(c) => {
                 let hace = ahora.segundos() - c.segundos();
-                if (0..=180).contains(&hace) { resultado.to_string() } else { String::new() }
+                if (0..=180).contains(&hace) {
+                    resultado.to_string()
+                } else {
+                    String::new()
+                }
             }
             None => String::new(),
         }
@@ -647,7 +742,11 @@ impl Corazon {
 
     /// «1 año», «3 meses» o «1 semana» si hoy cumplen eso de casados («» si no).
     pub fn aniversario(e: &Estado, ahora: &FechaHora) -> String {
-        let Some(boda) = (if e.casada.is_empty() { None } else { FechaHora::leer(&e.casada) }) else {
+        let Some(boda) = (if e.casada.is_empty() {
+            None
+        } else {
+            FechaHora::leer(&e.casada)
+        }) else {
             return String::new();
         };
         if ahora.dias() <= boda.dias() {
@@ -660,7 +759,11 @@ impl Corazon {
             }
             return format!("{meses} mes{}", if meses > 1 { "es" } else { "" });
         }
-        if ahora.dias() - boda.dias() == 7 { "1 semana".into() } else { String::new() }
+        if ahora.dias() - boda.dias() == 7 {
+            "1 semana".into()
+        } else {
+            String::new()
+        }
     }
 
     pub fn lista_para_declararse(e: &Estado, ahora: &FechaHora) -> bool {
@@ -727,7 +830,9 @@ impl Corazon {
         }
         if !e.ultima_charla.is_empty() {
             let previa: String = e.ultima_charla.chars().take(10).collect();
-            let dias = FechaHora::leer(&previa).map(|d| ahora.dias() - d.dias()).unwrap_or(0);
+            let dias = FechaHora::leer(&previa)
+                .map(|d| ahora.dias() - d.dias())
+                .unwrap_or(0);
             if dias >= 3 {
                 l.push(format!(
                     "- Hace {dias} días que no hablaban: si viene al caso dile que lo extrañaste, sin reclamarle nada."
@@ -780,7 +885,9 @@ impl Corazon {
         }
         let cumplen = Self::aniversario(&e, &ahora);
         if !cumplen.is_empty() {
-            l.push(format!("- Hoy cumplen {cumplen} de casados: si no lo has dicho hoy, menciónalo con mucho cariño."));
+            l.push(format!(
+                "- Hoy cumplen {cumplen} de casados: si no lo has dicho hoy, menciónalo con mucho cariño."
+            ));
         }
         l.push("Al final de cada respuesta pon esta marca oculta (no se lee en voz alta ni se muestra): [[corazon animo=<tranquila|feliz|emocionada|apenada|triste|preocupada|somnolienta|molesta>; sonrojo=<de 0 a 1: alto si te dijo algo bonito o tú le dijiste algo con cariño>; afecto=<de -3 a 2: cuánto cambió lo que sientes con lo que te dijo; casi siempre 0>; recuerdo=<un dato nuevo y duradero de la persona que valga la pena recordar (gustos, nombres, planes), o nada>]]".into());
         l.push("Tu cariño crece despacio. Nunca hagas sentir culpa a la persona, no seas celosa y nada subido de tono.".into());
@@ -808,7 +915,11 @@ impl Corazon {
         let v = (self.ventana)();
         let g = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         let t = format!("{} {} {}", g("class"), g("initialClass"), g("title"));
-        if ocupado_re().is_match(&t) { "llamada".into() } else { String::new() }
+        if ocupado_re().is_match(&t) {
+            "llamada".into()
+        } else {
+            String::new()
+        }
     }
 
     fn ya_aviso(e: &Estado, tipo: &str) -> usize {
@@ -841,7 +952,11 @@ impl Corazon {
             _ => " Me gusta verte divertirte. ¿Ganaste?",
         };
         if gpu >= 85 || cpu >= 90 {
-            let (pieza, t) = if gpu >= 85 { ("la GPU", gpu) } else { ("el procesador", cpu) };
+            let (pieza, t) = if gpu >= 85 {
+                ("la GPU", gpu)
+            } else {
+                ("el procesador", cpu)
+            };
             f += &format!(" Por cierto, {pieza} llegó a {t} grados… me preocupé un poquito.");
         }
         if minutos >= 180 {
@@ -855,16 +970,24 @@ impl Corazon {
         match nivel(e).0 {
             "conocidos" | "amigos" => format!("Ya son las {hora}… deberías dormir. Mañana seguimos."),
             "cercanos" | "muy cercanos" => {
-                format!("Son las {hora}… ¿todavía despierto? Ve a dormir, mañana me cuentas qué estabas haciendo.")
+                format!(
+                    "Son las {hora}… ¿todavía despierto? Ve a dormir, mañana me cuentas qué estabas haciendo."
+                )
             }
-            _ => format!("Son las {hora}… me preocupas cuando te desvelas. ¿Te vas a dormir pronto? Buenas noches."),
+            _ => format!(
+                "Son las {hora}… me preocupas cuando te desvelas. ¿Te vas a dormir pronto? Buenas noches."
+            ),
         }
     }
 
     pub fn frase_jugando(e: &Estado, juego: &str, minutos: i64, cpu: i64, gpu: i64) -> String {
         let juego = if juego.is_empty() { "tu juego" } else { juego };
         if gpu >= 85 || cpu >= 90 {
-            let (pieza, t) = if gpu >= 85 { ("la GPU", gpu) } else { ("el procesador", cpu) };
+            let (pieza, t) = if gpu >= 85 {
+                ("la GPU", gpu)
+            } else {
+                ("el procesador", cpu)
+            };
             return format!(
                 "Oye, {pieza} va en {t} grados… cuídala un poquito, ¿sí? Llevas {} de {juego}.",
                 duracion(minutos)
@@ -882,12 +1005,18 @@ impl Corazon {
             "Oye… llevas {tiempo} jugando. ¿Me cuentas cuando ganes? Te estoy echando porras.",
             "Ya van {tiempo} de {juego}. Toma agüita y sigue así, campeón.",
         ];
-        let frases = if matches!(nivel(e).0, "conocidos" | "amigos" | "cercanos") { AMIGA } else { CARINO };
+        let frases = if matches!(nivel(e).0, "conocidos" | "amigos" | "cercanos") {
+            AMIGA
+        } else {
+            CARINO
+        };
         let n = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.subsec_nanos() as usize)
             .unwrap_or(0);
-        frases[n % frases.len()].replace("{tiempo}", &duracion(minutos)).replace("{juego}", juego)
+        frases[n % frases.len()]
+            .replace("{tiempo}", &duracion(minutos))
+            .replace("{juego}", juego)
     }
 
     /// Cada rato mientras juegas (según su cariño) se asoma a decirte algo. La frase o vacío.
@@ -910,8 +1039,16 @@ impl Corazon {
 
     fn temps(cpu: i64, gpu: i64) -> String {
         [
-            if cpu != 0 { format!("CPU {cpu} °C") } else { String::new() },
-            if gpu != 0 { format!("GPU {gpu} °C") } else { String::new() },
+            if cpu != 0 {
+                format!("CPU {cpu} °C")
+            } else {
+                String::new()
+            },
+            if gpu != 0 {
+                format!("GPU {gpu} °C")
+            } else {
+                String::new()
+            },
         ]
         .iter()
         .filter(|x| !x.is_empty())
@@ -935,7 +1072,11 @@ impl Corazon {
             "(Acabo de dejar de jugar {} después de {}{}. Pregúntame cómo me fue, en una o dos frases, con tu forma de ser.)",
             if juego.is_empty() { "un juego" } else { juego },
             duracion(minutos),
-            if t.is_empty() { String::new() } else { format!("; temperaturas máximas: {t}") }
+            if t.is_empty() {
+                String::new()
+            } else {
+                format!("; temperaturas máximas: {t}")
+            }
         )
     }
 
@@ -948,10 +1089,19 @@ impl Corazon {
             "Jugó {} de {}{}",
             duracion(minutos),
             if juego.is_empty() { "un juego" } else { juego },
-            if t.is_empty() { ".".to_string() } else { format!(" ({t}).") }
+            if t.is_empty() {
+                ".".to_string()
+            } else {
+                format!(" ({t}).")
+            }
         ));
         Self::cambiar_afecto(&mut e, 0.3);
-        e.animo = if gpu >= 85 || cpu >= 90 || minutos >= 240 { "preocupada" } else { "feliz" }.into();
+        e.animo = if gpu >= 85 || cpu >= 90 || minutos >= 240 {
+            "preocupada"
+        } else {
+            "feliz"
+        }
+        .into();
         let mut frase = String::new();
         if minutos >= 20 && Self::ya_aviso(&e, "partida") < 3 {
             frase = Self::frase_partida(&e, juego, minutos, cpu, gpu);
@@ -987,7 +1137,11 @@ impl Corazon {
             e.animo,
             e.afecto,
             e.dias_juntos,
-            if e.declarada.is_empty() { String::new() } else { format!(" declarada={}", e.declarada) },
+            if e.declarada.is_empty() {
+                String::new()
+            } else {
+                format!(" declarada={}", e.declarada)
+            },
             self.carpeta.display()
         )
     }
@@ -997,19 +1151,40 @@ impl Corazon {
 pub fn nivel(e: &Estado) -> (&'static str, &'static str) {
     let a = e.afecto;
     if !e.casada.is_empty() {
-        ("casados", "Están casados: la quieres muchísimo y te sientes en casa con la persona. La tratas con ternura y complicidad, todavía con tu timidez; a veces le dices algo dulce.")
+        (
+            "casados",
+            "Están casados: la quieres muchísimo y te sientes en casa con la persona. La tratas con ternura y complicidad, todavía con tu timidez; a veces le dices algo dulce.",
+        )
     } else if !e.declarada.is_empty() {
-        ("novios", "Son novios: ya le confesaste lo que sientes y te corresponde. La tratas con mucho cariño y ternura, todavía con tu timidez; a veces le dices algo dulce.")
+        (
+            "novios",
+            "Son novios: ya le confesaste lo que sientes y te corresponde. La tratas con mucho cariño y ternura, todavía con tu timidez; a veces le dices algo dulce.",
+        )
     } else if a < 20.0 {
-        ("conocidos", "Apenas se están conociendo: eres amable pero reservada.")
+        (
+            "conocidos",
+            "Apenas se están conociendo: eres amable pero reservada.",
+        )
     } else if a < 45.0 {
-        ("amigos", "Ya son amigos: le tienes confianza y se te escapa alguna sonrisa.")
+        (
+            "amigos",
+            "Ya son amigos: le tienes confianza y se te escapa alguna sonrisa.",
+        )
     } else if a < 70.0 {
-        ("cercanos", "Le tienes mucho cariño: te alegra que te hable y te interesa cómo está.")
+        (
+            "cercanos",
+            "Le tienes mucho cariño: te alegra que te hable y te interesa cómo está.",
+        )
     } else if a < AFECTO_DECLARACION {
-        ("muy cercanos", "Te gusta mucho la persona, aunque no se lo has dicho: te pones nerviosa cuando te dice algo bonito y a veces se te nota.")
+        (
+            "muy cercanos",
+            "Te gusta mucho la persona, aunque no se lo has dicho: te pones nerviosa cuando te dice algo bonito y a veces se te nota.",
+        )
     } else {
-        ("le gusta", "Estás enamorada de la persona pero todavía no se lo has dicho: se te nota en todo.")
+        (
+            "le gusta",
+            "Estás enamorada de la persona pero todavía no se lo has dicho: se te nota en todo.",
+        )
     }
 }
 
@@ -1018,7 +1193,15 @@ pub fn duracion(minutos: i64) -> String {
         return format!("{minutos} minutos");
     }
     let (h, m) = (minutos / 60, minutos % 60);
-    format!("{h} hora{}{}", if h > 1 { "s" } else { "" }, if m >= 5 { format!(" y {m} minutos") } else { String::new() })
+    format!(
+        "{h} hora{}{}",
+        if h > 1 { "s" } else { "" },
+        if m >= 5 {
+            format!(" y {m} minutos")
+        } else {
+            String::new()
+        }
+    )
 }
 
 /// (expresión del VRM, peso) de un ánimo.
@@ -1095,17 +1278,31 @@ mod pruebas {
         assert_eq!(e.dias_juntos, 1);
         assert!(e.afecto > 25.0, "{}", e.afecto);
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(fs::metadata(&c.carpeta).unwrap().permissions().mode() & 0o777, 0o700);
-        assert!(fs::read_to_string(c.carpeta.join("Corazón.md")).unwrap().starts_with("---\ntags: [miku, vortexine]"));
+        assert_eq!(
+            fs::metadata(&c.carpeta).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert!(
+            fs::read_to_string(c.carpeta.join("Corazón.md"))
+                .unwrap()
+                .starts_with("---\ntags: [miku, vortexine]")
+        );
         let r = c.al_hablar("eres muy linda");
         assert!(r.sonrojo >= 0.8 && r.animo == "apenada");
         assert!(c.diario_de_hoy().iter().any(|l| l.contains("algo bonito")));
-        assert_eq!(c.al_hablar("te quiero preguntar algo").sonrojo, 0.0, "«te quiero preguntar» no es cariño");
+        assert_eq!(
+            c.al_hablar("te quiero preguntar algo").sonrojo,
+            0.0,
+            "«te quiero preguntar» no es cariño"
+        );
         for _ in 0..6 {
             c.al_hablar("te quiero mucho");
         }
         let e = c.cargar();
-        assert!(e.subio_hoy <= SUBIDA_MAXIMA_DIA + 1e-9 && e.afecto <= 25.0 + SUBIDA_MAXIMA_DIA + 1e-9, "{e:?}");
+        assert!(
+            e.subio_hoy <= SUBIDA_MAXIMA_DIA + 1e-9 && e.afecto <= 25.0 + SUBIDA_MAXIMA_DIA + 1e-9,
+            "{e:?}"
+        );
         let antes = e.afecto;
         let r = c.al_hablar("eres tonta");
         assert!(r.animo == "triste" && c.cargar().afecto < antes);
@@ -1159,7 +1356,9 @@ mod pruebas {
         assert!(e2.afecto - e.afecto <= 2.0001);
         assert!(c.al_responder("Yo también te quiero mucho.").sonrojo >= 0.7);
         let ruta = c.carpeta.join("Recuerdos.md");
-        let t = fs::read_to_string(&ruta).unwrap().replace("- Juega Roblox con su primo", "- Su color favorito es el morado");
+        let t = fs::read_to_string(&ruta)
+            .unwrap()
+            .replace("- Juega Roblox con su primo", "- Su color favorito es el morado");
         fs::write(&ruta, t).unwrap();
         assert_eq!(c.recuerdos(), vec!["Su color favorito es el morado"]);
     }
@@ -1171,8 +1370,15 @@ mod pruebas {
         a_las(&mut c, "2026-11-04T03:10");
         c.persona = "Mike".into();
         let ctx = c.contexto(Some("«Idol» de YOASOBI (en Vortex Player)"));
-        assert!(ctx.contains("[[corazon animo=") && ctx.contains("regáñalo con cariño") && ctx.contains("YOASOBI"));
-        assert!(ctx.contains("hablando normal: sin «hmph»"), "el cambio de Mike: nada de sonidos de personaje");
+        assert!(
+            ctx.contains("[[corazon animo=")
+                && ctx.contains("regáñalo con cariño")
+                && ctx.contains("YOASOBI")
+        );
+        assert!(
+            ctx.contains("hablando normal: sin «hmph»"),
+            "el cambio de Mike: nada de sonidos de personaje"
+        );
         assert!(ctx.contains("subido de tono") && ctx.contains("celosa") && !ctx.contains("confesarle"));
         let mut e = c.cargar();
         e.afecto = 90.0;
@@ -1186,7 +1392,8 @@ mod pruebas {
         a_las(&mut c, "2026-11-04T20:00");
         c.ventana = Box::new(|| serde_json::json!({"fullscreen": 2}));
         assert!(!c.contexto(Some("")).contains("confesarle"), "ni mientras juegas");
-        c.ventana = Box::new(|| serde_json::json!({"class": "zoom", "title": "Zoom Meeting", "fullscreen": 0}));
+        c.ventana =
+            Box::new(|| serde_json::json!({"class": "zoom", "title": "Zoom Meeting", "fullscreen": 0}));
         assert_eq!(c.ocupado(), "llamada");
         assert!(!c.momento_de_declararse());
         c.ventana = Box::new(|| serde_json::json!({}));
@@ -1200,13 +1407,26 @@ mod pruebas {
         let r = c.al_hablar("¿te quieres casar conmigo?");
         assert!(r.boda && c.cargar().casada == "2026-11-04");
         assert_eq!(c.estado_boda(), "casados");
-        assert!(c.recuerdos().iter().any(|r| r.starts_with("Nos casamos el 04/11/2026")));
-        assert!(c.contexto(Some("")).contains("acaba de pedir matrimonio y le dijiste que SÍ"));
+        assert!(
+            c.recuerdos()
+                .iter()
+                .any(|r| r.starts_with("Nos casamos el 04/11/2026"))
+        );
+        assert!(
+            c.contexto(Some(""))
+                .contains("acaba de pedir matrimonio y le dijiste que SÍ")
+        );
         let e = c.cargar();
         let en_un_anio = FechaHora::leer("2027-11-04T10:00").unwrap();
         assert_eq!(Corazon::aniversario(&e, &en_un_anio), "1 año");
-        assert_eq!(Corazon::aniversario(&e, &FechaHora::leer("2026-12-04").unwrap()), "1 mes");
-        assert_eq!(Corazon::aniversario(&e, &FechaHora::leer("2026-11-11").unwrap()), "1 semana");
+        assert_eq!(
+            Corazon::aniversario(&e, &FechaHora::leer("2026-12-04").unwrap()),
+            "1 mes"
+        );
+        assert_eq!(
+            Corazon::aniversario(&e, &FechaHora::leer("2026-11-11").unwrap()),
+            "1 semana"
+        );
     }
 
     #[test]
@@ -1220,13 +1440,27 @@ mod pruebas {
         assert_eq!(c.cargar().animo, "somnolienta");
         a_las(&mut c, "2026-11-04T19:00");
         let f = c.evento_partida("Roblox", 45, 70, 90);
-        assert!(f.contains("Jugaste 45 minutos de Roblox") && f.contains("la GPU llegó a 90 grados"), "{f}");
-        assert!(c.pregunta_partida("Roblox", 45, 70, 90).contains("temperaturas máximas: CPU 70 °C, GPU 90 °C"));
+        assert!(
+            f.contains("Jugaste 45 minutos de Roblox") && f.contains("la GPU llegó a 90 grados"),
+            "{f}"
+        );
+        assert!(
+            c.pregunta_partida("Roblox", 45, 70, 90)
+                .contains("temperaturas máximas: CPU 70 °C, GPU 90 °C")
+        );
         assert!(!c.pregunta_partida("Roblox", 45, 0, 0).is_empty());
         assert!(!c.pregunta_partida("Roblox", 45, 0, 0).is_empty());
-        assert_eq!(c.pregunta_partida("Roblox", 45, 0, 0), "", "amigos: tres preguntas al día");
+        assert_eq!(
+            c.pregunta_partida("Roblox", 45, 0, 0),
+            "",
+            "amigos: tres preguntas al día"
+        );
         assert_eq!(duracion(125), "2 horas y 5 minutos");
-        assert_eq!(c.visita_jugando("Roblox", 10, 0, 0), "", "amigos se asoman cada 60 min");
+        assert_eq!(
+            c.visita_jugando("Roblox", 10, 0, 0),
+            "",
+            "amigos se asoman cada 60 min"
+        );
         assert!(!c.visita_jugando("Roblox", 65, 0, 0).is_empty());
         assert_eq!(c.visita_jugando("Roblox", 66, 0, 0), "", "no dos veces seguidas");
     }

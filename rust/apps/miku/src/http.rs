@@ -32,7 +32,10 @@ impl Cortador {
 
 impl Respuesta {
     pub fn cortador(&self) -> Cortador {
-        Cortador { pid: self.hijo.id(), vivo: self.vivo.clone() }
+        Cortador {
+            pid: self.hijo.id(),
+            vivo: self.vivo.clone(),
+        }
     }
 
     /// Una línea (sin el salto), `None` al terminar la respuesta.
@@ -82,16 +85,29 @@ pub fn pedir(
     inactivo: u64,
 ) -> Result<Respuesta, String> {
     let mut c = Command::new("curl");
-    c.args(["-sS", "-N", "-D", "-", "--connect-timeout", "15", "--speed-limit", "1", "--speed-time"])
-        .arg(inactivo.max(1).to_string())
-        .args(["-X", metodo, "-H", "Expect:", "-H", "User-Agent: vortex-miku"]);
+    c.args([
+        "-sS",
+        "-N",
+        "-D",
+        "-",
+        "--connect-timeout",
+        "15",
+        "--speed-limit",
+        "1",
+        "--speed-time",
+    ])
+    .arg(inactivo.max(1).to_string())
+    .args(["-X", metodo, "-H", "Expect:", "-H", "User-Agent: vortex-miku"]);
     for (k, v) in cabeceras {
         c.arg("-H").arg(format!("{k}: {v}"));
     }
     if cuerpo.is_some() {
         c.args(["--data-binary", "@-"]);
     }
-    c.arg(url).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    c.arg(url)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let mut hijo = c.spawn().map_err(|e| format!("no pude correr curl: {e}"))?;
     if let Some(mut e) = hijo.stdin.take() {
         std::thread::spawn(move || {
@@ -122,17 +138,32 @@ pub fn pedir(
             continue;
         }
         if l.starts_with("HTTP/") {
-            estado = l.split_whitespace().nth(1).and_then(|c| c.parse().ok()).unwrap_or(0);
+            estado = l
+                .split_whitespace()
+                .nth(1)
+                .and_then(|c| c.parse().ok())
+                .unwrap_or(0);
             cab.clear();
         } else if let Some((k, v)) = l.split_once(':') {
             cab.push((k.trim().to_lowercase(), v.trim().to_string()));
         }
     }
-    Ok(Respuesta { estado, cabeceras: cab, lector, hijo, vivo: Arc::new(AtomicBool::new(true)) })
+    Ok(Respuesta {
+        estado,
+        cabeceras: cab,
+        lector,
+        hijo,
+        vivo: Arc::new(AtomicBool::new(true)),
+    })
 }
 
 /// POST de JSON y el cuerpo entero de la respuesta.
-pub fn json_a_json(url: &str, cabeceras: &[(&str, String)], datos: &serde_json::Value, inactivo: u64) -> Result<(u16, String), String> {
+pub fn json_a_json(
+    url: &str,
+    cabeceras: &[(&str, String)],
+    datos: &serde_json::Value,
+    inactivo: u64,
+) -> Result<(u16, String), String> {
     let mut h: Vec<(&str, String)> = vec![("Content-Type", "application/json".into())];
     h.extend(cabeceras.iter().cloned());
     let mut r = pedir("POST", url, &h, Some(datos.to_string().into_bytes()), inactivo)?;

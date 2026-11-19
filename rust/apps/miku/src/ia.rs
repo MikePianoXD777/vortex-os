@@ -31,7 +31,10 @@ pub struct ErrorIA {
 
 impl ErrorIA {
     pub fn nuevo(clave: &str, mensaje: impl Into<String>) -> Self {
-        Self { clave: clave.into(), mensaje: mensaje.into() }
+        Self {
+            clave: clave.into(),
+            mensaje: mensaje.into(),
+        }
     }
 }
 
@@ -70,7 +73,13 @@ pub fn proveedor_base(id: &str, ollama: &str) -> Proveedor {
             Clave::Si,
             "aistudio.google.com/apikey",
         ),
-        "openai" => ("ChatGPT", "https://api.openai.com/v1".to_string(), "gpt-5-mini", Clave::Si, "platform.openai.com/api-keys"),
+        "openai" => (
+            "ChatGPT",
+            "https://api.openai.com/v1".to_string(),
+            "gpt-5-mini",
+            Clave::Si,
+            "platform.openai.com/api-keys",
+        ),
         "otra" => ("tu IA", String::new(), "", Clave::Opcional, ""),
         _ => ("Claude", String::new(), "", Clave::No, ""),
     };
@@ -85,12 +94,24 @@ pub fn proveedor_base(id: &str, ollama: &str) -> Proveedor {
     } else {
         Map::new()
     };
-    Proveedor { id: id.into(), nombre: nombre.into(), url, modelo: modelo.into(), clave, donde: donde.into(), extra }
+    Proveedor {
+        id: id.into(),
+        nombre: nombre.into(),
+        url,
+        modelo: modelo.into(),
+        clave,
+        donde: donde.into(),
+        extra,
+    }
 }
 
 /// `ia_url` / `ia_modelo` mandan si vienen.
 pub fn elegido(cfg: &Config, ollama: &str) -> Proveedor {
-    let id = if crate::config::IAS.contains(&cfg.ia.as_str()) { cfg.ia.as_str() } else { "claude" };
+    let id = if crate::config::IAS.contains(&cfg.ia.as_str()) {
+        cfg.ia.as_str()
+    } else {
+        "claude"
+    };
     let mut p = proveedor_base(id, ollama);
     if !cfg.ia_url.is_empty() && id == "otra" {
         p.url = cfg.ia_url.clone();
@@ -105,7 +126,10 @@ pub fn elegido(cfg: &Config, ollama: &str) -> Proveedor {
 /// Sin lo que algunas terminales meten al pegar (ESC[200~ … ESC[201~), ni espacios ni invisibles.
 pub fn limpiar_clave(clave: &str) -> String {
     let re = Regex::new(r"\x1b?\[20[01]~").unwrap();
-    re.replace_all(clave, "").chars().filter(|c| !c.is_control() && !c.is_whitespace()).collect()
+    re.replace_all(clave, "")
+        .chars()
+        .filter(|c| !c.is_control() && !c.is_whitespace())
+        .collect()
 }
 
 /// Explica un error HTTP en español.
@@ -113,19 +137,37 @@ pub fn explicar(p: &Proveedor, codigo: u16, cuerpo: &str) -> ErrorIA {
     let n = &p.nombre;
     let clave_mala = Regex::new(r"(?i)api[ _-]?key").unwrap();
     if codigo == 401 || codigo == 403 || (codigo == 400 && clave_mala.is_match(cuerpo)) {
-        return ErrorIA::nuevo("clave", format!("{n} no aceptó tu clave. Ponla otra vez en una terminal con: vortex-miku ia clave"));
+        return ErrorIA::nuevo(
+            "clave",
+            format!("{n} no aceptó tu clave. Ponla otra vez en una terminal con: vortex-miku ia clave"),
+        );
     }
     if codigo == 404 && p.id == "local" {
-        return ErrorIA::nuevo("modelo", format!("Para pensar sin internet necesito bajar mi IA local una sola vez ({TAMANO_LOCAL})."));
+        return ErrorIA::nuevo(
+            "modelo",
+            format!("Para pensar sin internet necesito bajar mi IA local una sola vez ({TAMANO_LOCAL})."),
+        );
     }
     if codigo == 404 {
-        return ErrorIA::nuevo("otro", format!("{n} no tiene el modelo «{}». Cámbialo con: vortex-miku ia {} MODELO", p.modelo, p.id));
+        return ErrorIA::nuevo(
+            "otro",
+            format!(
+                "{n} no tiene el modelo «{}». Cámbialo con: vortex-miku ia {} MODELO",
+                p.modelo, p.id
+            ),
+        );
     }
     if codigo == 429 {
-        return ErrorIA::nuevo("cuota", format!("Ya usé todo el límite de {n} por ahora. Prueba otra vez en un rato."));
+        return ErrorIA::nuevo(
+            "cuota",
+            format!("Ya usé todo el límite de {n} por ahora. Prueba otra vez en un rato."),
+        );
     }
     if codigo >= 500 {
-        return ErrorIA::nuevo("saturado", format!("Hay demasiada gente usando {n} en este momento. Prueba otra vez en un rato."));
+        return ErrorIA::nuevo(
+            "saturado",
+            format!("Hay demasiada gente usando {n} en este momento. Prueba otra vez en un rato."),
+        );
     }
     let corto: String = cuerpo.chars().take(160).collect();
     ErrorIA::nuevo("otro", format!("{n} contestó con un error ({codigo}): {corto}"))
@@ -169,7 +211,11 @@ impl Ia {
     // ---- La clave --------------------------------------------------------------------------------
 
     fn llavero_args(proveedor: &str) -> Vec<String> {
-        ["service", "vortex-miku", "cuenta"].iter().map(|s| s.to_string()).chain([format!("ia-{proveedor}")]).collect()
+        ["service", "vortex-miku", "cuenta"]
+            .iter()
+            .map(|s| s.to_string())
+            .chain([format!("ia-{proveedor}")])
+            .collect()
     }
 
     pub fn archivo_clave(&self, proveedor: &str) -> std::path::PathBuf {
@@ -182,7 +228,8 @@ impl Ia {
         {
             return limpiar_clave(&c);
         }
-        if self.llavero && sistema::cual("secret-tool").is_some()
+        if self.llavero
+            && sistema::cual("secret-tool").is_some()
             && let Ok(o) = Command::new("secret-tool")
                 .arg("lookup")
                 .args(Self::llavero_args(proveedor))
@@ -196,7 +243,9 @@ impl Ia {
                 return c;
             }
         }
-        std::fs::read_to_string(self.archivo_clave(proveedor)).map(|t| limpiar_clave(&t)).unwrap_or_default()
+        std::fs::read_to_string(self.archivo_clave(proveedor))
+            .map(|t| limpiar_clave(&t))
+            .unwrap_or_default()
     }
 
     /// Guarda la clave y dice dónde quedó («llavero» o la ruta del archivo).
@@ -225,7 +274,12 @@ impl Ia {
         std::fs::create_dir_all(&self.rutas.config_dir)?;
         {
             use std::os::unix::fs::OpenOptionsExt;
-            let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&archivo)?;
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&archivo)?;
             writeln!(f, "{clave}")?;
         }
         sistema::permisos(&archivo, 0o600)?;
@@ -287,7 +341,12 @@ impl Ia {
         if unidad {
             self.propio.lock().unwrap().unidad = true;
         } else {
-            let host = self.ollama.split("://").last().unwrap_or("127.0.0.1:11434").to_string();
+            let host = self
+                .ollama
+                .split("://")
+                .last()
+                .unwrap_or("127.0.0.1:11434")
+                .to_string();
             match Command::new("ollama")
                 .arg("serve")
                 .env("OLLAMA_HOST", host)
@@ -316,7 +375,8 @@ impl Ia {
     }
 
     pub fn modelo_local_listo(&self, modelo: &str) -> bool {
-        self.ollama_json("/api/show", Some(&json!({"model": modelo})), 5).is_ok()
+        self.ollama_json("/api/show", Some(&json!({"model": modelo})), 5)
+            .is_ok()
     }
 
     /// Sube el modelo a la GPU aparte (la primera respuesta tardaba ~20 s en cargarlo). La ventana lo llama
@@ -332,7 +392,11 @@ impl Ia {
         let (yo, modelo) = (self.clone(), modelo.to_string());
         std::thread::spawn(move || {
             if yo.arrancar_ollama(Duration::from_secs(20)) && yo.modelo_local_listo(&modelo) {
-                let _ = yo.ollama_json("/api/generate", Some(&json!({"model": modelo, "keep_alive": "10m"})), 300);
+                let _ = yo.ollama_json(
+                    "/api/generate",
+                    Some(&json!({"model": modelo, "keep_alive": "10m"})),
+                    300,
+                );
             }
         });
     }
@@ -340,7 +404,11 @@ impl Ia {
     /// Saca el modelo de la GPU ya (al cerrar Miku: si no, sigue ahí 10 min y la voz natural no cabe).
     pub fn soltar(&self, modelo: &str) {
         *self.precargado.lock().unwrap() = None;
-        let _ = self.ollama_json("/api/generate", Some(&json!({"model": modelo, "keep_alive": 0})), 3);
+        let _ = self.ollama_json(
+            "/api/generate",
+            Some(&json!({"model": modelo, "keep_alive": 0})),
+            3,
+        );
     }
 
     /// Al cerrar Miku: para el Ollama que arrancó ella (sin Miku abierta no queda nada corriendo).
@@ -363,21 +431,38 @@ impl Ia {
     /// Revisa que la IA local pueda contestar ya. Si no, `ErrorIA` con qué hacer («modelo»: falta bajarlo).
     pub fn preparar_local(&self, modelo: &str) -> Result<(), ErrorIA> {
         if !self.ollama_instalado() {
-            return Err(ErrorIA::nuevo("otro", "Me falta Ollama para pensar en tu PC. Actualiza Vortexine's en una terminal con: vortex actualizar"));
+            return Err(ErrorIA::nuevo(
+                "otro",
+                "Me falta Ollama para pensar en tu PC. Actualiza Vortexine's en una terminal con: vortex actualizar",
+            ));
         }
         if !self.arrancar_ollama(Duration::from_secs(20)) {
-            return Err(ErrorIA::nuevo("otro", "No pude arrancar la IA local (Ollama). Mira qué pasa con: systemctl --user status vortex-ollama"));
+            return Err(ErrorIA::nuevo(
+                "otro",
+                "No pude arrancar la IA local (Ollama). Mira qué pasa con: systemctl --user status vortex-ollama",
+            ));
         }
         if !self.modelo_local_listo(modelo) {
-            return Err(ErrorIA::nuevo("modelo", format!("Para pensar sin internet necesito bajar mi IA local una sola vez ({TAMANO_LOCAL}).")));
+            return Err(ErrorIA::nuevo(
+                "modelo",
+                format!("Para pensar sin internet necesito bajar mi IA local una sola vez ({TAMANO_LOCAL})."),
+            ));
         }
         Ok(())
     }
 
     /// Baja el modelo con Ollama. `progreso(detalle, fracción)`; `cancelar` corta la descarga.
-    pub fn bajar_modelo(&self, modelo: &str, progreso: &dyn Fn(&str, f64), cancelar: &AtomicBool) -> Result<(), ErrorIA> {
+    pub fn bajar_modelo(
+        &self,
+        modelo: &str,
+        progreso: &dyn Fn(&str, f64),
+        cancelar: &AtomicBool,
+    ) -> Result<(), ErrorIA> {
         if !self.arrancar_ollama(Duration::from_secs(20)) {
-            return Err(ErrorIA::nuevo("otro", "No pude arrancar la IA local (Ollama) para bajar el modelo."));
+            return Err(ErrorIA::nuevo(
+                "otro",
+                "No pude arrancar la IA local (Ollama) para bajar el modelo.",
+            ));
         }
         let cuerpo = json!({"model": modelo, "stream": true}).to_string().into_bytes();
         let mut r = http::pedir(
@@ -387,42 +472,69 @@ impl Ia {
             Some(cuerpo),
             60,
         )
-        .map_err(|e| ErrorIA::nuevo("internet", format!("Se cortó la descarga de la IA local ({e}). Mira tu internet y vuelve a intentarlo.")))?;
+        .map_err(|e| {
+            ErrorIA::nuevo(
+                "internet",
+                format!("Se cortó la descarga de la IA local ({e}). Mira tu internet y vuelve a intentarlo."),
+            )
+        })?;
         if r.estado >= 400 {
-            return Err(ErrorIA::nuevo("otro", format!("Ollama no quiso bajar «{modelo}» (error {}).", r.estado)));
+            return Err(ErrorIA::nuevo(
+                "otro",
+                format!("Ollama no quiso bajar «{modelo}» (error {}).", r.estado),
+            ));
         }
         let mut capas: HashMap<String, (u64, u64)> = HashMap::new();
         while let Some(l) = r.linea() {
             if cancelar.load(Ordering::SeqCst) {
                 return Err(ErrorIA::nuevo("cancelado", "Cancelé la descarga de la IA local."));
             }
-            let Ok(ev) = serde_json::from_slice::<Value>(&l) else { continue };
+            let Ok(ev) = serde_json::from_slice::<Value>(&l) else {
+                continue;
+            };
             if let Some(e) = ev.get("error").and_then(Value::as_str).filter(|e| !e.is_empty()) {
                 return Err(ErrorIA::nuevo("otro", format!("No pude bajar la IA local: {e}")));
             }
-            if let (Some(d), Some(t)) = (ev.get("digest").and_then(Value::as_str), ev.get("total").and_then(Value::as_u64))
-                && t > 0
+            if let (Some(d), Some(t)) = (
+                ev.get("digest").and_then(Value::as_str),
+                ev.get("total").and_then(Value::as_u64),
+            ) && t > 0
             {
-                capas.insert(d.into(), (ev.get("completed").and_then(Value::as_u64).unwrap_or(0), t));
+                capas.insert(
+                    d.into(),
+                    (ev.get("completed").and_then(Value::as_u64).unwrap_or(0), t),
+                );
             }
             let hecho: u64 = capas.values().map(|c| c.0).sum();
             let total: u64 = capas.values().map(|c| c.1).sum();
             if total > 0 {
-                progreso(&format!("{:.1} de {:.1} GB", hecho as f64 / 1e9, total as f64 / 1e9), (hecho as f64 / total as f64).min(1.0));
+                progreso(
+                    &format!("{:.1} de {:.1} GB", hecho as f64 / 1e9, total as f64 / 1e9),
+                    (hecho as f64 / total as f64).min(1.0),
+                );
             }
             if ev.get("status").and_then(Value::as_str) == Some("success") {
                 progreso("Lista", 1.0);
                 return Ok(());
             }
         }
-        Err(ErrorIA::nuevo("otro", "La descarga de la IA local terminó a medias. Vuelve a intentarlo."))
+        Err(ErrorIA::nuevo(
+            "otro",
+            "La descarga de la IA local terminó a medias. Vuelve a intentarlo.",
+        ))
     }
 
     // ---- La API compatible con OpenAI ------------------------------------------------------------
 
     /// POST /chat/completions. Devuelve la respuesta abierta (quien llama la lee). `al_abrir` recibe el
     /// cortador en cuanto existe, para cancelar desde otro hilo.
-    pub fn pedir(&self, p: &Proveedor, cuerpo: &Value, inactivo: u64, al_abrir: Option<&dyn Fn(Cortador)>) -> Result<Respuesta, ErrorIA> {
+    pub fn pedir(
+        &self,
+        p: &Proveedor,
+        cuerpo: &Value,
+        inactivo: u64,
+        al_abrir: Option<&dyn Fn(Cortador)>,
+    ) -> Result<Respuesta, ErrorIA> {
         let mut cab: Vec<(&str, String)> = vec![("Content-Type", "application/json".into())];
         if p.clave != Clave::No {
             let c = self.leer_clave(&p.id);
@@ -437,9 +549,15 @@ impl Ia {
         }
         let falla_red = |e: String| {
             if p.id == "local" {
-                ErrorIA::nuevo("otro", "La IA local no contesta. Mira que Ollama esté corriendo: systemctl --user status vortex-ollama")
+                ErrorIA::nuevo(
+                    "otro",
+                    "La IA local no contesta. Mira que Ollama esté corriendo: systemctl --user status vortex-ollama",
+                )
             } else {
-                ErrorIA::nuevo("internet", format!("No pude llegar a {} ({e}). Mira tu internet.", p.nombre))
+                ErrorIA::nuevo(
+                    "internet",
+                    format!("No pude llegar a {} ({e}). Mira tu internet.", p.nombre),
+                )
             }
         };
         let mut r = http::pedir(
@@ -464,18 +582,28 @@ impl Ia {
     pub fn completar(&self, p: &Proveedor, mensajes: &Value, timeout: u64) -> Result<String, ErrorIA> {
         let mut r = self.pedir(p, &json!({"messages": mensajes, "stream": false}), timeout, None)?;
         let datos: Value = serde_json::from_slice(&r.leer_todo()).unwrap_or(json!({}));
-        Ok(datos["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string())
+        Ok(datos["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .to_string())
     }
 
     /// («ok», "") si se puede hablar con este proveedor; si no, (clave, mensaje en español).
     pub fn comprobar(&self, p: &Proveedor) -> (String, String) {
         if p.url.is_empty() || p.modelo.is_empty() {
-            return ("otro".into(), "Me falta la dirección o el modelo de tu IA. Ponlos con: vortex-miku ia otra URL MODELO".into());
+            return (
+                "otro".into(),
+                "Me falta la dirección o el modelo de tu IA. Ponlos con: vortex-miku ia otra URL MODELO"
+                    .into(),
+            );
         }
         if p.clave == Clave::Si && self.leer_clave(&p.id).is_empty() {
             return (
                 "clave".into(),
-                format!("Para hablar conmigo con {} necesito tu clave ({}). Ponla en una terminal con: vortex-miku ia clave", p.nombre, p.donde),
+                format!(
+                    "Para hablar conmigo con {} necesito tu clave ({}). Ponla en una terminal con: vortex-miku ia clave",
+                    p.nombre, p.donde
+                ),
             );
         }
         if p.id == "local"

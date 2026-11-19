@@ -26,7 +26,8 @@ pub const MENSAJES_MAXIMOS: usize = 40;
 pub const TIEMPO_LECTURA_LOCAL: u64 = 120;
 pub const TIEMPO_LECTURA: u64 = 60;
 pub const TIEMPO_HERRAMIENTA: u64 = 300;
-pub const SIN_IMAGENES: &str = "(No puedo ver imágenes con este modelo: la imagen no me llegó. Dilo así y no inventes lo que hay.)";
+pub const SIN_IMAGENES: &str =
+    "(No puedo ver imágenes con este modelo: la imagen no me llegó. Dilo así y no inventes lo que hay.)";
 
 /// (nombre, comando, entorno) de un servidor MCP.
 pub type DefServidor = (String, Vec<String>, Vec<(String, String)>);
@@ -37,13 +38,22 @@ pub fn sin_imagenes(mensajes: &[Value]) -> Vec<Value> {
         .iter()
         .map(|m| {
             if let Some(partes) = m["content"].as_array() {
-                let mut textos: Vec<String> =
-                    partes.iter().filter(|c| c["type"] == "text").map(|c| c["text"].as_str().unwrap_or("").to_string()).collect();
+                let mut textos: Vec<String> = partes
+                    .iter()
+                    .filter(|c| c["type"] == "text")
+                    .map(|c| c["text"].as_str().unwrap_or("").to_string())
+                    .collect();
                 if partes.iter().any(|c| c["type"] == "image_url") {
                     textos.push("[imagen]".into());
                 }
                 let mut m = m.clone();
-                m["content"] = json!(textos.into_iter().filter(|t| !t.is_empty()).collect::<Vec<_>>().join(" "));
+                m["content"] = json!(
+                    textos
+                        .into_iter()
+                        .filter(|t| !t.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
                 m
             } else {
                 m.clone()
@@ -103,7 +113,14 @@ pub struct CerebroAbierto {
 }
 
 impl CerebroAbierto {
-    pub fn nuevo(rutas: &Rutas, ia: Arc<Ia>, avatar: bool, al_evento: AlEvento, cfg: &Config, servidores: Option<Vec<DefServidor>>) -> Self {
+    pub fn nuevo(
+        rutas: &Rutas,
+        ia: Arc<Ia>,
+        avatar: bool,
+        al_evento: AlEvento,
+        cfg: &Config,
+        servidores: Option<Vec<DefServidor>>,
+    ) -> Self {
         let mcp = encontrar_mcp();
         let mut persona = leer_persona(rutas, avatar);
         if mcp.is_none() && servidores.is_none() {
@@ -157,7 +174,10 @@ impl CerebroAbierto {
             }
         }
         let servidores = self.servidores.lock().unwrap().clone();
-        let permitidas: Vec<&str> = HERRAMIENTAS_PERMITIDAS.iter().map(|h| h.trim_start_matches("mcp__vortex__")).collect();
+        let permitidas: Vec<&str> = HERRAMIENTAS_PERMITIDAS
+            .iter()
+            .map(|h| h.trim_start_matches("mcp__vortex__"))
+            .collect();
         let (mut lista, mut rutas) = (vec![], BTreeMap::new());
         for (i, s) in servidores.iter().enumerate() {
             for h in &s.herramientas {
@@ -166,7 +186,10 @@ impl CerebroAbierto {
                     continue; // portapapeles e historial de la terminal: nunca
                 }
                 let nombre = format!("{}__{nombre_h}", s.nombre);
-                rutas.insert(nombre.clone(), (i, nombre_h.to_string(), format!("mcp__{}__{nombre_h}", s.nombre)));
+                rutas.insert(
+                    nombre.clone(),
+                    (i, nombre_h.to_string(), format!("mcp__{}__{nombre_h}", s.nombre)),
+                );
                 lista.push(json!({"type": "function", "function": {
                     "name": nombre,
                     "description": h["description"].as_str().unwrap_or(""),
@@ -177,7 +200,13 @@ impl CerebroAbierto {
     }
 
     /// Corre una herramienta. (texto para la IA, [(mime, base64), …] de imágenes).
-    fn correr(&self, servidores: &[Arc<ServidorMcp>], h: &Herramientas, nombre: &str, argumentos: &str) -> (String, Vec<(String, String)>) {
+    fn correr(
+        &self,
+        servidores: &[Arc<ServidorMcp>],
+        h: &Herramientas,
+        nombre: &str,
+        argumentos: &str,
+    ) -> (String, Vec<(String, String)>) {
         let Some((i, herramienta, _)) = h.rutas.get(nombre) else {
             return (format!("No existe la herramienta {nombre}."), vec![]);
         };
@@ -190,7 +219,11 @@ impl CerebroAbierto {
             }
         };
         let args = if args.is_object() { args } else { json!({}) };
-        let res = match servidores[*i].pedir("tools/call", json!({"name": herramienta, "arguments": args}), Duration::from_secs(TIEMPO_HERRAMIENTA)) {
+        let res = match servidores[*i].pedir(
+            "tools/call",
+            json!({"name": herramienta, "arguments": args}),
+            Duration::from_secs(TIEMPO_HERRAMIENTA),
+        ) {
             Ok(r) => r,
             Err(e) => return (format!("La herramienta falló: {e}"), vec![]),
         };
@@ -199,14 +232,21 @@ impl CerebroAbierto {
             match c["type"].as_str() {
                 Some("text") => textos.push(c["text"].as_str().unwrap_or("").to_string()),
                 Some("image") if c["data"].as_str().is_some_and(|d| !d.is_empty()) => {
-                    imagenes.push((c["mimeType"].as_str().unwrap_or("image/png").to_string(), c["data"].as_str().unwrap().to_string()));
+                    imagenes.push((
+                        c["mimeType"].as_str().unwrap_or("image/png").to_string(),
+                        c["data"].as_str().unwrap().to_string(),
+                    ));
                 }
                 _ => {}
             }
         }
         let t: Vec<String> = textos.into_iter().filter(|t| !t.is_empty()).collect();
         let mut texto = if t.is_empty() {
-            if imagenes.is_empty() { "Listo.".to_string() } else { "Listo: te mando la imagen.".to_string() }
+            if imagenes.is_empty() {
+                "Listo.".to_string()
+            } else {
+                "Listo: te mando la imagen.".to_string()
+            }
         } else {
             t.join("\n")
         };
@@ -217,14 +257,26 @@ impl CerebroAbierto {
     }
 
     /// Una respuesta de la IA en flujo: avisa del texto y devuelve (texto, llamadas a herramientas).
-    fn una_vuelta(&self, mensajes: &[Value], herramientas: &[Value], avisar: &dyn Fn(Evento), token: &AtomicBool) -> Result<(String, Vec<Value>), ErrorIA> {
+    fn una_vuelta(
+        &self,
+        mensajes: &[Value],
+        herramientas: &[Value],
+        avisar: &dyn Fn(Evento),
+        token: &AtomicBool,
+    ) -> Result<(String, Vec<Value>), ErrorIA> {
         let mut cuerpo = json!({"messages": mensajes, "stream": true});
         if !herramientas.is_empty() {
             cuerpo["tools"] = json!(herramientas);
         }
-        let inactivo = if self.proveedor.id == "local" { TIEMPO_LECTURA_LOCAL } else { TIEMPO_LECTURA };
+        let inactivo = if self.proveedor.id == "local" {
+            TIEMPO_LECTURA_LOCAL
+        } else {
+            TIEMPO_LECTURA
+        };
         let guardar = |c: Cortador| *self.cortador.lock().unwrap() = Some(c);
-        let mut r = self.ia.pedir(&self.proveedor, &cuerpo, inactivo, Some(&guardar))?;
+        let mut r = self
+            .ia
+            .pedir(&self.proveedor, &cuerpo, inactivo, Some(&guardar))?;
         let (mut contenido, mut llamadas): (String, BTreeMap<i64, Value>) = (String::new(), BTreeMap::new());
         let mut cortada = false;
         while let Some(l) = r.linea() {
@@ -233,16 +285,26 @@ impl CerebroAbierto {
                 break;
             }
             let l = String::from_utf8_lossy(&l).trim().to_string();
-            let Some(dato) = l.strip_prefix("data:") else { continue };
+            let Some(dato) = l.strip_prefix("data:") else {
+                continue;
+            };
             let dato = dato.trim();
             if dato == "[DONE]" {
                 break;
             }
-            let Ok(ev) = serde_json::from_str::<Value>(dato) else { continue };
+            let Ok(ev) = serde_json::from_str::<Value>(dato) else {
+                continue;
+            };
             if !ev["error"].is_null() && ev["error"] != json!(false) {
-                let m = ev["error"]["message"].as_str().map(String::from).unwrap_or_else(|| ev["error"].to_string());
+                let m = ev["error"]["message"]
+                    .as_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| ev["error"].to_string());
                 *self.cortador.lock().unwrap() = None;
-                return Err(ErrorIA::nuevo("otro", format!("{} contestó con un error: {m}", self.proveedor.nombre)));
+                return Err(ErrorIA::nuevo(
+                    "otro",
+                    format!("{} contestó con un error: {m}", self.proveedor.nombre),
+                ));
             }
             let delta = &ev["choices"][0]["delta"];
             if let Some(c) = delta["content"].as_str().filter(|c| !c.is_empty()) {
@@ -251,12 +313,18 @@ impl CerebroAbierto {
             }
             for t in delta["tool_calls"].as_array().cloned().unwrap_or_default() {
                 let i = t["index"].as_i64().unwrap_or(llamadas.len() as i64);
-                let ll = llamadas.entry(i).or_insert_with(|| json!({"id": "", "type": "function", "function": {"name": "", "arguments": ""}}));
+                let ll = llamadas.entry(i).or_insert_with(
+                    || json!({"id": "", "type": "function", "function": {"name": "", "arguments": ""}}),
+                );
                 if let Some(id) = t["id"].as_str().filter(|s| !s.is_empty()) {
                     ll["id"] = json!(id);
                 }
                 let f = &t["function"];
-                let nombre = format!("{}{}", ll["function"]["name"].as_str().unwrap_or(""), f["name"].as_str().unwrap_or(""));
+                let nombre = format!(
+                    "{}{}",
+                    ll["function"]["name"].as_str().unwrap_or(""),
+                    f["name"].as_str().unwrap_or("")
+                );
                 ll["function"]["name"] = json!(nombre);
                 let a = match &f["arguments"] {
                     Value::String(s) => s.clone(),
@@ -267,9 +335,17 @@ impl CerebroAbierto {
                 ll["function"]["arguments"] = json!(args);
             }
         }
-        if !cortada && !token.load(Ordering::SeqCst) && r.fallo().is_some() && contenido.is_empty() && llamadas.is_empty() {
+        if !cortada
+            && !token.load(Ordering::SeqCst)
+            && r.fallo().is_some()
+            && contenido.is_empty()
+            && llamadas.is_empty()
+        {
             *self.cortador.lock().unwrap() = None;
-            return Err(ErrorIA::nuevo("internet", format!("Se cortó la respuesta de {}.", self.proveedor.nombre)));
+            return Err(ErrorIA::nuevo(
+                "internet",
+                format!("Se cortó la respuesta de {}.", self.proveedor.nombre),
+            ));
         }
         *self.cortador.lock().unwrap() = None;
         if !contenido.is_empty() {
@@ -324,13 +400,24 @@ impl CerebroT for CerebroAbierto {
             return;
         }
         // Sin herramientas también se puede platicar.
-        let (servidores, herr) = self.herramientas().unwrap_or((vec![], Herramientas { lista: vec![], rutas: BTreeMap::new() }));
+        let (servidores, herr) = self.herramientas().unwrap_or((
+            vec![],
+            Herramientas {
+                lista: vec![],
+                rutas: BTreeMap::new(),
+            },
+        ));
         let mut nuevos: Vec<Value> = vec![json!({"role": "user", "content": texto})];
         avisar(Evento::Inicio);
         let (mut texto_total, mut ve_imagenes) = (String::new(), true);
         let mut terminado = false;
         for _ in 0..VUELTAS {
-            let sistema = format!("{}{}{}", self.persona.lock().unwrap(), self.sentimientos.lock().unwrap(), hoy());
+            let sistema = format!(
+                "{}{}{}",
+                self.persona.lock().unwrap(),
+                self.sentimientos.lock().unwrap(),
+                hoy()
+            );
             let mut mensajes = vec![json!({"role": "system", "content": sistema})];
             mensajes.extend(self.historial.lock().unwrap().iter().cloned());
             mensajes.extend(nuevos.iter().cloned());
@@ -348,7 +435,10 @@ impl CerebroT for CerebroAbierto {
                         }
                         continue;
                     }
-                    avisar(Evento::Error { clave: e.clave, mensaje: e.mensaje });
+                    avisar(Evento::Error {
+                        clave: e.clave,
+                        mensaje: e.mensaje,
+                    });
                     return;
                 }
             };
@@ -365,9 +455,16 @@ impl CerebroT for CerebroAbierto {
             let mut imagenes = vec![];
             for ll in &llamadas {
                 let nombre = ll["function"]["name"].as_str().unwrap_or("");
-                let completo = herr.rutas.get(nombre).map(|r| r.2.clone()).unwrap_or_else(|| nombre.to_string());
+                let completo = herr
+                    .rutas
+                    .get(nombre)
+                    .map(|r| r.2.clone())
+                    .unwrap_or_else(|| nombre.to_string());
                 avisar(Evento::Herramienta(completo));
-                let args = ll["function"]["arguments"].as_str().filter(|a| !a.is_empty()).unwrap_or("{}");
+                let args = ll["function"]["arguments"]
+                    .as_str()
+                    .filter(|a| !a.is_empty())
+                    .unwrap_or("{}");
                 let (resultado, imgs) = self.correr(&servidores, &herr, nombre, args);
                 if token.load(Ordering::SeqCst) {
                     return;
@@ -376,7 +473,8 @@ impl CerebroT for CerebroAbierto {
                 imagenes.extend(imgs);
             }
             if !imagenes.is_empty() {
-                let mut partes = vec![json!({"type": "text", "text": "La imagen que pediste (captura o foto):"})];
+                let mut partes =
+                    vec![json!({"type": "text", "text": "La imagen que pediste (captura o foto):"})];
                 partes.extend(imagenes.iter().map(|(mime, datos)| json!({"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{datos}")}})));
                 nuevos.push(json!({"role": "user", "content": if ve_imagenes { json!(partes) } else { json!(SIN_IMAGENES) }}));
             }

@@ -57,5 +57,38 @@ pub fn cual(programa: &str) -> Option<PathBuf> {
 }
 
 pub fn es_ejecutable(p: &Path) -> bool {
-    p.is_file() && std::fs::metadata(p).map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+    p.is_file()
+        && std::fs::metadata(p)
+            .map(|m| m.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+}
+
+/// Que el proceso hijo viva en su propia sesión (no se ata a Miku ni a su terminal): para lo que sigue
+/// corriendo después (apps, instalaciones, la grabación).
+pub fn nueva_sesion(cmd: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+    // SAFETY: `setsid` es async-signal-safe y solo se llama entre el fork y el exec.
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
+}
+
+/// Lanza algo aparte (sesión propia, sin entrada ni salida).
+pub fn lanzar_aparte(programa: &str, args: &[String]) -> std::io::Result<()> {
+    use std::process::{Command, Stdio};
+    let mut c = Command::new(programa);
+    c.args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    nueva_sesion(&mut c);
+    c.spawn().map(|_| ())
+}
+
+/// ¿Está vivo el proceso con ese pid?
+pub fn existe(pid: u32) -> bool {
+    Path::new(&format!("/proc/{pid}")).exists()
 }

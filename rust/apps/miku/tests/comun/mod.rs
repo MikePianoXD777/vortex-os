@@ -18,7 +18,10 @@ impl Peticion {
         serde_json::from_slice(&self.cuerpo).unwrap_or_default()
     }
     pub fn cabecera(&self, n: &str) -> Option<String> {
-        self.cabeceras.iter().find(|(k, _)| k.eq_ignore_ascii_case(n)).map(|(_, v)| v.clone())
+        self.cabeceras
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(n))
+            .map(|(_, v)| v.clone())
     }
 }
 
@@ -30,14 +33,21 @@ pub struct Servidor {
     pub pedidos: Arc<Mutex<Vec<Peticion>>>,
 }
 
-fn atender(mut s: TcpStream, f: &(dyn Fn(&Peticion) -> Contesta + Send + Sync), pedidos: &Mutex<Vec<Peticion>>) {
+fn atender(
+    mut s: TcpStream,
+    f: &(dyn Fn(&Peticion) -> Contesta + Send + Sync),
+    pedidos: &Mutex<Vec<Peticion>>,
+) {
     let mut lector = BufReader::new(s.try_clone().unwrap());
     let mut linea = String::new();
     if lector.read_line(&mut linea).unwrap_or(0) == 0 {
         return;
     }
     let mut p = linea.split_whitespace();
-    let (metodo, ruta) = (p.next().unwrap_or("").to_string(), p.next().unwrap_or("").to_string());
+    let (metodo, ruta) = (
+        p.next().unwrap_or("").to_string(),
+        p.next().unwrap_or("").to_string(),
+    );
     let (mut cabeceras, mut largo) = (vec![], 0usize);
     loop {
         let mut l = String::new();
@@ -53,10 +63,18 @@ fn atender(mut s: TcpStream, f: &(dyn Fn(&Peticion) -> Contesta + Send + Sync), 
     }
     let mut cuerpo = vec![0u8; largo];
     let _ = lector.read_exact(&mut cuerpo);
-    let pet = Peticion { metodo, ruta, cabeceras, cuerpo };
+    let pet = Peticion {
+        metodo,
+        ruta,
+        cabeceras,
+        cuerpo,
+    };
     let (codigo, tipo, datos) = f(&pet);
     pedidos.lock().unwrap().push(pet);
-    let _ = write!(s, "HTTP/1.1 {codigo} X\r\nContent-Type: {tipo}\r\nConnection: close\r\n\r\n");
+    let _ = write!(
+        s,
+        "HTTP/1.1 {codigo} X\r\nContent-Type: {tipo}\r\nConnection: close\r\n\r\n"
+    );
     let _ = s.write_all(&datos);
 }
 

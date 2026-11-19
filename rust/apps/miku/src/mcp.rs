@@ -38,7 +38,9 @@ impl ServidorMcp {
             let esperas = esperas.clone();
             std::thread::spawn(move || {
                 for l in BufReader::new(salida).lines().map_while(Result::ok) {
-                    let Ok(m) = serde_json::from_str::<Value>(&l) else { continue };
+                    let Ok(m) = serde_json::from_str::<Value>(&l) else {
+                        continue;
+                    };
                     if let Some(id) = m["id"].as_u64()
                         && let Some(tx) = esperas.lock().unwrap().remove(&id)
                     {
@@ -76,7 +78,9 @@ impl ServidorMcp {
 
     fn mandar(&self, msg: &Value) -> Result<(), String> {
         let mut e = self.entrada.lock().unwrap();
-        writeln!(e, "{msg}").and_then(|_| e.flush()).map_err(|e| e.to_string())
+        writeln!(e, "{msg}")
+            .and_then(|_| e.flush())
+            .map_err(|e| e.to_string())
     }
 
     pub fn pedir(&self, metodo: &str, params: Value, timeout: Duration) -> Result<Value, String> {
@@ -87,7 +91,10 @@ impl ServidorMcp {
         };
         let (tx, rx) = channel();
         self.esperas.lock().unwrap().insert(id, tx);
-        if self.mandar(&json!({"jsonrpc": "2.0", "id": id, "method": metodo, "params": params})).is_err() {
+        if self
+            .mandar(&json!({"jsonrpc": "2.0", "id": id, "method": metodo, "params": params}))
+            .is_err()
+        {
             self.esperas.lock().unwrap().remove(&id);
             return Err(format!("{} no contestó", self.nombre));
         }
@@ -96,7 +103,11 @@ impl ServidorMcp {
             return Err(format!("{} no contestó", self.nombre));
         };
         if let Some(e) = msg.get("error").filter(|e| !e.is_null()) {
-            return Err(e["message"].as_str().filter(|m| !m.is_empty()).unwrap_or("error").to_string());
+            return Err(e["message"]
+                .as_str()
+                .filter(|m| !m.is_empty())
+                .unwrap_or("error")
+                .to_string());
         }
         Ok(msg.get("result").cloned().unwrap_or(json!({})))
     }

@@ -62,7 +62,11 @@ fn montar(modo: &str) -> (tempfile::TempDir, Cerebro, Recolector) {
     let d = tempfile::tempdir().unwrap();
     let rutas = Rutas::en(d.path());
     std::fs::create_dir_all(&rutas.personas).unwrap();
-    std::fs::write(rutas.personas.join("asistente.txt"), "Eres la asistente de prueba.").unwrap();
+    std::fs::write(
+        rutas.personas.join("asistente.txt"),
+        "Eres la asistente de prueba.",
+    )
+    .unwrap();
     std::fs::write(d.path().join("modo"), modo).unwrap();
     let r = Recolector::default();
     let c = Cerebro::nuevo(&rutas, false, r.al_evento());
@@ -74,14 +78,31 @@ fn montar(modo: &str) -> (tempfile::TempDir, Cerebro, Recolector) {
 #[test]
 fn el_comando_va_cerrado_por_capas() {
     let aux = Path::new("/usr/lib/vortex/miku-aux");
-    let a = construir_comando("persona", "-hola", None, Some(Path::new("/usr/bin/vortex-mcp")), None, true, aux);
-    let pos = |x: &str| a.iter().position(|s| s == x).unwrap_or_else(|| panic!("falta {x}: {a:?}"));
+    let a = construir_comando(
+        "persona",
+        "-hola",
+        None,
+        Some(Path::new("/usr/bin/vortex-mcp")),
+        None,
+        true,
+        aux,
+    );
+    let pos = |x: &str| {
+        a.iter()
+            .position(|s| s == x)
+            .unwrap_or_else(|| panic!("falta {x}: {a:?}"))
+    };
     assert_eq!(a[pos("--tools") + 1], "", "sin herramientas integradas");
     assert!(a.contains(&"--strict-mcp-config".to_string()) && a.contains(&"--restricted".to_string()));
     assert_eq!(a[pos("--permission-mode") + 1], "dontAsk");
-    let permitidas: Vec<&String> = a[pos("--allowedTools") + 1..pos("--disallowedTools")].iter().collect();
+    let permitidas: Vec<&String> = a[pos("--allowedTools") + 1..pos("--disallowedTools")]
+        .iter()
+        .collect();
     assert_eq!(permitidas.len(), 4, "solo las 4 de vista: {permitidas:?}");
-    assert!(!a.contains(&"--settings".to_string()), "internet sin la ventana de permisos no vale");
+    assert!(
+        !a.contains(&"--settings".to_string()),
+        "internet sin la ventana de permisos no vale"
+    );
     assert_eq!(&a[a.len() - 2..], ["--", "-hola"], "el texto va tras «--»");
     assert!(a[pos("--disallowedTools") + 1..].contains(&"Bash".to_string()));
     // Con la ventana de permisos: acciones y, con internet, el hook y WebSearch/WebFetch permitidas.
@@ -89,12 +110,23 @@ fn el_comando_va_cerrado_por_capas() {
     let pos = |x: &str| a.iter().position(|s| s == x).unwrap();
     assert_eq!(a[pos("--tools") + 1], "WebSearch,WebFetch");
     let ajustes: serde_json::Value = serde_json::from_str(&a[pos("--settings") + 1]).unwrap();
-    assert!(ajustes["hooks"]["PreToolUse"][0]["hooks"][0]["command"].as_str().unwrap().ends_with("miku-aux hook-web"));
+    assert!(
+        ajustes["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap()
+            .ends_with("miku-aux hook-web")
+    );
     let mcp: serde_json::Value = serde_json::from_str(&a[pos("--mcp-config") + 1]).unwrap();
-    assert_eq!(mcp["mcpServers"]["miku"]["env"]["VORTEX_MIKU_AUTORIZAR"], "/run/x.sock");
+    assert_eq!(
+        mcp["mcpServers"]["miku"]["env"]["VORTEX_MIKU_AUTORIZAR"],
+        "/run/x.sock"
+    );
     assert_eq!(mcp["mcpServers"]["miku"]["args"], json!(["mcp"]));
     assert!(a[pos("--allowedTools") + 1..pos("--disallowedTools")].contains(&"mcp__miku__clic".to_string()));
-    assert!(!a[pos("--disallowedTools") + 1..].contains(&"WebFetch".to_string()), "con internet no se prohíbe lo web");
+    assert!(
+        !a[pos("--disallowedTools") + 1..].contains(&"WebFetch".to_string()),
+        "con internet no se prohíbe lo web"
+    );
     assert_eq!(a[pos("--resume") + 1], "s1");
 }
 
@@ -102,11 +134,26 @@ fn el_comando_va_cerrado_por_capas() {
 fn frases_en_trozos() {
     let mut d = DivisorFrases::default();
     let mut todas = vec![];
-    for t in ["Hola, soy el Dr. Pérez. ", "¿Cómo estás? Bien", ".\nListo", ". Fin"] {
+    for t in [
+        "Hola, soy el Dr. Pérez. ",
+        "¿Cómo estás? Bien",
+        ".\nListo",
+        ". Fin",
+    ] {
         todas.extend(d.alimentar(t));
     }
     todas.push(d.vaciar());
-    assert_eq!(todas, ["Hola, soy el Dr. Pérez.", "¿Cómo estás?", "Bien.", "Listo.", "Fin"], "{todas:?}");
+    assert_eq!(
+        todas,
+        [
+            "Hola, soy el Dr. Pérez.",
+            "¿Cómo estás?",
+            "Bien.",
+            "Listo.",
+            "Fin"
+        ],
+        "{todas:?}"
+    );
 }
 
 #[test]
@@ -116,9 +163,15 @@ fn errores_en_espanol() {
     assert!(m.starts_with("Ya usé todo el límite de Claude por ahora."));
     assert_eq!(mensaje_error("Please run /login", None, None, "").0, "sesion");
     assert_eq!(mensaje_error("", Some(401), None, "").0, "sesion");
-    assert_eq!(mensaje_error("", None, None, "getaddrinfo ENOTFOUND api").0, "internet");
+    assert_eq!(
+        mensaje_error("", None, None, "getaddrinfo ENOTFOUND api").0,
+        "internet"
+    );
     assert_eq!(mensaje_error("", Some(529), None, "").0, "saturado");
-    assert_eq!(mensaje_error("unknown option '--restricted'", None, None, "").0, "version");
+    assert_eq!(
+        mensaje_error("unknown option '--restricted'", None, None, "").0,
+        "version"
+    );
     assert_eq!(mensaje_error("algo raro", None, None, "").0, "otro");
 }
 
@@ -126,7 +179,14 @@ fn errores_en_espanol() {
 fn una_pregunta_de_principio_a_fin() {
     let (d, c, r) = montar("ok");
     c.preguntar("hola", 7);
-    let ev: Vec<_> = r.eventos().into_iter().map(|(e, ev)| { assert_eq!(e, 7); ev }).collect();
+    let ev: Vec<_> = r
+        .eventos()
+        .into_iter()
+        .map(|(e, ev)| {
+            assert_eq!(e, 7);
+            ev
+        })
+        .collect();
     assert_eq!(ev[0], Evento::Inicio);
     assert_eq!(ev[1], Evento::Herramienta("mcp__vortex__ver_pantalla".into()));
     assert_eq!(r.texto(), "Hola. Qué tal.");
@@ -149,7 +209,11 @@ fn sin_sesion_y_sin_claude() {
     let (d, c, r) = montar("ok");
     std::fs::write(d.path().join("sin-sesion"), "").unwrap();
     c.preguntar("hola", 1);
-    assert!(matches!(&r.eventos()[0].1, Evento::Error { clave, .. } if clave == "sesion"), "{:?}", r.eventos());
+    assert!(
+        matches!(&r.eventos()[0].1, Evento::Error { clave, .. } if clave == "sesion"),
+        "{:?}",
+        r.eventos()
+    );
     // Sin el programa: pide activarlo.
     let d2 = tempfile::tempdir().unwrap();
     let r2 = Recolector::default();
@@ -158,7 +222,11 @@ fn sin_sesion_y_sin_claude() {
     c2.revisar_activado.store(false, Ordering::SeqCst);
     // `claude_fijo` apunta a algo inexistente: aun así «existe» para `comprobar`; el error sale al lanzar.
     c2.preguntar("hola", 1);
-    assert!(matches!(&r2.eventos().last().unwrap().1, Evento::Error { .. }), "{:?}", r2.eventos());
+    assert!(
+        matches!(&r2.eventos().last().unwrap().1, Evento::Error { .. }),
+        "{:?}",
+        r2.eventos()
+    );
 }
 
 #[test]
@@ -166,7 +234,10 @@ fn error_de_login_de_claude() {
     let (_d, c, r) = montar("login");
     c.preguntar("hola", 1);
     let e = r.eventos();
-    assert!(matches!(&e.last().unwrap().1, Evento::Error { clave, mensaje } if clave == "sesion" && mensaje.contains("No tengo sesión")), "{e:?}");
+    assert!(
+        matches!(&e.last().unwrap().1, Evento::Error { clave, mensaje } if clave == "sesion" && mensaje.contains("No tengo sesión")),
+        "{e:?}"
+    );
 }
 
 #[test]
@@ -177,7 +248,11 @@ fn la_conversacion_perdida_empieza_otra() {
     // Se «pierde» la sesión s2 en el servidor: el siguiente --resume falla una vez y se reintenta sin él.
     std::fs::write(d.path().join("args.txt"), "--resume").unwrap();
     c.preguntar("dos", 2);
-    assert!(matches!(&r.eventos().last().unwrap().1, Evento::Listo(t) if t == "otra vez"), "{:?}", r.eventos());
+    assert!(
+        matches!(&r.eventos().last().unwrap().1, Evento::Listo(t) if t == "otra vez"),
+        "{:?}",
+        r.eventos()
+    );
 }
 
 #[test]
@@ -197,5 +272,10 @@ fn cancelar_corta_y_calla() {
     h.join().unwrap();
     assert!(t0.elapsed().as_secs() < 5, "cancelar no esperó los 30 s");
     let tipos = r.eventos();
-    assert!(!tipos.iter().any(|(_, e)| matches!(e, Evento::Error { .. } | Evento::Listo(_))), "tras cancelar ya no avisa: {tipos:?}");
+    assert!(
+        !tipos
+            .iter()
+            .any(|(_, e)| matches!(e, Evento::Error { .. } | Evento::Listo(_))),
+        "tras cancelar ya no avisa: {tipos:?}"
+    );
 }

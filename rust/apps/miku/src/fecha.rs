@@ -25,7 +25,14 @@ pub fn dias_civil(anio: i32, mes: u32, dia: u32) -> i64 {
 
 impl FechaHora {
     pub fn nueva(anio: i32, mes: u32, dia: u32, hora: u32, minuto: u32) -> Self {
-        Self { anio, mes, dia, hora, minuto, segundo: 0 }
+        Self {
+            anio,
+            mes,
+            dia,
+            hora,
+            minuto,
+            segundo: 0,
+        }
     }
 
     /// «AAAA-MM-DD», «AAAA-MM-DDTHH:MM» o «AAAA-MM-DDTHH:MM:SS» (lo que entiende `fromisoformat`).
@@ -53,7 +60,14 @@ impl FechaHora {
                 return None;
             }
         }
-        Some(Self { anio, mes, dia, hora, minuto, segundo })
+        Some(Self {
+            anio,
+            mes,
+            dia,
+            hora,
+            minuto,
+            segundo,
+        })
     }
 
     pub fn dias(&self) -> i64 {
@@ -62,7 +76,10 @@ impl FechaHora {
 
     /// Segundos desde la época, sin zona (para restar dos fechas).
     pub fn segundos(&self) -> i64 {
-        self.dias() * 86_400 + i64::from(self.hora) * 3600 + i64::from(self.minuto) * 60 + i64::from(self.segundo)
+        self.dias() * 86_400
+            + i64::from(self.hora) * 3600
+            + i64::from(self.minuto) * 60
+            + i64::from(self.segundo)
     }
 
     /// 0 = lunes … 6 = domingo.
@@ -136,9 +153,27 @@ pub fn ahora() -> FechaHora {
         .unwrap_or_else(reloj_local)
 }
 
-pub const DIAS: [&str; 7] = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+pub const DIAS: [&str; 7] = [
+    "lunes",
+    "martes",
+    "miércoles",
+    "jueves",
+    "viernes",
+    "sábado",
+    "domingo",
+];
 pub const MESES: [&str; 12] = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre",
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
     "diciembre",
 ];
 
