@@ -822,7 +822,9 @@ impl Actor {
                 .stdout(log.try_clone().map(Stdio::from).unwrap_or_else(|_| Stdio::null()))
                 .stderr(Stdio::from(log));
             sistema::nueva_sesion(&mut c);
-            let _ = c.spawn();
+            if let Ok(h) = c.spawn() {
+                sistema::recoger(h);
+            }
         }
     }
 
@@ -1455,13 +1457,16 @@ impl Actor {
     }
 
     fn notificar(&self, titulo: &str, cuerpo: &str) {
-        if self.env.notificar && sistema::cual("notify-send").is_some() {
-            let _ = Command::new("notify-send")
+        if self.env.notificar
+            && sistema::cual("notify-send").is_some()
+            && let Ok(h) = Command::new("notify-send")
                 .args(["-a", "Miku", "-i", "vortex-miku", titulo, cuerpo])
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
-                .spawn();
+                .spawn()
+        {
+            sistema::recoger(h);
         }
     }
 

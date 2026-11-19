@@ -85,7 +85,15 @@ pub fn lanzar_aparte(programa: &str, args: &[String]) -> std::io::Result<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     nueva_sesion(&mut c);
-    c.spawn().map(|_| ())
+    c.spawn().map(recoger)
+}
+
+/// Espera al hijo en un hilo aparte, para que al terminar no quede zombi mientras Miku sigue abierta
+/// (`let _ = c.spawn()` suelta el `Child` sin esperarlo nunca).
+pub fn recoger(mut hijo: std::process::Child) {
+    std::thread::spawn(move || {
+        let _ = hijo.wait();
+    });
 }
 
 /// ¿Está vivo el proceso con ese pid?
