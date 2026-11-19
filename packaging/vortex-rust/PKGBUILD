@@ -33,6 +33,9 @@
 #     grabar, sentir…), con los mismos textos, códigos y archivos que el de Python. El lanzador /usr/bin/vortex-miku
 #     (paquete vortex-miku) salta a este si existe. Solo «natural» y «elevenlabs» (instalar la voz con pip, la clave en
 #     el llavero) se le pasan a vortex-miku-python.
+#   - miku-voz (vortex-miku-voz): la voz de fábrica de Miku (Supertonic 3) en Rust, con el protocolo de voz_worker.py;
+#     onnxruntime se carga al arrancar (la libonnxruntime.so de python-onnxruntime-cpu), no se baja al compilar.
+#     ElevenLabs y la voz natural siguen en Python; VORTEX_MIKU_VOZ_PYTHON=1 fuerza la de Python.
 #   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #   - vortex-traducir (4.0, solo en Rust): Super+Alt+T traduce lo seleccionado con la IA local (Ollama).
@@ -42,7 +45,7 @@
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=17
+pkgrel=18
 pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, Local AI, Miku, traducir y limpieza)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -57,7 +60,7 @@ options=('!lto')
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt vortex-local-ai-qt
-         vortex-player-qt vortex-miku vortex-miku-qt vortex-traducir vortex-limpieza vortex-escritorio)
+         vortex-player-qt vortex-miku vortex-miku-qt vortex-miku-voz vortex-traducir vortex-limpieza vortex-escritorio)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
 prepare() {
@@ -115,6 +118,8 @@ package() {
     install -Dm755 "$b/miku-rs" "$pkgdir/usr/lib/vortex/miku-rs"
     install -Dm755 "$b/miku-aux" "$pkgdir/usr/lib/vortex/miku-aux"
     install -Dm755 "$b/vortex-miku-rs" "$pkgdir/usr/lib/vortex/vortex-miku-rs"
+    # La voz Supertonic en Rust (carga la libonnxruntime.so de python-onnxruntime-cpu, que trae vortex-miku).
+    install -Dm755 "$b/miku-voz" "$pkgdir/usr/lib/vortex/miku-voz"
     install -d "$pkgdir/usr/share/vortex-miku-rs/qml"
     cp -r "$r/apps/miku/qt/qml/." "$pkgdir/usr/share/vortex-miku-rs/qml/"
     # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).

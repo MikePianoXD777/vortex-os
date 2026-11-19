@@ -481,6 +481,8 @@ fn decir_a_un_wav_con_la_voz_falsa_y_sus_errores() {
         ),
     );
     let wav = c.base.join("hola.wav");
+    // Con la voz de Python (VORTEX_MIKU_VOZ_PYTHON) y con la de Rust (miku-voz, otro falso que hace lo mismo).
+    c.env("VORTEX_MIKU_VOZ_PYTHON", "1");
     let (cod, sal, err) = c.correr(&["decir", "hola", "mundo", "-o", wav.to_str().unwrap()]);
     assert_eq!(cod, 0, "{err}");
     assert_eq!(sal, format!("Listo: {}\n", wav.display()));
@@ -488,6 +490,21 @@ fn decir_a_un_wav_con_la_voz_falsa_y_sus_errores() {
     let llamada = std::fs::read_to_string(&anota).unwrap();
     assert!(
         llamada.contains("voz_worker.py --voz supertonic-f1 --estilo miku --salida")
+            && llamada.trim_end().ends_with("hola mundo"),
+        "{llamada}"
+    );
+    c.extra.retain(|(k, _)| k != "VORTEX_MIKU_VOZ_PYTHON");
+    std::fs::remove_file(&anota).unwrap();
+    std::fs::remove_file(&wav).unwrap();
+    let rust = c.bin.join("miku-voz");
+    std::fs::copy(c.bin.join("python3"), &rust).unwrap();
+    c.env("VORTEX_MIKU_VOZ", rust.to_str().unwrap());
+    let (cod, _, err) = c.correr(&["decir", "hola", "mundo", "-o", wav.to_str().unwrap()]);
+    assert_eq!(cod, 0, "{err}");
+    assert!(wav.is_file());
+    let llamada = std::fs::read_to_string(&anota).unwrap();
+    assert!(
+        llamada.starts_with("--voz supertonic-f1 --estilo miku --salida")
             && llamada.trim_end().ends_with("hola mundo"),
         "{llamada}"
     );

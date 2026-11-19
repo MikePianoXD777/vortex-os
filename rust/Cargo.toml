@@ -37,6 +37,7 @@ members = [
     "apps/vortex-escritorio",
     "apps/miku",
     "apps/miku/qt",
+    "apps/miku/voz",
 ]
 
 [workspace.package]

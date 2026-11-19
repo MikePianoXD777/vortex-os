@@ -1,8 +1,8 @@
 //! La voz de Miku: el catálogo de voces, el proceso aparte que las dice y cómo suena cada frase.
 //!
-//! La síntesis NO está en Rust: Supertonic 3 corre sobre onnxruntime + numpy, y la voz natural (Qwen3-TTS)
-//! sobre PyTorch en la GPU; las dos siguen en Python (`miku/voz_worker.py` y `miku/voz_natural.py`, sin
-//! tocarlas). Este módulo las lanza como proceso aparte con el mismo protocolo de líneas de JSON:
+//! Supertonic 3 (la de fábrica) se dice en Rust (`miku-voz`, del crate `apps/miku/voz`, sobre onnxruntime);
+//! ElevenLabs sigue en `miku/voz_worker.py` y la voz natural (Qwen3-TTS, PyTorch en la GPU) en
+//! `miku/voz_natural.py`. Este módulo las lanza como proceso aparte con el mismo protocolo de líneas de JSON:
 //!
 //!   entra   {"id": 1, "texto": "Hola."}                 (o {"cmd": "salir"})
 //!   sale    {"listo": true, "voz": "supertonic-f1"}     al cargar el modelo
@@ -274,11 +274,39 @@ pub fn leer_mensaje(linea: &str) -> Option<MensajeVoz> {
     None
 }
 
+/// La voz en Rust (`miku-voz`, Supertonic sobre onnxruntime), si está: `VORTEX_MIKU_VOZ`, junto a este
+/// binario o en `/usr/lib/vortex`. `VORTEX_MIKU_VOZ_PYTHON=1` vuelve a la de Python (`miku/voz_worker.py`).
+pub fn voz_rust() -> Option<PathBuf> {
+    if std::env::var_os("VORTEX_MIKU_VOZ_PYTHON").is_some_and(|v| !v.is_empty()) {
+        return None;
+    }
+    if let Some(p) = std::env::var_os("VORTEX_MIKU_VOZ").filter(|v| !v.is_empty()) {
+        return Some(p.into());
+    }
+    let junto = std::env::current_exe()
+        .ok()
+        .and_then(|e| Some(e.parent()?.join("miku-voz")));
+    [junto, Some(PathBuf::from("/usr/lib/vortex/miku-voz"))]
+        .into_iter()
+        .flatten()
+        .find(|p| sistema::es_ejecutable(p))
+}
+
 /// Cómo se lanza la voz `id`: (programa, argumentos, variables de entorno).
 pub fn comando_de_voz(
     rutas: &Rutas,
     voz: &Value,
     avatar: bool,
+) -> (PathBuf, Vec<String>, Vec<(String, String)>) {
+    comando_con(rutas, voz, avatar, voz_rust())
+}
+
+/// Como `comando_de_voz`, con la voz de Rust que se le diga (`None` = la de Python).
+pub fn comando_con(
+    rutas: &Rutas,
+    voz: &Value,
+    avatar: bool,
+    rust: Option<PathBuf>,
 ) -> (PathBuf, Vec<String>, Vec<(String, String)>) {
     let id = voz["id"].as_str().unwrap_or(VOZ_DEFECTO).to_string();
     if voz["motor"].as_str() == Some("qwen") {
@@ -288,6 +316,15 @@ pub fn comando_de_voz(
             rutas.natural_python(),
             vec!["-I".into(), script.to_string_lossy().into(), "--voz".into(), id],
             vec![("HF_HUB_OFFLINE".into(), "1".into())],
+        );
+    }
+    let estilo = if avatar { "miku" } else { "normal" };
+    // Supertonic: en Rust si está. ElevenLabs (por internet) sigue en voz_worker.py.
+    if let Some(b) = rust.filter(|_| voz["motor"].as_str() != Some("elevenlabs")) {
+        return (
+            b,
+            vec!["--voz".into(), id, "--estilo".into(), estilo.into()],
+            vec![],
         );
     }
     let script = rutas.raiz.join("miku/voz_worker.py");
@@ -300,7 +337,7 @@ pub fn comando_de_voz(
             "--voz".into(),
             id,
             "--estilo".into(),
-            if avatar { "miku" } else { "normal" }.into(),
+            estilo.into(),
         ],
         vec![],
     )
@@ -502,14 +539,33 @@ mod pruebas {
     fn como_se_lanza_cada_voz() {
         let d = tempfile::tempdir().unwrap();
         let r = Rutas::en(d.path());
-        let (_, args, env) = comando_de_voz(&r, &json!({"id": "supertonic-f1", "motor": "supertonic"}), true);
+        let (_, args, env) = comando_con(
+            &r,
+            &json!({"id": "supertonic-f1", "motor": "supertonic"}),
+            true,
+            None,
+        );
         assert_eq!(&args[0], "-I");
         assert!(args[1].ends_with("miku/voz_worker.py"));
         assert_eq!(&args[2..], ["--voz", "supertonic-f1", "--estilo", "miku"]);
         assert!(env.is_empty());
-        let (_, args, _) = comando_de_voz(&r, &json!({"id": "supertonic-f2"}), false);
+        let (_, args, _) = comando_con(&r, &json!({"id": "supertonic-f2"}), false, None);
         assert_eq!(args.last().unwrap(), "normal");
-        let (py, args, env) = comando_de_voz(&r, &json!({"id": "miku-natural", "motor": "qwen"}), true);
+        // Con la voz de Rust: Supertonic va en Rust; ElevenLabs y la natural, no.
+        let rs = Some(PathBuf::from("/x/miku-voz"));
+        let (b, args, env) = comando_con(
+            &r,
+            &json!({"id": "supertonic-f2", "motor": "supertonic"}),
+            true,
+            rs.clone(),
+        );
+        assert_eq!(b, PathBuf::from("/x/miku-voz"));
+        assert_eq!(args, ["--voz", "supertonic-f2", "--estilo", "miku"]);
+        assert!(env.is_empty());
+        let (b, args, _) = comando_con(&r, &json!({"id": "e", "motor": "elevenlabs"}), true, rs.clone());
+        assert_ne!(b, PathBuf::from("/x/miku-voz"));
+        assert!(args[1].ends_with("miku/voz_worker.py"));
+        let (py, args, env) = comando_con(&r, &json!({"id": "miku-natural", "motor": "qwen"}), true, rs);
         assert_eq!(py, r.natural_python());
         assert!(args[1].ends_with("miku/voz_natural.py"));
         assert_eq!(env, vec![("HF_HUB_OFFLINE".to_string(), "1".to_string())]);

@@ -1,0 +1,31 @@
+[package]
+name = "vortex-miku-voz"
+description = "La voz de Miku en Rust: Supertonic 3 sobre onnxruntime (la del sistema, cargada al arrancar)"
+version = "4.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "miku-voz"
+path = "src/main.rs"
+
+[lib]
+name = "vortex_miku_voz"
+path = "src/lib.rs"
+
+[dependencies]
+vortex-miku.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+unicode-normalization = "0.1"
+# Sin descargar nada al compilar: libonnxruntime.so se carga al arrancar (la de python-onnxruntime-cpu).
+# api-22 = pide la API de onnxruntime 1.22, que cualquier 1.22 o más nueva sirve (el sistema trae 1.29).
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-22"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
