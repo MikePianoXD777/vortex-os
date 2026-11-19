@@ -22,6 +22,9 @@ fn mismo_estado_que_el_panel() {
     let t = tempfile::tempdir().unwrap();
     let home = t.path().join("home");
     let bin = t.path().join("bin");
+    // La carpeta personal tiene que existir: el script del repo solo vale si es de su dueño (si no, la prueba
+    // pasaba de rebote con el instalado en /usr/share, que es de root).
+    std::fs::create_dir_all(&home).unwrap();
     for n in ["easyeffects", "systemctl", "notify-send", "pgrep"] {
         ejecutable(&bin.join(n), "exit 0\n"); // notify-send: nada llega al escritorio
     }
