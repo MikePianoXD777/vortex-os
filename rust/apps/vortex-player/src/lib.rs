@@ -16,6 +16,7 @@ pub mod letras;
 pub mod mpv;
 pub mod nube;
 pub mod red;
+pub mod reproductor;
 pub mod rutas;
 
 /// Nombre de la app, como en la de Python.

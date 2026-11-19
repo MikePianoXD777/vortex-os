@@ -145,7 +145,7 @@ pub struct MpvIpc {
     cola_fundido: Vec<Child>,
 }
 
-fn carpeta_socket_privada(pid: u32) -> Result<(PathBuf, Option<PathBuf>), ErrorMpv> {
+pub fn carpeta_socket_privada(pid: u32) -> Result<(PathBuf, Option<PathBuf>), ErrorMpv> {
     if cfg!(windows) {
         return Ok((PathBuf::new(), None));
     }
