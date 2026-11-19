@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -101,7 +103,13 @@ class Reproductor(QObject):
     def _arrancar(self) -> None:
         mpv = os.environ.get("VORTEX_PLAYER_MPV", "mpv")
         ao = plataforma.salida_audio()
-        self._mpv.start(mpv, ["--idle=yes", "--no-video", "--no-terminal", "--no-config", "--audio-display=no",
+        # 4.0: si el Player muere de golpe, su mpv también (setpriv --pdeathsig, de util-linux); si no,
+        # quedaba huérfano esperando (~20 MB cada uno). En Windows no hay setpriv: se arranca igual que antes.
+        antes = []
+        setpriv = shutil.which("setpriv") if sys.platform.startswith("linux") else None
+        if setpriv:
+            antes, mpv = ["--pdeathsig", "TERM", mpv], setpriv
+        self._mpv.start(mpv, antes + ["--idle=yes", "--no-video", "--no-terminal", "--no-config", "--audio-display=no",
                               f"--ao={ao}", "--volume-max=100", f"--volume={self._volumen}",
                               "--replaygain=no", "--audio-pitch-correction=no", "--gapless-audio=weak",
                               "--audio-client-name=Vortex Player", "--pause=yes",

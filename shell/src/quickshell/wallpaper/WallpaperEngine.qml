@@ -79,6 +79,29 @@ ShellRoot {
                 }
                 readonly property bool autoPaused: !animEnabled || (animPauseCovered && covered) || (animPauseBattery && onBattery) || animIdle.isIdle
                 readonly property bool effectivePaused: playbackPaused || autoPaused
+
+                // 4.0: si el video lleva 30 s en pausa porque nadie lo ve (ventanas encima o el equipo sin usar),
+                // se suelta el reproductor (su memoria y la de la gráfica) y queda su cuadro fijo, el mismo del
+                // perfil bajo. Al volver a verse, el cuadro se queda 1,5 s mientras el video arranca otra vez.
+                readonly property bool nadieLoVe: (animPauseCovered && covered) || animIdle.isIdle
+                property bool videoSuelto: false
+                property bool reanudando: false
+                readonly property bool cuadroFijo: perfilBajo || videoSuelto || reanudando
+                Timer {
+                    id: soltarVideo
+                    interval: 30000
+                    repeat: true
+                    running: barWindow.effectivePaused && barWindow.nadieLoVe && !barWindow.perfilBajo &&
+                             !barWindow.videoSuelto && !barWindow.transitionBusy &&
+                             (barWindow.activeLayer === 0 ? (barWindow.isVideoA && barWindow.snapReadyA)
+                                                          : (barWindow.isVideoB && barWindow.snapReadyB))
+                    onTriggered: barWindow.videoSuelto = true
+                }
+                Timer {
+                    id: finReanudar
+                    interval: 1500
+                    onTriggered: barWindow.reanudando = false
+                }
                 property var optimizedReady: ({})       // video original -> copia optimizada (ya hecha)
                 property var optimizedApplied: ({})     // las que ya se reproducen (se cambian sin que se vea)
                 readonly property string videoSrcA: (isVideoA && pathA) ? (optimizedApplied[pathA] || pathA) : ""
@@ -90,6 +113,11 @@ ShellRoot {
                 }
 
                 onEffectivePausedChanged: {
+                    if (!effectivePaused && barWindow.videoSuelto) {
+                        barWindow.reanudando = true;
+                        barWindow.videoSuelto = false;
+                        finReanudar.restart();
+                    }
                     if (effectivePaused) {
                         barWindow.applyOptimized();
                         barWindow.pauseA();
@@ -457,6 +485,7 @@ ShellRoot {
                 function _loadNew(path, force) {
                     if (!path) return;
                     if (!force && path === barWindow.currentWallpaperPath) return;
+                    barWindow.videoSuelto = false;
 
                     let cleanPath = String(path).trim();
                     let vid = barWindow.isVideo(cleanPath);
@@ -784,11 +813,11 @@ ShellRoot {
                             source: {
                                 if (!(parent.width > 0) || !barWindow.pathA) return "";
                                 if (!barWindow.isVideoA) return "file://" + barWindow.pathA;
-                                return barWindow.perfilBajo && barWindow.snapReadyA ? "file://" + barWindow.layerSnapshotPathA : "";
+                                return barWindow.cuadroFijo && barWindow.snapReadyA ? "file://" + barWindow.layerSnapshotPathA : "";
                             }
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
-                            visible: (!barWindow.isVideoA || barWindow.perfilBajo) && barWindow.pathA !== ""
+                            visible: (!barWindow.isVideoA || barWindow.cuadroFijo) && barWindow.pathA !== ""
                             cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
@@ -797,7 +826,7 @@ ShellRoot {
                         Loader {
                             id: videoLoaderA
                             anchors.fill: parent
-                            active: barWindow.isVideoA && barWindow.pathA !== "" && !barWindow.perfilBajo
+                            active: barWindow.isVideoA && barWindow.pathA !== "" && !barWindow.perfilBajo && !barWindow.videoSuelto
                             asynchronous: false
                             sourceComponent: videoLayerCompA
                             visible: barWindow.isVideoA
@@ -861,11 +890,11 @@ ShellRoot {
                             source: {
                                 if (!(parent.width > 0) || !barWindow.pathB) return "";
                                 if (!barWindow.isVideoB) return "file://" + barWindow.pathB;
-                                return barWindow.perfilBajo && barWindow.snapReadyB ? "file://" + barWindow.layerSnapshotPathB : "";
+                                return barWindow.cuadroFijo && barWindow.snapReadyB ? "file://" + barWindow.layerSnapshotPathB : "";
                             }
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
-                            visible: (!barWindow.isVideoB || barWindow.perfilBajo) && barWindow.pathB !== ""
+                            visible: (!barWindow.isVideoB || barWindow.cuadroFijo) && barWindow.pathB !== ""
                             cache: false
                             sourceSize.width: parent.width > 0 ? Math.ceil(parent.width * (Screen.devicePixelRatio || 1)) : 0
                             sourceSize.height: parent.height > 0 ? Math.ceil(parent.height * (Screen.devicePixelRatio || 1)) : 0
@@ -874,7 +903,7 @@ ShellRoot {
                         Loader {
                             id: videoLoaderB
                             anchors.fill: parent
-                            active: barWindow.isVideoB && barWindow.pathB !== "" && !barWindow.perfilBajo
+                            active: barWindow.isVideoB && barWindow.pathB !== "" && !barWindow.perfilBajo && !barWindow.videoSuelto
                             asynchronous: false
                             sourceComponent: videoLayerCompB
                             visible: barWindow.isVideoB

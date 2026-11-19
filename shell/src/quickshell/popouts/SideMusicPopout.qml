@@ -61,8 +61,11 @@ PanelWindow {
         return "modular";
     }
 
+    // 4.0: solo si cambia ya cargado; al crearse (BajoDemanda) el estilo «cambia» al de la barra y lo cerraba.
+    property bool _creado: false
+    Component.onCompleted: _creado = true
     onBarStyleChanged: {
-        SideMusicController.hide();
+        if (_creado) SideMusicController.hide();
     }
 
     property bool isFill: barStyle === "fill"
@@ -78,6 +81,7 @@ PanelWindow {
     SpringProgress {
         id: reveal
         open: sideMusicPopout.isVisible
+        animarAlCrear: true
         openDuration: 520
         closeDuration: 150
     }

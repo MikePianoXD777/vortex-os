@@ -103,7 +103,12 @@ ShellRoot {
     LockRedactor {}
 
     Launcher {}
-    Clipboard {}    
+    // 4.0: el portapapeles se carga al abrirlo (Super+V) y se suelta 20 s después de cerrarlo. El historial
+    // no depende de él: lo guardan los «wl-paste --watch» con cliphist.
+    BajoDemanda {
+        abierto: ClipboardController.isVisible
+        fuente: Qt.resolvedUrl("clipboard/Clipboard.qml")
+    }
     Dashboard {}
 
     Polkit {}

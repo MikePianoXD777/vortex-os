@@ -67,6 +67,14 @@ PanelWindow {
         }
     }
 
+    // 4.0: se carga al pedir el menú (BajoDemanda.qml en PopoutManager), así que la señal ya pasó.
+    Component.onCompleted: {
+        if (DockAppMenuController.isVisible) {
+            dockAppMenuWindow.windowsList = DockAppMenuController.windows;
+            openAnim.restart();
+        }
+    }
+
     Connections {
         target: DockAppMenuController
         function onWindowsChanged() {

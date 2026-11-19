@@ -4,6 +4,9 @@ QtObject {
     id: root
 
     property bool open: false
+    // 4.0: los paneles que se cargan al abrirlos (BajoDemanda.qml) nacen ya abiertos; con esto animan
+    // igual que si hubieran estado cargados, en vez de aparecer de golpe.
+    property bool animarAlCrear: false
     property bool animated: true
     property int openDuration: 700
     property int closeDuration: 180
@@ -49,7 +52,12 @@ QtObject {
     Component.onCompleted: {
         if (open && !active) {
             active = true;
-            value = 1.0;
+            if (animarAlCrear && animated) {
+                origin = 0.0;
+                openAnim.restart();
+            } else {
+                value = 1.0;
+            }
         }
     }
 

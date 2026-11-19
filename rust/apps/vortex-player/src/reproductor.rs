@@ -938,6 +938,25 @@ pub struct MpvProceso {
     cerrando: Arc<std::sync::atomic::AtomicBool>,
 }
 
+/// Si el Player muere de golpe (se cuelga, lo matan, se cierra la sesión), su mpv también. Sin esto quedaba
+/// huérfano esperando (~20 MB cada uno). `PR_SET_PDEATHSIG` va atado al hilo que lo arranca: aquí siempre es el
+/// de la interfaz (también al volver a levantarlo, que pasa por su cola), que vive lo que vive el Player.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)] // prctl en el hijo, antes del exec: no toca memoria del padre
+fn morir_con_el_padre(orden: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    // SAFETY: el cierre solo llama a prctl, que es seguro entre fork y exec.
+    unsafe {
+        orden.pre_exec(|| {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+            Ok(())
+        });
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn morir_con_el_padre(_orden: &mut Command) {}
+
 impl MpvProceso {
     /// Arranca mpv (`VORTEX_PLAYER_MPV` cambia cuál; `VORTEX_PLAYER_AO=null` no saca sonido) y un hilo que se
     /// conecta a su socket y lee sus eventos.
@@ -972,7 +991,9 @@ impl MpvProceso {
         if !cfg!(windows) {
             let _ = std::fs::remove_file(&self.socket);
         }
-        let hijo = Command::new(Self::programa())
+        let mut orden = Command::new(Self::programa());
+        morir_con_el_padre(&mut orden);
+        let hijo = orden
             .args([
                 "--idle=yes",
                 "--no-video",

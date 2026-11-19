@@ -14,6 +14,12 @@ Item {
         return Object.freeze(arr);
     }
     property var barLevels: emptyLevels
+    // 4.0: dos listas fijas que se turnan en vez de una nueva por cada lectura de cava (30 por segundo, más el
+    // «split» con 64 textos): esa basura hacía crecer la memoria del shell con la música y el visualizador.
+    // Se turnan para que cada lectura sea otra lista y los visualizadores se enteren del cambio.
+    readonly property var _listaA: new Array(barCount).fill(0.0)
+    readonly property var _listaB: new Array(barCount).fill(0.0)
+    property bool _usarA: true
     property int activeConsumers: 0
     property bool isPlaying: MprisController.isPlaying || Audio.hasActiveStream
     property bool isDecaying: false
@@ -97,21 +103,39 @@ Item {
         stdout: SplitParser {
             onRead: data => {
                 if (!root.processEnabled) return;
-                // Vortex: cava saca los niveles como «n;n;n;…» (0 a 1000), no como JSON
-                let str = data.trim();
-                if (str.length === 0) return;
+                // Vortex: cava saca los niveles como «n;n;n;…» (0 a 1000), no como JSON. 4.0: se leen cifra
+                // por cifra, sin crear textos ni listas nuevas.
+                let n = root.barCount;
+                let out = root._usarA ? root._listaA : root._listaB;
+                let i = 0;
+                let val = 0;
+                let cifras = false;
+                let algo = false;
+                for (let k = 0; k < data.length && i < n; k++) {
+                    let c = data.charCodeAt(k);
+                    if (c >= 48 && c <= 57) {
+                        val = val * 10 + (c - 48);
+                        cifras = true;
+                    } else if (c === 59 && cifras) {
+                        out[i++] = val >= 1000 ? 1.0 : val / 1000.0;
+                        if (val > 0) algo = true;
+                        val = 0;
+                        cifras = false;
+                    }
+                }
+                if (cifras && i < n) {
+                    out[i++] = val >= 1000 ? 1.0 : val / 1000.0;
+                    if (val > 0) algo = true;
+                }
+                if (i === 0) return;
                 root.consecutiveCrashes = 0;
-                if (!/[1-9]/.test(str)) {
+                if (!algo) {
                     if (root.barLevels !== root.emptyLevels) root.resetBars();
                     return;
                 }
-                let parts = str.split(";");
-                let levels = new Array(root.barCount);
-                for (let i = 0; i < root.barCount; i++) {
-                    let val = i < parts.length ? (parseInt(parts[i]) || 0) : 0;
-                    levels[i] = Math.max(0.0, Math.min(1.0, val / 1000.0));
-                }
-                root.barLevels = levels;
+                for (; i < n; i++) out[i] = 0.0;
+                root._usarA = !root._usarA;
+                root.barLevels = out;
             }
         }
     }

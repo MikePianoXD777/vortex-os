@@ -76,8 +76,10 @@ PanelWindow {
         return "bottom";
     }
 
+    // 4.0: solo si cambia ya cargado; al crearse (BajoDemanda) la posición «cambia» a la de la barra y lo cerraba.
+    property bool _creado: false
     onBarPositionChanged: {
-        ClipboardController.hide();
+        if (_creado) ClipboardController.hide();
     }
 
     property bool isSideAttached: attachEdge === "left" || attachEdge === "right"
@@ -533,6 +535,15 @@ PanelWindow {
         }
     }
 
+    // 4.0: se carga al abrirlo (BajoDemanda.qml en Shell.qml): nace ya abierto y sin historial leído.
+    Component.onCompleted: {
+        _creado = true;
+        if (isVisible) {
+            refreshClips();
+            focusTimer.restart();
+        }
+    }
+
     onIsVisibleChanged: {
         if (isVisible) {
             searchInput.clear();
@@ -578,6 +589,7 @@ PanelWindow {
         SpringProgress {
             id: clipboardReveal
             open: clipboardWindow.isVisible
+            animarAlCrear: true
             openDuration: 520
             closeDuration: 200
         }

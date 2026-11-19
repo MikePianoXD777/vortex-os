@@ -76,9 +76,30 @@ Item {
         return edges;
     }
 
+    // 4.0: las listas de cada paso (niveles, onda, animación) son fijas y se turnan de dos en dos, en vez de una
+    // nueva en cada cuadro (60 por segundo): esa basura hacía crecer la memoria del shell con el visualizador.
+    property var _mapaA: []
+    property var _mapaB: []
+    property var _ondaA: []
+    property var _ondaB: []
+    property var _animA: []
+    property var _animB: []
+    // El turno va en un objeto (no en propiedades): cambiarlo dentro de «targets» no debe avisar a nadie.
+    readonly property var _turno: ({ mapa: false, onda: false, anim: false })
+    readonly property var _matriz: new Array(16).fill(0.0)
+    readonly property var _nombresMatriz: ["levels0", "levels1", "levels2", "levels3", "levels4", "levels5", "levels6", "levels7"]
+
+    function _lista(l, n) {
+        if (l.length !== n) l.length = n;
+        return l;
+    }
+
     function mapLevels(source) {
         let map = root.sourceMap;
-        let out = new Array(map.length).fill(0.0);
+        let turno = root._turno;
+        turno.mapa = !turno.mapa;
+        let out = root._lista(turno.mapa ? root._mapaA : root._mapaB, map.length);
+        out.fill(0.0);
         if (!source || source.length === 0) return out;
 
         // Read the properties once, every read inside a binding is tracked
@@ -115,12 +136,14 @@ Item {
         let edges = root.waveEdge;
         let n = levels.length;
         let ring = root.ringRadius > 0;
-        let out = [];
+        let turno = root._turno;
+        turno.onda = !turno.onda;
+        let out = root._lista(turno.onda ? root._ondaA : root._ondaB, n);
         for (let i = 0; i < n; i++) {
             let prev = i > 0 ? levels[i - 1] : (ring ? levels[n - 1] : levels[i]);
             let next = i < n - 1 ? levels[i + 1] : (ring ? levels[0] : levels[i]);
             let side = ring ? 0.14 : 0.25;
-            out.push((prev * side + levels[i] * (1 - 2 * side) + next * side) * (ring ? 1.0 : edges[i]));
+            out[i] = (prev * side + levels[i] * (1 - 2 * side) + next * side) * (ring ? 1.0 : edges[i]);
         }
         return out;
     }
@@ -151,15 +174,16 @@ Item {
     onTargetsChanged: settling = true
 
     function packLevels(v, o) {
-        let m = [];
-        for (let k = 0; k < 16; k++) m.push(v[o + k] || 0.0);
+        let m = root._matriz;
+        for (let k = 0; k < 16; k++) m[k] = v[o + k] || 0.0;
         return Qt.matrix4x4(m);
     }
 
     // The shaders never read past count, so only the used matrices are refreshed
     function uploadLevels(v) {
+        let nombres = root._nombresMatriz;
         for (let m = 0; m < Math.ceil(v.length / 16); m++) {
-            effect["levels" + m] = packLevels(v, m * 16);
+            effect[nombres[m]] = packLevels(v, m * 16);
         }
     }
 
@@ -186,7 +210,9 @@ Item {
             let cur = root.currentLevels;
             let rise = 1 - Math.pow(1 - root.rise, elapsed / 0.016);
             let fall = 1 - Math.pow(1 - root.fall, elapsed / 0.016);
-            let next = new Array(target.length);
+            let turno = root._turno;
+            turno.anim = !turno.anim;
+            let next = root._lista(turno.anim ? root._animA : root._animB, target.length);
             let moving = false;
             let sum = 0.0;
 

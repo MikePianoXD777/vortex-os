@@ -33,6 +33,11 @@ PanelWindow {
 
     Component.onCompleted: {
         updateNightLightState();
+        // 4.0: se carga al pedir el menú (BajoDemanda.qml en PopoutManager): nace ya abierto.
+        if (isVisible) {
+            rootContainer.forceActiveFocus();
+            openAnim.restart();
+        }
     }
 
     mask: Region {
