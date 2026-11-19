@@ -53,7 +53,7 @@ static RE_NO_PALABRA: LazyLock<Regex> = LazyLock::new(|| re(r"\W+"));
 // --- enlaces -----------------------------------------------------------------------------------------
 
 /// `%XX` → bytes (y `+` → espacio si `mas`), como `unquote`/`parse_qs`.
-fn desescapar(s: &str, mas: bool) -> String {
+pub(crate) fn desescapar(s: &str, mas: bool) -> String {
     let b = s.as_bytes();
     let mut v = Vec::with_capacity(b.len());
     let mut i = 0;

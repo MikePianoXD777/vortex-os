@@ -9,6 +9,7 @@ pub mod biblioteca;
 pub mod calidad;
 pub mod cola;
 pub mod cripto;
+pub mod cuenta_google;
 pub mod descargas;
 pub mod discord;
 pub mod ecualizador;
@@ -19,6 +20,7 @@ pub mod nube;
 pub mod red;
 pub mod reproductor;
 pub mod rutas;
+pub mod sincronia;
 
 /// Nombre de la app, como en la de Python.
 pub const NOMBRE: &str = "Vortex Player";
