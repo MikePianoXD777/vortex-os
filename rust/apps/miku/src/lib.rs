@@ -2,9 +2,15 @@
 //! de memoria (`~/.config/vortex/miku.json`, `Documentos/Miku`), mismas acciones con permiso. La ventana
 //! (cxx-qt, QML y el avatar web) vive en `qt/`.
 
+pub mod cerebro;
+pub mod cerebro_abierto;
 pub mod config;
 pub mod corazon;
+pub mod eventos;
 pub mod fecha;
+pub mod http;
+pub mod ia;
+pub mod mcp;
 pub mod rutas;
 pub mod sistema;
 

@@ -109,6 +109,25 @@ fn reloj_local() -> FechaHora {
     }
 }
 
+/// Una marca de tiempo Unix en la hora local.
+#[allow(unsafe_code)]
+pub fn desde_epoch_local(segundos: i64) -> FechaHora {
+    // SAFETY: `localtime_r` solo escribe en la `tm` que le damos.
+    unsafe {
+        let t: libc::time_t = segundos;
+        let mut tm: libc::tm = std::mem::zeroed();
+        libc::localtime_r(&t, &mut tm);
+        FechaHora {
+            anio: tm.tm_year + 1900,
+            mes: (tm.tm_mon + 1) as u32,
+            dia: tm.tm_mday as u32,
+            hora: tm.tm_hour as u32,
+            minuto: tm.tm_min as u32,
+            segundo: tm.tm_sec as u32,
+        }
+    }
+}
+
 /// La hora de ahora (o la fijada con `VORTEX_MIKU_AHORA`).
 pub fn ahora() -> FechaHora {
     std::env::var("VORTEX_MIKU_AHORA")
