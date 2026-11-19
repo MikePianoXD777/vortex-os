@@ -200,9 +200,8 @@ Item {
             anchors.fill: parent
             source: wpPreviewContainer.tab.isWallpaperVideo ? ("file://" + Caching.getCacheDir("wallpaper") + "/current_wallpaper.png?rev=" + wpPreviewContainer.tab.wallpaperRevision) : (wpPreviewContainer.tab.currentWallpaperPath ? "file://" + wpPreviewContainer.tab.currentWallpaperPath : "")
             fillMode: Image.PreserveAspectCrop
-            // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
-            // Se decodifica al ancho de la tarjeta (decodeWidth) para que no se vea borroso con uiScale > 1.
-            sourceSize: Qt.size(wpPreviewContainer.decodeWidth, Math.round(wpPreviewContainer.decodeWidth * 9 / 16))
+            // Vortex: BoundedImage ya decodifica al tamaño de la tarjeta (no lleva sourceSize: con él, la
+            // pestaña entera no cargaba en la 4.0).
             asynchronous: true
             smooth: true
             cache: false

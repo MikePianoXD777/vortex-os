@@ -72,9 +72,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 250 } }
             source: preview.wallpaperPath !== "" && !preview.wallpaperIsVideo ? "file://" + preview.wallpaperPath : ""
             fillMode: Image.PreserveAspectCrop
-            // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
-            // Se decodifica al ancho de la tarjeta (decodeWidth) para que no se vea borroso con uiScale > 1.
-            sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
+            // Vortex: BoundedImage ya decodifica al tamaño de la tarjeta (no lleva sourceSize: con él, la
+            // pestaña entera no cargaba en la 4.0).
             asynchronous: true
             smooth: true
             cache: false
@@ -87,9 +86,8 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 250 } }
             source: preview.customPath !== "" && !preview.tab.isVideoPath(preview.customPath) ? "file://" + preview.customPath : ""
             fillMode: Image.PreserveAspectCrop
-            // Vortex: la vista previa se muestra chica; decodificar el fondo entero gastaba ~14 MB.
-            // Se decodifica al ancho de la tarjeta (decodeWidth) para que no se vea borroso con uiScale > 1.
-            sourceSize: Qt.size(preview.decodeWidth, Math.round(preview.decodeWidth * 9 / 16))
+            // Vortex: BoundedImage ya decodifica al tamaño de la tarjeta (no lleva sourceSize: con él, la
+            // pestaña entera no cargaba en la 4.0).
             asynchronous: true
             smooth: true
             cache: false

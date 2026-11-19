@@ -30,10 +30,13 @@ Rectangle {
     property string searchTab: ""
     property string searchSubTab: ""
     property string searchKeywords: ""
-    property string section: ""
+    // 4.0.4: se llamaba «section» y tapaba el «id: section» de las secciones de Ajustes: dentro de una
+    // fila de un Repeater o de un «component», «section.algo» leía esta cadena vacía (pestañas que no
+    // cargaban, interruptores de «Fondos animados» y «Tus sonidos» que no hacían nada).
+    property string seccionBusqueda: ""
 
     readonly property string effectiveSection: {
-        if (section !== "") return section;
+        if (seccionBusqueda !== "") return seccionBusqueda;
         let p = root.parent;
         while (p) {
             if (p.searchSection !== undefined && p.searchSection !== "") return p.searchSection;
