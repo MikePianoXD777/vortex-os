@@ -1241,6 +1241,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-local-ai-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-local-ai",
+]
+
+[[package]]
 name = "vortex-memoria"
 version = "0.1.0"
 dependencies = [

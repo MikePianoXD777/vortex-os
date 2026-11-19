@@ -20,6 +20,15 @@ if [[ -z "$raiz" ]]; then
   exit 1
 fi
 
+# 4.0: si está la versión en Rust (paquete vortex-rust), se usa esa: misma ventana (los QML de esta misma
+# carpeta), menos memoria. VORTEX_LOCAL_AI_PYTHON=1 obliga a usar la de Python.
+rust_bin="${VORTEX_RUST_BIN:-/usr/lib/vortex}/vortex-local-ai-rs"
+if [[ -z "${VORTEX_LOCAL_AI_PYTHON:-}" && -x "$rust_bin" ]]; then
+  export VORTEX_LOCAL_AI_DIR="$raiz"
+  export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}" MALLOC_TRIM_THRESHOLD_="${MALLOC_TRIM_THRESHOLD_:-131072}"
+  exec "$rust_bin" "$@"
+fi
+
 export PYTHONPATH="$raiz${PYTHONPATH:+:$PYTHONPATH}"
 # Vortex 4.0: que la memoria que la app suelta vuelva al sistema al momento (glibc guarda una
 # arena por hilo y casi nunca las devuelve). Solo en las apps propias, nunca para toda la sesión.

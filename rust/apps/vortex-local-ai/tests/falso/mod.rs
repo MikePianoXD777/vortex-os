@@ -17,6 +17,10 @@ pub struct EstadoFalso {
     pub peticiones: Mutex<Vec<String>>,
     /// Los cuerpos de cada `/api/chat`.
     pub chats: Mutex<Vec<Value>>,
+    /// Los modelos instalados: `(nombre, bytes)`. Bajar suma, borrar quita.
+    pub modelos: Mutex<Vec<(String, u64)>>,
+    /// Modo ventana: bajar tarda lo que se ve en la barra y todos los modelos platican «paso a paso».
+    pub ventana: AtomicBool,
 }
 
 pub struct ServidorFalso {
@@ -109,16 +113,25 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
     let modelo = datos["model"].as_str().unwrap_or("").to_string();
     match (metodo, ruta) {
         ("GET", "/api/version") => json_resp(&mut c, &json!({"version": "0.99.0"}), 200),
-        ("GET", "/api/tags") => json_resp(
-            &mut c,
-            &json!({"models": [
-                {"name": "qwen3:8b", "size": 5_200_000_000u64, "modified_at": "2026-11-01T10:00:00Z",
-                 "details": {"family": "qwen3", "families": ["qwen3"], "parameter_size": "8.2B", "quantization_level": "Q4_K_M"}},
-                {"name": "emb:latest", "size": 600_000_000u64, "modified_at": "2026-11-02T10:00:00Z",
-                 "details": {"family": "bert", "families": ["bert"], "parameter_size": "600M", "quantization_level": "F16"}},
-            ]}),
-            200,
-        ),
+        ("GET", "/api/tags") => {
+            let lista: Vec<Value> = estado
+                .modelos
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(n, bytes)| {
+                    let (familia, params, cuant) = if n.starts_with("emb") {
+                        ("bert", "600M", "F16")
+                    } else {
+                        ("qwen3", "8.2B", "Q4_K_M")
+                    };
+                    json!({"name": n, "size": bytes, "modified_at": "2026-11-01T10:00:00Z",
+                           "details": {"family": familia, "families": [familia], "parameter_size": params,
+                                       "quantization_level": cuant}})
+                })
+                .collect();
+            json_resp(&mut c, &json!({"models": lista}), 200)
+        }
         ("GET", "/api/ps") => json_resp(
             &mut c,
             &json!({"models": [{"name": "qwen3:8b", "size": 6_000_000_000u64, "size_vram": 4_500_000_000u64,
@@ -126,7 +139,9 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
             200,
         ),
         ("DELETE", "/api/delete") => {
-            if modelo == "qwen3:8b" {
+            let hay = estado.modelos.lock().unwrap().iter().any(|(n, _)| *n == modelo);
+            if hay && (modelo == "qwen3:8b" || estado.ventana.load(Ordering::SeqCst)) {
+                estado.modelos.lock().unwrap().retain(|(n, _)| *n != modelo);
                 estado.borrados.lock().unwrap().push(modelo);
                 json_resp(&mut c, &json!({}), 200);
             } else {
@@ -148,6 +163,24 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
                 return;
             }
             linea(&mut c, &json!({"status": "pulling manifest"}));
+            if estado.ventana.load(Ordering::SeqCst) {
+                // Lo que la barra de la ventana alcanza a mostrar (20 pasos, ~0.8 s).
+                for i in 0..=20u64 {
+                    if !linea(
+                        &mut c,
+                        &json!({"status": "pulling aaa", "digest": "sha256:aaa", "total": 4_000_000_000u64,
+                                "completed": 200_000_000u64 * i}),
+                    ) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(40));
+                }
+                for e in ["verifying sha256 digest", "writing manifest", "success"] {
+                    linea(&mut c, &json!({"status": e}));
+                }
+                estado.modelos.lock().unwrap().push((modelo, 4_000_000_000));
+                return;
+            }
             if modelo == "lento:1b" {
                 linea(
                     &mut c,
@@ -172,6 +205,7 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
             for e in ["verifying sha256 digest", "writing manifest", "success"] {
                 linea(&mut c, &json!({"status": e}));
             }
+            estado.modelos.lock().unwrap().push((modelo, 4_000_000_000));
         }
         ("POST", "/api/chat") => {
             estado.chats.lock().unwrap().push(datos.clone());
@@ -184,7 +218,12 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
             }
             empezar_stream(&mut c);
             let msg = |t: &str| json!({"message": {"role": "assistant", "content": t}, "done": false});
-            match modelo.as_str() {
+            let modelo_chat = if estado.ventana.load(Ordering::SeqCst) {
+                "paso_a_paso"
+            } else {
+                modelo.as_str()
+            };
+            match modelo_chat {
                 "pensador" => {
                     for t in ["<thi", "nk>Hmm, ", "pienso</th", "ink>Hola", " mundo", "<"] {
                         linea(&mut c, &msg(t));
@@ -266,9 +305,28 @@ fn atender(mut c: TcpStream, estado: &EstadoFalso) {
 
 impl ServidorFalso {
     pub fn new() -> ServidorFalso {
+        Self::con(false)
+    }
+
+    /// El de la ventana (`qt/tests/interfaz.rs`): solo `qwen3:8b` instalado, bajar tarda lo que se ve y el
+    /// chat siempre contesta «paso a paso» (como el `FalsoOllama` de `pruebas/test_interfaz.py`).
+    pub fn para_ventana() -> ServidorFalso {
+        Self::con(true)
+    }
+
+    fn con(ventana: bool) -> ServidorFalso {
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", l.local_addr().unwrap());
         let estado = Arc::new(EstadoFalso::default());
+        *estado.modelos.lock().unwrap() = if ventana {
+            vec![("qwen3:8b".into(), 5_200_000_000)]
+        } else {
+            vec![
+                ("qwen3:8b".into(), 5_200_000_000),
+                ("emb:latest".into(), 600_000_000),
+            ]
+        };
+        estado.ventana.store(ventana, Ordering::SeqCst);
         let vivo = Arc::new(AtomicBool::new(true));
         let (e, v) = (estado.clone(), vivo.clone());
         std::thread::spawn(move || {
