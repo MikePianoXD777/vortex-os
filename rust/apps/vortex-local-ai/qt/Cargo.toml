@@ -1,0 +1,30 @@
+[package]
+name = "vortex-local-ai-qt"
+description = "Vortexine's Local AI en Rust: la ventana (cxx-qt, los mismos QML) sobre el motor vortex-local-ai"
+version = "1.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+vortex-local-ai.workspace = true
+vortex-core.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true
+
+[[bin]]
+name = "vortex-local-ai-rs"
+path = "src/main.rs"
+
+[lints]
+workspace = true

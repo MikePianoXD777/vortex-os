@@ -22,6 +22,8 @@
 #     instalar») salta a este si existe; VORTEX_CAMERA_PYTHON=1 fuerza la de Python.
 #   - vortex-player-rs: Vortex Player (cxx-qt, los mismos QML del paquete vortex-player). Su lanzador
 #     (/usr/bin/vortex-player) salta a este si existe; VORTEX_PLAYER_PYTHON=1 fuerza la de Python.
+#   - vortex-local-ai-rs: Vortexine's Local AI (cxx-qt, los mismos QML: chat con Ollama, modelos, vault y memoria). Su
+#     lanzador (/usr/bin/vortex-local-ai) salta a este si existe; VORTEX_LOCAL_AI_PYTHON=1 fuerza la de Python.
 #   - vortex-tirones (nuevo en la 4.0, solo en Rust): el detector de tirones de los juegos. Lo arranca el gestor al
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #   - vortex-traducir (4.0, solo en Rust): Super+Alt+T traduce lo seleccionado con la IA local (Ollama).
@@ -31,8 +33,8 @@
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=13
-pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, traducir y limpieza)"
+pkgrel=14
+pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, Local AI, traducir y limpieza)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
 license=('MIT')
@@ -44,7 +46,7 @@ options=('!lto')
 
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
-         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt
+         vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt vortex-local-ai-qt
          vortex-player-qt vortex-traducir vortex-limpieza)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 
@@ -72,6 +74,10 @@ check() {
     if command -v ffmpeg >/dev/null && command -v python3 >/dev/null; then
         cargo test --release --frozen -p vortex-camera
     fi
+    # El motor de Local AI se prueba contra un Ollama falso por HTTP (y un `ollama` falso hecho con python3).
+    if command -v python3 >/dev/null; then
+        cargo test --release --frozen -p vortex-local-ai
+    fi
     # El motor del Player (mpv, MPRIS en un bus propio, Discord, la nube con un Google falso).
     if command -v mpv >/dev/null; then
         cargo test --release --frozen -p vortex-player
@@ -91,7 +97,7 @@ package() {
     install -Dm755 "$b/vortex-tirones" "$pkgdir/usr/bin/vortex-tirones"
     install -Dm755 "$b/vortex-traducir" "$pkgdir/usr/bin/vortex-traducir"
     install -Dm755 "$b/vortex-limpieza" "$pkgdir/usr/bin/vortex-limpieza"
-    for a in task-manager runner video shop app-installer connect shared camera player; do
+    for a in task-manager runner video shop app-installer connect shared camera local-ai player; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done
     # Los QML que cambian respecto a los de Python (Video usa los del paquete vortex-video).
@@ -106,5 +112,9 @@ package() {
     # es por si se abre el binario solo.
     install -d "$pkgdir/usr/share/vortex-camera-rs/qml"
     cp -r "$r/../apps/vortex-camera/vortex_camera/qml/." "$pkgdir/usr/share/vortex-camera-rs/qml/"
+    # Local AI trae sus QML en el paquete vortex-local-ai; su lanzador le pasa los suyos, y esta copia es por si
+    # se abre el binario solo.
+    install -d "$pkgdir/usr/share/vortex-local-ai-rs/qml"
+    cp -r "$r/../apps/vortex-local-ai/vortex_local_ai/qml/." "$pkgdir/usr/share/vortex-local-ai-rs/qml/"
     find "$pkgdir/usr/share" -type f -exec chmod 644 {} +
 }

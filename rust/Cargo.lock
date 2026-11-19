@@ -1228,9 +1228,31 @@ dependencies = [
 
 [[package]]
 name = "vortex-local-ai"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
+ "libc",
+ "rand",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
  "vortex-core",
+]
+
+[[package]]
+name = "vortex-local-ai-qt"
+version = "1.0.0"
+dependencies = [
+ "cxx",
+ "cxx-qt",
+ "cxx-qt-build",
+ "cxx-qt-lib",
+ "regex",
+ "serde_json",
+ "tempfile",
+ "vortex-core",
+ "vortex-local-ai",
 ]
 
 [[package]]
