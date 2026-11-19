@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use serde_json::json;
 use tempfile::TempDir;
-use vortex_player::biblioteca::{Ajustes, Biblioteca, ME_GUSTA, Orden};
+use vortex_player::biblioteca::{Biblioteca, ME_GUSTA, Orden};
 use vortex_player::calidad;
 use vortex_player::cola::{AccionAnterior, Cola, Pista, Repetir};
 use vortex_player::mpv::{ErrorMpv, EventoMpv, MpvIpc, OpcionesCarga, construir_filtros, validar_ruta_carga};
@@ -254,16 +254,15 @@ fn biblioteca_ajustes_y_otras_carpetas() {
         "",
     );
 
-    let ajustes = Ajustes {
-        carpetas: vec![otra.to_string_lossy().to_string()],
-        ..Ajustes::default()
-    };
-    Biblioteca::guardar_ajustes_en(&cfg, &ajustes).unwrap();
+    // Una clave que no es de la biblioteca (la guarda el puente) no se pierde al guardar otra.
+    Biblioteca::guardar_ajuste_en(&cfg, "discord", serde_json::json!(false)).unwrap();
+    Biblioteca::guardar_ajuste_en(&cfg, "carpetas", serde_json::json!([otra.to_string_lossy()])).unwrap();
     let leidos = Biblioteca::ajustes_en(&cfg);
-    assert_eq!(leidos.volumen, 80);
+    assert_eq!(leidos.volumen(), 80);
+    assert_eq!(leidos.valor("discord"), Some(&serde_json::json!(false)));
 
     let bib = Biblioteca::abrir(Some(&db_path), "ffprobe").unwrap();
-    let carpetas: Vec<PathBuf> = leidos.carpetas.into_iter().map(PathBuf::from).collect();
+    let carpetas: Vec<PathBuf> = leidos.carpetas().into_iter().map(PathBuf::from).collect();
     bib.escanear_carpetas(&carpetas).unwrap();
     assert_eq!(
         bib.canciones("", Orden::Agregada).unwrap()[0].etiqueta,

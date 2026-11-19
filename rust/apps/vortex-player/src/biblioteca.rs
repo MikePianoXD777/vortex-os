@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value, json};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -44,28 +45,61 @@ pub enum ErrorBiblioteca {
     Json(#[from] serde_json::Error),
 }
 
-/// Ajustes persistidos en `ajustes.json` (compatibles con la versión Python).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Ajustes {
-    pub carpetas: Vec<String>,
-    pub navegador_premium: String,
-    pub volumen: i64,
-    pub ldac_hq: bool,
-    pub fundido: f64,
-    pub radio: bool,
+/// `ajustes.json`, como el `dict` de la de Python: las claves que conoce (con su valor de fábrica) y todas
+/// las demás que guarde la app (`discord`, `despertador`, `aparato`…), que se conservan al guardar.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Ajustes(pub Map<String, Value>);
+
+/// Los de fábrica (`AJUSTES_BASE` de la de Python).
+fn ajustes_base() -> Map<String, Value> {
+    let Value::Object(m) = json!({
+        "carpetas": [],            // además de Música
+        "navegador_premium": "",   // «firefox», «chrome»…: baja con tu sesión de YouTube Music Premium
+        "volumen": 80,
+        "ldac_hq": true,           // pedir LDAC a 990 kbps cuando hay audífonos que lo soportan
+        "fundido": 5,              // segundos de crossfade entre canciones (0 = sin)
+        "radio": true,             // al acabarse la cola siguen canciones parecidas (radio sin fin)
+    }) else {
+        unreachable!()
+    };
+    m
 }
 
-impl Default for Ajustes {
-    fn default() -> Self {
-        Self {
-            carpetas: Vec::new(),
-            navegador_premium: String::new(),
-            volumen: 80,
-            ldac_hq: true,
-            fundido: 5.0,
-            radio: true,
+impl Ajustes {
+    pub fn valor(&self, clave: &str) -> Option<&Value> {
+        self.0.get(clave)
+    }
+    pub fn texto(&self, clave: &str) -> String {
+        self.0
+            .get(clave)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
+    }
+    pub fn numero(&self, clave: &str, defecto: f64) -> f64 {
+        self.0.get(clave).and_then(Value::as_f64).unwrap_or(defecto)
+    }
+    /// Como el `bool()` de Python: `null`, `false`, 0 y «» son falso.
+    pub fn booleano(&self, clave: &str, defecto: bool) -> bool {
+        match self.0.get(clave) {
+            None => defecto,
+            Some(Value::Bool(b)) => *b,
+            Some(Value::Number(n)) => n.as_f64().is_some_and(|x| x != 0.0),
+            Some(Value::String(s)) => !s.is_empty(),
+            Some(Value::Array(a)) => !a.is_empty(),
+            Some(Value::Object(o)) => !o.is_empty(),
+            Some(Value::Null) => false,
         }
+    }
+    pub fn volumen(&self) -> i64 {
+        self.numero("volumen", 80.0).round() as i64
+    }
+    pub fn carpetas(&self) -> Vec<String> {
+        self.0
+            .get("carpetas")
+            .and_then(Value::as_array)
+            .map(|v| v.iter().filter_map(|c| c.as_str().map(str::to_string)).collect())
+            .unwrap_or_default()
     }
 }
 
@@ -118,6 +152,7 @@ pub struct Playlist {
     pub url: String,
     pub nube: String,
     pub canciones: i64,
+    #[serde(rename = "meGusta")]
     pub me_gusta: bool,
 }
 
@@ -262,33 +297,35 @@ impl Biblioteca {
         })
     }
 
-    /// Lee `ajustes.json` o devuelve los valores por defecto.
+    /// Lee `ajustes.json` (lo que falte, de fábrica).
     pub fn ajustes() -> Ajustes {
         Self::ajustes_en(&rutas::config())
     }
 
     /// Lee `ajustes.json` desde una carpeta concreta.
     pub fn ajustes_en(dir: &Path) -> Ajustes {
-        let ruta = dir.join("ajustes.json");
-        let Ok(contenido) = fs::read_to_string(ruta) else {
-            return Ajustes::default();
-        };
-        serde_json::from_str(&contenido).unwrap_or_default()
+        let mut a = ajustes_base();
+        if let Some(Value::Object(g)) = fs::read_to_string(dir.join("ajustes.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        {
+            a.extend(g);
+        }
+        Ajustes(a)
     }
 
-    /// Guarda los ajustes completos de forma atómica en `ajustes.json`.
-    pub fn guardar_ajustes(ajustes: &Ajustes) -> Result<(), ErrorBiblioteca> {
-        Self::guardar_ajustes_en(&rutas::config(), ajustes)
+    /// Cambia una clave y guarda todo el archivo de una vez (con un temporal, para no dejarlo a medias).
+    pub fn guardar_ajuste(clave: &str, valor: Value) -> Result<(), ErrorBiblioteca> {
+        Self::guardar_ajuste_en(&rutas::config(), clave, valor)
     }
 
-    /// Guarda los ajustes de forma atómica en una carpeta concreta.
-    pub fn guardar_ajustes_en(dir: &Path, ajustes: &Ajustes) -> Result<(), ErrorBiblioteca> {
+    pub fn guardar_ajuste_en(dir: &Path, clave: &str, valor: Value) -> Result<(), ErrorBiblioteca> {
+        let mut a = Self::ajustes_en(dir);
+        a.0.insert(clave.to_string(), valor);
         fs::create_dir_all(dir)?;
         let tmp = dir.join("ajustes.json.tmp");
-        let destino = dir.join("ajustes.json");
-        let texto = serde_json::to_string_pretty(ajustes)?;
-        fs::write(&tmp, texto)?;
-        fs::rename(tmp, destino)?;
+        fs::write(&tmp, serde_json::to_string_pretty(&Value::Object(a.0))?)?;
+        fs::rename(tmp, dir.join("ajustes.json"))?;
         Ok(())
     }
 
@@ -296,7 +333,7 @@ impl Biblioteca {
     pub fn carpetas(&self) -> Vec<PathBuf> {
         let mut vistas = Vec::new();
         let mut candidatos = vec![rutas::musica()];
-        for c in Self::ajustes().carpetas {
+        for c in Self::ajustes().carpetas() {
             candidatos.push(PathBuf::from(c));
         }
         for c in candidatos {
@@ -1002,5 +1039,212 @@ impl Biblioteca {
             self.borrar_playlist(pid, false)?;
         }
         Ok(())
+    }
+}
+
+/// Lo que falta de la 1.7.3 de Python: «Tu resumen», lo más escuchado, «Agregar canciones» de una playlist
+/// (1.7.2), renombrar y el mosaico de la portada.
+impl Biblioteca {
+    /// Tus canciones (las que siguen en tu biblioteca) que más sonaron desde `desde`.
+    pub fn mas_escuchadas(&self, desde: f64, n: usize) -> Result<Vec<Cancion>, ErrorBiblioteca> {
+        let rutas_: Vec<String> = {
+            let mut st = self.db.prepare(
+                "SELECT e.ruta, COUNT(*) AS veces FROM escuchas e JOIN canciones c ON c.ruta = e.ruta \
+                 WHERE e.cuando >= ?1 GROUP BY e.ruta ORDER BY veces DESC, MAX(e.cuando) DESC LIMIT ?2",
+            )?;
+            st.query_map(params![desde, n as i64], |r| r.get(0))?
+                .collect::<Result<_, _>>()?
+        };
+        let mut v = Vec::new();
+        for r in rutas_ {
+            if let Some(c) = self.cancion(&r)? {
+                v.push(c);
+            }
+        }
+        Ok(v)
+    }
+
+    /// Tus artistas de los últimos días; sin escuchas, los que más tienes en tu biblioteca.
+    pub fn artistas_mas_escuchados(&self, desde: f64, n: usize) -> Result<Vec<String>, ErrorBiblioteca> {
+        let leer = |sql: &str, con_desde: bool| -> Result<Vec<String>, ErrorBiblioteca> {
+            let mut st = self.db.prepare(sql)?;
+            let f = |r: &rusqlite::Row<'_>| r.get::<_, Option<String>>(0);
+            let v: Vec<Option<String>> = if con_desde {
+                st.query_map(params![desde], f)?.collect::<Result<_, _>>()?
+            } else {
+                st.query_map([], f)?.collect::<Result<_, _>>()?
+            };
+            Ok(v.into_iter().map(Option::unwrap_or_default).collect())
+        };
+        let mut filas = leer("SELECT artista FROM escuchas WHERE cuando >= ?1", true)?;
+        if filas.is_empty() {
+            filas = leer("SELECT artista FROM canciones", false)?;
+        }
+        // (clave, nombre, veces) en orden de aparición: el sort de Python es estable
+        let mut cuenta: Vec<(String, String, usize)> = Vec::new();
+        for f in filas {
+            let a = letras::limpiar_artista(&f);
+            if a.is_empty() {
+                continue;
+            }
+            let k = a.to_lowercase();
+            match cuenta.iter_mut().find(|(c, _, _)| *c == k) {
+                Some(x) => x.2 += 1,
+                None => cuenta.push((k, a, 1)),
+            }
+        }
+        cuenta.sort_by_key(|c| std::cmp::Reverse(c.2));
+        Ok(cuenta.into_iter().take(n).map(|(_, a, _)| a).collect())
+    }
+
+    /// Lo que escuchaste entre `desde` y `hasta`: minutos, cuántas, cuántos días y lo más escuchado.
+    pub fn resumen(&self, desde: f64, hasta: f64, n: usize) -> Result<Value, ErrorBiblioteca> {
+        type Fila = (f64, String, String, String, f64);
+        let filas: Vec<Fila> = {
+            let mut st = self.db.prepare(
+                "SELECT cuando, ruta, titulo, artista, segundos FROM escuchas WHERE cuando >= ?1 AND cuando < ?2",
+            )?;
+            st.query_map(params![desde, hasta], |r| {
+                Ok((
+                    r.get::<_, Option<f64>>(0)?.unwrap_or(0.0),
+                    r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                    r.get::<_, Option<f64>>(4)?.unwrap_or(0.0),
+                ))
+            })?
+            .collect::<Result<_, _>>()?
+        };
+        struct Cuenta {
+            clave: String,
+            datos: Value,
+            veces: i64,
+            minutos: f64,
+        }
+        fn sumar(lista: &mut Vec<Cuenta>, clave: String, datos: impl FnOnce() -> Value, s: f64) {
+            match lista.iter_mut().find(|c| c.clave == clave) {
+                Some(c) => {
+                    c.veces += 1;
+                    c.minutos += s / 60.0;
+                }
+                None => lista.push(Cuenta {
+                    clave,
+                    datos: datos(),
+                    veces: 1,
+                    minutos: s / 60.0,
+                }),
+            }
+        }
+        let mut canciones: Vec<Cuenta> = Vec::new();
+        let mut artistas: Vec<Cuenta> = Vec::new();
+        let mut dias = HashSet::new();
+        let mut total = 0.0;
+        for (cuando, ruta, titulo, artista, seg) in &filas {
+            dias.insert(crate::fecha::dia_texto(*cuando));
+            total += seg;
+            let nombre = letras::limpiar_artista(artista); // «YOASOBI - Topic» es «YOASOBI»
+            let mostrar = if nombre.is_empty() {
+                artista.clone()
+            } else {
+                nombre.clone()
+            };
+            sumar(
+                &mut canciones,
+                format!("{}\u{0}{}", titulo.to_lowercase(), nombre.to_lowercase()),
+                || json!({"titulo": titulo, "artista": mostrar, "ruta": ruta}),
+                *seg,
+            );
+            if !nombre.is_empty() {
+                sumar(
+                    &mut artistas,
+                    nombre.to_lowercase(),
+                    || json!({"artista": nombre, "ruta": ruta}),
+                    *seg,
+                );
+            }
+        }
+        let top = |mut l: Vec<Cuenta>| -> Vec<Value> {
+            // (-veces, -minutos), estable como el sorted de Python
+            l.sort_by(|a, b| b.veces.cmp(&a.veces).then(b.minutos.total_cmp(&a.minutos)));
+            l.into_iter()
+                .take(n)
+                .map(|c| {
+                    let mut d = c.datos;
+                    d["veces"] = json!(c.veces);
+                    d["minutos"] = json!(redondear(c.minutos));
+                    d
+                })
+                .collect()
+        };
+        let distintas = canciones.len();
+        Ok(json!({
+            "desde": desde, "hasta": hasta, "minutos": redondear(total / 60.0), "escuchas": filas.len(),
+            "distintas": distintas, "dias": dias.len(), "canciones": top(canciones), "artistas": top(artistas),
+        }))
+    }
+
+    /// Canciones de tu biblioteca para agregar a una playlist, con `enPlaylist` si ya están: las que todavía
+    /// no están, primero; entre ellas, las más nuevas.
+    pub fn para_agregar(&self, pid: i64, buscar: &str, limite: usize) -> Result<Vec<Value>, ErrorBiblioteca> {
+        let dentro: HashSet<String> = {
+            let mut st = self
+                .db
+                .prepare("SELECT ruta FROM playlist_canciones WHERE playlist = ?1")?;
+            st.query_map(params![pid], |r| r.get::<_, String>(0))?
+                .collect::<Result<_, _>>()?
+        };
+        let mut v: Vec<Value> = self
+            .canciones(buscar, Orden::Agregada)?
+            .into_iter()
+            .map(|c| {
+                let en = dentro.contains(&c.ruta);
+                let mut j = serde_json::to_value(c).unwrap_or_default();
+                j["enPlaylist"] = json!(en);
+                j
+            })
+            .collect();
+        v.sort_by_key(|c| c["enPlaylist"].as_bool().unwrap_or(false)); // estable
+        v.truncate(limite);
+        Ok(v)
+    }
+
+    pub fn renombrar_playlist(&self, pid: i64, nombre: &str) -> Result<(), ErrorBiblioteca> {
+        let nombre = if nombre.trim().is_empty() {
+            "Playlist"
+        } else {
+            nombre.trim()
+        };
+        self.db.execute(
+            "UPDATE playlists SET nombre = ?1, modificada = ?2 WHERE id = ?3",
+            params![nombre, ahora_epoch(), pid],
+        )?;
+        Ok(())
+    }
+
+    /// Las rutas de las primeras canciones (para el mosaico de la portada).
+    pub fn primeras_de_playlist(&self, pid: i64, n: usize) -> Result<Vec<String>, ErrorBiblioteca> {
+        let mut st = self.db.prepare(
+            "SELECT p.ruta FROM playlist_canciones p JOIN canciones c ON c.ruta = p.ruta WHERE p.playlist = ?1 \
+             ORDER BY p.pos LIMIT ?2",
+        )?;
+        Ok(st
+            .query_map(params![pid, n as i64], |r| r.get(0))?
+            .collect::<Result<_, _>>()?)
+    }
+
+    /// Las rutas de todo lo que hay (para saber qué ids de YouTube ya tienes).
+    pub fn todas_las_rutas(&self) -> Result<Vec<String>, ErrorBiblioteca> {
+        let mut st = self.db.prepare("SELECT ruta FROM canciones")?;
+        Ok(st.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
+    }
+}
+
+/// El `round()` de Python (al par más cercano en los empates).
+pub fn redondear(x: f64) -> i64 {
+    let r = x.round();
+    if (x - x.trunc()).abs() == 0.5 && (r as i64) % 2 != 0 {
+        (r - x.signum()) as i64
+    } else {
+        r as i64
     }
 }

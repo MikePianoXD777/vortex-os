@@ -46,15 +46,15 @@ pub fn musica() -> PathBuf {
     if cfg!(windows) {
         return home.join("Music");
     }
-    if let Ok(out) = Command::new("xdg-user-dir").arg("MUSIC").output()
-        && out.status.success()
-    {
+    // xdg-user-dir se pregunta una sola vez: al escanear se pide por cada archivo (origen_de).
+    static XDG: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    let xdg = XDG.get_or_init(|| {
+        let out = Command::new("xdg-user-dir").arg("MUSIC").output().ok()?;
         let ruta = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if !ruta.is_empty() && ruta != home.to_string_lossy() {
-            return PathBuf::from(ruta);
-        }
-    }
-    home.join("Música")
+        (out.status.success() && !ruta.is_empty() && ruta != home.to_string_lossy())
+            .then(|| PathBuf::from(ruta))
+    });
+    xdg.clone().unwrap_or_else(|| home.join("Música"))
 }
 
 /// Carpeta donde quedan las canciones descargadas: `Música/Vortex Player`.

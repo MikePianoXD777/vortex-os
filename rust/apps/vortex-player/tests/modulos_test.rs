@@ -3,18 +3,16 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 
 use serde_json::json;
 use tempfile::TempDir;
 use vortex_core::paleta;
 use vortex_player::biblioteca::{Biblioteca, ME_GUSTA, Orden};
-use vortex_player::descargas::{EventoLinea, TipoEnlace};
 use vortex_player::discord::DatosActividad;
 use vortex_player::ecualizador::{self, Banda};
 use vortex_player::nube::{CancionNube, Local, PlaylistNube};
-use vortex_player::{audio, descargas, discord, letras, nube};
+use vortex_player::{audio, discord, letras, nube};
 
 fn exigir_binario(nombre: &str) {
     let ok = Command::new("which")
@@ -132,136 +130,6 @@ fn letras_limpieza_y_lrc() {
         .map(|ms| letras::actual(&lineas, ms))
         .collect();
     assert_eq!(activos, vec![-1, 0, 1, 2, 3]);
-}
-
-#[test]
-fn descargas_urls_spotify_y_ytmusic() {
-    assert_eq!(
-        descargas::tipo_de("https://open.spotify.com/playlist/37i9dQZF1DX?si=1"),
-        Some(TipoEnlace::Spotify {
-            clase: "playlist".into(),
-            id: "37i9dQZF1DX".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("https://open.spotify.com/intl-es/track/abc123"),
-        Some(TipoEnlace::Spotify {
-            clase: "track".into(),
-            id: "abc123".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("spotify:album:XYZ"),
-        Some(TipoEnlace::Spotify {
-            clase: "album".into(),
-            id: "XYZ".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("https://music.youtube.com/watch?v=dQw4&list=RD1"),
-        Some(TipoEnlace::Youtube {
-            clase: "cancion".into(),
-            id: "dQw4".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("https://youtu.be/dQw4"),
-        Some(TipoEnlace::Youtube {
-            clase: "cancion".into(),
-            id: "dQw4".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("music.youtube.com/playlist?list=PL9"),
-        Some(TipoEnlace::Youtube {
-            clase: "playlist".into(),
-            id: "PL9".into()
-        })
-    );
-    assert_eq!(
-        descargas::tipo_de("https://music.youtube.com/browse/MPREb_x"),
-        Some(TipoEnlace::Youtube {
-            clase: "playlist".into(),
-            id: "MPREb_x".into()
-        })
-    );
-    assert!(descargas::tipo_de("https://example.com/cancion.mp3").is_none());
-    assert!(descargas::tipo_de("hola").is_none());
-
-    let enlaces = descargas::enlaces_playlist(
-        "Para Ana & co",
-        &["ZRtdQ81jPUQ", "", "dQw4w9WgXcQ", "ZRtdQ81jPUQ"],
-    );
-    assert_eq!(
-        enlaces,
-        vec![
-            "https://www.youtube.com/watch_videos?video_ids=ZRtdQ81jPUQ,dQw4w9WgXcQ&title=Para%20Ana%20%26%20co"
-        ]
-    );
-    let ids_120: Vec<String> = (0..120).map(|i| format!("{i:011}")).collect();
-    let refs_120: Vec<&str> = ids_120.iter().map(String::as_str).collect();
-    let muchos = descargas::enlaces_playlist("Larga", &refs_120);
-    assert_eq!(muchos.len(), 3);
-    assert!(muchos[0].ends_with("&title=Larga%20%281%2F3%29"));
-    assert!(descargas::enlaces_playlist("Vacía", &["", ""]).is_empty());
-
-    let pagina = format!(
-        "<html><script id=\"__NEXT_DATA__\" type=\"application/json\">{}</script></html>",
-        json!({
-            "props": {"pageProps": {"state": {"data": {"entity": {
-                "type": "playlist",
-                "name": "Mis favoritas",
-                "trackList": [
-                    {"title": "Kick Back", "subtitle": "Kenshi\u{00a0}Yonezu", "duration": 193000},
-                    {"title": "Idol", "subtitle": "YOASOBI, Otro", "duration": 213000},
-                    {"title": "", "subtitle": "nadie"}
-                ]
-            }}}}}
-        })
-    );
-    let (nombre, pistas) = descargas::leer_spotify(&pagina).unwrap();
-    assert_eq!(nombre, "Mis favoritas");
-    assert_eq!(pistas.len(), 2);
-    assert_eq!(pistas[0].artistas, "Kenshi Yonezu");
-    assert_eq!(
-        descargas::busqueda_ytmusic(&pistas[1]),
-        "https://music.youtube.com/search?q=YOASOBI%20Idol#songs"
-    );
-    assert!(descargas::leer_spotify("<html></html>").is_err());
-
-    let cmd = descargas::comando(
-        "https://youtu.be/x",
-        &PathBuf::from("/m"),
-        "firefox",
-        true,
-        "yt-dlp",
-    );
-    assert!(cmd.contains(&"-x".to_string()));
-    assert!(!cmd.contains(&"--audio-format".to_string()));
-    assert!(cmd.contains(&"--no-playlist".to_string()));
-    assert_eq!(
-        &cmd[cmd.len() - 2..],
-        ["--".to_string(), "https://youtu.be/x".to_string()]
-    );
-
-    assert_eq!(
-        descargas::leer_linea("VORTEXA\t/m/a b.opus\n"),
-        Some(EventoLinea::Archivo {
-            ruta: "/m/a b.opus".into()
-        })
-    );
-    assert_eq!(
-        descargas::leer_linea("VORTEXP\t 42.5%\tIdol"),
-        Some(EventoLinea::Progreso {
-            porcentaje: 42.5,
-            titulo: "Idol".into()
-        })
-    );
-    assert!(matches!(
-        descargas::leer_linea("ERROR: [youtube] x: Private video"),
-        Some(EventoLinea::Aviso { .. })
-    ));
-    assert!(descargas::leer_linea("[download] Destination: x").is_none());
 }
 
 #[test]

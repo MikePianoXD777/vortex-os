@@ -24,9 +24,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 vortex-core.workspace = true
+libc.workspace = true
+tempfile.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 
 [lints]
 workspace = true

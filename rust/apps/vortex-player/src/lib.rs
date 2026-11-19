@@ -7,12 +7,15 @@ pub mod audio;
 pub mod biblioteca;
 pub mod calidad;
 pub mod cola;
+pub mod cripto;
 pub mod descargas;
 pub mod discord;
 pub mod ecualizador;
+pub mod fecha;
 pub mod letras;
 pub mod mpv;
 pub mod nube;
+pub mod red;
 pub mod rutas;
 
 /// Nombre de la app, como en la de Python.
