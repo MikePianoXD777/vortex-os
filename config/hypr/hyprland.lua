@@ -137,10 +137,14 @@ end)
 --   hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 require("config/monitors")
 -- Cada pantalla a su frecuencia más alta (hasta 240 Hz) en su resolución máxima: «preferred» deja
--- muchos monitores de 144-240 Hz en 60. Lo hace bin/vortex-pantallas al entrar y al conectar un
--- monitor; no toca los que configuraste en hypr-mio.lua o en Ajustes → Pantalla.
+-- muchos monitores de 144-240 Hz en 60. Lo hace bin/vortex-pantallas al entrar, al conectar un
+-- monitor y al recargar la config (cada recarga vuelve a aplicar config/monitors con «preferred» y
+-- dejaba la pantalla en 60 Hz, p. ej. después de «vortex actualizar»); no toca los que configuraste
+-- en hypr-mio.lua o en Ajustes → Pantalla. No usamos «highrr»: puede bajar la resolución con tal de
+-- subir los Hz; vortex-pantallas se queda en la nativa.
 hl.on("hyprland.start", function() hl.exec_cmd("vortex-pantallas") end)
 hl.on("monitor.added", function() hl.exec_cmd("vortex-pantallas") end)
+hl.on("config.reloaded", function() hl.exec_cmd("vortex-pantallas") end)
 require("config/settings")
 -- Vortexine's 1.2: ventanas más redondeadas, con curva suave (como el shell, borderRadius 18), y
 -- un 15 % más de espacio entre ventanas y en las orillas (4 → 5 y 6 → 7 px).
