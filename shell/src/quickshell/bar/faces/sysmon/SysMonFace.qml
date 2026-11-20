@@ -119,8 +119,30 @@ Item {
         property bool useSineWave: root.useSineWave
         property bool initAnimTrigger: (!barWindow || !!(root.activeTarget && root.activeTarget.isPreview))
 
-        property real animValue: initAnimTrigger ? value : 0
-        Behavior on animValue { NumberAnimation { duration: 600; easing.type: Easing.OutQuint } }
+        // Vortex 4.0.7: temporizador, no Behavior/NumberAnimation. Los datos llegan cada 2 s y una
+        // animación de Qt de 600 ms hacía redibujar todas las ventanas del shell (las barras y los
+        // fondos de cada monitor) a la frecuencia del monitor un tercio del tiempo (medido con
+        // qmlprofiler: ~700 cuadros/s a 200 Hz). Con el temporizador solo se redibuja la barra, a 30 fps.
+        readonly property real targetValue: initAnimTrigger ? value : 0
+        property real animValue: 0
+        property real tweenFrom: 0
+        property real tweenStart: 0
+        onTargetValueChanged: {
+            tweenFrom = animValue;
+            tweenStart = Date.now();
+            tween.restart();
+        }
+        Timer {
+            id: tween
+            interval: 33
+            repeat: true
+            onTriggered: {
+                const p = Math.min(1, (Date.now() - circleRoot.tweenStart) / 600);
+                const e = 1 - Math.pow(1 - p, 5); // OutQuint, como la animación de antes
+                circleRoot.animValue = circleRoot.tweenFrom + (circleRoot.targetValue - circleRoot.tweenFrom) * e;
+                if (p >= 1) stop();
+            }
+        }
 
         property real fillRatio: Math.max(0.0, Math.min(1.0, isNaN(animValue) ? 0.0 : animValue))
 
