@@ -1771,6 +1771,8 @@ cmd_actualizar() {
   pantalla_inicio
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
+  # 4.0.6: la unidad de OneDrive de antes reintentaba cada 20 s para siempre si la cuenta estaba rota.
+  "$VORTEX_DIR/bin/vortex-onedrive" poner-al-dia 2>/dev/null || true
   # Hasta la 1.6.2 el modo otaku podía apagarse dejando sus fondos en el selector (vortex-otaku reparar).
   "$VORTEX_DIR/bin/vortex-otaku" reparar 2>/dev/null || true
   # 2.0.2: los clips graban solo en el modo juego; el grabador que dejó corriendo el shell de antes se

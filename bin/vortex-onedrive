@@ -25,7 +25,10 @@ ABOUT="$ESTADO_DIR/onedrive-espacio.json"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/vortex/onedrive"
 CARPETA="${VORTEX_ONEDRIVE_CARPETA:-$HOME/OneDrive}"
 UNIDAD=vortex-onedrive.service
+UNIDAD_FALLO=vortex-onedrive-fallo.service
+YO="$(command -v vortex-onedrive 2>/dev/null || readlink -f "${BASH_SOURCE[0]}")"
 UNIDAD_ARCHIVO="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$UNIDAD"
+UNIDAD_FALLO_ARCHIVO="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$UNIDAD_FALLO"
 MARCADORES="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/bookmarks"
 WEB="https://onedrive.live.com/"
 
@@ -39,7 +42,9 @@ fallo() {
   exit 1
 }
 
-conectado() { [[ -f "$RC" ]] && grep -q '^\[onedrive\]' "$RC" && grep -q '^token = ' "$RC"; }
+# 4.0.6: sin drive_id rclone no puede montar («unable to get drive_id and drive_type»): esa cuenta no
+# cuenta como conectada, y «conectar» vuelve a iniciar sesión.
+conectado() { [[ -f "$RC" ]] && grep -q '^\[onedrive\]' "$RC" && grep -q '^token = ' "$RC" && grep -q '^drive_id = .' "$RC"; }
 montado() { mountpoint -q "$CARPETA" 2>/dev/null; }
 conectando() { [[ -f "$CONECTANDO" ]] && kill -0 "$(cat "$CONECTANDO" 2>/dev/null)" 2>/dev/null; }
 
@@ -62,6 +67,11 @@ escribir_unidad() {
 [Unit]
 Description=OneDrive en la carpeta $CARPETA
 After=network-online.target
+# 4.0.6: si falla 3 veces en 5 min, se rinde (antes reintentaba cada 20 s para siempre) y
+# $UNIDAD_FALLO deja el aviso para el panel. Un fallo suelto (sin red al arrancar) no avisa.
+StartLimitIntervalSec=300
+StartLimitBurst=3
+OnFailure=$UNIDAD_FALLO
 
 [Service]
 Type=notify
@@ -70,9 +80,19 @@ ExecStart=/usr/bin/rclone mount onedrive: "$CARPETA" --config "$RC" --cache-dir 
 ExecStop=/usr/bin/fusermount3 -uz "$CARPETA"
 Restart=on-failure
 RestartSec=20
+ExecStartPost=/usr/bin/rm -f "$ERROR"
 
 [Install]
 WantedBy=default.target
+FIN
+  cat >"$UNIDAD_FALLO_ARCHIVO" <<FIN
+# Vortexine's OS (vortex onedrive): cuando $UNIDAD se rinde, deja el aviso para el panel.
+[Unit]
+Description=Aviso de OneDrive cuando no se pudo montar
+
+[Service]
+Type=oneshot
+ExecStart="$YO" fallo-montaje
 FIN
 }
 
@@ -159,6 +179,27 @@ estado() {
       error: $error, carpeta: $carpeta, usado: ($espacio.used // -1), total: ($espacio.total // -1)}'
 }
 
+# Lo llama la unidad cuando rclone no pudo montar: deja el error para el panel y avisa una vez.
+fallo_montaje() {
+  [[ -f "$ERROR" ]] && return 0
+  mkdir -p "$ESTADO_DIR"
+  printf '%s\n' "OneDrive no pudo abrir tu cuenta. Desconéctalo y vuelve a conectarlo desde el panel." >"$ERROR"
+  notificar "OneDrive" "No pudo abrir tu cuenta. Desconéctalo y vuelve a conectarlo desde el panel de OneDrive."
+}
+
+# Lo llama «vortex actualizar»: reescribe la unidad de quien ya tenía OneDrive (con el límite de
+# reintentos) y, si la cuenta está rota, apaga la unidad para que no se quede reintentando.
+poner_al_dia() {
+  [[ -f "$UNIDAD_ARCHIVO" ]] || return 0
+  escribir_unidad
+  systemctl --user daemon-reload 2>/dev/null
+  if ! conectado; then
+    systemctl --user disable --now "$UNIDAD" >/dev/null 2>&1
+    fallo_montaje
+  fi
+  return 0
+}
+
 abrir() {
   if montado; then
     setsid -f xdg-open "$CARPETA" >/dev/null 2>&1
@@ -171,7 +212,7 @@ desconectar() {
   # La caché no se borra: si quedó algo por subir, rclone lo sube al volver a conectar.
   systemctl --user disable --now "$UNIDAD" >/dev/null 2>&1
   montado && fusermount3 -uz "$CARPETA" 2>/dev/null
-  rm -f "$UNIDAD_ARCHIVO" "$ABOUT" "$ERROR"
+  rm -f "$UNIDAD_ARCHIVO" "$UNIDAD_FALLO_ARCHIVO" "$ABOUT" "$ERROR"
   systemctl --user daemon-reload 2>/dev/null
   rm -f "$RC" "$CONF_DIR/conectar.log"
   rmdir "$CONF_DIR" 2>/dev/null
@@ -187,5 +228,7 @@ case "${1:-estado}" in
   espacio) espacio ;;
   abrir) abrir ;;
   desconectar) desconectar ;;
+  fallo-montaje) fallo_montaje ;;
+  poner-al-dia) poner_al_dia ;;
   *) echo "uso: vortex-onedrive [estado | conectar | montar | abrir | desconectar]" >&2; exit 2 ;;
 esac

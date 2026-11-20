@@ -98,6 +98,30 @@ rm -rf "$H/OneDrive"
 od conectar 2>/dev/null
 [[ "$(campo '"\(.montado) \(.error)"')" == "true " ]] && bien "al volver a intentar, se borra el error" || mal "error viejo: $(od estado)"
 
+echo "== cuenta rota (4.0.6)"
+grep -q "^StartLimitBurst=3" "$UNIDAD" && grep -q "^OnFailure=vortex-onedrive-fallo.service" "$UNIDAD" &&
+  [[ -f "$H/.config/systemd/user/vortex-onedrive-fallo.service" ]] &&
+  bien "la unidad se rinde tras 3 intentos y avisa con su propia unidad" || mal "límite: $(cat "$UNIDAD")"
+grep -q '^ExecStartPost=/usr/bin/rm -f ".*onedrive-error"' "$UNIDAD" && bien "si monta, borra el aviso viejo" || mal "ExecStartPost: $(grep ExecStartPost "$UNIDAD")"
+od fallo-montaje
+[[ "$(campo .error)" == "OneDrive no pudo abrir tu cuenta"* ]] && bien "fallo-montaje deja el aviso para el panel" || mal "fallo-montaje: $(od estado)"
+: >"$T/registro"; od fallo-montaje
+! grep -q notify-send "$T/registro" && bien "y avisa una sola vez" || mal "avisó dos veces"
+sed -i '/^drive_id/d' "$RC"
+[[ "$(campo .conectado)" == false ]] && bien "sin drive_id la cuenta no cuenta como conectada" || mal "sin drive_id: $(od estado)"
+: >"$T/registro"
+sed -i '/^StartLimit/d' "$UNIDAD"
+od poner-al-dia
+grep -q "^StartLimitBurst=3" "$UNIDAD" && grep -q "systemctl --user disable --now vortex-onedrive.service" "$T/registro" &&
+  bien "poner-al-dia reescribe la unidad vieja y apaga la de una cuenta rota" || mal "poner-al-dia: $(cat "$T/registro")"
+: >"$T/registro"; od conectar 2>/dev/null
+grep -q "config create" "$T/registro" && [[ "$(campo '"\(.conectado) \(.montado)"')" == "true true" ]] &&
+  bien "«conectar» vuelve a iniciar sesión y monta" || mal "reconectar rota: $(od estado)"
+od desconectar
+[[ ! -e "$H/.config/systemd/user/vortex-onedrive-fallo.service" ]] && bien "desconectar borra también la unidad del aviso" || mal "quedó la unidad del aviso"
+rm -rf "$H/.config/systemd"; : >"$T/registro"; od poner-al-dia
+[[ ! -s "$T/registro" ]] && bien "sin OneDrive, poner-al-dia no hace nada" || mal "poner-al-dia sin OneDrive: $(cat "$T/registro")"
+
 echo
 ((FALLOS)) && { echo "$FALLOS pruebas fallaron."; exit 1; }
 echo "Todas las pruebas pasaron."
