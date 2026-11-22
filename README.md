@@ -348,11 +348,10 @@ Claude), así que no gasta RAM cuando no la usas.
 - **Comandos:** `vortex miku` abre o cierra, `vortex miku estado` dice si el 3D está encendido y si está
   abierta, `vortex miku voz [ID]` lista o elige la voz y `vortex miku modelo RUTA.vrm` pone otro modelo 3D.
   Las opciones quedan en `~/.config/vortex/miku.json`.
-- **El modelo 3D no viene en este repo ni en el paquete** (es del autor del personaje y su licencia pide
-  crédito). La ISO lo toma al construirse de la carpeta `VORTEX_MIKU_MODELO` (con `modelo.vrm` y
-  `CREDITO.txt`; si no se la das, usa `~/.local/share/vortex/miku` de quien corre `sudo`) y lo deja en
-  `/usr/share/vortex-miku/modelo/`; sin modelo la ISO sale igual y Miku funciona como solo voz. `install.sh`
-  tampoco lo trae: la app muestra cómo ponerlo. La ventana de Miku lleva el crédito a la vista.
+- **El modelo 3D de fábrica es «MIKU NAKANO», de Vewertyg (VRoid Hub)**: su licencia permite
+  redistribuirlo con crédito y sin uso comercial, así que va en el repo (`apps/miku/modelo/`, con su
+  `CREDITO.txt`) y el paquete `vortex-miku` lo deja en `/usr/share/vortex-miku/modelo/` (desde la 4.0.8).
+  La ventana de Miku lleva el crédito a la vista. Con `vortex miku modelo RUTA.vrm` pones otro.
 
 Las pruebas corren sin VM ni pantalla: `pruebas/miku.sh` (el comando, la ISO y el instalador),
 `pruebas/miku-qml.sh` (el interruptor de Ajustes, con el quickshell de verdad) y `pruebas/atajos.sh` (Super+O y

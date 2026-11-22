@@ -9,8 +9,8 @@ Modelo 3D «MIKU NAKANO»
   Autor: Vewertyg (VRoid Hub). Crédito obligatorio, sin uso comercial (personal ni corporativo),
   sin expresión sexual; se permite modificarlo y redistribuirlo. El crédito exacto va en el archivo
   CREDITO.txt que acompaña al modelo y se ve en la ventana de Miku (botón de información).
-  El modelo no forma parte del código: no está en el repositorio, lo pone la ISO en
-  /usr/share/vortex-miku/modelo/ (o tú con «vortex-miku modelo RUTA.vrm»).
+  Viene sin cambios en el paquete, en /usr/share/vortex-miku/modelo/ (en el repositorio, en
+  apps/miku/modelo/); puedes poner otro con «vortex-miku modelo RUTA.vrm».
 
 Voz natural (opcional, en la GPU o, lenta, en la CPU): Qwen3-TTS
   Alibaba Qwen Team (https://github.com/QwenLM/Qwen3-TTS), modelo Qwen3-TTS-12Hz-1.7B-Base (en la GPU) o

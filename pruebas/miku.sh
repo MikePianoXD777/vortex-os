@@ -8,7 +8,7 @@
 #   3. la ISO: iso/paquetes.sh construye vortex-miku, iso/paquetes.txt lo trae instalado, y
 #      iso/miku-modelo.sh (lo que usa construir.sh) pone el modelo 3D en la imagen: modelo.vrm y
 #      CREDITO.txt en /usr/share/vortex-miku/modelo/ con modo 0644, avisa y sigue si falta el
-#      modelo o el crédito, y rechaza lo que no es un VRM; el *.vrm nunca va a git;
+#      modelo o el crédito, y rechaza lo que no es un VRM; en git solo el de fábrica (con su crédito);
 #   4. install.sh: el paso install/65-miku.sh arma el paquete con makepkg -sif (en modo prueba solo
 #      lo muestra), se puede omitir (--sin-miku) y, si falla, avisa y sigue;
 #   5. el README habla del asistente, de Super+O y de los créditos del modelo.
@@ -180,7 +180,9 @@ eval "$(sed -n '/^for archivo in "\${MIKU_ARCHIVOS\[@\]}"; do$/,/^done$/p' "$AQU
 permisos="$(bash -c 'declare -A file_permissions; source "$1"; for k in "${!file_permissions[@]}"; do echo "$k=${file_permissions[$k]}"; done | sort' _ "$perfil/profiledef.sh")"
 probar "profiledef.sh queda con el modelo y el crédito en 0:0:644 y lo anterior intacto" \
   test "$permisos" == $'/usr/local/bin/=0:0:755\n/usr/share/vortex-miku/modelo/CREDITO.txt=0:0:644\n/usr/share/vortex-miku/modelo/modelo.vrm=0:0:644'
-probar "ningún .vrm está en git" bash -c '[[ -z "$(git -C "$1" ls-files | grep -i "\.vrm$")" ]]' _ "$AQUI"
+# 4.0.8: el de fábrica (MIKU NAKANO, de Vewertyg; su licencia permite redistribuirlo con crédito) sí va.
+probar "en git solo el .vrm de fábrica" bash -c '[[ -z "$(git -C "$1" ls-files | grep -i "\.vrm$" | grep -vx apps/miku/modelo/modelo.vrm)" ]]' _ "$AQUI"
+probar "…y con su CREDITO.txt (Vewertyg)" grep -q Vewertyg "$AQUI/apps/miku/modelo/CREDITO.txt"
 probar "*.vrm está en .gitignore (git no lo agrega)" git -C "$AQUI" check-ignore -q packaging/vortex-miku/modelo.vrm
 
 # ---------------------------------------------------------------------------------------------

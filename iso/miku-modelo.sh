@@ -2,9 +2,9 @@
 # El modelo 3D de Miku en la imagen de la ISO. Lo carga iso/construir.sh con source (y
 # pruebas/miku.sh lo prueba sin root ni archiso).
 #
-# El modelo NO va en el repo (*.vrm está en .gitignore) ni en el paquete vortex-miku: es de su autor
-# y su licencia pide crédito. Se pone al construir la ISO, desde una carpeta con modelo.vrm y
-# CREDITO.txt:
+# Desde la 4.0.8 el de fábrica (MIKU NAKANO, de Vewertyg) ya viene en el paquete vortex-miku
+# (apps/miku/modelo/). Esto queda para construir una ISO con otro modelo, desde una carpeta con
+# modelo.vrm y CREDITO.txt:
 #
 #   sudo VORTEX_MIKU_MODELO=/ruta/a/la/carpeta iso/construir.sh
 #

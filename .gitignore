@@ -12,9 +12,10 @@ packaging/*/pkg/
 packaging/*/src/
 packaging/*/*.pkg.tar.*
 
-# Modelos 3D (VRM) del asistente Miku: son del autor del modelo, nunca van a git. La ISO los toma
-# de VORTEX_MIKU_MODELO al construirse (iso/miku-modelo.sh).
+# Modelos 3D (VRM) del asistente Miku: no van a git, salvo el de fábrica (MIKU NAKANO, de Vewertyg,
+# cuya licencia permite redistribuirlo con crédito: apps/miku/modelo/CREDITO.txt).
 *.vrm
+!apps/miku/modelo/modelo.vrm
 # Fuentes que baja makepkg (three.js, three-vrm…)
 packaging/*/*.tgz
 packaging/vortex-miku/whisper.cpp-MIT.txt
