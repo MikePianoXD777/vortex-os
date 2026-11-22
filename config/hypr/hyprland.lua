@@ -118,6 +118,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("vortex novedades mostrar")
     -- Vortex 1.8: fondos que cambian solos (si se encendió en Ajustes → Tema; si no, solo duerme).
     hl.exec_cmd("vortex fondos-auto correr")
+    -- Vortex 4.0.8: la compañera de escritorio, si la encendiste («vortex mascota on»); si no, nada.
+    hl.exec_cmd("vortex mascota al-iniciar")
     -- Gestor de recursos automático (prioridad a la ventana enfocada, modo juego solo y
     -- presión de memoria). «vortex gestor apagar» lo deshabilita.
     hl.exec_cmd("systemctl --user -q is-enabled vortex-gestor.service && systemctl --user start vortex-gestor.service")

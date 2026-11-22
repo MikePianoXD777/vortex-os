@@ -1,0 +1,27 @@
+[package]
+name = "vortex-mascota"
+description = "La compañera de escritorio de Vortexine's OS: un sprite de pixel art que camina por tu pantalla"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vortex-mascota"
+path = "src/main.rs"
+
+[dependencies]
+png = "0.17"
+smithay-client-toolkit = { version = "0.20", default-features = false, features = ["calloop"] }
+wayland-client = "0.31"
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

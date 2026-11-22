@@ -64,6 +64,9 @@ Uso: vortex <comando>
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   fondo-agregar [ARCHIVO...]           copia videos (mp4, mov, mkv, webm, avi…) o imágenes a tus fondos
                                        y pone el primero; sin archivos, los eliges en una ventana
+  mascota [on|off|usar CARPETA|original]
+                                       la compañera de escritorio: camina por tu pantalla, se sube a las
+                                       ventanas y se esconde cuando juegas («usar»: tu propio paquete Shimeji)
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
   bateria [estado|on|off]              modo laptop: ahorra al desenchufar y vuelve al enchufar (lo llama el shell)
   arreglar [ID]                        «algo no funciona»: revisa sonido, internet, Bluetooth, disco… y lo arregla
@@ -338,6 +341,31 @@ cambiar_fondo_al_azar() {
   local fondo
   fondo="$(fondo_al_azar)" || return 0
   [[ -n "$fondo" ]] && cmd_fondo "$fondo"
+}
+
+# ---- Compañera de escritorio (4.0.8) ------------------------------------------------------------------
+# vortex-mascota (paquete vortex-rust): un sprite que camina por la orilla de abajo, se sube a las ventanas,
+# se duerme si no usas la PC y se esconde cuando juegas. Se enciende con «on» (se queda para los próximos
+# inicios de sesión: marca en ~/.config/vortex/mascota-encendida) y se apaga con «off».
+MARCA_MASCOTA="$CONF/mascota-encendida"
+cmd_mascota() {
+  command -v vortex-mascota >/dev/null || { aviso "falta vortex-mascota (viene en el paquete vortex-rust): corre «vortex actualizar»"; exit 1; }
+  case "${1:-alternar}" in
+    on | encender)
+      mkdir -p "$CONF" && : >"$MARCA_MASCOTA"
+      setsid -f vortex-mascota </dev/null >/dev/null 2>&1
+      echo "Compañera encendida: clic para que te hable, doble clic abre a Miku, arrástrala, clic derecho para que se vaya." ;;
+    off | apagar)
+      rm -f "$MARCA_MASCOTA"
+      vortex-mascota apagar ;;
+    alternar)
+      if vortex-mascota estado | grep -q '^encendida'; then cmd_mascota off; else cmd_mascota on; fi ;;
+    al-iniciar)
+      [[ -e "$MARCA_MASCOTA" ]] && exec vortex-mascota
+      return 0 ;;
+    usar | original | estado | hoja) exec vortex-mascota "$@" ;;
+    *) aviso "uso: vortex mascota [on|off|alternar|estado|usar CARPETA|original]"; exit 1 ;;
+  esac
 }
 
 cmd_fondos_auto() {
@@ -2560,6 +2588,7 @@ case "${1:-ayuda}" in
   fondo) shift; cmd_fondo "$@" ;;
   fondo-agregar) shift; cmd_fondo_agregar "$@" ;;
   fondos-auto) shift; cmd_fondos_auto "$@" ;;
+  mascota) shift; cmd_mascota "$@" ;;
   bateria) shift; cmd_bateria "$@" ;;
   fps) shift; cmd_fps "$@" ;;
   saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
