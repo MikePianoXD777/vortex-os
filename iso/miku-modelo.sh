@@ -2,7 +2,7 @@
 # El modelo 3D de Miku en la imagen de la ISO. Lo carga iso/construir.sh con source (y
 # pruebas/miku.sh lo prueba sin root ni archiso).
 #
-# Desde la 4.0.8 el de fábrica (MIKU NAKANO, de Vewertyg) ya viene en el paquete vortex-miku
+# Desde la 4.1 el de fábrica (MIKU NAKANO, de Vewertyg) ya viene en el paquete vortex-miku
 # (apps/miku/modelo/). Esto queda para construir una ISO con otro modelo, desde una carpeta con
 # modelo.vrm y CREDITO.txt:
 #

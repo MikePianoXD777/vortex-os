@@ -180,7 +180,7 @@ eval "$(sed -n '/^for archivo in "\${MIKU_ARCHIVOS\[@\]}"; do$/,/^done$/p' "$AQU
 permisos="$(bash -c 'declare -A file_permissions; source "$1"; for k in "${!file_permissions[@]}"; do echo "$k=${file_permissions[$k]}"; done | sort' _ "$perfil/profiledef.sh")"
 probar "profiledef.sh queda con el modelo y el crédito en 0:0:644 y lo anterior intacto" \
   test "$permisos" == $'/usr/local/bin/=0:0:755\n/usr/share/vortex-miku/modelo/CREDITO.txt=0:0:644\n/usr/share/vortex-miku/modelo/modelo.vrm=0:0:644'
-# 4.0.8: el de fábrica (MIKU NAKANO, de Vewertyg; su licencia permite redistribuirlo con crédito) sí va.
+# 4.1: el de fábrica (MIKU NAKANO, de Vewertyg; su licencia permite redistribuirlo con crédito) sí va.
 probar "en git solo el .vrm de fábrica" bash -c '[[ -z "$(git -C "$1" ls-files | grep -i "\.vrm$" | grep -vx apps/miku/modelo/modelo.vrm)" ]]' _ "$AQUI"
 probar "…y con su CREDITO.txt (Vewertyg)" grep -q Vewertyg "$AQUI/apps/miku/modelo/CREDITO.txt"
 probar "*.vrm está en .gitignore (git no lo agrega)" git -C "$AQUI" check-ignore -q packaging/vortex-miku/modelo.vrm

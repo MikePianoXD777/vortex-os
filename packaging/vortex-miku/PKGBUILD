@@ -7,7 +7,7 @@
 #   - las licencias de todo en /usr/share/licenses/vortex-miku/.
 #
 #   - el modelo 3D «MIKU NAKANO» de Vewertyg (VRoid Hub; su licencia permite redistribuirlo con crédito y sin
-#     uso comercial) con su CREDITO.txt en /usr/share/vortex-miku/modelo/ (desde el pkgrel 5, 4.0.8).
+#     uso comercial) con su CREDITO.txt en /usr/share/vortex-miku/modelo/ (desde el pkgrel 5, 4.1).
 #
 # NO trae los modelos de voz y de oído (~560 MB: la ISO no los carga; la app los
 # baja la primera vez que se abre a Miku, con URL fija y sha256, a ~/.local/share/vortex/miku/).

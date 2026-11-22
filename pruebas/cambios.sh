@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2015,SC2034,SC1090
-# Prueba de los cambios hechos a mano (4.0.8, traer_vortex / cmd_cambios / apartar_paquetes de bin/vortex):
+# Prueba de los cambios hechos a mano (4.1, traer_vortex / cmd_cambios / apartar_paquetes de bin/vortex):
 # un repo «oficial» de mentira (bare), una copia instalada con archivos cambiados, sueltos y commits sin
 # publicar, y un pacman falso que dice que un archivo de vortex-miku no es el original. Todo en un HOME
 # temporal: no toca git ni pacman de verdad.

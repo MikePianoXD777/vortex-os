@@ -1,4 +1,4 @@
-//! La compañera de escritorio de Vortexine's OS (4.0.8): un sprite de pixel art, diseño original de
+//! La compañera de escritorio de Vortexine's OS (4.1): un sprite de pixel art, diseño original de
 //! Vortexine's (audífonos blancos con morado, sudadera negra), que camina por la orilla de abajo de la
 //! pantalla, se sube a las ventanas, se cae si las mueves, se sienta, se duerme cuando no usas la PC y
 //! se esconde cuando juegas.

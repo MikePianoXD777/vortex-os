@@ -343,7 +343,7 @@ cambiar_fondo_al_azar() {
   [[ -n "$fondo" ]] && cmd_fondo "$fondo"
 }
 
-# ---- Compañera de escritorio (4.0.8) ------------------------------------------------------------------
+# ---- Compañera de escritorio (4.1) ------------------------------------------------------------------
 # vortex-mascota (paquete vortex-rust): un sprite que camina por la orilla de abajo, se sube a las ventanas,
 # se duerme si no usas la PC y se esconde cuando juegas. Se enciende con «on» (se queda para los próximos
 # inicios de sesión: marca en ~/.config/vortex/mascota-encendida) y se apaga con «off».
@@ -364,7 +364,7 @@ cmd_mascota() {
       [[ -e "$MARCA_MASCOTA" ]] && exec vortex-mascota
       return 0 ;;
     usar | original | estado | hoja) exec vortex-mascota "$@" ;;
-    *) aviso "uso: vortex mascota [on|off|alternar|estado|usar CARPETA|original]"; exit 1 ;;
+    *) aviso "uso: vortex mascota [on|off|alternar|estado|usar CARPETA|ARCHIVO.zip|original]"; exit 1 ;;
   esac
 }
 
@@ -1113,7 +1113,7 @@ traer_vortex() {
     git_vortex reset -q --hard origin/main
     return
   fi
-  # 4.0.8: antes era un «git pull --ff-only» a secas, y cualquier archivo cambiado a mano lo hacía fallar
+  # 4.1: antes era un «git pull --ff-only» a secas, y cualquier archivo cambiado a mano lo hacía fallar
   # sin explicar nada («¿sin red?»): la actualización no llegaba nunca. Ahora se trae, se revisa qué es
   # distinto de la versión oficial y, si hay algo, se avisa, se guarda en un respaldo y se pone la oficial.
   if [[ "$(git_leer branch --show-current 2>/dev/null)" != main ]]; then
@@ -1130,7 +1130,7 @@ traer_vortex() {
   git_vortex merge -q --ff-only origin/main
 }
 
-# ---- Cambios hechos a mano (4.0.8) ----------------------------------------------------------------------
+# ---- Cambios hechos a mano (4.1) ----------------------------------------------------------------------
 # Lo que tu Vortexine's tiene distinto de la versión oficial: archivos del código cambiados o borrados,
 # archivos sueltos que no son del repo, commits tuyos sin publicar y archivos cambiados dentro de los
 # paquetes ya instalados. Si se quedan, la actualización choca con ellos («git pull» se niega) o se
@@ -1982,7 +1982,7 @@ cmd_actualizar() {
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  # 4.0.8: un paquete con archivos cambiados a mano se reinstala aunque su versión sea la misma.
+  # 4.1: un paquete con archivos cambiados a mano se reinstala aunque su versión sea la misma.
   local -A reinstalar=()
   while IFS= read -r pkg; do [[ -n "$pkg" ]] && reinstalar["$pkg"]=1; done < <(apartar_paquetes)
   for pkg in "${PAQUETES_PROPIOS[@]}"; do

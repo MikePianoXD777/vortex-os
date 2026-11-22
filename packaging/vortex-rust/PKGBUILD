@@ -40,12 +40,12 @@
 #     abrir un juego y vortex-partida pone lo que encontró en el resumen del final; «vortex tirones» da el detalle.
 #   - vortex-traducir (4.0, solo en Rust): Super+Alt+T traduce lo seleccionado con la IA local (Ollama).
 #   - vortex-limpieza (4.0, solo en Rust): la limpieza de la semana (temporizador de usuario que deja «vortex»).
-#   - vortex-mascota (4.0.8, solo en Rust): la compañera de escritorio, un sprite que camina por la pantalla
+#   - vortex-mascota (4.1, solo en Rust): la compañera de escritorio, un sprite que camina por la pantalla
 #     (capa de Wayland, sin Qt: casi no gasta). De fábrica un diseño original; cada quien puede poner su paquete
 #     Shimeji o de tiras (animations.json + spritesheets_128/) en ~/.local/share/vortex/mascota
 #     («vortex mascota usar CARPETA|ARCHIVO.zip»). El repo no trae personajes ajenos.
 #   - vortex-usb-rs también respalda a una memoria marcada «Usar para respaldos» (4.0).
-#   - Vortex Player (4.0.8): avisa por MPRIS cuando cambia CanSeek y manda la duración de mpv si la canción no la
+#   - Vortex Player (4.1): avisa por MPRIS cuando cambia CanSeek y manda la duración de mpv si la canción no la
 #     trae: la barra del panel de música ya deja elegir el tiempo.
 #
 #   cd packaging/vortex-rust && makepkg -si

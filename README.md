@@ -350,7 +350,7 @@ Claude), así que no gasta RAM cuando no la usas.
   Las opciones quedan en `~/.config/vortex/miku.json`.
 - **El modelo 3D de fábrica es «MIKU NAKANO», de Vewertyg (VRoid Hub)**: su licencia permite
   redistribuirlo con crédito y sin uso comercial, así que va en el repo (`apps/miku/modelo/`, con su
-  `CREDITO.txt`) y el paquete `vortex-miku` lo deja en `/usr/share/vortex-miku/modelo/` (desde la 4.0.8).
+  `CREDITO.txt`) y el paquete `vortex-miku` lo deja en `/usr/share/vortex-miku/modelo/` (desde la 4.1).
   La ventana de Miku lleva el crédito a la vista. Con `vortex miku modelo RUTA.vrm` pones otro.
 
 Las pruebas corren sin VM ni pantalla: `pruebas/miku.sh` (el comando, la ISO y el instalador),
