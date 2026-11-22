@@ -315,9 +315,14 @@ fn wav(ruta: &std::path::Path, segundos: f64) {
     std::fs::write(ruta, b).unwrap();
 }
 
+/// Las pruebas con mpv de verdad, de una en una: el socket de mpv va por PID y dos a la vez en este proceso
+/// chocaban (de_punta_a_punta_con_mpv fallaba al correr junto a buscar_lleva_a_mpv_al_punto).
+static UN_MPV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 #[allow(unsafe_code)] // set_var antes de arrancar hilos
 fn de_punta_a_punta_con_mpv() {
+    let _turno = UN_MPV.lock().unwrap_or_else(|e| e.into_inner());
     if std::process::Command::new("mpv").arg("--version").output().is_err() {
         eprintln!("falta mpv: se salta");
         return;
@@ -361,6 +366,7 @@ fn de_punta_a_punta_con_mpv() {
 #[test]
 #[allow(unsafe_code)] // set_var antes de arrancar hilos
 fn buscar_lleva_a_mpv_al_punto() {
+    let _turno = UN_MPV.lock().unwrap_or_else(|e| e.into_inner());
     if std::process::Command::new("mpv").arg("--version").output().is_err() {
         eprintln!("falta mpv: se salta");
         return;
@@ -375,7 +381,7 @@ fn buscar_lleva_a_mpv_al_punto() {
     let mut r = Reproductor::new();
     r.tocar(&lista, 0);
     mpv.despachar(&mut r);
-    let mut esperar = |r: &mut Reproductor, mpv: &mut MpvProceso, hasta: &dyn Fn(&Reproductor) -> bool| {
+    let esperar = |r: &mut Reproductor, mpv: &mut MpvProceso, hasta: &dyn Fn(&Reproductor) -> bool| {
         let limite = std::time::Instant::now() + Duration::from_secs(15);
         while std::time::Instant::now() < limite && !hasta(r) {
             match rx.recv_timeout(Duration::from_millis(100)) {

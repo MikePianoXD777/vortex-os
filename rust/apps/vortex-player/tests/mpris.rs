@@ -94,3 +94,90 @@ fn en_un_bus_propio() {
     let _ = d.kill();
     let _ = d.wait();
 }
+
+/// Vortex Player se abre sin canción (CanSeek = false) y luego suena una: tiene que avisar que ya se puede
+/// adelantar. Si no, el panel de música se quedaba con CanSeek = false y su barra no dejaba elegir el tiempo
+/// (Quickshell: «Cannot set position … because canSeek is false»). Y si la canción no trae su duración, va la
+/// de mpv (sin duración la barra del panel no tiene a dónde moverse).
+#[test]
+fn avisa_que_ya_se_puede_adelantar() {
+    use futures_util::StreamExt;
+    let t = tempfile::tempdir().unwrap();
+    let sock = t.path().join("bus");
+    let Ok(mut d) = Command::new("dbus-daemon")
+        .args([
+            "--session",
+            "--nofork",
+            "--print-address=1",
+            &format!("--address=unix:path={}", sock.display()),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        eprintln!("falta dbus-daemon: se salta");
+        return;
+    };
+    let mut dir = String::new();
+    BufReader::new(d.stdout.take().unwrap())
+        .read_line(&mut dir)
+        .unwrap();
+    let dir = dir.trim().to_string();
+    let (tx, _rx) = mpsc::channel();
+    let m = Mpris::arrancar(Some(&dir), tx).expect("se registra en el bus");
+
+    async_io::block_on(async {
+        let c = zbus::connection::Builder::address(dir.as_str())
+            .build()
+            .await
+            .unwrap();
+        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player")
+            .await
+            .unwrap();
+        assert!(
+            !p.get_property::<bool>("CanSeek").await.unwrap(),
+            "sin canción no se puede adelantar"
+        );
+        let mut cambios = p.receive_property_changed::<bool>("CanSeek").await;
+        let mut metas = p
+            .receive_property_changed::<std::collections::HashMap<String, OwnedValue>>("Metadata")
+            .await;
+        m.poner(EstadoMpris {
+            cancion: json!({"ruta": "/m/a.flac", "titulo": "Uno"}),
+            duracion: 200.5,
+            ..EstadoMpris::default()
+        });
+        // El primero puede ser el valor de antes (false): se espera hasta que diga true.
+        let hasta_true = async {
+            while let Some(a) = cambios.next().await {
+                if a.get().await.unwrap() {
+                    return true;
+                }
+            }
+            false
+        };
+        let espera = async {
+            async_io::Timer::after(Duration::from_secs(3)).await;
+            false
+        };
+        let aviso = match futures_util::future::select(Box::pin(hasta_true), Box::pin(espera)).await {
+            futures_util::future::Either::Left((a, _)) | futures_util::future::Either::Right((a, _)) => a,
+        };
+        assert!(aviso, "avisó que ya se puede adelantar");
+        // La duración: la de mpv, porque la canción no traía.
+        let mut meta = None;
+        for _ in 0..3 {
+            let Some(cambio) = metas.next().await else { break };
+            let v = cambio.get().await.unwrap();
+            if v.contains_key("mpris:length") {
+                meta = Some(v);
+                break;
+            }
+        }
+        let meta = meta.expect("llegaron los metadatos");
+        assert_eq!(i64::try_from(meta["mpris:length"].clone()).unwrap(), 200_500_000);
+    });
+    drop(m);
+    let _ = d.kill();
+    let _ = d.wait();
+}

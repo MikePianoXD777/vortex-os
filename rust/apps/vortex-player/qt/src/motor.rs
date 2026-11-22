@@ -90,6 +90,7 @@ impl Motor {
                 aleatorio: self.r.aleatorio(),
                 volumen: self.r.volumen(),
                 posicion: self.r.posicion(),
+                duracion: self.r.duracion(),
                 hay_siguiente: self.r.hay_siguiente(),
                 hay_anterior: self.r.hay_anterior(),
             });

@@ -45,6 +45,8 @@
 #     Shimeji o de tiras (animations.json + spritesheets_128/) en ~/.local/share/vortex/mascota
 #     («vortex mascota usar CARPETA|ARCHIVO.zip»). El repo no trae personajes ajenos.
 #   - vortex-usb-rs también respalda a una memoria marcada «Usar para respaldos» (4.0).
+#   - Vortex Player (4.0.8): avisa por MPRIS cuando cambia CanSeek y manda la duración de mpv si la canción no la
+#     trae: la barra del panel de música ya deja elegir el tiempo.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust

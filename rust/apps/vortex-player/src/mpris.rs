@@ -51,6 +51,8 @@ pub struct EstadoMpris {
     pub aleatorio: bool,
     pub volumen: i64,
     pub posicion: f64,
+    /// La duración que dio mpv (para el panel cuando la canción no la trae).
+    pub duracion: f64,
     pub hay_siguiente: bool,
     pub hay_anterior: bool,
 }
@@ -135,6 +137,16 @@ fn a_dbus(m: Vec<(&'static str, Meta)>) -> HashMap<String, OwnedValue> {
             Some((k.to_string(), OwnedValue::try_from(z).ok()?))
         })
         .collect()
+}
+
+/// La canción con la duración de mpv si no traía una: sin duración, el panel no deja elegir el tiempo.
+fn con_duracion(e: &EstadoMpris) -> Value {
+    let mut c = e.cancion.clone();
+    let trae = c.get("duracion").and_then(Value::as_f64).is_some_and(|d| d > 0.0);
+    if !trae && e.duracion > 0.0 && let Some(m) = c.as_object_mut() {
+        m.insert("duracion".into(), Value::from(e.duracion));
+    }
+    c
 }
 
 type Compartido = Arc<Mutex<EstadoMpris>>;
@@ -281,7 +293,7 @@ impl Jugador {
     #[zbus(property)]
     fn metadata(&self) -> HashMap<String, OwnedValue> {
         let e = leer(&self.estado);
-        a_dbus(metadatos(&e.cancion, &e.portada))
+        a_dbus(metadatos(&con_duracion(&e), &e.portada))
     }
     #[zbus(property)]
     fn volume(&self) -> f64 {
@@ -372,6 +384,9 @@ impl Mpris {
                         let _ = match cambio {
                             Cambio::Cancion => {
                                 let _ = i.metadata_changed(em).await;
+                                // Sin esto, si Vortex Player se abre sin canción el panel se queda con
+                                // CanSeek = false y su barra no deja elegir el tiempo.
+                                let _ = i.can_seek_changed(em).await;
                                 let _ = i.can_go_next_changed(em).await;
                                 i.can_go_previous_changed(em).await
                             }
@@ -381,6 +396,7 @@ impl Mpris {
                                 let _ = i.shuffle_changed(em).await;
                                 let _ = i.volume_changed(em).await;
                                 let _ = i.can_play_changed(em).await;
+                                let _ = i.can_seek_changed(em).await;
                                 i.can_pause_changed(em).await
                             }
                         };
@@ -396,6 +412,7 @@ impl Mpris {
     pub fn poner(&self, nuevo: EstadoMpris) {
         let viejo = std::mem::replace(&mut *self.estado.lock().unwrap_or_else(|x| x.into_inner()), nuevo.clone());
         if viejo.cancion != nuevo.cancion
+            || con_duracion(&viejo) != con_duracion(&nuevo)
             || viejo.portada != nuevo.portada
             || viejo.hay_siguiente != nuevo.hay_siguiente
             || viejo.hay_anterior != nuevo.hay_anterior
