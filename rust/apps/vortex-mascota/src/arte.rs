@@ -396,6 +396,26 @@ pub const FRASE_SUENO: &str = "TENGO SUEÑO";
 pub const FRASE_ADIOS: &str = "¡ADIÓS!";
 pub const FRASE_DESPIERTA: &str = "¡YA DESPERTÉ!";
 
+/// La frase como se dice en voz alta: «¡HOLA!» → «¡Hola!», «TENGO SUEÑO» → «Tengo sueño».
+pub fn frase_hablada(frase: &str) -> String {
+    let mut primera = true;
+    frase
+        .chars()
+        .flat_map(|c| {
+            let mayuscula = primera && c.is_alphabetic();
+            if c.is_alphabetic() {
+                primera = false;
+            }
+            let v: Vec<char> = if mayuscula {
+                c.to_uppercase().collect()
+            } else {
+                c.to_lowercase().collect()
+            };
+            v
+        })
+        .collect()
+}
+
 /// Cuántos pixeles (sin escalar) mide el texto: 6 por letra (5 + 1 de aire).
 pub fn ancho_texto(t: &str) -> usize {
     t.chars().count() * 6 - 1
@@ -526,6 +546,15 @@ mod pruebas {
         let q = cuadro(Pose::Caminando(1), Cara::Feliz);
         assert_eq!(q.espejo().espejo(), q);
         assert_ne!(q.espejo(), q);
+    }
+
+    #[test]
+    fn las_frases_se_dicen_en_minusculas() {
+        assert_eq!(frase_hablada("¡HOLA!"), "¡Hola!");
+        assert_eq!(frase_hablada("¿TE AYUDO?"), "¿Te ayudo?");
+        assert_eq!(frase_hablada("AQUÍ ANDO"), "Aquí ando");
+        assert_eq!(frase_hablada(FRASE_SUENO), "Tengo sueño");
+        assert_eq!(frase_hablada(FRASE_DESPIERTA), "¡Ya desperté!");
     }
 
     #[test]

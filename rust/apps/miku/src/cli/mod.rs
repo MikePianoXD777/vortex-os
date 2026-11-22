@@ -112,6 +112,7 @@ pub fn principal(argv: &[String]) -> i32 {
         "habla-sola" | "habla_sola" => ajustes::habla_sola(&cx, args),
         "sentir" => sentir::sentir(&cx, args),
         "mostrar" => proc::mostrar(&cx),
+        "chat" | "mini" => proc::chat(&cx),
         otra => error(&format!("no conozco «{otra}». Mira: vortex-miku ayuda"), 2),
     }
 }

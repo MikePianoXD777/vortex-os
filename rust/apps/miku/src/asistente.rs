@@ -100,6 +100,9 @@ pub struct Arranque {
     pub companera: String,
     /// La visita con GPU chica: la voz ligera.
     pub voz_forzada: Option<String>,
+    /// Chat mini (doble clic en la compañera de escritorio): el panel chico para escribirle, sin abrir el
+    /// micrófono solo (el botón del micrófono sigue ahí).
+    pub chat: bool,
 }
 
 impl Arranque {
@@ -110,6 +113,7 @@ impl Arranque {
             pregunta_inicial: sacar("VORTEX_MIKU_PREGUNTA"),
             companera: sacar("VORTEX_MIKU_COMPANERA"),
             voz_forzada: Some(sacar("VORTEX_MIKU_VOZ")).filter(|v| !v.is_empty()),
+            chat: sacar("VORTEX_MIKU_CHAT") == "1",
         }
     }
 }
@@ -373,6 +377,7 @@ struct Actor {
     vio_bienvenida: bool,
     tono: String,
     voz_forzada: Option<String>,
+    chat: bool,
     cerebro_listo: bool,
     turno: u64,
     pregunta_id: u64,
@@ -460,6 +465,7 @@ impl Actor {
             vio_bienvenida: false,
             tono: companera::TONO_DEFECTO.into(),
             voz_forzada: arranque.voz_forzada,
+            chat: arranque.chat,
             cerebro_listo: true,
             turno: 0,
             pregunta_id: 0,
@@ -830,7 +836,8 @@ impl Actor {
 
     fn escuchar_si_toca(&mut self) {
         // Mientras juegas no abre el micrófono (oiría el juego o tu Discord).
-        if !self.visita.is_empty() || !self.companera.is_empty() || self.en_cuenta {
+        // En el chat mini se escribe: el micrófono solo se abre con su botón.
+        if !self.visita.is_empty() || !self.companera.is_empty() || self.en_cuenta || self.chat {
             return;
         }
         if self.estado_actual == REPOSO && self.cerebro_listo && !self.acciones_visibles && self.claude_ok {

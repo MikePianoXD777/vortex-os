@@ -508,6 +508,19 @@ fn decir_a_un_wav_con_la_voz_falsa_y_sus_errores() {
             && llamada.trim_end().ends_with("hola mundo"),
         "{llamada}"
     );
+    // «--voz ID»: otra voz solo esta vez (la compañera usa la rápida) y no se dice en voz alta.
+    std::fs::remove_file(&anota).unwrap();
+    let (cod, _, err) = c.correr(&["decir", "--voz", "supertonic-f3", "hola", "-o", wav.to_str().unwrap()]);
+    assert_eq!(cod, 0, "{err}");
+    let llamada = std::fs::read_to_string(&anota).unwrap();
+    assert!(
+        llamada.starts_with("--voz supertonic-f3 ") && llamada.trim_end().ends_with(&format!("--salida {} hola", wav.display())),
+        "{llamada}"
+    );
+    let (cod, _, err) = c.correr(&["decir", "--voz", "nadie", "hola"]);
+    assert_eq!(cod, 2);
+    assert!(err.contains("no conozco la voz «nadie»"), "{err}");
+    assert_eq!(c.correr(&["decir", "hola", "--voz"]).0, 2);
     // Sin dónde reproducir (PATH sin pw-play/paplay/aplay).
     let (cod, _, err) = c.correr(&["decir", "hola"]);
     assert_eq!(cod, 1);

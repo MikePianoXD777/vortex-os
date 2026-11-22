@@ -190,23 +190,40 @@ pub fn licencias(cx: &Ctx) -> i32 {
     }
 }
 
-/// Prueba la voz elegida: suena o se guarda en un WAV.
+const USO_DECIR: &str = "uso: vortex-miku decir \"texto\" [-o archivo.wav] [--voz ID]";
+
+/// Prueba la voz elegida (u otra con `--voz`): suena o se guarda en un WAV.
 pub fn decir(cx: &Ctx, args: &[String]) -> i32 {
     let mut args = args.to_vec();
     let mut salida = None;
     if let Some(i) = args.iter().position(|a| a == "-o") {
         if i + 1 >= args.len() {
-            return error("uso: vortex-miku decir \"texto\" [-o archivo.wav]", 2);
+            return error(USO_DECIR, 2);
         }
         salida = Some(args[i + 1].clone());
         args.drain(i..i + 2);
     }
+    // «--voz ID»: otra voz solo para esta vez (la compañera de escritorio usa la rápida, sin tocar la elegida).
+    let mut otra = None;
+    if let Some(i) = args.iter().position(|a| a == "--voz") {
+        if i + 1 >= args.len() {
+            return error(USO_DECIR, 2);
+        }
+        otra = Some(args[i + 1].clone());
+        args.drain(i..i + 2);
+    }
     let texto = args.join(" ").trim().to_string();
     if texto.is_empty() {
-        return error("uso: vortex-miku decir \"texto\" [-o archivo.wav]", 2);
+        return error(USO_DECIR, 2);
     }
-    let cfg = cx.cfg();
+    let mut cfg = cx.cfg();
     let r = &cx.rutas;
+    if let Some(id) = otra {
+        if voz::buscar(r, &id).is_none() {
+            return error(&format!("no conozco la voz «{id}». Mira: vortex-miku voz"), 2);
+        }
+        cfg.voz = id;
+    }
     let elegida = voz::buscar(r, &cfg.voz);
     let motor = elegida
         .as_ref()

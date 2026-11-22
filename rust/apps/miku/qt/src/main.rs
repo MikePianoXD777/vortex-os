@@ -48,7 +48,9 @@ fn main() {
     };
     let _ = vortex_core::registro::iniciar("miku-rs");
     let cfg = Config::cargar(&rutas.config, &rutas);
-    let (avatar, nota) = interfaz::elegir_modo(cfg.avatar, &rutas.vendor);
+    // El chat mini (doble clic en la compañera de escritorio) es siempre el panel chico, aunque esté el 3D.
+    let chat = std::env::var("VORTEX_MIKU_CHAT").is_ok_and(|v| v == "1");
+    let (avatar, nota) = interfaz::elegir_modo(cfg.avatar && !chat, &rutas.vendor);
     let _ = puente::MODO.set(puente::Modo { avatar, nota, cfg });
     let codigo = arranque::ffi::vortex_miku_correr(&qml.join("Main.qml").to_string_lossy(), avatar, prueba);
     // Si el comando dejó su PID, solo se quita cuando es el nuestro.

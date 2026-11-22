@@ -869,7 +869,7 @@ fn escucha_transcribe_y_pregunta() {
     trozo(3.0, 30.0, false, &mut pcm);
     let f = dir.path().join("mic.raw");
     std::fs::write(&f, &pcm).unwrap();
-    let b2 = banco_con_oido(&f);
+    let b2 = banco_con_oido(&f, Arranque::default());
     b2.asistente.iniciar();
     assert!(
         b2.esperar(|v| hay_estado(v, "escuchando"), 10),
@@ -893,7 +893,25 @@ fn escucha_transcribe_y_pregunta() {
     b2.asistente.cerrar_todo();
 }
 
-fn banco_con_oido(f: &Path) -> Banco {
+/// El chat mini (doble clic en la compañera de escritorio): con el oído listo, no abre el micrófono solo; lo
+/// que escribes sí llega a la IA.
+#[test]
+fn en_el_chat_mini_no_abre_el_microfono_solo() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("mic.raw");
+    std::fs::write(&f, vec![0u8; 32000]).unwrap();
+    let b = banco_con_oido(&f, Arranque { chat: true, ..Default::default() });
+    b.asistente.iniciar();
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    assert!(!hay_estado(&b.vistas(), "escuchando"), "{:?}", b.vistas());
+    b.asistente.enviar("hola");
+    assert!(b.esperar(|_| !b.preguntas.lock().unwrap().is_empty(), 10));
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    assert!(!hay_estado(&b.vistas(), "escuchando"), "ni después de contestar: {:?}", b.vistas());
+    b.asistente.cerrar_todo();
+}
+
+fn banco_con_oido(f: &Path, arranque: Arranque) -> Banco {
     let o = Opciones {
         guion: guion_hola(),
         ..Default::default()
@@ -973,7 +991,7 @@ fn banco_con_oido(f: &Path) -> Banco {
         },
         true,
         env,
-        Arranque::default(),
+        arranque,
         Arc::new(move |x| s.lock().unwrap().push(x)),
     );
     Banco {

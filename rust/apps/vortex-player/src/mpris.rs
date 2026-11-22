@@ -338,12 +338,27 @@ impl Jugador {
 enum Cambio {
     Cancion,
     Estado,
+    /// La posición brincó (en microsegundos): se avisa con `Seeked`.
+    Salto(i64),
+}
+
+/// Un brinco de más de esto (contra lo que tocaría por el tiempo que pasó) se avisa con `Seeked`.
+const SALTO: f64 = 1.5;
+
+/// Si la posición brincó: lo que dice `nuevo` contra lo que tocaría con `viejo` y `pasaron` segundos.
+/// Sin `Seeked`, el panel de música sigue con su cuenta propia (MPRIS no avisa la posición) y se queda
+/// en otro tiempo cuando la canción se adelanta desde Vortex Player o arranca donde se había quedado.
+pub fn brinco(viejo: &EstadoMpris, nuevo: &EstadoMpris, pasaron: f64) -> bool {
+    let esperada = viejo.posicion + if viejo.pausado { 0.0 } else { pasaron };
+    nuevo.cancion.is_object() && (nuevo.posicion - esperada).abs() > SALTO
 }
 
 /// MPRIS en su hilo. Se va del bus al soltarlo.
 pub struct Mpris {
     estado: Compartido,
     aviso: futures_channel::mpsc::UnboundedSender<Option<Cambio>>,
+    /// Cuándo se puso el estado por última vez (para saber si la posición brincó).
+    puesto: Mutex<std::time::Instant>,
 }
 
 impl Mpris {
@@ -399,18 +414,28 @@ impl Mpris {
                                 let _ = i.can_seek_changed(em).await;
                                 i.can_pause_changed(em).await
                             }
+                            Cambio::Salto(us) => Jugador::seeked(em, us).await,
                         };
                     }
                 });
             })
             .ok()?;
         listo_rx.recv().ok().filter(|ok| *ok)?;
-        Some(Self { estado, aviso })
+        Some(Self { estado, aviso, puesto: Mutex::new(std::time::Instant::now()) })
     }
 
-    /// Lo que suena. Avisa al escritorio solo de lo que cambió (la posición no se avisa: se pide).
+    /// Lo que suena. Avisa al escritorio solo de lo que cambió (la posición no se avisa: se pide; solo sus brincos, con `Seeked`).
     pub fn poner(&self, nuevo: EstadoMpris) {
         let viejo = std::mem::replace(&mut *self.estado.lock().unwrap_or_else(|x| x.into_inner()), nuevo.clone());
+        let pasaron = {
+            let mut p = self.puesto.lock().unwrap_or_else(|x| x.into_inner());
+            let s = p.elapsed().as_secs_f64();
+            *p = std::time::Instant::now();
+            s
+        };
+        if brinco(&viejo, &nuevo, pasaron) {
+            let _ = self.aviso.unbounded_send(Some(Cambio::Salto((nuevo.posicion * 1_000_000.0) as i64)));
+        }
         if viejo.cancion != nuevo.cancion
             || con_duracion(&viejo) != con_duracion(&nuevo)
             || viejo.portada != nuevo.portada

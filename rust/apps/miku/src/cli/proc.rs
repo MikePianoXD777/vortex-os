@@ -247,6 +247,17 @@ pub fn alternar(cx: &Ctx) -> i32 {
     lanzar(cx, &[])
 }
 
+/// El chat mini (doble clic en la compañera de escritorio): el panel chico para escribirle, aunque esté el 3D, y
+/// sin abrir el micrófono solo. Si Miku ya está abierta (de cualquier forma), la cierra, como `alternar`.
+pub fn chat(cx: &Ctx) -> i32 {
+    let _c = Candado::tomar();
+    if let Some(pid) = pid_abierta() {
+        cerrar_todo(pid);
+        return 0;
+    }
+    lanzar(cx, &[("VORTEX_MIKU_CHAT", "1")])
+}
+
 /// Abre a Miku si está cerrada; si ya está abierta, la deja (el botón «Hablar con Miku» de un aviso).
 pub fn mostrar(cx: &Ctx) -> i32 {
     let _c = Candado::tomar();

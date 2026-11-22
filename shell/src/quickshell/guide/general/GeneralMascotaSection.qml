@@ -60,7 +60,7 @@ SettingsBlob {
         wrapText: true
         title: I18n.t("guide.general.mascota.title", "Desktop companion")
         description: section.available
-            ? I18n.t("guide.general.mascota.desc", "A pixel-art character that walks on your screen and climbs your windows. Click it to talk, double click opens Miku, right click sends it away. It hides while you play")
+            ? I18n.t("guide.general.mascota.desc", "A pixel-art character that walks on your screen and climbs your windows. Click it to talk (it speaks out loud), double click opens a mini chat with Miku, right click sends it away. It hides while you play")
             : I18n.t("guide.general.mascota.missing", "Not installed yet: run «vortex actualizar»")
         searchKeywords: "companion mascot pet sprite pixel desktop shimeji compañera mascota escritorio personaje miku"
 

@@ -325,7 +325,7 @@
       },
       "mascota": {
         "title": "Compañera de escritorio",
-        "desc": "Un personaje en pixel art que camina por tu pantalla y se sube a tus ventanas. Clic para que te hable, doble clic abre a Miku, clic derecho para que se vaya. Se esconde mientras juegas",
+        "desc": "Un personaje en pixel art que camina por tu pantalla y se sube a tus ventanas. Clic para que te hable (en voz alta), doble clic abre un chat mini con Miku, clic derecho para que se vaya. Se esconde mientras juegas",
         "missing": "Todavía no está instalada: corre «vortex actualizar»"
       },
       "bienvenida": {

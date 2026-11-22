@@ -70,6 +70,29 @@ fn corriendo() -> Option<u32> {
     (comm.trim() == "vortex-mascota" && pid != std::process::id()).then_some(pid)
 }
 
+/// La voz con la que dice sus frases: la rápida de Miku (Supertonic F1, en el procesador; no toca la GPU).
+const VOZ: &str = "supertonic-f1";
+
+/// `vortex mascota voz off` deja esta marca: dice sus frases solo en el globito.
+fn callada() -> bool {
+    std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+        .unwrap_or_default()
+        .join("vortex/mascota-callada")
+        .exists()
+}
+
+/// Si Miku (la app) está abierta: entonces no le habla encima.
+fn miku_abierta() -> bool {
+    let dir = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from);
+    std::fs::read_to_string(dir.join("vortex-miku.pid"))
+        .ok()
+        .and_then(|t| t.trim().parse::<u32>().ok())
+        .is_some_and(|pid| PathBuf::from(format!("/proc/{pid}")).exists())
+}
+
 fn modo_juego() -> bool {
     let estado = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
@@ -370,6 +393,10 @@ struct Estado {
     reloj: Instant,
     revision: f32,
     salir: bool,
+    /// La frase que ya se dijo en voz alta (para decir cada una una sola vez).
+    frase_dicha: Option<&'static str>,
+    /// La voz que está sonando (no se enciman dos).
+    voz: Option<std::process::Child>,
 }
 
 fn correr() -> Result<(), String> {
@@ -442,6 +469,8 @@ fn correr() -> Result<(), String> {
         reloj: Instant::now(),
         revision: 10.0,
         salir: false,
+        frase_dicha: None,
+        voz: None,
     };
     // Las salidas llegan en las primeras vueltas: con ellas se elige la de esa pantalla.
     cola.roundtrip(&mut estado).map_err(|e| e.to_string())?;
@@ -547,7 +576,34 @@ impl Estado {
         }
         // La ventana no se sale de arriba: la pisada nunca queda más arriba que el ancla.
         self.mascota.y = self.mascota.y.max(self.ancla.1 as f32);
+        if self.mascota.frase != self.frase_dicha {
+            self.frase_dicha = self.mascota.frase;
+            if let Some(f) = self.frase_dicha {
+                self.decir(f);
+            }
+        }
         self.dibujar();
+    }
+
+    /// Dice la frase en voz alta con la voz rápida de Miku (`vortex-miku decir`). No si está callada, si
+    /// juegas, si Miku está abierta o si todavía suena la anterior; sin la voz bajada, solo queda el globito.
+    fn decir(&mut self, frase: &str) {
+        if let Some(h) = &mut self.voz {
+            if matches!(h.try_wait(), Ok(None)) {
+                return;
+            }
+            self.voz = None;
+        }
+        if callada() || modo_juego() || miku_abierta() {
+            return;
+        }
+        self.voz = Command::new("vortex-miku")
+            .args(["decir", "--voz", VOZ, &vortex_mascota::arte::frase_hablada(frase)])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
     }
 
     fn esconder(&mut self) {
@@ -616,9 +672,10 @@ impl Estado {
         capa.commit();
     }
 
+    /// El chat mini de Miku (el panel chico para escribirle); otro doble clic lo cierra.
     fn abrir_asistente(&self) {
         let _ = Command::new("vortex-miku")
-            .arg("alternar")
+            .arg("chat")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

@@ -8,8 +8,11 @@ Un personaje en pixel art que vive en tu pantalla: camina por la orilla de abajo
 ventanas, se sienta en ellas y, si las mueves o las cierras, se cae. De vez en cuando se pone a hacer
 algo, como tomar café, ver el celular, leer o jugar.
 
-- **Clic:** te dice algo. **Doble clic:** abre a Miku. **Arrástrala** a donde quieras.
-  **Clic derecho:** se despide y se va.
+- **Clic:** te dice algo, en el globito y en voz alta (con la voz rápida de Miku, si ya la tienes
+  bajada). **Doble clic:** abre un chat chiquito con Miku para escribirle (otro doble clic lo cierra).
+  **Arrástrala** a donde quieras. **Clic derecho:** se despide y se va.
+- Si prefieres que no hable: `vortex mascota voz off` (se queda solo el globito). Tampoco habla mientras
+  juegas ni cuando Miku está abierta.
 - Si no usas la PC un rato, se duerme; al mover el mouse, se despierta.
 - **Cuando juegas o tienes algo en pantalla completa, se esconde sola.**
 - Casi no gasta: está hecha en Rust y no usa Qt.
@@ -53,6 +56,18 @@ poner otro.
 Si abrías Vortex Player antes de poner una canción, la barra de tiempo del panel de música no hacía
 nada: Vortex Player nunca le avisaba al panel que ya se podía adelantar. Ahora le avisa con cada
 canción. Además le pasa la duración real de la canción cuando no la tiene guardada.
+
+### El panel de música ya no se queda en otro tiempo
+
+Si adelantabas la canción desde Vortex Player, o la canción arrancaba donde la habías dejado, el panel
+de música seguía con su propia cuenta y enseñaba otro tiempo (por ejemplo, 00:07 cuando iba en 2:31).
+Ahora Vortex Player le avisa cada vez que la canción brinca.
+
+### Para los que programan
+
+- `vortex-miku chat` abre el panel chico de Miku para escribirle, aunque tengas el 3D, y sin abrir el
+  micrófono solo.
+- `vortex-miku decir "texto" --voz ID` habla con otra voz solo esa vez.
 
 ## Para actualizar
 

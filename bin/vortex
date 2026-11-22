@@ -64,7 +64,7 @@ Uso: vortex <comando>
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   fondo-agregar [ARCHIVO...]           copia videos (mp4, mov, mkv, webm, avi…) o imágenes a tus fondos
                                        y pone el primero; sin archivos, los eliges en una ventana
-  mascota [on|off|usar CARPETA|original]
+  mascota [on|off|voz on|off|usar CARPETA|original]
                                        la compañera de escritorio: camina por tu pantalla, se sube a las
                                        ventanas y se esconde cuando juegas («usar»: tu propio paquete Shimeji)
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
@@ -354,7 +354,7 @@ cmd_mascota() {
     on | encender)
       mkdir -p "$CONF" && : >"$MARCA_MASCOTA"
       setsid -f vortex-mascota </dev/null >/dev/null 2>&1
-      echo "Compañera encendida: clic para que te hable, doble clic abre a Miku, arrástrala, clic derecho para que se vaya." ;;
+      echo "Compañera encendida: clic para que te hable, doble clic abre el chat con Miku, arrástrala, clic derecho para que se vaya." ;;
     off | apagar)
       rm -f "$MARCA_MASCOTA"
       vortex-mascota apagar ;;
@@ -363,8 +363,16 @@ cmd_mascota() {
     al-iniciar)
       [[ -e "$MARCA_MASCOTA" ]] && exec vortex-mascota
       return 0 ;;
+    voz)
+      # Dice sus frases en voz alta con la voz rápida de Miku (si está bajada); «off» las deja solo en el globito.
+      case "${2:-estado}" in
+        on) rm -f "$CONF/mascota-callada"; echo "La compañera dice sus frases en voz alta." ;;
+        off) mkdir -p "$CONF" && : >"$CONF/mascota-callada"; echo "La compañera ya no habla: solo el globito." ;;
+        estado) if [[ -e "$CONF/mascota-callada" ]]; then echo "callada"; else echo "habla"; fi ;;
+        *) aviso "uso: vortex mascota voz [on|off|estado]"; exit 1 ;;
+      esac ;;
     usar | original | estado | hoja) exec vortex-mascota "$@" ;;
-    *) aviso "uso: vortex mascota [on|off|alternar|estado|usar CARPETA|ARCHIVO.zip|original]"; exit 1 ;;
+    *) aviso "uso: vortex mascota [on|off|alternar|estado|voz on|off|usar CARPETA|ARCHIVO.zip|original]"; exit 1 ;;
   esac
 }
 
