@@ -1290,7 +1290,21 @@ cmd_cambios() {
 # El shell que corre se quedó con el QML de antes (los textos sí se recargan solos: salía a medias).
 # Se reinicia como con Ctrl+Super+Alt+R: lo lanza Hyprland, con el comando de su config (y su entorno),
 # así no muere al cerrar la terminal de «vortex actualizar». Sin shell corriendo o sin Hyprland, nada.
+# 4.1: si Hyprland quedó en «modo de emergencia» (sin atajos), lo recarga. Pasa cuando se actualiza vortex-shell:
+# Hyprland ve que su configuración cambió y recarga justo cuando pacman ya quitó un archivo (config/env.lua)
+# y todavía no pone el nuevo («module 'config/env' not found»). Sin errores no recarga (no le quita el modo
+# juego ni nada de lo que se puso con hyprctl).
+recargar_hyprland_si_fallo() {
+  hypr_corriendo || return 0
+  local errores
+  errores="$(hypr configerrors 2>/dev/null)" || return 0
+  [[ -n "${errores//[[:space:]]/}" ]] || return 0
+  hypr reload >/dev/null 2>&1 &&
+    printf 'vortex: %s\n' "recargué Hyprland: su configuración tenía errores (se había quedado sin atajos)" || true
+}
+
 reiniciar_shell() {
+  recargar_hyprland_si_fallo
   pgrep -u "$(id -u)" -x quickshell >/dev/null 2>&1 && hypr_corriendo || return 0
   # Un shell lanzado desde otra carpeta (el repo, con SERPANTINUM_DIR) vuelve a arrancar desde ahí,
   # no desde el paquete. La ruta va escapada para bash y, encima, para la cadena de Lua.

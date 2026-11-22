@@ -63,6 +63,12 @@ Si adelantabas la canción desde Vortex Player, o la canción arrancaba donde la
 de música seguía con su propia cuenta y enseñaba otro tiempo (por ejemplo, 00:07 cuando iba en 2:31).
 Ahora Vortex Player le avisa cada vez que la canción brinca.
 
+### Hyprland ya no se queda sin atajos después de actualizar
+
+A veces, al actualizar, Hyprland recargaba su configuración justo cuando faltaba un archivo y se quedaba
+en «modo de emergencia»: un aviso rojo arriba y sin atajos de teclado. Ahora `vortex actualizar` (y
+`vortex reiniciar-shell`) lo revisa al final y, si pasó, recarga Hyprland solo.
+
 ### Para los que programan
 
 - `vortex-miku chat` abre el panel chico de Miku para escribirle, aunque tengas el 3D, y sin abrir el
