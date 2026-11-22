@@ -68,9 +68,14 @@ _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace v
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt vortex-local-ai-qt
          vortex-player-qt vortex-miku vortex-miku-qt vortex-miku-voz vortex-traducir vortex-limpieza vortex-mascota)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
+# 4.1: con rustup en ~/.cargo/bin (antes que /usr/bin en el PATH), «stable» puede ser más vieja que la que
+# pide el workspace (rust-version 1.100) y la construcción fallaba aunque el sistema trajera la buena. Se
+# usa el cargo de /usr/bin primero (el del paquete rust; con rustup instalado por pacman es su proxy).
+_cargo_del_sistema() { [[ -x /usr/bin/cargo ]] && export PATH="/usr/bin:$PATH"; return 0; }
 
 prepare() {
     cd "$(_raiz)"
+    _cargo_del_sistema
     # El rust-toolchain.toml del repo pide una versión fija con rustup; aquí basta la estable del sistema.
     export RUSTUP_TOOLCHAIN=stable
     cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
@@ -78,6 +83,7 @@ prepare() {
 
 build() {
     cd "$(_raiz)"
+    _cargo_del_sistema
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     # Dos a la vez: con más, cxx-qt se come la memoria de una PC chica.
     # shellcheck disable=SC2046
@@ -86,6 +92,7 @@ build() {
 
 check() {
     cd "$(_raiz)"
+    _cargo_del_sistema
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
     cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones -p vortex-traducir -p vortex-limpieza -p vortex-mascota -p vortex-miku
