@@ -44,9 +44,9 @@ else
 fi
 # El ícono de la app Miku (apps/miku/icono/vortex-miku.svg) es original: una nota musical, sin el personaje.
 # Solo imágenes y modelos: el asistente Miku (apps/miku, packaging/vortex-miku, pruebas/miku*.sh...) lleva
-# «miku» en el nombre de sus scripts. El modelo 3D (*.vrm) nunca va a git: pruebas/miku.sh.
+# «miku» en el nombre de sus scripts. Del modelo 3D solo va el de fábrica, con crédito (pruebas/miku.sh).
 probar "ninguna imagen del personaje en el repo (solo el respaldo original)" \
-  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -i -E '\\.(jpe?g|png|webp|gif|bmp|avif|svg|vrm|glb|gltf|fbx|psd)\$' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/|apps/miku/icono/vortex-miku\\.svg\$)' || true)\" ]]"
+  "[[ -z \"\$(cd '$AQUI' && git ls-files | grep -i -E 'wallhaven|nakano|miku' | grep -i -E '\\.(jpe?g|png|webp|gif|bmp|avif|svg|vrm|glb|gltf|fbx|psd)\$' | grep -v -E '^(bin/vortex-otaku|pruebas/otaku.sh|shell/|apps/miku/icono/vortex-miku\\.svg\$|apps/miku/modelo/modelo\\.vrm\$)' || true)\" ]]"
 
 # --- Entorno falso ---
 mkdir -p "$T/bin"
@@ -447,7 +447,8 @@ case "\$2" in
   *) exit 1 ;;
 esac
 EOF
-printf '#!/usr/bin/env bash\nbasename "$PWD" >>"$T/makepkg.log"\n' >"$T/bin/makepkg"
+# Solo cuenta las construcciones: desde la 4.0.1 también se pregunta «makepkg --packagelist».
+printf '#!/usr/bin/env bash\n[[ "$1" == --packagelist ]] && exit 0\nbasename "$PWD" >>"$T/makepkg.log"\n' >"$T/bin/makepkg"
 # En una línea: «actualizar» reinicia el shell con un «hyprctl eval» de varias líneas, y cada línea
 # suelta se contaría como un paquete reconstruido (pasaba al correr la prueba dentro de Hyprland).
 printf '#!/usr/bin/env bash\necho "hyprctl ${*//$'"'"'\\n'"'"'/ }" >>"$T/makepkg.log"\n' >"$T/bin/hyprctl"

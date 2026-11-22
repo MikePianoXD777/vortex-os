@@ -356,3 +356,50 @@ fn de_punta_a_punta_con_mpv() {
     assert_eq!(r.cancion()["titulo"], "b");
     mpv.cerrar();
 }
+
+/// La barra de tiempo: adelantar a un punto (buscar) tiene que llevar a mpv ahí, sonando o en pausa.
+#[test]
+#[allow(unsafe_code)] // set_var antes de arrancar hilos
+fn buscar_lleva_a_mpv_al_punto() {
+    if std::process::Command::new("mpv").arg("--version").output().is_err() {
+        eprintln!("falta mpv: se salta");
+        return;
+    }
+    unsafe { std::env::set_var("VORTEX_PLAYER_AO", "null") };
+    let t = tempfile::tempdir().unwrap();
+    let a = t.path().join("larga.wav");
+    wav(&a, 30.0);
+    let lista = [json!({"ruta": a.to_string_lossy(), "titulo": "larga", "duracion": 30.0})];
+    let (enviar, rx) = canal();
+    let mut mpv = MpvProceso::arrancar(80, enviar);
+    let mut r = Reproductor::new();
+    r.tocar(&lista, 0);
+    mpv.despachar(&mut r);
+    let mut esperar = |r: &mut Reproductor, mpv: &mut MpvProceso, hasta: &dyn Fn(&Reproductor) -> bool| {
+        let limite = std::time::Instant::now() + Duration::from_secs(15);
+        while std::time::Instant::now() < limite && !hasta(r) {
+            match rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(DeMpv::Conectado) => r.al_conectar(),
+                Ok(DeMpv::Evento(ev)) => r.al_evento(&ev),
+                Ok(_) | Err(_) => {}
+            }
+            r.tic();
+            mpv.despachar(r);
+        }
+        hasta(r)
+    };
+    assert!(esperar(&mut r, &mut mpv, &|r| r.posicion() > 0.3), "no empezó a sonar");
+    r.buscar(20.0);
+    mpv.despachar(&mut r);
+    // Que mpv lo confirme: la posición que reporta pasa de 20 (y no regresa al principio).
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(esperar(&mut r, &mut mpv, &|r| r.posicion() >= 20.0 && r.posicion() < 29.0), "sonando: quedó en {}", r.posicion());
+    // En pausa también.
+    r.pausar();
+    mpv.despachar(&mut r);
+    r.buscar(5.0);
+    mpv.despachar(&mut r);
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(esperar(&mut r, &mut mpv, &|r| (r.posicion() - 5.0).abs() < 1.0), "en pausa: quedó en {}", r.posicion());
+    mpv.cerrar();
+}
