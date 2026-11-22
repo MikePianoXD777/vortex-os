@@ -52,7 +52,9 @@ Uso: vortex <comando>
   claude avisos [todo|cambios]         avisar también cuando Claude solo mira (todo) o solo
                                        cuando cambia algo (cambios, lo normal)
   bench [--guardar] [--comparar A B]   mide RAM, servicios, paquetes y arranque
-  actualizar                           actualiza Vortex, su shell y el sistema
+  actualizar                           actualiza Vortex, su shell y el sistema (si cambiaste algo a mano,
+                                       lo guarda en un respaldo antes de poner la versión oficial)
+  cambios                              lo que tu Vortexine's tiene distinto de la versión oficial (no toca nada)
   actualizaciones [revisar|on|off|sonido ARCHIVO]
                                        avisa (con notificación y un botón «Actualizar») cuando hay
                                        actualizaciones del sistema, de tus apps o de Vortexine's
@@ -1083,7 +1085,170 @@ traer_vortex() {
     git_vortex reset -q --hard origin/main
     return
   fi
-  git_vortex pull --ff-only
+  # 4.0.8: antes era un «git pull --ff-only» a secas, y cualquier archivo cambiado a mano lo hacía fallar
+  # sin explicar nada («¿sin red?»): la actualización no llegaba nunca. Ahora se trae, se revisa qué es
+  # distinto de la versión oficial y, si hay algo, se avisa, se guarda en un respaldo y se pone la oficial.
+  if [[ "$(git_leer branch --show-current 2>/dev/null)" != main ]]; then
+    # Una carpeta de quien programa, en otra rama: se avisa y se deja como siempre.
+    local cambios
+    cambios="$(cambios_codigo)"
+    [[ -n "$cambios" ]] && mostrar_cambios "$cambios" 0 &&
+      echo "Tu carpeta de Vortex está en la rama «$(git_leer branch --show-current)», no en main: no la toco."
+    git_vortex pull --ff-only
+    return
+  fi
+  git_vortex fetch -q origin main || return 1
+  revisar_cambios_locales || return
+  git_vortex merge -q --ff-only origin/main
+}
+
+# ---- Cambios hechos a mano (4.0.8) ----------------------------------------------------------------------
+# Lo que tu Vortexine's tiene distinto de la versión oficial: archivos del código cambiados o borrados,
+# archivos sueltos que no son del repo, commits tuyos sin publicar y archivos cambiados dentro de los
+# paquetes ya instalados. Si se quedan, la actualización choca con ellos («git pull» se niega) o se
+# construye tu copia en vez de la oficial (le pasó al compa de Mike con Miku en la 4.0). «vortex
+# actualizar» los guarda en ~/.local/share/vortex/cambios-apartados/FECHA y pone la versión oficial.
+# Lo que solo lee va como tú aunque la carpeta sea de root: así «vortex cambios» no pide contraseña.
+git_leer() { GIT_TERMINAL_PROMPT=0 git -c safe.directory="$VORTEX_DIR" -C "$VORTEX_DIR" "$@"; }
+APARTADOS="${XDG_DATA_HOME:-$HOME/.local/share}/vortex/cambios-apartados"
+PAQUETES_PROPIOS=(serpantinum-core serpantinum-gamma vortex-shell vortex-shop vortex-app-installer vortex-player
+  vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai vortex-rust)
+
+# Una línea «tipo<TAB>ruta» por cambio del código: modificado, borrado o nuevo (suelto, no es del repo).
+# Lo suelto en packaging/ es lo que baja makepkg (fuentes, tarballs): solo cuenta si choca con un archivo
+# que la versión oficial trae en esa misma ruta.
+cambios_codigo() {
+  local linea antes xy ruta
+  local -A oficiales=()
+  while IFS= read -r -d '' ruta; do oficiales["$ruta"]=1; done \
+    < <(git_leer ls-tree -r -z --name-only origin/main -- packaging 2>/dev/null)
+  while IFS= read -r -d '' linea; do
+    xy="${linea:0:2}" ruta="${linea:3}"
+    [[ "$xy" == R* || "$xy" == C* ]] && IFS= read -r -d '' antes   # el nombre de antes viene aparte
+    case "$xy" in
+      '??')
+        [[ "$ruta" == packaging/* && -z "${oficiales[$ruta]:-}" ]] && continue
+        printf 'nuevo\t%s\n' "$ruta" ;;
+      *D*) printf 'borrado\t%s\n' "$ruta" ;;
+      *) printf 'modificado\t%s\n' "$ruta" ;;
+    esac
+  done < <(git_leer status --porcelain=v1 -z --untracked-files=all 2>/dev/null)
+}
+
+# Una línea «paquete<TAB>archivo» por archivo cambiado o borrado de un paquete propio ya instalado
+# (pacman -Qkk compara cada uno con lo que instaló). Solo cuenta el contenido, no la fecha.
+paquetes_alterados() {
+  local pkg
+  for pkg in "${PAQUETES_PROPIOS[@]}"; do
+    pacman -Q "$pkg" >/dev/null 2>&1 || continue
+    LC_ALL=C pacman -Qkk "$pkg" 2>&1 |
+      sed -n "s#^warning: $pkg: \(/.*\) (\(SHA256 checksum mismatch\|MD5 checksum mismatch\|Size mismatch\|No such file or directory\))\$#$pkg\t\1#p" ||
+      true   # pacman -Qkk sale con error justo cuando hay archivos cambiados
+  done | sort -u
+}
+
+# La lista, para leerla de un vistazo: hasta 12 y «… y N más».
+mostrar_cambios() {
+  local cambios="$1" adelante="${2:-0}" total tipo ruta n=0
+  total="$(grep -c . <<<"$cambios")" || total=0
+  echo
+  echo "Tu Vortexine's tiene cambios que no son de la versión oficial:"
+  while IFS=$'\t' read -r tipo ruta; do
+    [[ -n "$ruta" ]] || continue
+    n=$((n + 1))
+    ((n > 12)) && { echo "   … y $((total - 12)) más"; break; }
+    printf '   %-11s %s\n' "$tipo" "$ruta"
+  done <<<"$cambios"
+  ((adelante > 0)) && echo "   + $adelante commit(s) tuyos que no están publicados"
+  return 0
+}
+
+# Guarda los cambios del código (un parche, una copia de cada archivo tal cual y los commits sin
+# publicar) y pone la versión oficial. Imprime la carpeta del respaldo.
+apartar_cambios() {
+  local cambios="$1" adelante="$2" d tipo ruta nuevos=()
+  d="$APARTADOS/$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$d/archivos" || return 1
+  git_leer diff --binary HEAD >"$d/cambios.patch" || return 1
+  ((adelante > 0)) && { git_leer format-patch --stdout origin/main..HEAD >"$d/commits.patch" || return 1; }
+  while IFS=$'\t' read -r tipo ruta; do
+    [[ -n "$ruta" && "$tipo" != borrado ]] || continue
+    [[ "$tipo" == nuevo ]] && nuevos+=("$ruta")
+    mkdir -p "$d/archivos/$(dirname "$ruta")" && cp -a "$VORTEX_DIR/$ruta" "$d/archivos/$ruta" || return 1
+  done <<<"$cambios"
+  printf '%s\n' "$cambios" >"$d/lista.txt"
+  cat >"$d/LEEME.txt" <<FIN
+Cambios que tu Vortexine's tenía distintos de la versión oficial el $(date '+%d/%m/%Y a las %H:%M').
+«vortex actualizar» los guardó aquí y puso la versión oficial, para que la actualización entrara.
+
+- lista.txt: qué archivos eran (modificado, borrado o nuevo).
+- archivos/: cada uno tal como lo tenías, en su misma ruta dentro de $VORTEX_DIR.
+- cambios.patch: lo mismo como parche de git (git -C "$VORTEX_DIR" apply "$d/cambios.patch").
+$( ((adelante > 0)) && echo "- commits.patch: tus $adelante commit(s) sin publicar (git -C \"$VORTEX_DIR\" am \"$d/commits.patch\")." )
+- paquetes/: si estaba, archivos de los paquetes instalados que habías cambiado, en su ruta de /.
+
+Si no los necesitas, borra esta carpeta.
+FIN
+  # Lo suelto primero (sin pathspec no se borra nada: solo esos archivos), luego lo del repo.
+  ((${#nuevos[@]})) && { git_vortex clean -fq -- "${nuevos[@]}" || return 1; }
+  git_vortex reset -q --hard origin/main || return 1
+  echo "$d"
+}
+
+# Antes de traer lo nuevo: si hay algo distinto, se avisa y (en la terminal se pregunta; sin terminal, sí)
+# se guarda y se pone la oficial. Devuelve 2 si dijiste que no: entonces no se actualiza nada.
+revisar_cambios_locales() {
+  local cambios adelante r d
+  cambios="$(cambios_codigo)"
+  adelante="$(git_leer rev-list --count origin/main..HEAD 2>/dev/null)" || adelante=0
+  [[ -z "$cambios" && "$adelante" == 0 ]] && return 0
+  mostrar_cambios "$cambios" "$adelante"
+  echo "Si se quedan así, la actualización choca con ellos o instala tu copia en vez de la oficial."
+  if [[ -t 0 ]]; then
+    read -r -p "¿Los guardo en un respaldo y pongo la versión oficial? [S/n]: " r
+    [[ -z "$r" || "${r,,}" == s* ]] || return 2
+  fi
+  d="$(apartar_cambios "$cambios" "$adelante")" || { aviso "no pude guardar tus cambios: no toqué nada"; return 1; }
+  echo "Listo: tus cambios quedaron en ${d/#"$HOME"/\~} (ahí está cómo recuperarlos)."
+  notificar -i document-save "Guardé tus cambios de Vortexine's" \
+    "Eran distintos de la versión oficial y chocaban con la actualización. Están en ${d/#"$HOME"/\~}"
+}
+
+# Los paquetes instalados con archivos cambiados: se guardan esos archivos y se reinstala el paquete
+# oficial aunque su versión no haya cambiado. Imprime los paquetes, uno por línea.
+apartar_paquetes() {
+  local alterados pkg f d
+  alterados="$(paquetes_alterados)"
+  [[ -n "$alterados" ]] || return 0
+  d="$APARTADOS/$(date +%Y%m%d-%H%M%S)"
+  echo >&2
+  echo "Hay archivos de los paquetes instalados que no son los originales:" >&2
+  while IFS=$'\t' read -r pkg f; do
+    printf '   %-20s %s\n' "$pkg" "$f" >&2
+    [[ -e "$f" ]] && mkdir -p "$d/paquetes$(dirname "$f")" && cp -a "$f" "$d/paquetes$f" 2>/dev/null
+  done <<<"$alterados"
+  [[ -d "$d/paquetes" ]] && echo "Los guardé en ${d/#"$HOME"/\~}/paquetes y reinstalo los originales." >&2
+  cut -f1 <<<"$alterados" | sort -u
+}
+
+cmd_cambios() {
+  [[ -e "$VORTEX_DIR/.git" ]] || { echo "Tu Vortexine's no tiene historial de git: no hay con qué comparar."; return 0; }
+  local cambios adelante alterados pkg f
+  cambios="$(cambios_codigo)"
+  adelante="$(git_leer rev-list --count origin/main..HEAD 2>/dev/null)" || adelante=0
+  alterados="$(paquetes_alterados)"
+  if [[ -z "$cambios" && "$adelante" == 0 && -z "$alterados" ]]; then
+    echo "Todo igual a la versión oficial: nada cambiado a mano."
+    return 0
+  fi
+  [[ -n "$cambios" || "$adelante" != 0 ]] && mostrar_cambios "$cambios" "$adelante"
+  if [[ -n "$alterados" ]]; then
+    echo
+    echo "Archivos de los paquetes instalados que no son los originales:"
+    while IFS=$'\t' read -r pkg f; do printf '   %-20s %s\n' "$pkg" "$f"; done <<<"$alterados"
+  fi
+  echo
+  echo "«vortex actualizar» los guarda en un respaldo y pone la versión oficial."
 }
 
 # El shell que corre se quedó con el QML de antes (los textos sí se recargan solos: salía a medias).
@@ -1732,11 +1897,17 @@ cmd_actualizar() {
     fi
     # Sin red, sin repo publicado o con historia divergida falla: no debe abortar antes de actualizar
     # los paquetes, ni quedarse pidiendo credenciales.
-    if traer_vortex; then
+    local traido=0
+    traer_vortex || traido=$?
+    if ((traido == 0)); then
       # Lo de abajo puede haber cambiado: se sigue con el vortex recién traído.
       exec "$VORTEX_DIR/bin/vortex" actualizar --ya-traido "$@"
     fi
-    aviso "no pude actualizar Vortex (¿sin red?); sigo con los paquetes"
+    if ((traido == 2)); then
+      echo "Está bien: no toqué nada y no se actualizó. Cuando quieras, «vortex cambios» te los enseña."
+      exit 1
+    fi
+    aviso "no pude traer lo nuevo de Vortex (¿sin red o sin acceso a GitHub?); sigo con los paquetes"
   else
     shift
   fi
@@ -1783,7 +1954,10 @@ cmd_actualizar() {
   # reconstruye el que falte o cuya versión (pkgver-pkgrel) no sea la del PKGBUILD. Con --forzar, todos.
   # Vortex Studio (1.10) llega una sola vez a quien no lo tenga: si luego lo quitas, no vuelve.
   local pkg instalado
-  for pkg in serpantinum-core serpantinum-gamma vortex-shell vortex-shop vortex-app-installer vortex-player vortex-task-manager vortex-video vortex-shared vortex-connect vortex-miku vortex-studio vortex-local-ai vortex-rust; do
+  # 4.0.8: un paquete con archivos cambiados a mano se reinstala aunque su versión sea la misma.
+  local -A reinstalar=()
+  while IFS= read -r pkg; do [[ -n "$pkg" ]] && reinstalar["$pkg"]=1; done < <(apartar_paquetes)
+  for pkg in "${PAQUETES_PROPIOS[@]}"; do
     [[ -f "$VORTEX_DIR/packaging/$pkg/PKGBUILD" ]] || continue
     instalado="$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')" || instalado=""
     # Vortex Studio (1.10) y Vortexine's Local AI (3.1) llegan una sola vez: si los quitas, no vuelven.
@@ -1792,7 +1966,7 @@ cmd_actualizar() {
       [[ -e "$marca_ofrecido" ]] && continue
       mkdir -p "$AVISOS_ESTADO" && : >"$marca_ofrecido"
     fi
-    [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar ]] || continue
+    [[ "$instalado" != "$(version_pkgbuild "$pkg")" || "${1:-}" == --forzar || -n "${reinstalar[$pkg]:-}" ]] || continue
     # makepkg no corre como root ni escribe en una carpeta de root (/usr/share/vortex-os): ahí se
     # construye en una copia en tu caché.
     local base="$VORTEX_DIR"
@@ -2380,6 +2554,7 @@ case "${1:-ayuda}" in
   reporte) exec "$VORTEX_DIR/bin/vortex-reporte" ;;
   novedades) shift; cmd_novedades "$@" ;;
   actualizar) shift; cmd_actualizar "$@" ;;
+  cambios) cmd_cambios ;;
   actualizaciones) shift; cmd_actualizaciones "$@" ;;
   sonidos) shift; cmd_sonidos "$@" ;;
   fondo) shift; cmd_fondo "$@" ;;
