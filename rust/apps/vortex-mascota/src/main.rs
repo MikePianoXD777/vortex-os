@@ -3,7 +3,8 @@
 //!   vortex-mascota              la pone en la pantalla donde está el mouse (una sola a la vez)
 //!   vortex-mascota apagar       la quita
 //!   vortex-mascota estado       dice si está y cuál aspecto usa
-//!   vortex-mascota usar RUTA    copia un paquete Shimeji (carpeta con shime1.png…) como la tuya
+//!   vortex-mascota usar RUTA    copia un paquete como el tuyo: de tiras (animations.json +
+//!                               spritesheets_128/) o Shimeji (shime1.png…); también un .zip
 //!   vortex-mascota original     vuelve al diseño original
 //!   vortex-mascota hoja A.png   saca los cuadros del aspecto que se usa a un PNG
 //!
@@ -101,7 +102,9 @@ fn main() -> ExitCode {
         Some("usar") => match args.get(1) {
             Some(ruta) => usar(Path::new(ruta)),
             None => {
-                eprintln!("uso: vortex-mascota usar CARPETA (la que tiene shime1.png, shime2.png…)");
+                eprintln!(
+                    "uso: vortex-mascota usar CARPETA (la de animations.json o la de shime1.png…) o ARCHIVO.zip"
+                );
                 ExitCode::from(2)
             }
         },
@@ -116,8 +119,10 @@ fn main() -> ExitCode {
                 eprintln!("uso: vortex-mascota hoja ARCHIVO.png [ESCALA]");
                 return ExitCode::from(2);
             };
-            let escala = args.get(2).and_then(|e| e.parse().ok()).unwrap_or(6);
-            let (w, h, px) = vortex_mascota::arte::hoja();
+            // La del aspecto que se usa (la original sale a escala 3; el paquete, a su tamaño).
+            let escala = args.get(2).and_then(|e| e.parse().ok()).unwrap_or(1);
+            let (a, _) = aspecto::cargar(ESCALA_ORIGINAL);
+            let (w, h, px) = a.hoja();
             match std::fs::write(ruta, png::codificar(w, h, &px, escala)) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
@@ -145,14 +150,41 @@ fn reiniciar_si_corre() {
     }
 }
 
-/// Copia las shime*.png de un paquete a la carpeta propia (solo PNG que se puedan leer).
+/// Copia un paquete a la carpeta propia (solo PNG que se puedan leer). Un .zip se abre primero.
 fn usar(origen: &Path) -> ExitCode {
+    if origen.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+        let destino = aspecto::carpeta();
+        let abierto = destino.with_extension("zip.d");
+        let _ = std::fs::remove_dir_all(&abierto);
+        // bsdtar (de libarchive, siempre está en Arch) no saca nada fuera de la carpeta.
+        let ok = std::fs::create_dir_all(&abierto).is_ok()
+            && Command::new("bsdtar")
+                .arg("-xf")
+                .arg(origen)
+                .arg("-C")
+                .arg(&abierto)
+                .status()
+                .is_ok_and(|s| s.success());
+        if !ok {
+            let _ = std::fs::remove_dir_all(&abierto);
+            eprintln!("No pude abrir {}.", origen.display());
+            return ExitCode::FAILURE;
+        }
+        // El paquete puede venir dentro de una carpeta.
+        let raiz = buscar_paquete(&abierto, 3).unwrap_or_else(|| abierto.clone());
+        let r = usar(&raiz);
+        let _ = std::fs::remove_dir_all(&abierto);
+        return r;
+    }
+    if origen.join("animations.json").is_file() {
+        return usar_tiras(origen);
+    }
     let img = [origen.join("img"), origen.to_path_buf()]
         .into_iter()
         .find(|d| d.join("shime1.png").is_file());
     let Some(img) = img else {
         eprintln!(
-            "No encontré shime1.png en {} ni en su carpeta img/.",
+            "No encontré animations.json ni shime1.png en {} (ni en su carpeta img/).",
             origen.display()
         );
         return ExitCode::FAILURE;
@@ -187,8 +219,95 @@ fn usar(origen: &Path) -> ExitCode {
             return ExitCode::FAILURE;
         }
     }
-    let _ = std::fs::remove_dir_all(&destino);
-    if let Err(e) = std::fs::rename(&nueva, &destino) {
+    guardar(&nueva, &destino, copiadas)
+}
+
+/// La primera carpeta (hasta `hondo` niveles abajo) que tenga un paquete.
+fn buscar_paquete(dir: &Path, hondo: u8) -> Option<PathBuf> {
+    if dir.join("animations.json").is_file()
+        || dir.join("shime1.png").is_file()
+        || dir.join("img/shime1.png").is_file()
+    {
+        return Some(dir.to_path_buf());
+    }
+    if hondo == 0 {
+        return None;
+    }
+    let mut hijas: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    hijas.sort();
+    hijas.iter().find_map(|h| buscar_paquete(h, hondo - 1))
+}
+
+/// Un paquete de tiras: animations.json, mascota.json y las tiras que nombra.
+fn usar_tiras(origen: &Path) -> ExitCode {
+    let Some((tiras, _)) = aspecto::carpeta_de_tiras(origen) else {
+        eprintln!(
+            "{} no tiene spritesheets_128/ ni spritesheets_32/.",
+            origen.display()
+        );
+        return ExitCode::FAILURE;
+    };
+    let info: serde_json::Value = match std::fs::read_to_string(origen.join("animations.json"))
+        .map_err(|e| e.to_string())
+        .and_then(|t| serde_json::from_str(&t).map_err(|e| e.to_string()))
+    {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("animations.json no se pudo leer: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let destino = aspecto::carpeta();
+    let nueva = destino.with_extension("nueva");
+    let _ = std::fs::remove_dir_all(&nueva);
+    let dir_nuevo = nueva.join(tiras.file_name().unwrap_or_default());
+    if let Err(e) = std::fs::create_dir_all(&dir_nuevo) {
+        eprintln!("No pude crear {}: {e}", nueva.display());
+        return ExitCode::FAILURE;
+    }
+    let mut copiadas = 0;
+    let nombres = info["animations"]
+        .as_object()
+        .map(|m| m.keys().cloned().collect::<Vec<_>>());
+    for nombre in nombres.unwrap_or_default() {
+        // Solo nombres simples: nada de rutas.
+        if nombre.is_empty()
+            || !nombre
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            continue;
+        }
+        let f = tiras.join(format!("{nombre}.png"));
+        if !f.is_file() {
+            continue;
+        }
+        if let Err(e) = aspecto::leer_png(&f) {
+            eprintln!("Me salto {}: {e}", f.display());
+            continue;
+        }
+        if std::fs::copy(&f, dir_nuevo.join(format!("{nombre}.png"))).is_ok() {
+            copiadas += 1;
+        }
+    }
+    let _ = std::fs::copy(origen.join("animations.json"), nueva.join("animations.json"));
+    let _ = std::fs::copy(origen.join("mascota.json"), nueva.join("mascota.json"));
+    if let Err(e) = Aspecto::tiras(&nueva).and_then(|a| a.ok_or_else(|| "sin animations.json".into())) {
+        let _ = std::fs::remove_dir_all(&nueva);
+        eprintln!("El paquete no sirve: {e}");
+        return ExitCode::FAILURE;
+    }
+    guardar(&nueva, &destino, copiadas)
+}
+
+fn guardar(nueva: &Path, destino: &Path, copiadas: usize) -> ExitCode {
+    let _ = std::fs::remove_dir_all(destino);
+    if let Err(e) = std::fs::rename(nueva, destino) {
         eprintln!("No pude guardarlo en {}: {e}", destino.display());
         return ExitCode::FAILURE;
     }
@@ -286,6 +405,7 @@ fn correr() -> Result<(), String> {
         .filter(|x| *x > 0.0 && *x < pantalla.ancho)
         .unwrap_or(pantalla.ancho / 3.0);
     let mut mascota = Mascota::nueva(x0, (w / 2) as f32, semilla);
+    mascota.ocios = aspecto.ocios();
     mascota.y = (lienzo::BURBUJA + arriba) as f32;
 
     let mut estado = Estado {
@@ -455,7 +575,7 @@ impl Estado {
         let Some(capa) = &self.capa else { return };
         let m = &self.mascota;
         let img = self.aspecto.cuadro(m.anim(), m.t, m.dir);
-        let emote = m.emote();
+        let emote = self.aspecto.emote(m.anim(), m.emote());
         // La zeta flota: cambia de lugar cada tanto.
         let fase = if emote.is_some() { (m.t * 8.0) as i32 } else { 0 };
         let clave = (img as *const _ as usize, emote, m.frase, fase);

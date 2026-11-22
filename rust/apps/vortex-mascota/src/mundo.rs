@@ -18,6 +18,14 @@ pub enum Anim {
     Agarrada,
     Cayendo,
     Aterrizando,
+    /// Le hiciste clic (con la original, saluda).
+    Caricia,
+    /// Se despierta (con la original, saluda).
+    Despertando,
+    /// Se despide al quitarla (con la original, saluda).
+    Despedida,
+    /// Un pasatiempo del paquete (café, celular, leer…); la original no tiene y se queda parada.
+    Ocio(u8),
 }
 
 /// Una orilla donde se puede parar: la de arriba de una ventana, o el piso.
@@ -47,11 +55,13 @@ enum Accion {
     Caminando { hasta: f32 },
     Sentada { falta: f32 },
     Dormida,
-    Saludando { falta: f32 },
     Agarrada,
     Cayendo,
     Aterrizando { falta: f32 },
     Despidiendose { falta: f32 },
+    Caricia { falta: f32 },
+    Despertando { falta: f32 },
+    Ocio { cual: u8, falta: f32 },
 }
 
 /// Cuánto tarda en dormirse sin que muevas el mouse.
@@ -75,6 +85,8 @@ pub struct Mascota {
     pub medio_ancho: f32,
     azar: u64,
     pub terminar: bool,
+    /// Cuántos pasatiempos tiene el aspecto (0: ninguno).
+    pub ocios: u8,
 }
 
 impl Mascota {
@@ -92,6 +104,7 @@ impl Mascota {
             medio_ancho,
             azar: semilla | 1,
             terminar: false,
+            ocios: 0,
         }
     }
 
@@ -113,7 +126,10 @@ impl Mascota {
             Accion::Caminando { .. } => Anim::Caminando,
             Accion::Sentada { .. } => Anim::Sentada,
             Accion::Dormida => Anim::Dormida,
-            Accion::Saludando { .. } | Accion::Despidiendose { .. } => Anim::Saludando,
+            Accion::Despidiendose { .. } => Anim::Despedida,
+            Accion::Caricia { .. } => Anim::Caricia,
+            Accion::Despertando { .. } => Anim::Despertando,
+            Accion::Ocio { cual, .. } => Anim::Ocio(cual),
             Accion::Agarrada => Anim::Agarrada,
             Accion::Cayendo => Anim::Cayendo,
             Accion::Aterrizando { .. } => Anim::Aterrizando,
@@ -123,7 +139,9 @@ impl Mascota {
     pub fn emote(&self) -> Option<arte::Emote> {
         match self.accion {
             Accion::Dormida => Some(arte::Emote::Zeta),
-            Accion::Saludando { .. } if self.frase.is_none() => Some(arte::Emote::Corazon),
+            Accion::Caricia { .. } | Accion::Despertando { .. } if self.frase.is_none() => {
+                Some(arte::Emote::Corazon)
+            }
             Accion::Sentada { .. } if self.t % 12.0 < 3.0 => Some(arte::Emote::Nota),
             _ => None,
         }
@@ -207,7 +225,7 @@ impl Mascota {
             Accion::Dormida => {
                 if e.mouse_quieto < 1.0 {
                     self.decir(arte::FRASE_DESPIERTA, 2.0);
-                    self.cambiar(Accion::Saludando { falta: 2.0 });
+                    self.cambiar(Accion::Despertando { falta: 2.0 });
                 }
             }
             Accion::Parada { falta } => {
@@ -217,12 +235,18 @@ impl Mascota {
                     self.decidir(e, orilla);
                 }
             }
-            Accion::Sentada { falta } | Accion::Saludando { falta } | Accion::Aterrizando { falta } => {
+            Accion::Sentada { falta }
+            | Accion::Aterrizando { falta }
+            | Accion::Caricia { falta }
+            | Accion::Despertando { falta }
+            | Accion::Ocio { falta, .. } => {
                 let resto = falta - dt;
                 if resto > 0.0 {
                     self.accion = match self.accion {
                         Accion::Sentada { .. } => Accion::Sentada { falta: resto },
-                        Accion::Saludando { .. } => Accion::Saludando { falta: resto },
+                        Accion::Caricia { .. } => Accion::Caricia { falta: resto },
+                        Accion::Despertando { .. } => Accion::Despertando { falta: resto },
+                        Accion::Ocio { cual, .. } => Accion::Ocio { cual, falta: resto },
                         _ => Accion::Aterrizando { falta: resto },
                     };
                 } else {
@@ -237,7 +261,7 @@ impl Mascota {
 
     fn decidir(&mut self, e: &Entorno, orilla: Orilla) {
         let r = self.azar();
-        if r < 0.6 {
+        if r < 0.55 {
             // Camina a un punto de la orilla donde está (en el piso, de toda la pantalla).
             let (min, max) = (
                 orilla.x0.max(self.medio_ancho),
@@ -256,9 +280,13 @@ impl Mascota {
             };
             self.dir = if hasta >= self.x { 1 } else { -1 };
             self.cambiar(Accion::Caminando { hasta });
-        } else if r < 0.85 {
+        } else if r < 0.75 {
             let falta = self.entre(6.0, 15.0);
             self.cambiar(Accion::Sentada { falta });
+        } else if r < 0.92 && self.ocios > 0 {
+            let cual = (self.azar() * f32::from(self.ocios)) as u8 % self.ocios;
+            let falta = self.entre(4.0, 10.0);
+            self.cambiar(Accion::Ocio { cual, falta });
         } else {
             let falta = self.entre(2.0, 5.0);
             self.cambiar(Accion::Parada { falta });
@@ -328,7 +356,7 @@ impl Mascota {
         }
         let i = (self.azar() * arte::FRASES.len() as f32) as usize % arte::FRASES.len();
         self.decir(arte::FRASES[i], 2.5);
-        self.cambiar(Accion::Saludando { falta: 2.5 });
+        self.cambiar(Accion::Caricia { falta: 2.5 });
     }
 
     /// Clic derecho: se despide y se va.
@@ -437,8 +465,30 @@ mod pruebas {
         assert!(m.dormida(), "sigue dormida mientras no muevas el mouse");
         e.mouse_quieto = 0.0;
         m.paso(0.1, &e);
-        assert_eq!(m.anim(), Anim::Saludando);
+        assert_eq!(m.anim(), Anim::Despertando);
         assert_eq!(m.frase, Some(arte::FRASE_DESPIERTA));
+    }
+
+    #[test]
+    fn con_pasatiempos_a_veces_hace_uno() {
+        let e = entorno();
+        let mut m = Mascota::nueva(500.0, 48.0, 99);
+        m.ocios = 5;
+        let mut vistos = std::collections::HashSet::new();
+        for _ in 0..(600 * 30) {
+            m.paso(1.0 / 30.0, &e);
+            if let Anim::Ocio(n) = m.anim() {
+                assert!(n < 5);
+                vistos.insert(n);
+            }
+        }
+        assert!(vistos.len() >= 2, "en 10 minutos debió hacer varios: {vistos:?}");
+        // Sin pasatiempos nunca hace uno.
+        let mut m = Mascota::nueva(500.0, 48.0, 99);
+        for _ in 0..(600 * 30) {
+            m.paso(1.0 / 30.0, &e);
+            assert!(!matches!(m.anim(), Anim::Ocio(_)));
+        }
     }
 
     #[test]
@@ -461,7 +511,7 @@ mod pruebas {
         let mut m = Mascota::nueva(500.0, 48.0, 3);
         correr(&mut m, &e, 2.0);
         m.clic();
-        assert_eq!(m.anim(), Anim::Saludando);
+        assert_eq!(m.anim(), Anim::Caricia);
         assert!(m.frase.is_some());
         m.despedir();
         correr(&mut m, &e, 2.0);

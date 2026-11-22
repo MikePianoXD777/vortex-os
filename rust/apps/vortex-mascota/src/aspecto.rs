@@ -8,10 +8,15 @@
 //!
 //! Un `mascota.json` opcional en esa carpeta cambia la escala o qué imágenes usa cada animación:
 //! `{"escala": 1.5, "acciones": {"sentada": [11], "caminando": [1, 2, 1, 3]}}`.
+//!
+//! - O un paquete de tiras: `animations.json` (cuántos cuadros y cuánto dura cada uno) y una tira por
+//!   animación en `spritesheets_128/` (o `spritesheets_32/`, que se agranda 4 veces): `idle.png`,
+//!   `walk_side.png`, `sit.png`… Los cuadros son cuadrados, miran de frente y pisan en la fila de abajo;
+//!   `walk_side`, `run_side` y `point` miran a la derecha. Ver `TABLA` y `OCIOS` para qué usa cada cosa.
 
 use crate::arte::{self, Cara, Pose};
 use crate::mundo::Anim;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Una imagen lista para copiar a la ventana: ARGB premultiplicado.
@@ -96,34 +101,129 @@ fn premultiplicar(argb: u32) -> u32 {
     (a << 24) | c(16) | c(8) | c(0)
 }
 
+/// Hacia dónde miran las imágenes de una animación.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mira {
+    /// De frente: nunca van al espejo.
+    Frente,
+    /// A la izquierda (Shimeji): a la derecha van al espejo.
+    Izquierda,
+    /// A la derecha: a la izquierda van al espejo.
+    Derecha,
+}
+
+struct Secuencia {
+    /// (cuadro, segundos)
+    cuadros: Vec<(usize, f32)>,
+    mira: Mira,
+}
+
 pub struct Aspecto {
     /// Cada cuadro dos veces: [normal, al espejo].
     cuadros: Vec<[Imagen; 2]>,
-    anims: HashMap<Anim, Vec<(usize, f32)>>,
-    /// Las imágenes miran a la izquierda (Shimeji): a la derecha van al espejo.
-    miran_izquierda: bool,
+    anims: HashMap<Anim, Secuencia>,
+    /// Cuántos pasatiempos (`Anim::Ocio`) tiene.
+    ocios: u8,
+    /// Animaciones que ya traen su dibujito (la zeta al dormir, los corazones): no se pone otro encima.
+    con_emote: HashSet<Anim>,
     pub nombre: String,
 }
 
 impl Aspecto {
     pub fn cuadro(&self, anim: Anim, t: f32, dir: i8) -> &Imagen {
+        let respaldo = match anim {
+            Anim::Caricia | Anim::Despertando | Anim::Despedida => Some(Anim::Saludando),
+            _ => None,
+        };
         let secuencia = self
             .anims
             .get(&anim)
+            .or_else(|| respaldo.and_then(|r| self.anims.get(&r)))
             .or_else(|| self.anims.get(&Anim::Parada))
             .expect("siempre hay Parada");
-        let total: f32 = secuencia.iter().map(|(_, d)| d).sum();
+        let total: f32 = secuencia.cuadros.iter().map(|(_, d)| d).sum();
         let mut resto = if total > 0.0 { t % total } else { 0.0 };
-        let mut i = secuencia[0].0;
-        for (c, d) in secuencia {
+        let mut i = secuencia.cuadros[0].0;
+        for (c, d) in &secuencia.cuadros {
             i = *c;
             if resto < *d {
                 break;
             }
             resto -= d;
         }
-        let espejo = usize::from(self.miran_izquierda && dir > 0);
-        &self.cuadros[i][espejo]
+        let espejo = match secuencia.mira {
+            Mira::Frente => false,
+            Mira::Izquierda => dir > 0,
+            Mira::Derecha => dir < 0,
+        };
+        &self.cuadros[i][usize::from(espejo)]
+    }
+
+    /// Cuántos pasatiempos tiene (para que la compañera elija uno).
+    pub fn ocios(&self) -> u8 {
+        self.ocios
+    }
+
+    /// Una hoja con lo que usa cada animación (una fila cada una, hasta 10 cuadros), para revisar un
+    /// paquete sin abrir ventanas. Fondo gris para ver lo transparente.
+    pub fn hoja(&self) -> (usize, usize, Vec<u32>) {
+        let mut filas: Vec<(Anim, i8)> = vec![
+            (Anim::Parada, 1),
+            (Anim::Caminando, 1),
+            (Anim::Caminando, -1),
+            (Anim::Sentada, 1),
+            (Anim::Dormida, 1),
+            (Anim::Saludando, 1),
+            (Anim::Caricia, 1),
+            (Anim::Despertando, 1),
+            (Anim::Despedida, 1),
+            (Anim::Agarrada, 1),
+            (Anim::Cayendo, 1),
+            (Anim::Aterrizando, 1),
+        ];
+        filas.extend((0..self.ocios).map(|i| (Anim::Ocio(i), 1)));
+        let (cw, ch) = self
+            .cuadros
+            .iter()
+            .fold((1, 1), |(w, h), [c, _]| (w.max(c.ancho), h.max(c.alto)));
+        let (cw, ch) = (cw + 4, ch + 4);
+        let columnas = 10;
+        let (w, h) = (cw * columnas, ch * filas.len());
+        let mut px = vec![0xFF5A_5A5A; w * h];
+        for (f, (anim, dir)) in filas.into_iter().enumerate() {
+            let Some(sec) = self.anims.get(&anim) else {
+                continue;
+            };
+            let espejo = match sec.mira {
+                Mira::Frente => 0,
+                Mira::Izquierda => usize::from(dir > 0),
+                Mira::Derecha => usize::from(dir < 0),
+            };
+            let mut vistos = Vec::new();
+            for &(i, _) in &sec.cuadros {
+                if !vistos.contains(&i) {
+                    vistos.push(i);
+                }
+            }
+            for (k, i) in vistos.into_iter().take(columnas).enumerate() {
+                let c = &self.cuadros[i][espejo];
+                let (ox, oy) = (k * cw + 2, f * ch + 2 + (ch - 4 - c.alto));
+                for y in 0..c.alto {
+                    for x in 0..c.ancho {
+                        let p = c.px[y * c.ancho + x];
+                        if p >> 24 != 0 {
+                            px[(oy + y) * w + ox + x] = p | 0xFF00_0000;
+                        }
+                    }
+                }
+            }
+        }
+        (w, h, px)
+    }
+
+    /// El dibujito que va encima, salvo que la animación ya traiga el suyo.
+    pub fn emote(&self, anim: Anim, e: Option<arte::Emote>) -> Option<arte::Emote> {
+        e.filter(|_| !self.con_emote.contains(&anim))
     }
 
     /// El más ancho y el más alto de todos (la ventana tiene que caber cualquiera).
@@ -162,9 +262,18 @@ impl Aspecto {
         let feliz = agregar(Pose::Parada, Cara::Feliz);
         let colgando = agregar(Pose::Colgando, Cara::Sorpresa);
         let mut anims = HashMap::new();
-        anims.insert(Anim::Parada, vec![(parada, 3.2), (parpadeo, 0.15)]);
-        anims.insert(Anim::Caminando, pasos.iter().map(|&p| (p, 0.16)).collect());
-        anims.insert(
+        let mut poner = |a: Anim, cuadros: Vec<(usize, f32)>| {
+            anims.insert(
+                a,
+                Secuencia {
+                    cuadros,
+                    mira: Mira::Frente,
+                },
+            );
+        };
+        poner(Anim::Parada, vec![(parada, 3.2), (parpadeo, 0.15)]);
+        poner(Anim::Caminando, pasos.iter().map(|&p| (p, 0.16)).collect());
+        poner(
             Anim::Sentada,
             vec![
                 (sentada0, 0.6),
@@ -174,18 +283,19 @@ impl Aspecto {
                 (sentada_parpadeo, 0.15),
             ],
         );
-        anims.insert(Anim::Dormida, vec![(dormida, 1.0)]);
-        anims.insert(
+        poner(Anim::Dormida, vec![(dormida, 1.0)]);
+        poner(
             Anim::Saludando,
             vec![(saludo, 0.3), (saludo_habla, 0.2), (feliz, 0.3)],
         );
-        anims.insert(Anim::Agarrada, vec![(colgando, 1.0)]);
-        anims.insert(Anim::Cayendo, vec![(colgando, 1.0)]);
-        anims.insert(Anim::Aterrizando, vec![(parpadeo, 1.0)]);
+        poner(Anim::Agarrada, vec![(colgando, 1.0)]);
+        poner(Anim::Cayendo, vec![(colgando, 1.0)]);
+        poner(Anim::Aterrizando, vec![(parpadeo, 1.0)]);
         Self {
             cuadros,
             anims,
-            miran_izquierda: false,
+            ocios: 0,
+            con_emote: HashSet::new(),
             nombre: "original".into(),
         }
     }
@@ -208,8 +318,8 @@ impl Aspecto {
 
         // Las de siempre de Shimeji: 1 parada, 2 y 3 los pasos, 4 cayendo, 5 agarrada, 11 sentada,
         // 18 y 19 al aterrizar, 21 acostada, 31 a 33 sentada en una orilla con las piernas colgando.
-        type Secuencia = &'static [(u32, f32)];
-        let de_fabrica: [(Anim, &str, Secuencia); 8] = [
+        type Lista = &'static [(u32, f32)];
+        let de_fabrica: [(Anim, &str, Lista); 8] = [
             (Anim::Parada, "parada", &[(1, 1.0)]),
             (
                 Anim::Caminando,
@@ -271,7 +381,13 @@ impl Aspecto {
             if secuencia.is_empty() {
                 secuencia.push((parada, 1.0));
             }
-            anims.insert(anim, secuencia);
+            anims.insert(
+                anim,
+                Secuencia {
+                    cuadros: secuencia,
+                    mira: Mira::Izquierda,
+                },
+            );
         }
         let nombre = carpeta
             .file_name()
@@ -279,10 +395,172 @@ impl Aspecto {
         Ok(Some(Self {
             cuadros,
             anims,
-            miran_izquierda: true,
+            ocios: 0,
+            con_emote: HashSet::new(),
             nombre,
         }))
     }
+
+    /// Un paquete de tiras (`animations.json` + `spritesheets_128/`). None si no hay `animations.json`.
+    pub fn tiras(carpeta: &Path) -> Result<Option<Self>, String> {
+        let Ok(texto) = std::fs::read_to_string(carpeta.join("animations.json")) else {
+            return Ok(None);
+        };
+        let info: serde_json::Value =
+            serde_json::from_str(&texto).map_err(|e| format!("animations.json: {e}"))?;
+        let (dir_tiras, agrandar) = carpeta_de_tiras(carpeta)
+            .ok_or_else(|| "no hay carpeta spritesheets_128/ ni spritesheets_32/".to_string())?;
+        let ajustes: serde_json::Value = std::fs::read_to_string(carpeta.join("mascota.json"))
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or(serde_json::Value::Null);
+        let escala = ajustes["escala"]
+            .as_f64()
+            .map_or(1.0, |e| e.clamp(0.25, 4.0) as f32)
+            * agrandar;
+
+        let mut cuadros = Vec::new();
+        // Cada tira se lee una vez: nombre → [(cuadro, segundos)].
+        let mut leidas: HashMap<&str, Option<Vec<(usize, f32)>>> = HashMap::new();
+        let mut leer = |nombre: &'static str| -> Result<Option<Vec<(usize, f32)>>, String> {
+            if let Some(l) = leidas.get(nombre) {
+                return Ok(l.clone());
+            }
+            let anim = &info["animations"][nombre];
+            let ruta = dir_tiras.join(format!("{nombre}.png"));
+            let lista = if anim.is_object() && ruta.is_file() {
+                let (w, h, px) = leer_png(&ruta)?;
+                let n = anim["frames"].as_u64().unwrap_or(1).max(1) as usize;
+                let cw = w / n;
+                if cw == 0 {
+                    return Err(format!("{}: más cuadros que pixeles", ruta.display()));
+                }
+                let duraciones = anim["durations_ms"].as_array();
+                let mut l = Vec::new();
+                for k in 0..n {
+                    let mut c = vec![0; cw * h];
+                    for y in 0..h {
+                        c[y * cw..(y + 1) * cw].copy_from_slice(&px[y * w + k * cw..y * w + (k + 1) * cw]);
+                    }
+                    let img = Imagen::nueva(cw, h, c, cw / 2, h).escalar(escala);
+                    let esp = img.espejo();
+                    cuadros.push([img, esp]);
+                    let ms = duraciones
+                        .and_then(|d| d.get(k))
+                        .and_then(serde_json::Value::as_f64)
+                        .unwrap_or(200.0);
+                    l.push((cuadros.len() - 1, (ms as f32 / 1000.0).max(0.02)));
+                }
+                Some(l)
+            } else {
+                None
+            };
+            leidas.insert(nombre, lista.clone());
+            Ok(lista)
+        };
+
+        let mut anims = HashMap::new();
+        for (anim, partes) in TABLA {
+            let mut secuencia = Vec::new();
+            let mut mira = None;
+            for &(nombre, desde, veces) in partes {
+                let Some(l) = leer(nombre)? else { continue };
+                mira.get_or_insert(mira_de(nombre));
+                for _ in 0..veces {
+                    secuencia.extend(l.iter().skip(desde).copied());
+                }
+            }
+            if !secuencia.is_empty() {
+                anims.insert(
+                    anim,
+                    Secuencia {
+                        cuadros: secuencia,
+                        mira: mira.unwrap_or(Mira::Frente),
+                    },
+                );
+            }
+        }
+        if !anims.contains_key(&Anim::Parada) {
+            return Err("el paquete no trae idle.png".into());
+        }
+        let mut ocios = 0u8;
+        for nombre in OCIOS {
+            if let Some(l) = leer(nombre)? {
+                anims.insert(
+                    Anim::Ocio(ocios),
+                    Secuencia {
+                        cuadros: l,
+                        mira: mira_de(nombre),
+                    },
+                );
+                ocios += 1;
+            }
+        }
+        // La de dormir ya trae su zeta y la caricia sus corazones.
+        let con_emote = [Anim::Dormida, Anim::Caricia]
+            .into_iter()
+            .filter(|a| anims.contains_key(a))
+            .collect();
+        let nombre = carpeta
+            .file_name()
+            .map_or("propia".into(), |n| n.to_string_lossy().into_owned());
+        Ok(Some(Self {
+            cuadros,
+            anims,
+            ocios,
+            con_emote,
+            nombre,
+        }))
+    }
+}
+
+/// Qué tiras usa cada animación: (tira, desde qué cuadro, cuántas veces). Las que falten se saltan.
+type Partes = &'static [(&'static str, usize, u8)];
+const TABLA: [(Anim, Partes); 11] = [
+    (Anim::Parada, &[("idle", 0, 3), ("blink", 0, 1)]),
+    (Anim::Caminando, &[("walk_side", 0, 1)]),
+    (Anim::Sentada, &[("sit", 0, 2), ("sit_swing", 0, 4)]),
+    (Anim::Dormida, &[("sleep_sit", 0, 1)]),
+    (Anim::Saludando, &[("wave", 0, 2)]),
+    (Anim::Caricia, &[("headpat", 0, 2)]),
+    (Anim::Despertando, &[("stretch", 0, 1), ("wave", 0, 1)]),
+    (Anim::Despedida, &[("wave_both", 0, 3)]),
+    (Anim::Agarrada, &[("drag", 0, 1)]),
+    (Anim::Cayendo, &[("fall", 0, 1)]),
+    // Los últimos cuadros del salto: cuando cae.
+    (Anim::Aterrizando, &[("jump", 3, 1)]),
+];
+
+/// Los pasatiempos que hace de vez en cuando, si el paquete los trae.
+const OCIOS: [&str; 12] = [
+    "look_around",
+    "bored",
+    "think",
+    "sing",
+    "dance",
+    "phone",
+    "coffee",
+    "read",
+    "gaming",
+    "typing",
+    "nod",
+    "wink",
+];
+
+fn mira_de(tira: &str) -> Mira {
+    if matches!(tira, "walk_side" | "run_side" | "point") {
+        Mira::Derecha
+    } else {
+        Mira::Frente
+    }
+}
+
+/// La carpeta con las tiras y cuánto hay que agrandarlas.
+pub fn carpeta_de_tiras(carpeta: &Path) -> Option<(PathBuf, f32)> {
+    [("spritesheets_128", 1.0), ("spritesheets_32", 4.0)]
+        .into_iter()
+        .map(|(d, f)| (carpeta.join(d), f))
+        .find(|(d, _)| d.is_dir())
 }
 
 /// La carpeta de la mascota propia.
@@ -296,7 +574,12 @@ pub fn carpeta() -> PathBuf {
 
 /// La propia si hay una que sirva; si no (o si falla al leerla), la original.
 pub fn cargar(escala_original: f32) -> (Aspecto, Option<String>) {
-    match Aspecto::shimeji(&carpeta()) {
+    let c = carpeta();
+    let propia = match Aspecto::tiras(&c) {
+        Ok(None) => Aspecto::shimeji(&c),
+        otro => otro,
+    };
+    match propia {
         Ok(Some(a)) => (a, None),
         Ok(None) => (Aspecto::original(escala_original), None),
         Err(e) => (Aspecto::original(escala_original), Some(e)),
@@ -314,8 +597,8 @@ pub fn leer_png(ruta: &Path) -> Result<(usize, usize, Vec<u32>), String> {
         let i = lector.info();
         (i.width as usize, i.height as usize)
     };
-    if w == 0 || h == 0 || w > 1024 || h > 1024 {
-        return Err(error(&"la imagen tiene que medir entre 1 y 1024 pixeles"));
+    if w == 0 || h == 0 || w > 8192 || h > 2048 {
+        return Err(error(&"la imagen tiene que medir hasta 8192 × 2048 pixeles"));
     }
     let mut buf = vec![0; lector.output_buffer_size()];
     let info = lector.next_frame(&mut buf).map_err(|e| error(&e))?;

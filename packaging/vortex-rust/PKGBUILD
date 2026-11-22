@@ -42,7 +42,8 @@
 #   - vortex-limpieza (4.0, solo en Rust): la limpieza de la semana (temporizador de usuario que deja «vortex»).
 #   - vortex-mascota (4.0.8, solo en Rust): la compañera de escritorio, un sprite que camina por la pantalla
 #     (capa de Wayland, sin Qt: casi no gasta). De fábrica un diseño original; cada quien puede poner su paquete
-#     Shimeji en ~/.local/share/vortex/mascota («vortex mascota usar CARPETA»). El repo no trae personajes ajenos.
+#     Shimeji o de tiras (animations.json + spritesheets_128/) en ~/.local/share/vortex/mascota
+#     («vortex mascota usar CARPETA|ARCHIVO.zip»). El repo no trae personajes ajenos.
 #   - vortex-usb-rs también respalda a una memoria marcada «Usar para respaldos» (4.0).
 #
 #   cd packaging/vortex-rust && makepkg -si
