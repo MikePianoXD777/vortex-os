@@ -14,13 +14,14 @@ algo, como tomar café, ver el celular, leer o jugar.
 - **Cuando juegas o tienes algo en pantalla completa, se esconde sola.**
 - Casi no gasta: está hecha en Rust y no usa Qt.
 
-Viene apagada. Para encenderla:
+Viene apagada. Para encenderla, ve a **Ajustes → General → Compañera de escritorio**, o en la terminal:
 
 ```
 vortex mascota on
 ```
 
-Se queda encendida en los próximos inicios de sesión hasta que la apagues con `vortex mascota off`.
+Se queda encendida en los próximos inicios de sesión hasta que la apagues (en Ajustes o con
+`vortex mascota off`).
 
 **Ponle tu propio personaje:** `vortex mascota usar ARCHIVO.zip` acepta un paquete de tiras
 (`animations.json` y una tira por animación en `spritesheets_128/`) o uno de Shimeji (`shime1.png`…).

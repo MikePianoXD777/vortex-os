@@ -322,6 +322,11 @@
         "title": "FPS counter in games",
         "desc": "FPS, GPU and CPU in the corner of your games (MangoHud). Right Shift + F12 hides it. Reopen Steam after changing it"
       },
+      "mascota": {
+        "title": "Desktop companion",
+        "desc": "A pixel-art character that walks on your screen and climbs your windows. Click it to talk, double click opens Miku, right click sends it away. It hides while you play",
+        "missing": "Not installed yet: run «vortex actualizar»"
+      },
       "bienvenida": {
         "title": "Welcome when you sign in",
         "desc": "A card with the weather, your tasks for today and your music"

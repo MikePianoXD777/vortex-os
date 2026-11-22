@@ -157,6 +157,9 @@ GuideTab {
             // Vortex 1.8: contador de FPS en los juegos (MangoHud, «vortex fps»).
             GeneralFpsSection { tab: generalTabRoot }
 
+            // Vortex 4.1: la compañera de escritorio («vortex mascota», viene apagada).
+            GeneralMascotaSection { tab: generalTabRoot }
+
             // Vortex: conectar con Claude (viene apagado).
             GeneralClaudeSection { tab: generalTabRoot }
 

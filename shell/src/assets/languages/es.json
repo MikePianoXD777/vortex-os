@@ -323,6 +323,11 @@
         "title": "Contador de FPS en los juegos",
         "desc": "Los FPS, la GPU y la CPU en la esquina de tus juegos (MangoHud). Shift derecho + F12 lo esconde. Vuelve a abrir Steam después de cambiarlo"
       },
+      "mascota": {
+        "title": "Compañera de escritorio",
+        "desc": "Un personaje en pixel art que camina por tu pantalla y se sube a tus ventanas. Clic para que te hable, doble clic abre a Miku, clic derecho para que se vaya. Se esconde mientras juegas",
+        "missing": "Todavía no está instalada: corre «vortex actualizar»"
+      },
       "bienvenida": {
         "title": "Bienvenida al entrar",
         "desc": "Una tarjeta con el clima, tus tareas de hoy y tu música"
