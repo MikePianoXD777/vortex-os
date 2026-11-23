@@ -50,7 +50,8 @@
       "theme_wallpapers": "Wallpapers",
       "general_main": "General",
       "general_presets": "Presets",
-      "general_weather": "Weather"
+      "general_weather": "Weather",
+      "autostart": "Autostart"
     },
     "launcher": {
       "position": {
@@ -430,7 +431,6 @@
         "floating": "KDE",
         "working": "Switching…"
       },
-      "bluelight": {},
       "laptop": {
         "title": "Laptop mode",
         "desc": "When unplugged: power saving, no animations, dimmer screen and 60 Hz. Everything comes back when you plug it in"
@@ -605,11 +605,7 @@
           "ram": "Memory",
           "temp": "Temperature",
           "disk": "Disk"
-        },
-        "cpu": {},
-        "ram": {},
-        "temp": {},
-        "disk": {}
+        }
       },
       "bat": {
         "show_percent": {
@@ -762,9 +758,7 @@
           },
           "button": "Interactive icon buttons with background",
           "icon": "Clean icons without background"
-        },
-        "show_settings": {},
-        "show_launcher": {}
+        }
       },
       "height": {
         "title": "Bar height",
@@ -1291,7 +1285,8 @@
           "unavailable": "Unavailable",
           "disabled": "Disabled",
           "unknown": "Unknown"
-        }
+        },
+        "note": "Your location is sent to official alert sources. This does not replace official emergency alerts."
       },
       "quiet": {
         "title": "Quiet hours",
@@ -1299,6 +1294,14 @@
         "range": {
           "title": "Quiet period",
           "desc": "Drag the handles to choose when alerts are held back"
+        },
+        "end": {
+          "desc": "Local time, 0 to 23",
+          "title": "Quiet hours end"
+        },
+        "start": {
+          "desc": "Local time, 0 to 23",
+          "title": "Quiet hours start"
         }
       },
       "kinds": {
@@ -1359,6 +1362,49 @@
           "desc": "Poor air quality is forecast"
         }
       }
+    },
+    "autostart": {
+      "add_button": "Add application",
+      "browse_file": "Browse file",
+      "condition_ac_only": "AC only",
+      "condition_always": "Always",
+      "condition_battery_only": "Battery only",
+      "condition_label": "Startup condition",
+      "condition_multi_monitor": "Multi-monitor only",
+      "count_desc": "Number of instances to run on startup",
+      "count_label": "Run count",
+      "delay_desc": "Wait time in seconds before starting",
+      "delay_label": "Start delay",
+      "delay_unit": "s",
+      "delete": "Delete",
+      "desc": "Manage programs, binaries and scripts that start automatically on login",
+      "empty_desc": "Click 'add application' to specify commands, binaries, delays and repeat counts.",
+      "empty_title": "No startup applications",
+      "exec_label": "Executable command",
+      "exec_placeholder": "Path to binary or name with flags (e.g., discord --start-minimized)",
+      "master_switch": {
+        "desc": "Run configured startup application list globally on login",
+        "title": "Enable autostart"
+      },
+      "name_label": "Name",
+      "name_placeholder": "e.g., Discord, Telegram, script",
+      "no_log": "Log is empty",
+      "repeat_delay_desc": "Delay between repeated runs",
+      "repeat_delay_label": "Repeat interval",
+      "restart_crash_desc": "Restart service automatically on failure",
+      "restart_crash_label": "Restart on crash",
+      "run_now": "Run now",
+      "silent_desc": "Open window in background without stealing focus",
+      "silent_label": "Silent start",
+      "status_failed": "Failed",
+      "status_idle": "Idle",
+      "status_running": "Running",
+      "status_success": "Completed",
+      "title": "Autostart",
+      "toggle": "Toggle",
+      "view_log": "Log",
+      "workspace_default": "Default",
+      "workspace_label": "Workspace"
     }
   },
   "sysnotif": {
@@ -2014,13 +2060,16 @@
     },
     "presets": {
       "minimal": {
-        "name": "Minimal"
+        "name": "Minimal",
+        "desc": "Clean and subtle layout with minimal digital clock and compact weather."
       },
       "media_station": {
-        "name": "Media station"
+        "name": "Media station",
+        "desc": "Media setup with centered visualizer bars and circular music controller."
       },
       "dashboard": {
-        "name": "Dashboard"
+        "name": "Dashboard",
+        "desc": "Full workspace monitor with digital clock, hardware usage and battery status."
       }
     },
     "github": {

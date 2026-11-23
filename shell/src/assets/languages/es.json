@@ -431,7 +431,6 @@
         "floating": "KDE",
         "working": "Cambiando…"
       },
-      "bluelight": {},
       "laptop": {
         "title": "Modo laptop",
         "desc": "Al desenchufarla: ahorro de energía, sin animaciones, pantalla más tenue y a 60 Hz. Todo regresa al enchufarla"
@@ -606,11 +605,7 @@
           "ram": "Memoria",
           "temp": "Temperatura",
           "disk": "Disco"
-        },
-        "cpu": {},
-        "ram": {},
-        "temp": {},
-        "disk": {}
+        }
       },
       "bat": {
         "show_percent": {
@@ -763,9 +758,7 @@
           },
           "button": "Botones de icono interactivos con fondo",
           "icon": "Iconos limpios sin fondo"
-        },
-        "show_settings": {},
-        "show_launcher": {}
+        }
       },
       "height": {
         "title": "Alto de la barra",
@@ -2365,7 +2358,12 @@
       "installing_title": "Instalando paquetes del sistema y dependencias...",
       "installing_pkg": "Instalando {pkg}...",
       "install_ok": "{pkg} instalado con éxito",
-      "install_failed": "Error al instalar {pkg}"
+      "install_failed": "Error al instalar {pkg}",
+      "enabling_copr": "Habilitando repositorio COPR {repo}...",
+      "enabling_repo": "Habilitando repositorio {repo}...",
+      "enabling_terra": "Habilitando el repositorio Terra...",
+      "quickshell_outdated": "Quickshell {version} es demasiado antiguo, se requiere {minimum} o superior. Actualizando...",
+      "quickshell_still_old": "Quickshell sigue siendo más antiguo que {minimum}. Actualízalo manualmente, de lo contrario la configuración no se abrirá."
     },
     "deploy": {
       "configuring_sddm": "Configurando el gestor de pantalla SDDM...",
@@ -2375,6 +2373,42 @@
       "sddm_no_xorg": "No se encontró Xorg, se usa {compositor} para SDDM.",
       "sddm_no_backend": "No se encontró Xorg ni un compositor Wayland compatible para la pantalla de inicio de sesión (kwin_wayland/weston) en /usr/local/bin, /usr/bin o /bin.",
       "sddm_skipped": "Se omite la configuración de SDDM: no se encontró un servidor gráfico ni un compositor de inicio de sesión utilizable. El gestor de pantalla actual no se modifica."
+    },
+    "audio": {
+      "building": "No hay motor de audio precompilado para este sistema, compilándolo desde el código...",
+      "checksum_failed": "La descarga del motor de audio falló la verificación de suma de control, omitiendo.",
+      "download_failed": "No se pudo descargar el motor de audio Serpantinum, omitiendo. Puedes instalarlo luego desde github.com/ilyamiro/serpantinum-audio.",
+      "install_failed": "Falló la instalación del motor de audio Serpantinum. El ecualizador no funcionará hasta que se instale desde github.com/ilyamiro/serpantinum-audio.",
+      "installed": "Se instaló el motor de audio Serpantinum {version}",
+      "installing": "Instalando el motor de audio Serpantinum...",
+      "up_to_date": "-> El motor de audio Serpantinum {version} ya está instalado."
+    },
+    "core": {
+      "checksum_failed": "La descarga de los servicios principales falló la verificación de suma de control, omitiendo.",
+      "download_failed": "No se pudieron descargar los servicios principales Serpantinum, omitiendo. Puedes instalarlos luego desde github.com/ilyamiro/serpantinum-core.",
+      "install_failed": "Falló la instalación de los servicios principales Serpantinum. El uso del sistema, indicadores de bloqueo de teclado y portapapeles no funcionarán hasta que se instalen desde github.com/ilyamiro/serpantinum-core.",
+      "installed": "Se instalaron los servicios principales Serpantinum {version}",
+      "installing": "Instalando los servicios principales Serpantinum...",
+      "unsupported_arch": "Los paquetes precompilados de servicios principales solo existen para x86_64, omitiendo.",
+      "up_to_date": "-> Los servicios principales Serpantinum {version} ya están instalados."
+    },
+    "gamma": {
+      "checksum_failed": "La descarga del filtro de luz azul falló la verificación de suma de control, omitiendo.",
+      "download_failed": "No se pudo descargar el filtro de luz azul Serpantinum, omitiendo. Puedes instalarlo luego desde github.com/ilyamiro/serpantinum-gamma.",
+      "install_failed": "Falló la instalación del filtro de luz azul Serpantinum. No funcionará hasta que se instale desde github.com/ilyamiro/serpantinum-gamma.",
+      "installed": "Se instaló el filtro de luz azul Serpantinum {version}",
+      "installing": "Instalando el filtro de luz azul Serpantinum...",
+      "unsupported_arch": "Los paquetes precompilados del filtro de luz azul solo existen para x86_64, omitiendo.",
+      "up_to_date": "-> El filtro de luz azul Serpantinum {version} ya está instalado."
+    },
+    "ski": {
+      "checksum_failed": "La descarga de Ski falló la verificación de suma de control, omitiendo.",
+      "download_failed": "No se pudo descargar Ski, omitiendo. Puedes instalarlo luego desde github.com/ilyamiro/Ski.",
+      "install_failed": "Falló la instalación de Ski",
+      "installed": "Se instaló Ski {version}",
+      "installing": "Instalando el gestor de archivos Ski...",
+      "unsupported_arch": "Los paquetes precompilados de Ski solo existen para x86_64, omitiendo.",
+      "up_to_date": "-> Ski {version} ya está instalado."
     }
   },
   "translator": {
