@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
-use vortex_player::mpris::{EstadoMpris, Meta, Mpris, NOMBRE, OrdenMpris, RUTA, brinco, metadatos};
+use vortex_player::mpris::{EstadoMpris, Meta, Mpris, NOMBRE, OrdenMpris, RUTA, brinco, metadatos, portada_local};
 use zbus::OwnedVariant as OwnedValue;
 
 #[test]
@@ -244,6 +244,71 @@ fn avisa_cuando_la_cancion_brinca() {
             futures_util::future::Either::Left((a, _)) | futures_util::future::Either::Right((a, _)) => a,
         };
         assert_eq!(us, Some(151_000_000), "avisó el brinco (y no el avance normal)");
+    });
+    drop(m);
+    let _ = d.kill();
+    let _ = d.wait();
+}
+
+/// Sin la portada de la ventana (una lista que no la había cargado), MPRIS la busca en el disco: la .jpg de al
+/// lado (yt-dlp), la de la carpeta o la de la caché. Sin ella, la barra enseñaba una nota (Mike: «Blissful»).
+#[test]
+fn busca_la_portada_en_el_disco() {
+    let t = tempfile::tempdir().unwrap();
+    let cache = t.path().join("cache");
+    let dir = t.path().join("Txmy");
+    std::fs::create_dir_all(&dir).unwrap();
+    let cancion = dir.join("Blissful [9tmrPnFBPH4].opus");
+    std::fs::write(&cancion, b"x").unwrap();
+    assert_eq!(portada_local(cancion.to_str().unwrap(), &cache), "", "sin imagen, nada");
+    // La de la caché (la que la ventana sacó del archivo).
+    std::fs::create_dir_all(&cache).unwrap();
+    let hash = vortex_player::cripto::hex(&vortex_player::cripto::sha1(cancion.to_str().unwrap().as_bytes()));
+    std::fs::write(cache.join(format!("{hash}.jpg")), b"j").unwrap();
+    assert!(portada_local(cancion.to_str().unwrap(), &cache).ends_with(&format!("cache/{hash}.jpg")));
+    // La de la carpeta gana a la de la caché, y la de al lado gana a todas.
+    std::fs::write(dir.join("cover.jpg"), b"c").unwrap();
+    assert!(portada_local(cancion.to_str().unwrap(), &cache).ends_with("/Txmy/cover.jpg"));
+    std::fs::write(dir.join("Blissful [9tmrPnFBPH4].jpg"), b"j").unwrap();
+    let u = portada_local(cancion.to_str().unwrap(), &cache);
+    assert!(u.starts_with("file:///") && u.ends_with("/Txmy/Blissful%20%5B9tmrPnFBPH4%5D.jpg"), "{u}");
+    // Lo que no es un archivo local, nada.
+    assert_eq!(portada_local("https://www.youtube.com/watch?v=x", &cache), "");
+    assert_eq!(portada_local("", &cache), "");
+}
+
+/// Y en los metadatos: la canción llega sin portada y el artUrl sale con la de al lado.
+#[test]
+fn los_metadatos_llevan_la_portada_del_disco() {
+    let t = tempfile::tempdir().unwrap();
+    let sock = t.path().join("bus");
+    let Ok(mut d) = Command::new("dbus-daemon")
+        .args(["--session", "--nofork", "--print-address=1", &format!("--address=unix:path={}", sock.display())])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        eprintln!("falta dbus-daemon: se salta");
+        return;
+    };
+    let mut dir = String::new();
+    BufReader::new(d.stdout.take().unwrap()).read_line(&mut dir).unwrap();
+    let dir = dir.trim().to_string();
+    let cancion = t.path().join("Lucent.opus");
+    std::fs::write(&cancion, b"x").unwrap();
+    std::fs::write(t.path().join("Lucent.jpg"), b"j").unwrap();
+    let (tx, _rx) = mpsc::channel();
+    let m = Mpris::arrancar(Some(&dir), tx).expect("se registra en el bus");
+    m.poner(EstadoMpris {
+        cancion: json!({"ruta": cancion.to_str().unwrap(), "titulo": "Lucent", "duracion": 139.0}),
+        ..EstadoMpris::default()
+    });
+    async_io::block_on(async {
+        let c = zbus::connection::Builder::address(dir.as_str()).build().await.unwrap();
+        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player").await.unwrap();
+        let meta: std::collections::HashMap<String, OwnedValue> = p.get_property("Metadata").await.unwrap();
+        let art = String::try_from(meta["mpris:artUrl"].clone()).unwrap();
+        assert!(art.starts_with("file://") && art.ends_with("/Lucent.jpg"), "{art}");
     });
     drop(m);
     let _ = d.kill();

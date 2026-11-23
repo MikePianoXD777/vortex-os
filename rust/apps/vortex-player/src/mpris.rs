@@ -90,6 +90,32 @@ pub enum Meta {
     Lista(Vec<String>),
 }
 
+/// Las portadas de carpeta que se buscan (las mismas que la ventana, `NOMBRES_PORTADA`).
+const NOMBRES_PORTADA: [&str; 8] = [
+    "cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "Cover.jpg", "Folder.jpg", "AlbumArt.jpg",
+];
+
+/// La portada de una canción local cuando la ventana no la mandó (las listas guardan la portada solo de las
+/// canciones que ya se vieron en pantalla, y sin ella la barra del escritorio enseña una nota en vez de la
+/// portada): la .jpg o .png de al lado (la que deja yt-dlp), la de la carpeta o la que la ventana ya sacó del
+/// archivo a `cache/portadas/<sha1>.jpg`. «» si no hay.
+pub fn portada_local(ruta: &str, cache: &Path) -> String {
+    if ruta.is_empty() || ruta.contains("://") {
+        return String::new();
+    }
+    let p = Path::new(ruta);
+    let mut candidatas = vec![p.with_extension("jpg"), p.with_extension("png")];
+    if let Some(padre) = p.parent() {
+        candidatas.extend(NOMBRES_PORTADA.iter().map(|n| padre.join(n)));
+    }
+    candidatas.push(cache.join(format!("{}.jpg", cripto::hex(&cripto::sha1(ruta.as_bytes())))));
+    candidatas
+        .into_iter()
+        .find(|c| c.is_file())
+        .map(|c| uri(&c.to_string_lossy()))
+        .unwrap_or_default()
+}
+
 fn uri(ruta: &str) -> String {
     if ruta.is_empty() { String::new() } else { format!("file://{}", red::escapar_ruta(ruta)) }
 }
@@ -359,6 +385,8 @@ pub struct Mpris {
     aviso: futures_channel::mpsc::UnboundedSender<Option<Cambio>>,
     /// Cuándo se puso el estado por última vez (para saber si la posición brincó).
     puesto: Mutex<std::time::Instant>,
+    /// La última portada buscada en disco: (ruta de la canción, URL), para no buscarla en cada aviso.
+    portada: Mutex<(String, String)>,
 }
 
 impl Mpris {
@@ -421,11 +449,19 @@ impl Mpris {
             })
             .ok()?;
         listo_rx.recv().ok().filter(|ok| *ok)?;
-        Some(Self { estado, aviso, puesto: Mutex::new(std::time::Instant::now()) })
+        Some(Self { estado, aviso, puesto: Mutex::new(std::time::Instant::now()), portada: Mutex::default() })
     }
 
     /// Lo que suena. Avisa al escritorio solo de lo que cambió (la posición no se avisa: se pide; solo sus brincos, con `Seeked`).
-    pub fn poner(&self, nuevo: EstadoMpris) {
+    pub fn poner(&self, mut nuevo: EstadoMpris) {
+        if nuevo.portada.is_empty() {
+            let ruta = nuevo.cancion.get("ruta").and_then(Value::as_str).unwrap_or("");
+            let mut p = self.portada.lock().unwrap_or_else(|x| x.into_inner());
+            if p.0 != ruta {
+                *p = (ruta.to_string(), portada_local(ruta, &crate::rutas::cache().join("portadas")));
+            }
+            nuevo.portada = p.1.clone();
+        }
         let viejo = std::mem::replace(&mut *self.estado.lock().unwrap_or_else(|x| x.into_inner()), nuevo.clone());
         let pasaron = {
             let mut p = self.puesto.lock().unwrap_or_else(|x| x.into_inner());

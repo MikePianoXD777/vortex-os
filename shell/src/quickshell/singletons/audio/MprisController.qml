@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import "../../"
+import "ElegirReproductor.js" as Elegir
 
 Singleton {
     id: root
@@ -21,19 +22,44 @@ Singleton {
 
     property string lastPlayingBus: ""
 
+    // Vortex 4.1: desde cuándo suena cada reproductor (ElegirReproductor.js). Una vista previa de YouTube ya no
+    // le quita la barra a Vortex Player (ni su portada).
+    property var _desde: ({})
+    property int _reelegir: 0
+    readonly property var vigiaReproductores: root._playerWatch
+    onVigiaReproductoresChanged: root._marcarDesde()
+    Component.onCompleted: root._marcarDesde()
+    function _marcarDesde() {
+        let falta = Elegir.marcar(root._lista(), root._desde, Date.now());
+        root._reelegir++;
+        if (falta > 0) {
+            reelegirTimer.interval = falta + 50;
+            reelegirTimer.restart();
+        }
+    }
+    function _lista() {
+        return Mpris.players.values.filter(p => p).sort((a, b) => (a.busName || "").localeCompare(b.busName || "")).map(p => ({
+            player: p,
+            busName: p.busName || "",
+            isPlaying: p.isPlaying === true,
+            stopped: p.playbackState === MprisPlaybackState.Stopped,
+            title: p.trackTitle || "",
+            canControl: p.canControl === true
+        }));
+    }
+    Timer {
+        id: reelegirTimer
+        repeat: false
+        onTriggered: root._marcarDesde()
+    }
+
     readonly property MprisPlayer activePlayer: {
         let _ = _playerWatch;
+        let __ = _reelegir;
         try {
-            let players = Mpris.players.values.filter(p => p).sort((a, b) => (a.busName || "").localeCompare(b.busName || ""));
-            let playing = players.find(p => p.isPlaying);
-            if (playing) return playing;
-            let last = root.lastPlayingBus !== "" ? players.find(p => p.busName === root.lastPlayingBus) : null;
-            if (last) return last;
-            let loaded = players.find(p => p.playbackState !== MprisPlaybackState.Stopped && p.trackTitle !== "");
-            if (loaded) return loaded;
-            let controllable = players.find(p => p.canControl);
-            if (controllable) return controllable;
-            return players.length > 0 ? players[0] : null;
+            let lista = root._lista();
+            let i = Elegir.elegir(lista, root.lastPlayingBus, root._desde, Date.now());
+            return i >= 0 ? lista[i].player : null;
         } catch (e) {
             return null;
         }
@@ -139,6 +165,8 @@ Singleton {
             root.queueFetch();
         }
         function onPlaybackStateChanged() {
+            // El que se enseña y se pone a sonar queda como «el que sonaba» (así una vista previa no se lo lleva).
+            if (root.activePlayer && root.activePlayer.isPlaying) root.lastPlayingBus = root.activePlayer.busName || "";
             root.queueFetch();
         }
     }
