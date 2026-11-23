@@ -29,6 +29,11 @@ El cortafuegos que trae el sistema (ufw) bloqueaba la red de Android: no le daba
 Play Store no cargaba. Ahora Vortexine's le abre el paso solo a la red de Android. Si ya habías preparado
 Android, `vortex actualizar` lo arregla una sola vez (te pide la contraseña).
 
+### Android ya no se queda prendido por abrir la Shop
+
+Con solo abrir la sección «Juegos de Android», el contenedor de Android se prendía y ya no se apagaba. Ahora
+solo se prende cuando juegas, y se apaga solo cuando cierras la ventana de Android.
+
 ## Para actualizar
 
 ```

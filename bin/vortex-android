@@ -44,8 +44,11 @@ sin_aceleracion() {
 }
 intel_cpu() { grep -qm1 GenuineIntel /proc/cpuinfo; }
 preparado() { [[ -f "$VAR/images/system.img" && -f "$VAR/waydroid.cfg" ]]; }
-corriendo() { grep -qE 'Session:\s*RUNNING' <<<"$("$WAYDROID" status 2>/dev/null)"; }
-contenedor_activo() { systemctl is-active --quiet waydroid-container.service; }
+# 4.3: «waydroid status» le habla al contenedor por D-Bus y eso lo PRENDE (BusName=id.waydro.Container):
+# la Shop pregunta el estado al abrir la sección de Android, y el contenedor se quedaba prendido sin usarse.
+# Con el contenedor apagado, Android no corre: no se pregunta.
+contenedor_activo() { "${VORTEX_ANDROID_SYSTEMCTL:-systemctl}" is-active --quiet waydroid-container.service; }
+corriendo() { contenedor_activo && grep -qE 'Session:\s*RUNNING' <<<"$("$WAYDROID" status 2>/dev/null)"; }
 
 cmd_estado() {
   local inst=false prep=false corr=false nv=false sw=false reg=false
