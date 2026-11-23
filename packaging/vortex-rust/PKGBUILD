@@ -45,13 +45,15 @@
 #     Shimeji o de tiras (animations.json + spritesheets_128/) en ~/.local/share/vortex/mascota
 #     («vortex mascota usar CARPETA|ARCHIVO.zip»). El repo no trae personajes ajenos.
 #   - vortex-usb-rs también respalda a una memoria marcada «Usar para respaldos» (4.0).
+#   - vortex-lluvia (4.3, solo en Rust): la lluvia de dígitos que abre la terminal antes del saludo
+#     (config/terminal/saludo.sh). «vortex saludo lluvia off» la apaga.
 #   - Vortex Player (4.1): avisa por MPRIS cuando cambia CanSeek y manda la duración de mpv si la canción no la
 #     trae: la barra del panel de música ya deja elegir el tiempo.
 #
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=21
+pkgrel=22
 pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, Local AI, Miku, traducir y limpieza)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'
@@ -66,7 +68,7 @@ options=('!lto')
 _raiz() { echo "$startdir/../../rust"; }
 _crates=(vortex-bt-agente vortex-gestor vortex-tareas vortex-usb vortex-enlace vortex-memoria vortex-tirones vortex-task-manager-qt vortex-runner-qt vortex-video-qt vortex-shop-qt
          vortex-app-installer-qt vortex-connect-qt vortex-shared vortex-shared-qt vortex-camera-qt vortex-local-ai-qt
-         vortex-player-qt vortex-miku vortex-miku-qt vortex-miku-voz vortex-traducir vortex-limpieza vortex-mascota)
+         vortex-player-qt vortex-miku vortex-miku-qt vortex-miku-voz vortex-traducir vortex-limpieza vortex-mascota vortex-lluvia)
 _paquetes() { local c; for c in "${_crates[@]}"; do printf -- '-p %s ' "$c"; done; }
 # 4.1: con rustup en ~/.cargo/bin (antes que /usr/bin en el PATH), «stable» puede ser más vieja que la que
 # pide el workspace (rust-version 1.100) y la construcción fallaba aunque el sistema trajera la buena. Se
@@ -95,7 +97,7 @@ check() {
     _cargo_del_sistema
     export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$srcdir/target"
     command -v dbus-daemon >/dev/null || return 0
-    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones -p vortex-traducir -p vortex-limpieza -p vortex-mascota -p vortex-miku
+    cargo test --release --frozen -p vortex-bt-agente -p vortex-tareas -p vortex-usb -p vortex-enlace -p vortex-gestor -p vortex-memoria -p vortex-tirones -p vortex-traducir -p vortex-limpieza -p vortex-mascota -p vortex-lluvia -p vortex-miku
     # El motor de Camera se prueba contra una cámara falsa de verdad (RTSP con ffmpeg y python3).
     if command -v ffmpeg >/dev/null && command -v python3 >/dev/null; then
         cargo test --release --frozen -p vortex-camera
@@ -124,6 +126,7 @@ package() {
     install -Dm755 "$b/vortex-traducir" "$pkgdir/usr/bin/vortex-traducir"
     install -Dm755 "$b/vortex-limpieza" "$pkgdir/usr/bin/vortex-limpieza"
     install -Dm755 "$b/vortex-mascota" "$pkgdir/usr/bin/vortex-mascota"
+    install -Dm755 "$b/vortex-lluvia" "$pkgdir/usr/bin/vortex-lluvia"
     for a in task-manager runner video shop app-installer connect shared camera local-ai player; do
         install -Dm755 "$b/vortex-$a-rs" "$pkgdir/usr/lib/vortex/vortex-$a-rs"
     done

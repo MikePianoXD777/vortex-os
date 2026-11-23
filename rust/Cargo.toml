@@ -33,6 +33,7 @@ members = [
     "apps/vortex-camera/qt",
     "apps/vortex-player/qt",
     "apps/vortex-traducir",
+    "apps/vortex-lluvia",
     "apps/vortex-limpieza",
     "apps/vortex-mascota",
     "apps/miku",

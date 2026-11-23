@@ -5,6 +5,10 @@
 # «vortex actualizar»). A mano: «vortex saludo».
 aqui="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
+# 4.3: primero la lluvia de dígitos (vortex-lluvia, ~1,3 s; cualquier tecla la salta). Solo se ve en una
+# terminal de verdad y no deja rastro. «vortex saludo lluvia off» la apaga.
+command -v vortex-lluvia >/dev/null && vortex-lluvia
+
 printf '\e[1;38;2;255;255;255m'
 cat <<'LETRERO'
 

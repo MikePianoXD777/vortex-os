@@ -87,6 +87,7 @@ Uso: vortex <comando>
   onedrive [conectar|desconectar|abrir] OneDrive como la carpeta ~/OneDrive (cualquier cuenta de Microsoft)
   fps [estado|on|off]                  contador de FPS en los juegos (MangoHud; Shift derecho+F12 lo esconde)
   saludo                               el saludo de la terminal: «Vortexine's OS», el logo y tu PC
+  saludo lluvia on|off                 la lluvia de dígitos al abrir la terminal (4.3; viene encendida)
   otaku on|off|alternar|estado|otro    modo otaku: fondo de Miku Nakano y un toque de personalización
   windows                              reinicia una sola vez en Windows (dual boot)
   miku [avatar on|off|estado]          Miku, el asistente de voz (Super+O): la abre o la cierra del todo;
@@ -1301,6 +1302,25 @@ recargar_hyprland_si_fallo() {
   [[ -n "${errores//[[:space:]]/}" ]] || return 0
   hypr reload >/dev/null 2>&1 &&
     printf 'vortex: %s\n' "recargué Hyprland: su configuración tenía errores (se había quedado sin atajos)" || true
+}
+
+# El saludo de la terminal y, desde la 4.3, la lluvia de dígitos de antes (vortex-lluvia).
+#   vortex saludo                 lo enseña (lo llaman fish_greeting y ~/.bashrc)
+#   vortex saludo lluvia on|off   prende o apaga la lluvia (apagada = existe ~/.config/vortex/sin-lluvia)
+#   vortex saludo lluvia estado   dice cómo está
+cmd_saludo() {
+  local marca="$CONF/sin-lluvia"
+  case "${1:-}" in
+    "") exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
+    lluvia)
+      case "${2:-estado}" in
+        on|encender|prender) rm -f "$marca"; echo "La lluvia de dígitos sale al abrir la terminal." ;;
+        off|apagar) mkdir -p "$CONF" && : >"$marca"; echo "Listo: la terminal abre directo, sin la lluvia." ;;
+        estado) if [[ -e "$marca" ]]; then echo "apagada"; else echo "encendida"; fi ;;
+        *) echo "Uso: vortex saludo lluvia on|off|estado" >&2; return 2 ;;
+      esac ;;
+    *) echo "Uso: vortex saludo [lluvia on|off|estado]" >&2; return 2 ;;
+  esac
 }
 
 # 4.2: el driver de NVIDIA se actualizó pero la PC sigue con el módulo viejo cargado («Driver/library version
@@ -2634,7 +2654,7 @@ case "${1:-ayuda}" in
   mascota) shift; cmd_mascota "$@" ;;
   bateria) shift; cmd_bateria "$@" ;;
   fps) shift; cmd_fps "$@" ;;
-  saludo) exec bash "$VORTEX_DIR/config/terminal/saludo.sh" ;;
+  saludo) shift; cmd_saludo "$@" ;;
   # Vortex: el modo otaku vive en su propio comando (bin/vortex-otaku, copiado en /usr/local/bin).
   otaku)
     shift
