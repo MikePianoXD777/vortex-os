@@ -1727,6 +1727,19 @@ wifi_mediatek() {
   fi
 }
 
+# 4.3: quien preparó Android en la 4.0 tiene ufw bloqueándole la red (sin IP ni internet). Una sola vez y
+# solo si Android está preparado; VORTEX_ANDROID_VAR: solo para las pruebas.
+android_red() {
+  local marca="$AVISOS_ESTADO/android-red-ufw"
+  [[ -f "${VORTEX_ANDROID_VAR:-/var/lib/waydroid}/waydroid.cfg" && ! -e "$marca" ]] || return 0
+  command -v ufw >/dev/null && command -v vortex-android >/dev/null || return 0
+  if sudo vortex-android firewall-root; then
+    mkdir -p "$AVISOS_ESTADO" && : >"$marca"
+  else
+    aviso "no pude dejar pasar la red de Android en ufw (a mano: sudo vortex-android firewall-root)"
+  fi
+}
+
 # 2.6.3: que falte memoria no cierre apps enteras (a un amigo se le cerraba Discord). Solo pide sudo si
 # hay algo que cambiar. systemd --user lee su configuración de nuevo sin cerrar nada: los scopes nuevos
 # ya salen bien; los que ya estaban abiertos se quedan como estaban hasta cerrar esa app.
@@ -2031,6 +2044,7 @@ cmd_actualizar() {
   proteger_apps
   wifi_mediatek
   pantalla_inicio
+  android_red
   # El saludo de la terminal (1.7.1), una sola vez: cambia el de Caelestia que traían las instalaciones.
   bash "$VORTEX_DIR/config/terminal/poner-saludo.sh" || true
   # 4.0.6: la unidad de OneDrive de antes reintentaba cada 20 s para siempre si la cuenta estaba rota.

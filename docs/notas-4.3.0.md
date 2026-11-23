@@ -23,6 +23,12 @@ Faltaban 81 textos: 33 del instalador salían en inglés aunque usaras el sistem
 Ajustes (inicio automático, avisos del clima y los presets de widgets) salían en español con el sistema
 en inglés. Ya están todos en los dos idiomas.
 
+### Los juegos de Android se quedaban sin internet
+
+El cortafuegos que trae el sistema (ufw) bloqueaba la red de Android: no le daba dirección ni DNS, y la
+Play Store no cargaba. Ahora Vortexine's le abre el paso solo a la red de Android. Si ya habías preparado
+Android, `vortex actualizar` lo arregla una sola vez (te pide la contraseña).
+
 ## Para actualizar
 
 ```
