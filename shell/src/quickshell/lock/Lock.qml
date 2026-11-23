@@ -62,15 +62,36 @@ Scope {
     Component.onCompleted: {
         SystemInfo.fetch();
         root.updateScreenCount();
-        Quickshell.execDetached(["rm", "-f", Caching.getRunDir("lock") + "/locked"]);
+        // 4.2: si la marca «locked» sigue ahí, el shell anterior murió (o se reinició) con la pantalla
+        // bloqueada: se vuelve a bloquear luego luego. Antes se borraba la marca y Hyprland se quedaba en
+        // «lockscreen app died». La marca vive en $XDG_RUNTIME_DIR, así que un reinicio de la PC la quita.
+        relockProbe.running = true;
         root.defaultPamDir = pam.configDirectory;
         root.defaultPamConfig = pam.config;
         noFpPamBuilder.running = true;
         pamServiceProbe.running = true;
     }
 
-    Component.onDestruction: {
-        Quickshell.execDetached(["rm", "-f", Caching.getRunDir("lock") + "/locked"]);
+    // Al cerrar el shell la marca se queda: si estaba bloqueado, el que arranque después vuelve a bloquear.
+    // Solo se quita al desbloquear (completeUnlock y onLockedChanged).
+
+    Process {
+        id: relockProbe
+        command: ["test", "-f", Caching.getRunDir("lock") + "/locked"]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) relockTimer.start();
+        }
+    }
+
+    // Un respiro para que los monitores y PAM estén listos; estático porque una captura ahora sería la
+    // pantalla roja de Hyprland.
+    Timer {
+        id: relockTimer
+        interval: 150
+        onTriggered: {
+            console.info("lock: el shell anterior se cerró con la pantalla bloqueada; vuelvo a bloquear");
+            root.lockStatic();
+        }
     }
 
     Connections {

@@ -194,6 +194,34 @@ wallpaper_decoder() {
     echo none
 }
 
+# 4.2: si quickshell muere con la pantalla bloqueada (queda la marca «locked»), se vuelve a abrir para que
+# retome el bloqueo (Lock.qml lo hace al arrancar) en vez de dejar la pantalla roja de Hyprland
+# («lockscreen app died»). Hasta 5 veces en 2 minutos, para no quedarse en un ciclo si truena al arrancar.
+# «serpantinum kill» mata primero a este daemon, así que un reinicio a propósito no se duplica.
+# (pruebas/bloqueo-reinicio.sh)
+lanzar_quickshell() {
+    local mark="${QS_RUN_DIR:-${XDG_RUNTIME_DIR:-/tmp}/serpantinum}/lock/locked"
+    local -a veces=() recientes=()
+    local ahora t0
+    while :; do
+        setsid quickshell -p "$MAIN_QML" 9>&- &
+        QS_PID=$!
+
+        while kill -0 "$QS_PID" 2>/dev/null; do
+            wait "$QS_PID" 2>/dev/null
+        done
+
+        [ -f "$mark" ] || return 0
+        ahora=$(date +%s)
+        recientes=()
+        for t0 in "${veces[@]}"; do (( ahora - t0 < 120 )) && recientes+=("$t0"); done
+        veces=("${recientes[@]}" "$ahora")
+        (( ${#veces[@]} > 5 )) && return 1
+        echo "serpantinumd: quickshell se cerró con la pantalla bloqueada; lo vuelvo a abrir" >&2
+        sleep "${SERPANTINUM_RESPAWN_PAUSA:-0.3}"
+    done
+}
+
 if [ "$COMMAND" == "start" ]; then
     exec 9>"/tmp/serpantinumd.lock"
 
@@ -279,10 +307,5 @@ if [ "$COMMAND" == "start" ]; then
     if [ -d /proc/driver/nvidia ]; then
         export QT_FFMPEG_DECODING_HW_DEVICE_TYPES="${QT_FFMPEG_DECODING_HW_DEVICE_TYPES-$(wallpaper_decoder)}"
     fi
-    setsid quickshell -p "$MAIN_QML" 9>&- &
-    QS_PID=$!
-
-    while kill -0 "$QS_PID" 2>/dev/null; do
-        wait "$QS_PID" 2>/dev/null
-    done
+    lanzar_quickshell
 fi

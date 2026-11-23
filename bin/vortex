@@ -1303,9 +1303,30 @@ recargar_hyprland_si_fallo() {
     printf 'vortex: %s\n' "recargué Hyprland: su configuración tenía errores (se había quedado sin atajos)" || true
 }
 
+# 4.2: el driver de NVIDIA se actualizó pero la PC sigue con el módulo viejo cargado («Driver/library version
+# mismatch»). Todo lo que arranque desde ese momento ya no puede usar la tarjeta y Mesa lo dibuja con la CPU
+# (llvmpipe): un shell reiniciado así anima a tirones, a ~60 cuadros, y se come varios núcleos (pasó el
+# 22/11/2026 tras actualizar a 620.73). Imprime «módulo instalado» si no coinciden.
+nvidia_desfasado() {
+  local proc="${VORTEX_NVIDIA_PROC:-/proc/driver/nvidia/version}" cargado instalado
+  [[ -r "$proc" ]] || return 1
+  cargado="$(grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' "$proc" | head -1)"
+  instalado="$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}')"
+  instalado="${instalado%-*}"
+  [[ -n "$cargado" && -n "$instalado" && "$cargado" != "$instalado" ]] || return 1
+  printf '%s %s\n' "$cargado" "$instalado"
+}
+
 reiniciar_shell() {
   recargar_hyprland_si_fallo
   pgrep -u "$(id -u)" -x quickshell >/dev/null 2>&1 && hypr_corriendo || return 0
+  # El shell que ya corre trae cargado el driver viejo y sigue usando la tarjeta: se queda hasta reiniciar la PC.
+  local nv
+  if nv="$(nvidia_desfasado)"; then
+    printf 'vortex: %s\n' "se actualizó el driver de NVIDIA (${nv% *} → ${nv#* }): reinicia la PC para usarlo." \
+      "no reinicié el shell: hasta que reinicies se dibujaría con la CPU, lento y a tirones."
+    return 0
+  fi
   # Un shell lanzado desde otra carpeta (el repo, con SERPANTINUM_DIR) vuelve a arrancar desde ahí,
   # no desde el paquete. La ruta va escapada para bash y, encima, para la cadena de Lua.
   local qml dir previo=""
