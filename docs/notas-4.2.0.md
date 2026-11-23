@@ -19,3 +19,12 @@ que reinicies la PC.
 Si el shell se cerraba con la pantalla bloqueada, Hyprland enseñaba una pantalla roja («lockscreen app
 died») y había que recuperar el bloqueo a mano. Ahora el shell se vuelve a abrir solo y retoma el
 bloqueo en el momento, y te pide tu contraseña como siempre.
+
+## Para actualizar
+
+```
+vortex actualizar
+```
+
+Al terminar, el shell se reinicia solo (salvo que se haya actualizado el driver de NVIDIA: entonces te
+pide reiniciar la PC).
