@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import "../../"
 
 // Spectrum visualizer drawn by a single ShaderEffect: bars or a wave, horizontal or vertical.
@@ -192,11 +193,22 @@ Item {
         settling = true;
     }
 
+    // Vortex 4.3: un paso por cuadro de SU monitor (5 ms en uno de 200 Hz, 7 en uno de 144) en vez de 16 ms
+    // fijos: antes las barras se movían a 60 aunque la pantalla diera más. En el perfil «bajo» el shell
+    // dibuja a 60 Hz, así que ahí se queda en 16 ms. Lo calcula intervaloPaso() (pruebas/visualizador-hz.sh).
+    readonly property real refrescoMonitor: Screen.refreshRate > 0 ? Screen.refreshRate : 60
+    readonly property bool perfilBajo: Config.getSetting("rendimiento", "ultra") === "bajo"
+    function intervaloPaso(hz, bajo) {
+        if (bajo || !(hz > 0)) return 16;
+        return Math.max(4, Math.min(16, Math.round(1000 / hz)));
+    }
+
     // Vortex 2.8.4: temporizador, no FrameAnimation. Una animación de Qt hace redibujar todas las ventanas del
-    // shell (el fondo incluido) a la frecuencia de su monitor; cava solo manda 30 lecturas por segundo.
+    // shell (el fondo incluido) a la frecuencia de su monitor; un Timer solo redibuja la ventana del
+    // visualizador. cava manda 30 lecturas por segundo; el suavizado de en medio va a la frecuencia del monitor.
     Timer {
         id: levelAnimation
-        interval: 16
+        interval: root.intervaloPaso(root.refrescoMonitor, root.perfilBajo)
         repeat: true
         property double lastMs: 0
         running: root.settling && root.visible

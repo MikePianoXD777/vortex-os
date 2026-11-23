@@ -9,6 +9,12 @@ aparece el saludo de siempre. Cualquier tecla la salta, y no deja rastro en la t
 
 Si prefieres que la terminal abra directo: `vortex saludo lluvia off` (y `on` para volver a ponerla).
 
+### El visualizador de música va a la frecuencia de tu monitor
+
+Las barras del visualizador (en la barra, el widget de música y la portada) se movían a 60 cuadros por
+segundo aunque tu monitor diera más. Ahora van a la frecuencia de cada pantalla: 144 en un monitor de
+144 Hz, 200 en uno de 200 Hz. En el perfil de rendimiento «bajo» siguen a 60, para no gastar de más.
+
 ## Arreglado
 
 ### Textos del shell que salían en otro idioma
