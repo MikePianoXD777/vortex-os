@@ -631,3 +631,28 @@ fn compartir_pantalla_calla_las_notificaciones() {
         m.cuenta("qs.log", "compartiendo false") == 2
     });
 }
+
+#[test]
+fn anota_las_apps_cerradas_para_reabrirlas() {
+    let mut m = mundo_base();
+    m.iniciar();
+    let cerradas = m.run.join("vortex/cerradas");
+    m.hypr.evento(&[
+        "openwindow>>b001,1,firefox,Firefox",
+        "openwindow>>b002,1,firefox,Otra ventana",
+        "openwindow>>b003,1,org.gnome.Nautilus,Archivos",
+        "openwindow>>b004,1,org.quickshell,Panel",
+    ]);
+    dormir(3200);
+    // Un diálogo que vive menos de 3 s no cuenta.
+    m.hypr
+        .evento(&["openwindow>>b005,1,zenity,Pregunta", "closewindow>>b005"]);
+    // Cerrar una de dos ventanas de Firefox no anota nada: la app sigue abierta.
+    m.hypr.evento(&["closewindow>>b001", "closewindow>>b004"]);
+    dormir(300);
+    assert!(!cerradas.exists(), "{:?}", std::fs::read_to_string(&cerradas));
+    m.hypr.evento(&["closewindow>>b003", "closewindow>>b002"]);
+    esperar("se anotan las dos apps cerradas", || {
+        std::fs::read_to_string(&cerradas).is_ok_and(|t| t == "org.gnome.Nautilus\nfirefox\n")
+    });
+}

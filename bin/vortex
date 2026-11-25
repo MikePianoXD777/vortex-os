@@ -100,6 +100,8 @@ Uso: vortex <comando>
   rendimiento [estado|ultra|alto|medio|bajo]
                                        perfil de rendimiento: menos efectos y memoria para PCs modestas
                                        (también en Ajustes → Pantalla; de fábrica, ultra)
+  reabrir                              vuelve a abrir la última app que cerraste (otra vez: la anterior;
+                                       también con Super+Shift+R)
   daltonismo [estado|rojo|verde|azul|grises|no]
                                        filtro de pantalla que corrige los colores para daltonismo
                                        (rojo, verde o azul) o todo en grises (Ajustes → Pantalla)
@@ -2720,6 +2722,8 @@ case "${1:-ayuda}" in
   diseno | diseño) shift; cmd_diseno "$@" ;;
   rendimiento) shift; cmd_rendimiento "$@" ;;
   daltonismo) shift; cmd_daltonismo "$@" ;;
+  # 4.5: lo hace el gestor en Rust (las apps cerradas las anota él).
+  reabrir) exec /usr/lib/vortex/vortex-gestor-rs reabrir ;;
   primer-inicio) cmd_primer_inicio ;;
   # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
   version)

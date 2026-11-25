@@ -23,7 +23,8 @@
       { "teclas": ["SUPER + mouse:272"], "es": "Mover la ventana con el mouse", "en": "Move the window with the mouse" },
       { "teclas": ["SUPER + mouse:273"], "es": "Cambiar el tamaño con el mouse", "en": "Resize with the mouse" },
       { "teclas": ["SUPER + ALT + Left", "SUPER + ALT + Right", "SUPER + ALT + Up", "SUPER + ALT + Down"], "ver": "SUPER + ALT + ←→↑↓", "es": "Cambiar el tamaño con el teclado", "en": "Resize with the keyboard" },
-      { "teclas": ["SUPER + P"], "es": "Fijar la ventana en todos los escritorios", "en": "Pin the window to every desktop" }
+      { "teclas": ["SUPER + P"], "es": "Fijar la ventana en todos los escritorios", "en": "Pin the window to every desktop" },
+      { "teclas": ["SUPER + SHIFT + R"], "es": "Volver a abrir la última app que cerraste", "en": "Reopen the last app you closed" }
     ]
   },
   {

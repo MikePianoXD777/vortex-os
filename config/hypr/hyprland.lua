@@ -15,6 +15,7 @@ local reemplazados = {
     ["SUPER + F1"] = true, -- hoy libre; es la hoja de atajos de Vortex (1.7.7)
     ["SUPER + SHIFT + T"] = true, -- hoy libre; copiar el texto de la pantalla (1.8)
     ["SUPER + SHIFT + G"] = true, -- hoy libre; la biblioteca de juegos (1.8)
+    ["SUPER + SHIFT + R"] = true, -- hoy libre; reabrir la última app cerrada (4.5)
 }
 
 -- Atajos de teclado de Mike (los de su Caelestia, traducidos a Serpantinum). Si el archivo
@@ -399,6 +400,9 @@ hl.bind("SUPER + SHIFT + D", hl.dsp.exec_cmd("vortex-dictar"))
 
 -- Vortex 1.8: la biblioteca de juegos (Steam, Heroic y las apps de juegos, con portadas).
 hl.bind("SUPER + SHIFT + G", hl.dsp.event("serpantinum:toggle juegos"))
+
+-- 4.5: volver a abrir la última app que cerraste (el gestor las anota; otra vez, la anterior). R de «reabrir».
+hl.bind("SUPER + SHIFT + R", hl.dsp.exec_cmd("vortex reabrir"))
 
 -- Atajos de teclado de Mike (atajos.lua).
 local ok_registro, fallo_registro = pcall(atajos.registrar)

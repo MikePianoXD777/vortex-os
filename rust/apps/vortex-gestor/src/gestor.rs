@@ -18,6 +18,7 @@ use crate::config::{self, Ajustes, Rutas};
 use crate::hyprland::{Evento, Oido, Vuelta};
 use crate::ordenes::{Lanzador, existe_comando};
 use crate::procesos::{self, Drm};
+use crate::reabrir;
 use crate::sis;
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
@@ -145,6 +146,8 @@ pub struct Gestor {
     terminando: bool,
     /// Se está compartiendo la pantalla (4.4): las notificaciones se callan.
     compartiendo: bool,
+    /// 4.5: dirección de cada ventana abierta → (clase, cuándo se abrió), para reabrir lo cerrado.
+    ventanas: BTreeMap<String, (String, i64)>,
 }
 
 impl Gestor {
@@ -202,6 +205,7 @@ impl Gestor {
             disco_ultimo: 0,
             terminando: false,
             compartiendo: false,
+            ventanas: BTreeMap::new(),
         }
     }
 
@@ -1116,6 +1120,8 @@ impl Gestor {
     }
 
     fn en_abre(&mut self, dir: &str, tipo: &str, clase: &str) {
+        self.ventanas
+            .insert(dir.to_string(), (clase.to_string(), ahora_s()));
         if self.es_juego(clase, tipo) {
             self.agregar_juego(dir, clase);
         }
@@ -1123,6 +1129,13 @@ impl Gestor {
     }
 
     fn en_cierra(&mut self, dir: &str) {
+        // 4.5: si era la última ventana de su app y vivió unos segundos, se anota para reabrirla.
+        if let Some((clase, desde)) = self.ventanas.remove(dir) {
+            let quedan = self.ventanas.values().any(|(c, _)| *c == clase);
+            if !quedan && ahora_s() - desde >= reabrir::VIDA_MINIMA {
+                reabrir::anotar(&self.r.estado_dir, &clase);
+            }
+        }
         if self.juegos.remove(dir).is_none() {
             return;
         }

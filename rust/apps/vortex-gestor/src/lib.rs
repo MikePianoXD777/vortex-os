@@ -5,4 +5,5 @@ pub mod gestor;
 pub mod hyprland;
 pub mod ordenes;
 pub mod procesos;
+pub mod reabrir;
 pub mod sis;
