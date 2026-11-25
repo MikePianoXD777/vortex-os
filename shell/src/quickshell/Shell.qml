@@ -169,5 +169,7 @@ ShellRoot {
         // (bin/vortex, cmd_modo_juego), porque grabar el escritorio todo el día ocupaba 250-400 MB.
         WeatherAlerts.isQuietNow();
         GovAlerts.refresh();
+        // Vortex 4.5: el monitor de internet siempre cargado avisa cuando se fue o volvió la conexión (singletons/system/NetworkMonitor.qml).
+        NetworkMonitor.iniciar();
     }
 }

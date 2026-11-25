@@ -1433,6 +1433,13 @@
       "low_body": "Battery level is at {pct}%. Please connect your charger.",
       "critical_title": "Battery critical",
       "critical_body": "Battery level is at {pct}%. Connect your charger immediately."
+    },
+    "network": {
+      "gone_title": "The internet is down",
+      "gone_body": "You're connected to the network, but there's no internet. I'll let you know when it's back.",
+      "back_title": "The internet is back",
+      "back_min": "It was down for {n} min.",
+      "back_sec": "It was down for {n} s."
     }
   },
   "updater": {
