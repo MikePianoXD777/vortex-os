@@ -3,6 +3,8 @@ import QtQuick
 import QtQml
 import Quickshell
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Mpris
+import "../../"
 
 import "AudioCache.js" as AudioCache
 
@@ -175,5 +177,98 @@ Singleton {
     function getNodeAppName(node) {
         if (!node) return "";
         return node.properties?.["application.name"] || node.properties?.["application.process.binary"] || node.description || "Unknown App";
+    }
+
+    // ================================================================== el audio te sigue (4.4)
+    // Conectas audífonos (Bluetooth o USB) y el sonido se pasa solo a ellos. Los desconectas (o se les
+    // acaba la pila) mientras sonaban y la música se pausa, en vez de seguir por las bocinas.
+    // Se apaga en Ajustes con «audio.seguir»: false.
+
+    property bool seguirActivo: {
+        let a = (typeof Config !== "undefined") ? Config.getSetting("audio", {}) : {};
+        return !(a && a.seguir === false);
+    }
+    Connections {
+        target: (typeof Config !== "undefined") ? Config : null
+        ignoreUnknownSignals: true
+        function onSettingsLoaded() {
+            let a = Config.getSetting("audio", {});
+            root.seguirActivo = !(a && a.seguir === false);
+        }
+    }
+
+    function esAudifono(n) {
+        if (!n || n.isStream || !n.isSink || !n.audio) return false;
+        let nombre = n.name || "";
+        if (nombre.indexOf("bluez_output.") === 0) return true;
+        let p = n.properties || {};
+        let forma = String(p["device.form_factor"] || "").toLowerCase();
+        return forma === "headphone" || forma === "headset" || forma === "hands-free" || forma === "handset";
+    }
+
+    // Las salidas que ya había: al arrancar el shell (o PipeWire) no se cambia nada.
+    property var salidasVistas: ({})
+    property bool sigueListo: false
+    // Las dos últimas salidas por defecto: cuando se va una, PipeWire pone otra antes de que se revise.
+    property string ultimaSalida: ""
+    property string previaSalida: ""
+
+    Timer {
+        id: sigueArranque
+        interval: 6000
+        running: Pipewire.ready
+        onTriggered: {
+            let vistas = {};
+            for (const n of root.outputs) if (n && n.name) vistas[n.name] = root.esAudifono(n);
+            root.salidasVistas = vistas;
+            root.sigueListo = true;
+        }
+    }
+
+    // Una salida nueva tarda un momento en traer sus propiedades: se revisa un poco después.
+    Timer {
+        id: sigueRevisar
+        interval: 1500
+        onTriggered: root.revisarSalidas()
+    }
+    onOutputsChanged: if (sigueListo) sigueRevisar.restart()
+
+    onDefaultSinkChanged: {
+        let n = root.defaultSink;
+        if (n && n.name && n.name !== root.ultimaSalida) {
+            root.previaSalida = root.ultimaSalida;
+            root.ultimaSalida = n.name;
+        }
+    }
+
+    function revisarSalidas() {
+        let actuales = {};
+        let nuevoAudifono = null;
+        for (const n of root.outputs) {
+            if (!n || !n.name) continue;
+            let aud = root.esAudifono(n);
+            actuales[n.name] = aud;
+            if (!(n.name in root.salidasVistas) && aud) nuevoAudifono = n;
+        }
+        // Se fueron los audífonos por los que sonaba: pausa lo que se estaba oyendo.
+        for (const nombre in root.salidasVistas) {
+            if (nombre in actuales || !root.salidasVistas[nombre]) continue;
+            if (root.seguirActivo && (nombre === root.ultimaSalida || nombre === root.previaSalida)) {
+                root.pausarTodo();
+                break;
+            }
+        }
+        if (root.seguirActivo && nuevoAudifono && root.defaultSink !== nuevoAudifono) {
+            root.setDefaultOutput(nuevoAudifono);
+        }
+        root.salidasVistas = actuales;
+    }
+
+    function pausarTodo() {
+        let ps = Mpris.players ? Mpris.players.values : [];
+        for (let i = 0; i < ps.length; i++) {
+            let p = ps[i];
+            if (p && p.isPlaying && p.canPause) p.pause();
+        }
     }
 }
