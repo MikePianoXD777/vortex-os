@@ -203,7 +203,11 @@ Singleton {
         if (nombre.indexOf("bluez_output.") === 0) return true;
         let p = n.properties || {};
         let forma = String(p["device.form_factor"] || "").toLowerCase();
-        return forma === "headphone" || forma === "headset" || forma === "hands-free" || forma === "handset";
+        if (forma === "headphone" || forma === "headset" || forma === "hands-free" || forma === "handset") return true;
+        // Audífonos USB que no dicen su forma: por el nombre del aparato.
+        if (String(p["device.bus"] || "") !== "usb") return false;
+        let d = String(n.description || n.nickname || "").toLowerCase();
+        return /headset|headphone|audífono|audifono|auricular|earbud/.test(d);
     }
 
     // Las salidas que ya había: al arrancar el shell (o PipeWire) no se cambia nada.
