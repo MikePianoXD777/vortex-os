@@ -415,4 +415,15 @@ elseif perfil == "medio" or perfil == "bajo" then
     hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false } } })
 end
 
+-- 4.4: el filtro de pantalla para daltonismo (Ajustes → Pantalla o «vortex daltonismo»). Un shader que
+-- corrige los colores de todo: escritorio, apps y juegos. Va aquí para que cada «hypr reload» (modo juego,
+-- modo IA, batería) lo vuelva a poner.
+local f_dalt = io.open(home .. "/.config/vortex/daltonismo")
+local dalt = f_dalt and f_dalt:read("l") or ""
+if f_dalt then f_dalt:close() end
+local filtros = { protanopia = true, deuteranopia = true, tritanopia = true, grises = true }
+if filtros[dalt] then
+    hl.config({ decoration = { screen_shader = "/usr/share/serpantinum/src/assets/shaders/pantalla/daltonismo-" .. dalt .. ".frag" } })
+end
+
 pcall(dofile, home .. "/.config/vortex/hypr-mio.lua")

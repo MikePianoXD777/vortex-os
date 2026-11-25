@@ -12,4 +12,5 @@ LockBackgroundPreview 1.0 LockBackgroundPreview.qml
 DisplayWindowManagerSection 1.0 DisplayWindowManagerSection.qml
 DisplayLaptopSection 1.0 DisplayLaptopSection.qml
 DisplayPerformanceSection 1.0 DisplayPerformanceSection.qml
+DisplayDaltonismoSection 1.0 DisplayDaltonismoSection.qml
 singleton DisplayCache 1.0 DisplayCache.qml

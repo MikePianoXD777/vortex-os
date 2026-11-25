@@ -417,6 +417,19 @@
           "none": "Ningún fondo seleccionado"
         }
       },
+      "colorblind": {
+        "title": "Daltonismo",
+        "no": "No",
+        "protanopia": "Rojo",
+        "deuteranopia": "Verde",
+        "tritanopia": "Azul",
+        "grises": "Grises",
+        "no_desc": "Si te cuesta distinguir algún color, elige cuál y la pantalla entera lo corrige: escritorio, apps y juegos",
+        "protanopia_desc": "Protanopia: corrige los colores para quien no distingue bien el rojo",
+        "deuteranopia_desc": "Deuteranopia: corrige los colores para quien no distingue bien el verde (la más común)",
+        "tritanopia_desc": "Tritanopia: corrige los colores para quien no distingue bien el azul y el amarillo",
+        "grises_desc": "Toda la pantalla en escala de grises"
+      },
       "performance": {
         "title": "Rendimiento",
         "ultra": "Ultra",
@@ -1681,6 +1694,7 @@
         "title": "Batería"
       }
     },
+    "urgent": "Urgente",
     "focus": {
       "one": "Mientras te concentrabas llegó 1 notificación",
       "many": "Mientras te concentrabas llegaron %1 notificaciones",

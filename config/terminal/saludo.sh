@@ -19,8 +19,12 @@ LETRERO
 printf '\e[0m'
 
 command -v fastfetch >/dev/null || exit 0
+# 4.4: con el filtro de daltonismo, la RAM y el disco llevan además una barra (lo lleno no se nota solo por el
+# rojo del porcentaje).
+extra=()
+[[ -s "${XDG_CONFIG_HOME:-$HOME/.config}/vortex/daltonismo" ]] && extra=(--percent-type 11)
 if [[ -n "${KITTY_WINDOW_ID:-}" || "${TERM:-}" == xterm-kitty ]]; then
   exec fastfetch -c "$aqui/fastfetch.jsonc" --logo-type kitty --logo "$aqui/vortex-logo.png" \
-    --logo-width 20
+    --logo-width 20 "${extra[@]}"
 fi
-exec fastfetch -c "$aqui/fastfetch.jsonc" --logo-type file --logo "$aqui/vortex-logo.txt"
+exec fastfetch -c "$aqui/fastfetch.jsonc" --logo-type file --logo "$aqui/vortex-logo.txt" "${extra[@]}"

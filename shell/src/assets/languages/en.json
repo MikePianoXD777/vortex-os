@@ -417,6 +417,19 @@
           "none": "No background selected"
         }
       },
+      "colorblind": {
+        "title": "Color blindness",
+        "no": "Off",
+        "protanopia": "Red",
+        "deuteranopia": "Green",
+        "tritanopia": "Blue",
+        "grises": "Gray",
+        "no_desc": "If a color is hard for you to tell apart, pick it and the whole screen corrects it: desktop, apps and games",
+        "protanopia_desc": "Protanopia: corrects colors for people who can't tell red apart well",
+        "deuteranopia_desc": "Deuteranopia: corrects colors for people who can't tell green apart well (the most common)",
+        "tritanopia_desc": "Tritanopia: corrects colors for people who can't tell blue and yellow apart well",
+        "grises_desc": "The whole screen in grayscale"
+      },
       "performance": {
         "title": "Performance",
         "ultra": "Ultra",
@@ -1681,6 +1694,7 @@
         "title": "Battery"
       }
     },
+    "urgent": "Urgent",
     "focus": {
       "one": "1 notification arrived while you focused",
       "many": "%1 notifications arrived while you focused",

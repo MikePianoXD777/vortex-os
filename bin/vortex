@@ -100,6 +100,9 @@ Uso: vortex <comando>
   rendimiento [estado|ultra|alto|medio|bajo]
                                        perfil de rendimiento: menos efectos y memoria para PCs modestas
                                        (también en Ajustes → Pantalla; de fábrica, ultra)
+  daltonismo [estado|protanopia|deuteranopia|tritanopia|grises|no]
+                                       filtro de pantalla que corrige los colores para daltonismo
+                                       (rojo, verde o azul) o todo en grises (Ajustes → Pantalla)
   diseno [estado|mezcla|anterior]      el diseño nuevo (islas, Obsidian, Inter) o el de antes
   ventanas [estado|mosaico|kde]        gestor de ventanas: mosaico (como qtile, de fábrica) o kde
                                        (flotantes con barra de título, como KDE o Windows). También
@@ -1371,6 +1374,34 @@ hl.dispatch(hl.dsp.exec_cmd("serpantinum kill; sleep .1; '"$previo"'" .. c))' >/
 # hyprland.lua lee ~/.config/vortex/rendimiento al cargar, así que cada «hypr reload» (modo juego, modo IA,
 # batería) vuelve al perfil y no a todos los efectos. El shell lee «rendimiento» de settings.json.
 RENDIMIENTO="$CONF/rendimiento"
+
+# Daltonismo (4.4): un filtro de pantalla que corrige los colores de todo (shader de Hyprland). hyprland.lua
+# lee ~/.config/vortex/daltonismo al cargar (así lo mantienen el modo juego y cada recarga); aquí además se
+# pone al instante. El shell lo cambia desde Ajustes → Pantalla con este mismo comando.
+DALTONISMO="$CONF/daltonismo"
+SHADERS_PANTALLA=/usr/share/serpantinum/src/assets/shaders/pantalla
+
+cmd_daltonismo() {
+  local modo="${1:-estado}" ruta="" ajustes nuevos
+  case "$modo" in
+    estado) cat "$DALTONISMO" 2>/dev/null || echo no; return 0 ;;
+    protanopia | deuteranopia | tritanopia | grises) ruta="$SHADERS_PANTALLA/daltonismo-$modo.frag" ;;
+    no | off | ninguno) modo=no ;;
+    *) aviso "usa: vortex daltonismo [estado|protanopia|deuteranopia|tritanopia|grises|no]"; exit 1 ;;
+  esac
+  [[ -z "$ruta" || -f "$ruta" ]] || { aviso "falta $ruta (corre «vortex actualizar»)"; exit 1; }
+  mkdir -p "$CONF"
+  if [[ "$modo" == no ]]; then rm -f "$DALTONISMO"; else printf '%s\n' "$modo" >"$DALTONISMO"; fi
+  ajustes="${XDG_CONFIG_HOME:-$HOME/.config}/serpantinum/settings.json"
+  if [[ -s "$ajustes" ]] && nuevos="$(jq --arg m "$modo" '.accesibilidad.daltonismo = $m' "$ajustes" 2>/dev/null)"; then
+    printf '%s\n' "$nuevos" >"$ajustes"
+  fi
+  if hypr_corriendo; then
+    hyprctl eval "hl.config({ decoration = { screen_shader = \"$ruta\" } })" >/dev/null 2>&1 ||
+      hypr reload >/dev/null 2>&1 || true
+  fi
+  echo "$modo"
+}
 
 perfil_rendimiento() {
   local p
@@ -2687,6 +2718,7 @@ case "${1:-ayuda}" in
   ventanas) shift; cmd_ventanas "$@" ;;
   diseno | diseño) shift; cmd_diseno "$@" ;;
   rendimiento) shift; cmd_rendimiento "$@" ;;
+  daltonismo) shift; cmd_daltonismo "$@" ;;
   primer-inicio) cmd_primer_inicio ;;
   # La del sistema (/etc/vortex-release, que «vortex actualizar» pone al día); si no hay, la de tu usuario.
   version)

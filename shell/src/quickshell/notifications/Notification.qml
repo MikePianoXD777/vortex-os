@@ -98,7 +98,13 @@ Rectangle {
         if (isPopup) Qt.callLater(playPopupSound);
     }
 
+    // 4.4: lo urgente no se nota solo por el rojo (daltonismo): lleva «Urgente» junto a la hora.
     function updateTimeText() {
+        horaSinMarca();
+        if (urgency === 2 && timeText !== "") timeText = "󰀦 " + I18n.t("notifications.urgent", "Urgent") + " · " + timeText;
+    }
+
+    function horaSinMarca() {
         let now = new Date();
         let notifDate = new Date(timestamp);
         let diffSec = Math.floor((now.getTime() - notifDate.getTime()) / 1000);
@@ -161,6 +167,7 @@ Rectangle {
     }
 
     onTimestampChanged: updateTimeText()
+    onUrgencyChanged: updateTimeText()
     property real arrive: 0.0
 
     NumberAnimation {
