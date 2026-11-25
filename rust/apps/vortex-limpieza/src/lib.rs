@@ -4,7 +4,10 @@
 //! Lo que borra se rehace solo y nada es tuyo: miniaturas, cachés de yay/paru (lo que bajan para compilar
 //! del AUR), de pip y de npm, siempre lo que lleva más de 30 días sin tocarse; y las apps de Flatpak de tu
 //! usuario que ya nadie usa. La papelera es tuya: si lo que tiene de hace más de un mes pesa, **pregunta**
-//! con un aviso antes de vaciarlo. La caché de pacman la limpia `paccache.timer` (con root, lo enciende
+//! con un aviso antes de vaciarlo. Descargas también es tuya (4.4): los instaladores, .zip y descargas a
+//! medias de hace más de un mes van a la papelera (de donde se recuperan), **preguntando** con un aviso; lo
+//! que digas que se queda no se vuelve a preguntar. Fotos, documentos y videos de Descargas nunca se tocan.
+//! La caché de pacman la limpia `paccache.timer` (con root, lo enciende
 //! `vortex actualizar`). Las cachés de sombreadores no se tocan: rehacerlas da tirones en los juegos.
 //!
 //!   vortex-limpieza semanal    limpia y avisa (lo corre el temporizador)
@@ -224,6 +227,113 @@ pub fn vaciar(lista: &[(PathBuf, PathBuf)]) {
     }
 }
 
+// ====================================================================== Descargas (4.4)
+
+/// Lo que sobra en Descargas después de usarlo: instaladores, comprimidos y descargas a medias. Fotos,
+/// documentos, música y videos no están: esos los bajaste para quedártelos.
+pub const SOBRAS: &[&str] = &[
+    "exe", "msi", "deb", "rpm", "appimage", "apk", "xapk", "flatpakref", "pkg", "dmg", "iso", "img", "zip",
+    "rar", "7z", "tar", "gz", "tgz", "xz", "zst", "bz2", "jar", "torrent", "part", "crdownload",
+];
+
+fn es_sobra(p: &Path) -> bool {
+    p.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| SOBRAS.contains(&e.to_ascii_lowercase().as_str()))
+}
+
+/// La carpeta de Descargas: la de `user-dirs.dirs` (XDG_DOWNLOAD_DIR) o, si no, `~/Descargas` o `~/Downloads`.
+pub fn carpeta_descargas(home: &Path, config: &Path) -> Option<PathBuf> {
+    if let Ok(t) = fs::read_to_string(config.join("user-dirs.dirs")) {
+        for l in t.lines() {
+            if let Some(v) = l.trim().strip_prefix("XDG_DOWNLOAD_DIR=") {
+                let v = v.trim().trim_matches('"');
+                let d = match v.strip_prefix("$HOME") {
+                    Some(r) => home.join(r.trim_start_matches('/')),
+                    None => PathBuf::from(v),
+                };
+                if d.is_dir() && d != home {
+                    return Some(d);
+                }
+            }
+        }
+    }
+    ["Descargas", "Downloads"]
+        .iter()
+        .map(|n| home.join(n))
+        .find(|d| d.is_dir())
+}
+
+/// Las sobras de Descargas (solo el primer nivel, sin seguir enlaces) sin tocar desde `antes`, menos las que
+/// ya dijiste que se quedan, y cuánto pesan.
+pub fn descargas_viejas(dir: &Path, antes: SystemTime, guardadas: &[PathBuf]) -> (Vec<PathBuf>, u64) {
+    let mut lista = Vec::new();
+    let mut total = 0;
+    let Ok(es) = fs::read_dir(dir) else {
+        return (lista, 0);
+    };
+    for e in es.flatten() {
+        let p = e.path();
+        let Ok(m) = fs::symlink_metadata(&p) else { continue };
+        if !m.is_file() || !es_sobra(&p) || guardadas.contains(&p) {
+            continue;
+        }
+        if m.modified().is_ok_and(|t| t < antes) {
+            total += m.len();
+            lista.push(p);
+        }
+    }
+    lista.sort();
+    (lista, total)
+}
+
+/// Lo que dijiste que se queda (una ruta por línea), sin las que ya no existen.
+pub fn leer_guardadas(archivo: &Path) -> Vec<PathBuf> {
+    fs::read_to_string(archivo)
+        .unwrap_or_default()
+        .lines()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect()
+}
+
+pub fn guardar_guardadas(archivo: &Path, lista: &[PathBuf]) {
+    if let Some(d) = archivo.parent() {
+        let _ = fs::create_dir_all(d);
+    }
+    let t: String = lista.iter().map(|p| format!("{}\n", p.display())).collect();
+    let _ = fs::write(archivo, t);
+}
+
+/// A la papelera con `gio trash` (la misma de Thunar: de ahí se recuperan). Devuelve cuánto se fue.
+fn a_la_papelera(lista: &[PathBuf]) -> usize {
+    lista
+        .iter()
+        .filter(|p| {
+            Command::new("gio")
+                .arg("trash")
+                .arg(p)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success())
+        })
+        .count()
+}
+
+fn nombres(lista: &[PathBuf], max: usize) -> String {
+    let mut v: Vec<String> = lista
+        .iter()
+        .take(max)
+        .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .collect();
+    if lista.len() > max {
+        v.push(format!("y {} más", lista.len() - max));
+    }
+    v.join(", ")
+}
+
 // ====================================================================== correr
 
 /// `~/.cache` a partir de `~/.cache/vortex` (y lo mismo con `~/.local/share`).
@@ -304,6 +414,25 @@ pub fn principal(args: &[String]) -> i32 {
             libre += borrar_carpetas(&lista);
         }
     }
+    let guardadas_archivo = vortex_core::rutas::estado().join("descargas-que-se-quedan");
+    let guardadas = leer_guardadas(&guardadas_archivo);
+    let config = xdg(vortex_core::rutas::config());
+    let descargas = carpeta_descargas(&home, &config);
+    let (sobras, peso_sobras) = descargas
+        .as_deref()
+        .map(|d| descargas_viejas(d, antes, &guardadas))
+        .unwrap_or_default();
+    if solo_ver {
+        println!(
+            "Descargas (instaladores y comprimidos de hace más de {DIAS} días): {} archivos, {}",
+            sobras.len(),
+            tamano(peso_sobras)
+        );
+        for p in &sobras {
+            println!("  {}", p.display());
+        }
+    }
+
     let papelera = xdg(vortex_core::rutas::datos()).join("Trash");
     let (vieja, peso_vieja) = papelera_vieja(&papelera, hoy());
     if solo_ver {
@@ -316,7 +445,6 @@ pub fn principal(args: &[String]) -> i32 {
     }
     let flatpak = flatpak_sin_usar(&home);
     libre += flatpak;
-
     if libre >= AVISAR_DESDE {
         let que = if flatpak >= AVISAR_DESDE {
             "cachés viejas y apps de Flatpak que nadie usaba"
@@ -328,6 +456,48 @@ pub fn principal(args: &[String]) -> i32 {
             &format!("Liberé {} ({que}). Nada tuyo se tocó.", tamano(libre)),
             &[],
         );
+    }
+    // Descargas es tuya: se pregunta, y lo que se queda no se vuelve a preguntar.
+    if !sobras.is_empty() {
+        let r = avisar(
+            "Descargas que ya no usas",
+            &format!(
+                "{} {} de hace más de un mes ({}): {}. ¿Los mando a la papelera? De ahí los puedes recuperar.",
+                sobras.len(),
+                if sobras.len() == 1 { "archivo" } else { "instaladores y comprimidos" },
+                tamano(peso_sobras),
+                nombres(&sobras, 4)
+            ),
+            &["papelera=A la papelera", "ver=Ver cuáles", "no=Se quedan"],
+        );
+        match r.as_str() {
+            "papelera" => {
+                let n = a_la_papelera(&sobras);
+                if n > 0 {
+                    avisar(
+                        "Descargas en orden",
+                        &format!("Mandé {n} a la papelera ({}).", tamano(peso_sobras)),
+                        &[],
+                    );
+                }
+            }
+            "ver" => {
+                if let Some(d) = &descargas {
+                    let _ = Command::new("xdg-open")
+                        .arg(d)
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn();
+                }
+            }
+            "no" => {
+                let mut todas = guardadas;
+                todas.extend(sobras.iter().cloned());
+                guardar_guardadas(&guardadas_archivo, &todas);
+            }
+            _ => {}
+        }
     }
     // La papelera es tuya: se pregunta.
     if peso_vieja >= AVISAR_DESDE {

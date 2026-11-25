@@ -94,3 +94,42 @@ fn sin_carpetas_no_truena() {
     assert_eq!(papelera_vieja(&nada, 0).0.len(), 0);
     assert_eq!(peso(&nada), 0);
 }
+
+/// 4.4: de Descargas solo las sobras (instaladores, comprimidos, descargas a medias) de hace más de un mes, y
+/// nunca las que dijiste que se quedan.
+#[test]
+fn descargas_solo_sobras_viejas() {
+    let t = tempfile::tempdir().unwrap();
+    let d = t.path().join("Descargas");
+    archivo(&d.join("Discord-0.0.80.tar.gz"), 1000, 45);
+    archivo(&d.join("setup.EXE"), 500, 60);
+    archivo(&d.join("guardame.zip"), 300, 90);
+    archivo(&d.join("nuevo.zip"), 700, 3);
+    archivo(&d.join("foto.jpg"), 4000, 200);
+    archivo(&d.join("tarea.pdf"), 4000, 200);
+    archivo(&d.join("carpeta/dentro.zip"), 4000, 200);
+    let guardadas = vec![d.join("guardame.zip")];
+    let (lista, total) = descargas_viejas(&d, hace(DIAS), &guardadas);
+    assert_eq!(lista, vec![d.join("Discord-0.0.80.tar.gz"), d.join("setup.EXE")]);
+    assert_eq!(total, 1500);
+
+    let g = t.path().join("estado/descargas-que-se-quedan");
+    guardar_guardadas(&g, &[d.join("guardame.zip"), d.join("ya-no-existe.zip")]);
+    assert_eq!(leer_guardadas(&g), vec![d.join("guardame.zip")]);
+}
+
+#[test]
+fn la_carpeta_de_descargas() {
+    let t = tempfile::tempdir().unwrap();
+    let home = t.path();
+    let config = home.join(".config");
+    fs::create_dir_all(home.join("Bajadas")).unwrap();
+    fs::create_dir_all(home.join("Downloads")).unwrap();
+    fs::create_dir_all(&config).unwrap();
+    assert_eq!(carpeta_descargas(home, &config), Some(home.join("Downloads")));
+    fs::write(config.join("user-dirs.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/Bajadas\"\n").unwrap();
+    assert_eq!(carpeta_descargas(home, &config), Some(home.join("Bajadas")));
+    // Si apunta al home mismo (sin carpeta de descargas), no se toca nada del home.
+    fs::write(config.join("user-dirs.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/\"\n").unwrap();
+    assert_eq!(carpeta_descargas(home, &config), Some(home.join("Downloads")));
+}
