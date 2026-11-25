@@ -292,12 +292,21 @@ use vortex_player::reproductor::Aviso;
 use vortex_player::{fecha, rutas};
 
 pub const NOMBRES_PORTADA: [&str; 8] = [
-    "cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "Cover.jpg", "Folder.jpg", "AlbumArt.jpg",
+    "cover.jpg",
+    "cover.png",
+    "folder.jpg",
+    "folder.png",
+    "front.jpg",
+    "Cover.jpg",
+    "Folder.jpg",
+    "AlbumArt.jpg",
 ];
 /// Lo que llegó por la línea de comandos (enlaces o archivos): lo recibe el puente al arrancar.
 pub static ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
 
-pub const NAVEGADORES: [&str; 9] = ["", "firefox", "chrome", "chromium", "brave", "edge", "opera", "vivaldi", "zen"];
+pub const NAVEGADORES: [&str; 9] = [
+    "", "firefox", "chrome", "chromium", "brave", "edge", "opera", "vivaldi", "zen",
+];
 
 /// Todo lo que la de Python guardaba en `self._…`.
 pub type ColaDescargas = (VecDeque<(usize, String)>, bool);
@@ -603,18 +612,29 @@ pub fn verdadero(v: Option<&Value>) -> bool {
 
 /// El nombre del archivo sin extensión (el `Path(ruta).stem` de Python).
 pub fn tallo(ruta: &str) -> String {
-    Path::new(ruta).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+    Path::new(ruta)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// `id` de la canción o el de YouTube que trae en el nombre.
 pub fn id_o_ruta(c: &Value) -> String {
     let id = texto(c, "id");
-    if id.is_empty() { id_de(&texto(c, "ruta")) } else { id }
+    if id.is_empty() {
+        id_de(&texto(c, "ruta"))
+    } else {
+        id
+    }
 }
 
 /// «Título · Artista» (o solo el título).
 pub fn titulo_y(titulo: &str, artista: &str) -> String {
-    if artista.is_empty() { titulo.to_string() } else { format!("{titulo} · {artista}") }
+    if artista.is_empty() {
+        titulo.to_string()
+    } else {
+        format!("{titulo} · {artista}")
+    }
 }
 
 /// `file:///…` (con %XX) → ruta; lo demás, igual.
@@ -642,7 +662,10 @@ pub fn ruta_de(texto: &str) -> String {
 
 /// La URL de un archivo (lo que da `QUrl.fromLocalFile(...).toString()` para QML).
 pub fn url_de(ruta: &Path) -> String {
-    format!("file://{}", vortex_player::red::escapar_ruta(&ruta.to_string_lossy()))
+    format!(
+        "file://{}",
+        vortex_player::red::escapar_ruta(&ruta.to_string_lossy())
+    )
 }
 
 pub fn abrir(destino: &str) {
@@ -673,8 +696,7 @@ pub fn a_la_papelera(ruta: &str) {
 }
 
 pub fn hay_programa(nombre: &str) -> bool {
-    std::env::var_os("PATH")
-        .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(nombre).is_file()))
+    std::env::var_os("PATH").is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(nombre).is_file()))
 }
 
 pub fn leer_json(nombre: &str) -> Map<String, Value> {
@@ -728,7 +750,11 @@ pub fn lanzar<T: Send + 'static>(
 }
 
 /// `f` en el hilo de la interfaz dentro de `ms`.
-pub fn despues(hilo: CxxQtThread<qobject::Puente>, ms: u64, f: impl FnOnce(Pin<&mut qobject::Puente>) + Send + 'static) {
+pub fn despues(
+    hilo: CxxQtThread<qobject::Puente>,
+    ms: u64,
+    f: impl FnOnce(Pin<&mut qobject::Puente>) + Send + 'static,
+) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(ms));
         let _ = hilo.queue(f);
@@ -736,7 +762,12 @@ pub fn despues(hilo: CxxQtThread<qobject::Puente>, ms: u64, f: impl FnOnce(Pin<&
 }
 
 /// `f` cada `ms` mientras la app siga abierta.
-pub fn cada(hilo: CxxQtThread<qobject::Puente>, vivo: Arc<AtomicBool>, ms: u64, f: fn(Pin<&mut qobject::Puente>)) {
+pub fn cada(
+    hilo: CxxQtThread<qobject::Puente>,
+    vivo: Arc<AtomicBool>,
+    ms: u64,
+    f: fn(Pin<&mut qobject::Puente>),
+) {
     std::thread::spawn(move || {
         while vivo.load(Ordering::Relaxed) {
             std::thread::sleep(Duration::from_millis(ms));
@@ -806,7 +837,10 @@ impl qobject::Puente {
             .map(|c| {
                 let mut c = c.clone();
                 let id = texto(&c, "id");
-                c["titulo"] = json!(vortex_player::letras::titulo_limpio(&texto(&c, "titulo"), &texto(&c, "artistas")));
+                c["titulo"] = json!(vortex_player::letras::titulo_limpio(
+                    &texto(&c, "titulo"),
+                    &texto(&c, "artistas")
+                ));
                 c["estado"] = json!(if e.ids_biblioteca.contains(&id) {
                     "biblioteca"
                 } else if bajando.contains(&id) {
@@ -821,14 +855,22 @@ impl qobject::Puente {
 
     /// Las recomendadas no repiten lo que ya tienes: al bajarla, se quita de la lista.
     pub fn sin_las_tuyas(&self, lista: &[Value]) -> Vec<Value> {
-        self.con_estado(lista).into_iter().filter(|c| c["estado"] != "biblioteca").collect()
+        self.con_estado(lista)
+            .into_iter()
+            .filter(|c| c["estado"] != "biblioteca")
+            .collect()
     }
 
     pub fn poner_recomendaciones(mut self: Pin<&mut Self>) {
         let v = variante(&Value::Array(self.sin_las_tuyas(&self.es().recom)));
         self.as_mut().set_recomendaciones(v);
-        let (para, cargando, error) = (self.es().recom_para, self.es().recom_cargando, self.es().recom_error.clone());
-        self.as_mut().set_recomendando_para(i32::try_from(para).unwrap_or(-1));
+        let (para, cargando, error) = (
+            self.es().recom_para,
+            self.es().recom_cargando,
+            self.es().recom_error.clone(),
+        );
+        self.as_mut()
+            .set_recomendando_para(i32::try_from(para).unwrap_or(-1));
         self.as_mut().set_cargando_recomendaciones(cargando);
         self.as_mut().set_error_recomendaciones(q(&error));
     }
@@ -861,7 +903,8 @@ impl qobject::Puente {
             .iter()
             .filter(|d| matches!(d["estado"].as_str(), Some("espera" | "bajando")))
             .count();
-        self.as_mut().set_descargas_pendientes(i32::try_from(pendientes).unwrap_or(i32::MAX));
+        self.as_mut()
+            .set_descargas_pendientes(i32::try_from(pendientes).unwrap_or(i32::MAX));
         let r = variante(&json!(self.es().bajando_radio));
         self.as_mut().set_bajando_radio(r);
         self.as_mut().poner_en_linea();
@@ -893,11 +936,16 @@ impl qobject::Puente {
                 let mut l = b.canciones_de_playlist(e.vista).unwrap_or_default();
                 if !e.buscar.is_empty() {
                     let q = e.buscar.to_lowercase();
-                    l.retain(|c| format!("{} {} {}", c.titulo, c.artista, c.album).to_lowercase().contains(&q));
+                    l.retain(|c| {
+                        format!("{} {} {}", c.titulo, c.artista, c.album)
+                            .to_lowercase()
+                            .contains(&q)
+                    });
                 }
                 l
             } else {
-                b.canciones(&e.buscar, Orden::desde_str(&e.orden)).unwrap_or_default()
+                b.canciones(&e.buscar, Orden::desde_str(&e.orden))
+                    .unwrap_or_default()
             };
             let playlists: Vec<Value> = b
                 .playlists()
@@ -936,11 +984,14 @@ impl qobject::Puente {
             e.version_gustos += 1;
             e.ids_biblioteca = ids;
         }
-        self.as_mut().set_canciones(variante(&Value::Array(canciones.clone())));
+        self.as_mut()
+            .set_canciones(variante(&Value::Array(canciones.clone())));
         self.as_mut().set_totales(variante(&totales));
         let vista = self.es().vista;
-        self.as_mut().set_vista_playlist(i32::try_from(vista).unwrap_or(-1));
-        self.as_mut().set_playlists(variante(&Value::Array(playlists.clone())));
+        self.as_mut()
+            .set_vista_playlist(i32::try_from(vista).unwrap_or(-1));
+        self.as_mut()
+            .set_playlists(variante(&Value::Array(playlists.clone())));
         let mg = variante(&json!(self.es().me_gusta));
         self.as_mut().set_me_gusta(mg);
         let vg = self.es().version_gustos;
@@ -1042,7 +1093,13 @@ impl qobject::Puente {
     fn buscar_para_playlist(mut self: Pin<&mut Self>, pid: i32, texto_: &QString) {
         let t = texto_.to_string();
         self.as_mut().em().para_agregar_de = (i64::from(pid), t.clone());
-        let lista = if pid >= 0 { self.bib().para_agregar(i64::from(pid), &t, 60).unwrap_or_default() } else { Vec::new() };
+        let lista = if pid >= 0 {
+            self.bib()
+                .para_agregar(i64::from(pid), &t, 60)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         self.set_para_agregar(variante(&Value::Array(lista)));
     }
 
@@ -1099,7 +1156,8 @@ impl qobject::Puente {
             self.as_mut().sincronizar();
         }
         if nuevas > 0 && total > nuevas {
-            self.as_mut().avisar(&format!("{nuevas} canciones nuevas en tu biblioteca"));
+            self.as_mut()
+                .avisar(&format!("{nuevas} canciones nuevas en tu biblioteca"));
         }
         despues(self.qt_thread(), 3000, |obj| obj.bajar_letras());
     }
@@ -1117,7 +1175,11 @@ impl qobject::Puente {
 
     fn quitar_carpeta(mut self: Pin<&mut Self>, carpeta: &QString) {
         let carpeta = carpeta.to_string();
-        let quedan: Vec<String> = Biblioteca::ajustes().carpetas().into_iter().filter(|c| *c != carpeta).collect();
+        let quedan: Vec<String> = Biblioteca::ajustes()
+            .carpetas()
+            .into_iter()
+            .filter(|c| *c != carpeta)
+            .collect();
         guardar_ajuste("carpetas", json!(quedan));
         {
             let b = self.bib();
@@ -1134,7 +1196,11 @@ impl qobject::Puente {
     /// Archivos sueltos (o arrastrados a la ventana): se agregan donde están, sin copiarlos.
     fn agregar_archivos(self: Pin<&mut Self>, urls: &QVariant) {
         let rutas_: Vec<PathBuf> = match de_qml(urls) {
-            Value::Array(l) => l.iter().filter_map(|u| u.as_str()).map(|u| PathBuf::from(ruta_de(u))).collect(),
+            Value::Array(l) => l
+                .iter()
+                .filter_map(|u| u.as_str())
+                .map(|u| PathBuf::from(ruta_de(u)))
+                .collect(),
             Value::String(u) => vec![PathBuf::from(ruta_de(&u))],
             _ => Vec::new(),
         };
@@ -1178,13 +1244,18 @@ impl qobject::Puente {
             self.as_mut().em().portadas.insert(ruta.to_string(), u.clone());
             return u;
         }
-        let cache = rutas::cache().join("portadas").join(format!("{}.jpg", sha1_hex(ruta.as_bytes())));
+        let cache = rutas::cache()
+            .join("portadas")
+            .join(format!("{}.jpg", sha1_hex(ruta.as_bytes())));
         if cache.is_file() {
             let u = url_de(&cache);
             self.as_mut().em().portadas.insert(ruta.to_string(), u.clone());
             return u;
         }
-        self.as_mut().em().portadas.insert(ruta.to_string(), String::new());
+        self.as_mut()
+            .em()
+            .portadas
+            .insert(ruta.to_string(), String::new());
         let tiene = self.bib().cancion(ruta).ok().flatten().is_some_and(|c| c.portada);
         if tiene && hay_programa("ffmpeg") {
             let ruta = ruta.to_string();
@@ -1198,7 +1269,18 @@ impl qobject::Puente {
                             let _ = std::fs::create_dir_all(c);
                         }
                         let ok = std::process::Command::new("ffmpeg")
-                            .args(["-v", "quiet", "-y", "-i", &ruta, "-an", "-vf", "scale=600:-2", "-frames:v", "1"])
+                            .args([
+                                "-v",
+                                "quiet",
+                                "-y",
+                                "-i",
+                                &ruta,
+                                "-an",
+                                "-vf",
+                                "scale=600:-2",
+                                "-frames:v",
+                                "1",
+                            ])
                             .arg(&cache)
                             .stdin(std::process::Stdio::null())
                             .stdout(std::process::Stdio::null())
@@ -1251,7 +1333,11 @@ impl qobject::Puente {
         let gusta = self.bib().alternar_me_gusta(&ruta).unwrap_or(false);
         self.as_mut().recargar();
         self.as_mut().cambio_local();
-        self.avisar(if gusta { "Agregada a Tus me gusta" } else { "Quitada de Tus me gusta" });
+        self.avisar(if gusta {
+            "Agregada a Tus me gusta"
+        } else {
+            "Quitada de Tus me gusta"
+        });
     }
 
     fn le_gusta(&self, ruta: &QString, _version: i32) -> bool {
@@ -1345,7 +1431,12 @@ pub fn sha1_hex(datos: &[u8]) -> String {
                 40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1B_BCDC),
                 _ => (b ^ c ^ d, 0xCA62_C1D6),
             };
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(*wi);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(*wi);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -1363,13 +1454,19 @@ pub fn sha1_hex(datos: &[u8]) -> String {
 mod pruebas {
     #[test]
     fn sha1_como_python() {
-        assert_eq!(super::sha1_hex(b"abc"), "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(
+            super::sha1_hex(b"abc"),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
         assert_eq!(super::sha1_hex(b""), "da39a3ee5e6b4b0d3255bfef95601890afd80709");
     }
 
     #[test]
     fn rutas_de_qml() {
-        assert_eq!(super::ruta_de("file:///m%C3%BAsica/a%20b.flac"), "/música/a b.flac");
+        assert_eq!(
+            super::ruta_de("file:///m%C3%BAsica/a%20b.flac"),
+            "/música/a b.flac"
+        );
         assert_eq!(super::ruta_de("/ya/es/ruta"), "/ya/es/ruta");
     }
 }

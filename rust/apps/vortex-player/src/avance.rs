@@ -85,7 +85,11 @@ impl Avance {
         if !habia {
             (self.al)(DeAvance::Empezo);
         }
-        let inicio = if duracion >= 90.0 { (duracion * 0.35) as i64 } else { 0 };
+        let inicio = if duracion >= 90.0 {
+            (duracion * 0.35) as i64
+        } else {
+            0
+        };
         {
             let mut e = self.estado();
             e.args = vec![

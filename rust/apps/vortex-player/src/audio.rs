@@ -240,7 +240,13 @@ pub fn forzar_ldac(tarjeta: &str, pactl: &str) -> bool {
 /// Vuelve a arrancar PipeWire y WirePlumber para que lean los archivos de arriba (corta el sonido 1 s).
 pub fn reiniciar_audio() -> bool {
     let Ok(mut h) = std::process::Command::new("systemctl")
-        .args(["--user", "restart", "pipewire.service", "pipewire-pulse.service", "wireplumber.service"])
+        .args([
+            "--user",
+            "restart",
+            "pipewire.service",
+            "pipewire-pulse.service",
+            "wireplumber.service",
+        ])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -252,7 +258,9 @@ pub fn reiniciar_audio() -> bool {
     loop {
         match h.try_wait() {
             Ok(Some(s)) => return s.success(),
-            Ok(None) if std::time::Instant::now() < limite => std::thread::sleep(std::time::Duration::from_millis(50)),
+            Ok(None) if std::time::Instant::now() < limite => {
+                std::thread::sleep(std::time::Duration::from_millis(50))
+            }
             _ => {
                 let _ = h.kill();
                 let _ = h.wait();

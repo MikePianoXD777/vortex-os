@@ -623,7 +623,11 @@ impl Reproductor {
 
     /// La radio sin fin: al final de la cola; si ya se había acabado, sigue sonando con la primera.
     pub fn agregar_radio(&mut self, canciones: &[Value]) {
-        let nuevas: Vec<Value> = canciones.iter().filter(|c| !ruta_de(c).is_empty()).cloned().collect();
+        let nuevas: Vec<Value> = canciones
+            .iter()
+            .filter(|c| !ruta_de(c).is_empty())
+            .cloned()
+            .collect();
         if nuevas.is_empty() || self.orden.is_empty() {
             return;
         }
@@ -780,7 +784,11 @@ impl Reproductor {
         if self.i + 1 < self.n() {
             return self.i + 1;
         }
-        if self.repetir == "todo" && self.orden.len() > 1 { 0 } else { -1 }
+        if self.repetir == "todo" && self.orden.len() > 1 {
+            0
+        } else {
+            -1
+        }
     }
 
     /// A `fundido` segundos del final: la que se va sigue en otro mpv apagándose y la siguiente entra.
@@ -809,11 +817,14 @@ impl Reproductor {
         }
         let desde = self.posicion;
         let resto = (self.duracion - self.posicion).max(0.5);
-        let af = [self.eq.clone(), format!("lavfi=[afade=t=out:st={desde:.2}:d={resto:.2}]")]
-            .into_iter()
-            .filter(|x| !x.is_empty())
-            .collect::<Vec<_>>()
-            .join(",");
+        let af = [
+            self.eq.clone(),
+            format!("lavfi=[afade=t=out:st={desde:.2}:d={resto:.2}]"),
+        ]
+        .into_iter()
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<_>>()
+        .join(",");
         self.fundidos.push(vec![
             "--no-video".into(),
             "--no-terminal".into(),
@@ -1099,7 +1110,10 @@ impl MpvProceso {
 
     /// Lo vuelve a levantar después de que se cayó (`DeMpv::Murio`).
     pub fn relevantar(&self, volumen: i64, al_recibir: impl Fn(DeMpv) + Send + Sync + 'static) {
-        let carpeta = Path::new(&self.socket).parent().map(Path::to_path_buf).unwrap_or_default();
+        let carpeta = Path::new(&self.socket)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
         let (ipc, _) = rutas::canal_mpv("mpv", &carpeta);
         self.levantar(volumen, &ipc, Arc::new(al_recibir));
     }
@@ -1177,7 +1191,10 @@ impl Drop for MpvProceso {
 }
 
 /// Un canal sencillo para pasar `DeMpv` a otro hilo (las pruebas y quien no use Qt).
-pub fn canal() -> (impl Fn(DeMpv) + Send + Sync + Clone + 'static, mpsc::Receiver<DeMpv>) {
+pub fn canal() -> (
+    impl Fn(DeMpv) + Send + Sync + Clone + 'static,
+    mpsc::Receiver<DeMpv>,
+) {
     let (tx, rx) = mpsc::channel();
     let tx = Arc::new(Mutex::new(tx));
     (

@@ -276,9 +276,11 @@ pub fn problema() -> String {
         "sin-easyeffects" => {
             "Falta EasyEffects: el ecualizador no puede cambiar el sonido. Corre «vortex actualizar».".into()
         }
-        "sin-plugins" => "A EasyEffects le faltan sus plugins (lsp-plugins-lv2): el ecualizador no cambia el sonido. \
+        "sin-plugins" => {
+            "A EasyEffects le faltan sus plugins (lsp-plugins-lv2): el ecualizador no cambia el sonido. \
                           Corre «vortex actualizar»."
-            .into(),
+                .into()
+        }
         _ => String::new(),
     }
 }

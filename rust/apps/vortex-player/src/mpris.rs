@@ -92,7 +92,14 @@ pub enum Meta {
 
 /// Las portadas de carpeta que se buscan (las mismas que la ventana, `NOMBRES_PORTADA`).
 const NOMBRES_PORTADA: [&str; 8] = [
-    "cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "Cover.jpg", "Folder.jpg", "AlbumArt.jpg",
+    "cover.jpg",
+    "cover.png",
+    "folder.jpg",
+    "folder.png",
+    "front.jpg",
+    "Cover.jpg",
+    "Folder.jpg",
+    "AlbumArt.jpg",
 ];
 
 /// La portada de una canción local cuando la ventana no la mandó (las listas guardan la portada solo de las
@@ -117,7 +124,11 @@ pub fn portada_local(ruta: &str, cache: &Path) -> String {
 }
 
 fn uri(ruta: &str) -> String {
-    if ruta.is_empty() { String::new() } else { format!("file://{}", red::escapar_ruta(ruta)) }
+    if ruta.is_empty() {
+        String::new()
+    } else {
+        format!("file://{}", red::escapar_ruta(ruta))
+    }
 }
 
 /// Los xesam/mpris de la canción.
@@ -127,19 +138,35 @@ pub fn metadatos(c: &Value, portada: &str) -> Vec<(&'static str, Meta)> {
     }
     let campo = |k: &str| c.get(k).and_then(Value::as_str).unwrap_or("");
     let ruta = campo("ruta");
-    let n = u64::from_str_radix(&cripto::hex(&cripto::sha1(ruta.as_bytes()))[..12], 16).unwrap_or(0) % 1_000_000_000_000;
+    let n = u64::from_str_radix(&cripto::hex(&cripto::sha1(ruta.as_bytes()))[..12], 16).unwrap_or(0)
+        % 1_000_000_000_000;
     let titulo = Some(campo("titulo"))
         .filter(|t| !t.is_empty())
         .map(String::from)
-        .unwrap_or_else(|| Path::new(ruta).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default());
-    let mut artistas: Vec<String> =
-        campo("artista").split(',').map(str::trim).filter(|a| !a.is_empty()).map(String::from).collect();
+        .unwrap_or_else(|| {
+            Path::new(ruta)
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        });
+    let mut artistas: Vec<String> = campo("artista")
+        .split(',')
+        .map(str::trim)
+        .filter(|a| !a.is_empty())
+        .map(String::from)
+        .collect();
     if artistas.is_empty() {
         artistas.push(String::new());
     }
     let mut m = vec![
-        ("mpris:trackid", Meta::Ruta(format!("/org/vortex/player/cancion/{n}"))),
-        ("mpris:length", Meta::Entero((c.get("duracion").and_then(Value::as_f64).unwrap_or(0.0) * 1_000_000.0) as i64)),
+        (
+            "mpris:trackid",
+            Meta::Ruta(format!("/org/vortex/player/cancion/{n}")),
+        ),
+        (
+            "mpris:length",
+            Meta::Entero((c.get("duracion").and_then(Value::as_f64).unwrap_or(0.0) * 1_000_000.0) as i64),
+        ),
         ("xesam:title", Meta::Texto(titulo)),
         ("xesam:artist", Meta::Lista(artistas)),
         ("xesam:album", Meta::Texto(campo("album").into())),
@@ -169,7 +196,10 @@ fn a_dbus(m: Vec<(&'static str, Meta)>) -> HashMap<String, OwnedValue> {
 fn con_duracion(e: &EstadoMpris) -> Value {
     let mut c = e.cancion.clone();
     let trae = c.get("duracion").and_then(Value::as_f64).is_some_and(|d| d > 0.0);
-    if !trae && e.duracion > 0.0 && let Some(m) = c.as_object_mut() {
+    if !trae
+        && e.duracion > 0.0
+        && let Some(m) = c.as_object_mut()
+    {
         m.insert("duracion".into(), Value::from(e.duracion));
     }
     c
@@ -219,9 +249,17 @@ impl Raiz {
     }
     #[zbus(property)]
     fn supported_mime_types(&self) -> Vec<String> {
-        ["audio/flac", "audio/x-wav", "audio/mpeg", "audio/ogg", "audio/opus", "audio/mp4", "audio/x-aiff"]
-            .map(String::from)
-            .to_vec()
+        [
+            "audio/flac",
+            "audio/x-wav",
+            "audio/mpeg",
+            "audio/ogg",
+            "audio/opus",
+            "audio/mp4",
+            "audio/x-aiff",
+        ]
+        .map(String::from)
+        .to_vec()
     }
 }
 
@@ -266,7 +304,12 @@ impl Jugador {
         self.mandar(OrdenMpris::Buscar(nueva));
         let _ = Self::seeked(&em, (nueva * 1_000_000.0) as i64).await;
     }
-    async fn set_position(&self, _pista: ObjectPath<'_>, posicion: i64, #[zbus(signal_emitter)] em: SignalEmitter<'_>) {
+    async fn set_position(
+        &self,
+        _pista: ObjectPath<'_>,
+        posicion: i64,
+        #[zbus(signal_emitter)] em: SignalEmitter<'_>,
+    ) {
         let s = (posicion as f64 / 1_000_000.0).max(0.0);
         self.estado.lock().unwrap_or_else(|x| x.into_inner()).posicion = s;
         self.mandar(OrdenMpris::Buscar(s));
@@ -420,7 +463,9 @@ impl Mpris {
                         }
                     };
                     let _ = listo_tx.send(true);
-                    let Ok(j) = c.object_server().interface::<_, Jugador>(RUTA).await else { return };
+                    let Ok(j) = c.object_server().interface::<_, Jugador>(RUTA).await else {
+                        return;
+                    };
                     while let Some(Some(cambio)) = rx.next().await {
                         let em = j.signal_emitter();
                         let i = j.get().await;
@@ -449,7 +494,12 @@ impl Mpris {
             })
             .ok()?;
         listo_rx.recv().ok().filter(|ok| *ok)?;
-        Some(Self { estado, aviso, puesto: Mutex::new(std::time::Instant::now()), portada: Mutex::default() })
+        Some(Self {
+            estado,
+            aviso,
+            puesto: Mutex::new(std::time::Instant::now()),
+            portada: Mutex::default(),
+        })
     }
 
     /// Lo que suena. Avisa al escritorio solo de lo que cambió (la posición no se avisa: se pide; solo sus brincos, con `Seeked`).
@@ -458,11 +508,17 @@ impl Mpris {
             let ruta = nuevo.cancion.get("ruta").and_then(Value::as_str).unwrap_or("");
             let mut p = self.portada.lock().unwrap_or_else(|x| x.into_inner());
             if p.0 != ruta {
-                *p = (ruta.to_string(), portada_local(ruta, &crate::rutas::cache().join("portadas")));
+                *p = (
+                    ruta.to_string(),
+                    portada_local(ruta, &crate::rutas::cache().join("portadas")),
+                );
             }
             nuevo.portada = p.1.clone();
         }
-        let viejo = std::mem::replace(&mut *self.estado.lock().unwrap_or_else(|x| x.into_inner()), nuevo.clone());
+        let viejo = std::mem::replace(
+            &mut *self.estado.lock().unwrap_or_else(|x| x.into_inner()),
+            nuevo.clone(),
+        );
         let pasaron = {
             let mut p = self.puesto.lock().unwrap_or_else(|x| x.into_inner());
             let s = p.elapsed().as_secs_f64();
@@ -470,7 +526,9 @@ impl Mpris {
             s
         };
         if brinco(&viejo, &nuevo, pasaron) {
-            let _ = self.aviso.unbounded_send(Some(Cambio::Salto((nuevo.posicion * 1_000_000.0) as i64)));
+            let _ = self
+                .aviso
+                .unbounded_send(Some(Cambio::Salto((nuevo.posicion * 1_000_000.0) as i64)));
         }
         if viejo.cancion != nuevo.cancion
             || con_duracion(&viejo) != con_duracion(&nuevo)

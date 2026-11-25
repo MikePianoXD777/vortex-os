@@ -15,7 +15,11 @@ fn ejecutable(ruta: &Path, texto: &str) {
 #[test]
 #[allow(unsafe_code)] // set_var: esta prueba corre sola en su proceso
 fn mismo_estado_que_el_panel() {
-    if std::process::Command::new("jq").arg("--version").output().is_err() {
+    if std::process::Command::new("jq")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         eprintln!("falta jq: se salta");
         return;
     }
@@ -38,7 +42,10 @@ fn mismo_estado_que_el_panel() {
         std::env::set_var("PATH", path);
         std::env::set_var("XDG_DATA_HOME", home.join(".local/share"));
         std::env::set_var("XDG_RUNTIME_DIR", t.path().join("run"));
-        std::env::set_var("VORTEX_PLAYER_EQ", home.join(".local/state/serpantinum/music/eq_state.json"));
+        std::env::set_var(
+            "VORTEX_PLAYER_EQ",
+            home.join(".local/state/serpantinum/music/eq_state.json"),
+        );
         std::env::remove_var("VORTEX_PLAYER_EQ_MPV");
     }
     assert!(ecualizador::script().is_some());

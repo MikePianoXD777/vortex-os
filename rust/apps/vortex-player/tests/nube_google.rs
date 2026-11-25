@@ -82,17 +82,34 @@ fn la_pc_y_el_telefono_quedan_iguales() {
     assert!(sinc(&pc, &drive, &mut borradas, false).is_empty());
     let (_, plan) = sincronia::sincronizar(&tel, &drive, &mut |_, _, _| {}).unwrap();
     let faltan: HashSet<String> = plan.bajar.iter().map(|(v, _)| v.clone()).collect();
-    assert_eq!(faltan, HashSet::from(["aaaaaaaaaaa".into(), "bbbbbbbbbbb".into()]));
+    assert_eq!(
+        faltan,
+        HashSet::from(["aaaaaaaaaaa".into(), "bbbbbbbbbbb".into()])
+    );
     // La playlist ya existe en el teléfono, vacía hasta que se bajen sus canciones
-    let nombres = |b: &Mutex<Biblioteca>| b.lock().unwrap().playlists().unwrap().into_iter().map(|p| p.nombre).collect::<Vec<_>>();
+    let nombres = |b: &Mutex<Biblioteca>| {
+        b.lock()
+            .unwrap()
+            .playlists()
+            .unwrap()
+            .into_iter()
+            .map(|p| p.nombre)
+            .collect::<Vec<_>>()
+    };
     assert_eq!(nombres(&tel), ["Anime"]);
     for (vid, datos) in &plan.bajar {
         bajada(t.path(), "tel", vid, &datos.titulo);
     }
     sinc(&tel, &drive, &mut borradas, false);
     let p = tel.lock().unwrap().playlists().unwrap().remove(0);
-    let en_playlist: Vec<String> =
-        tel.lock().unwrap().canciones_de_playlist(p.id).unwrap().into_iter().map(|c| c.titulo).collect();
+    let en_playlist: Vec<String> = tel
+        .lock()
+        .unwrap()
+        .canciones_de_playlist(p.id)
+        .unwrap()
+        .into_iter()
+        .map(|c| c.titulo)
+        .collect();
     assert_eq!(en_playlist, ["Idol"]);
 
     // La del teléfono llega a la PC
@@ -110,8 +127,14 @@ fn la_pc_y_el_telefono_quedan_iguales() {
     assert_eq!(borradas, ["bbbbbbbbbbb"]);
     sinc(&tel, &drive, &mut Vec::new(), false);
     assert_eq!(nombres(&tel), ["Anime 2026"]);
-    let rutas_tel: Vec<String> =
-        tel.lock().unwrap().canciones("", Orden::Agregada).unwrap().into_iter().map(|c| c.ruta).collect();
+    let rutas_tel: Vec<String> = tel
+        .lock()
+        .unwrap()
+        .canciones("", Orden::Agregada)
+        .unwrap()
+        .into_iter()
+        .map(|c| c.ruta)
+        .collect();
     assert!(rutas_tel.contains(&local_tel));
 
     // Sin cambios no se vuelve a escribir en Drive
@@ -155,7 +178,9 @@ fn la_biblioteca_vieja_se_pone_al_dia_y_lo_borrado_queda_anotado() {
 // --- Google de mentira -----------------------------------------------------------------------------------
 
 fn form(cuerpo: Option<&[u8]>) -> Vec<(String, String)> {
-    let Some(c) = cuerpo.map(|c| String::from_utf8_lossy(c).to_string()) else { return vec![] };
+    let Some(c) = cuerpo.map(|c| String::from_utf8_lossy(c).to_string()) else {
+        return vec![];
+    };
     if !c.contains('=') || c.contains('{') {
         return vec![];
     }
@@ -173,7 +198,11 @@ fn google_falso() -> (Cuenta, Pedidos, tempfile::TempDir) {
     let p2 = pedidos.clone();
     let http: Http = Arc::new(move |metodo, url, cuerpo, _cab| {
         let datos = form(cuerpo);
-        let grant = datos.iter().find(|(k, _)| k == "grant_type").map(|(_, v)| v.clone()).unwrap_or_default();
+        let grant = datos
+            .iter()
+            .find(|(k, _)| k == "grant_type")
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default();
         p2.lock().unwrap().push((metodo.into(), url.into(), datos));
         let r = |v: Value| Ok((200, v.to_string().into_bytes()));
         if url == cg::TOKEN && grant == "authorization_code" {
@@ -213,7 +242,8 @@ fn navegador(estado: Option<&'static str>) -> impl Fn(&str) {
         let st = estado.map(String::from).unwrap_or_else(|| d("state"));
         std::thread::spawn(move || {
             let mut c = std::net::TcpStream::connect(format!("127.0.0.1:{puerto}")).unwrap();
-            c.write_all(format!("GET /?code=codigo1&state={st} HTTP/1.1\r\nHost: x\r\n\r\n").as_bytes()).unwrap();
+            c.write_all(format!("GET /?code=codigo1&state={st} HTTP/1.1\r\nHost: x\r\n\r\n").as_bytes())
+                .unwrap();
             let mut s = String::new();
             let _ = c.read_to_string(&mut s);
         });
@@ -223,21 +253,33 @@ fn navegador(estado: Option<&'static str>) -> impl Fn(&str) {
 #[test]
 fn iniciar_y_cerrar_sesion() {
     let (c, pedidos, t) = google_falso();
-    let d = c.iniciar_sesion(&navegador(None), Duration::from_secs(10)).unwrap();
+    let d = c
+        .iniciar_sesion(&navegador(None), Duration::from_secs(10))
+        .unwrap();
     assert_eq!(d, json!({"correo": "mike@ejemplo.com", "nombre": "Mike"}));
     let archivo = t.path().join("config/google.json");
     use std::os::unix::fs::PermissionsExt;
-    assert_eq!(std::fs::metadata(&archivo).unwrap().permissions().mode() & 0o777, 0o600);
+    assert_eq!(
+        std::fs::metadata(&archivo).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
     assert_eq!(c.sesion()["refresh_token"], "renovar1");
     let intercambio = pedidos
         .lock()
         .unwrap()
         .iter()
-        .find(|(_, _, p)| p.iter().any(|(k, v)| k == "grant_type" && v == "authorization_code"))
+        .find(|(_, _, p)| {
+            p.iter()
+                .any(|(k, v)| k == "grant_type" && v == "authorization_code")
+        })
         .unwrap()
         .2
         .clone();
-    assert!(intercambio.iter().any(|(k, v)| k == "code_verifier" && v.len() >= 43));
+    assert!(
+        intercambio
+            .iter()
+            .any(|(k, v)| k == "code_verifier" && v.len() >= 43)
+    );
     assert!(intercambio.iter().any(|(k, v)| k == "code" && v == "codigo1"));
 
     assert_eq!(c.token().unwrap(), "acceso1");
@@ -254,7 +296,10 @@ fn iniciar_y_cerrar_sesion() {
 #[test]
 fn un_estado_que_no_coincide_no_inicia_sesion() {
     let (c, _, _t) = google_falso();
-    assert!(c.iniciar_sesion(&navegador(Some("otro")), Duration::from_secs(10)).is_err());
+    assert!(
+        c.iniciar_sesion(&navegador(Some("otro")), Duration::from_secs(10))
+            .is_err()
+    );
     assert_eq!(c.sesion(), json!({}));
 }
 
@@ -264,16 +309,31 @@ fn drive_sube_y_lee_el_archivo() {
     let g = guardado.clone();
     let http: Http = Arc::new(move |metodo, url, cuerpo, cab| {
         assert!(cab.contains(&("Authorization", "Bearer t")));
-        let cuerpo = cuerpo.map(|c| String::from_utf8_lossy(c).to_string()).unwrap_or_default();
+        let cuerpo = cuerpo
+            .map(|c| String::from_utf8_lossy(c).to_string())
+            .unwrap_or_default();
         let mut g = g.lock().unwrap();
         if url.contains("files?spaces=appDataFolder") {
             assert!(url.contains("q=name%20%3D%20%27vortex-player.json%27"));
-            let f = if g.is_some() { json!([{"id": "f9"}]) } else { json!([]) };
+            let f = if g.is_some() {
+                json!([{"id": "f9"}])
+            } else {
+                json!([])
+            };
             return Ok((200, json!({"files": f}).to_string().into_bytes()));
         }
         if metodo == "POST" && url.contains("uploadType=multipart") {
             assert!(cuerpo.contains(r#""parents": ["appDataFolder"]"#), "{cuerpo}");
-            *g = Some(cuerpo.split("\r\n\r\n").nth(2).unwrap().split("\r\n--").next().unwrap().to_string());
+            *g = Some(
+                cuerpo
+                    .split("\r\n\r\n")
+                    .nth(2)
+                    .unwrap()
+                    .split("\r\n--")
+                    .next()
+                    .unwrap()
+                    .to_string(),
+            );
             return Ok((200, br#"{"id": "f9"}"#.to_vec()));
         }
         if metodo == "PATCH" {

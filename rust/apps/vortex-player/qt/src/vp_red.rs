@@ -102,7 +102,10 @@ impl Puente {
         }
         let (de_la_playlist, todas) = {
             let b = self.bib();
-            (b.canciones_de_playlist(pid).unwrap_or_default(), b.canciones("", Orden::Agregada).unwrap_or_default())
+            (
+                b.canciones_de_playlist(pid).unwrap_or_default(),
+                b.canciones("", Orden::Agregada).unwrap_or_default(),
+            )
         };
         if de_la_playlist.is_empty() {
             let e = self.as_mut().em();
@@ -201,7 +204,12 @@ impl Puente {
         if a.id_actual() == texto(c, "id") {
             a.parar();
         } else {
-            a.tocar(&texto(c, "id"), &texto(c, "url"), numero(c, "duracion"), leer(|r| r.volumen()));
+            a.tocar(
+                &texto(c, "id"),
+                &texto(c, "url"),
+                numero(c, "duracion"),
+                leer(|r| r.volumen()),
+            );
         }
     }
 
@@ -214,7 +222,11 @@ impl Puente {
     }
 
     pub fn escuchar_resultado(self: Pin<&mut Self>, i: i32) {
-        if let Some(c) = usize::try_from(i).ok().and_then(|i| self.es().en_linea.get(i)).cloned() {
+        if let Some(c) = usize::try_from(i)
+            .ok()
+            .and_then(|i| self.es().en_linea.get(i))
+            .cloned()
+        {
             self.escuchar(&c);
         }
     }
@@ -227,7 +239,11 @@ impl Puente {
 
     /// Baja el resultado i a la biblioteca; con playlist ≥ 0, además lo agrega a esa playlist.
     pub fn bajar_resultado(self: Pin<&mut Self>, i: i32, playlist: i32) {
-        if let Some(c) = usize::try_from(i).ok().and_then(|i| self.es().en_linea.get(i)).cloned() {
+        if let Some(c) = usize::try_from(i)
+            .ok()
+            .and_then(|i| self.es().en_linea.get(i))
+            .cloned()
+        {
             let nombre = titulo_y(&texto(&c, "titulo"), &texto(&c, "artistas"));
             self.bajar_con(&texto(&c, "url"), i64::from(playlist), &texto(&c, "id"), &nombre);
         }
@@ -244,7 +260,11 @@ impl Puente {
             return;
         };
         let n = self.es().descargas.len();
-        let nombre = if nombre.is_empty() { url.clone() } else { nombre.to_string() };
+        let nombre = if nombre.is_empty() {
+            url.clone()
+        } else {
+            nombre.to_string()
+        };
         self.as_mut().em().descargas.push(json!({
             "url": url, "servicio": servicio, "nombre": nombre, "total": 0, "hechas": 0, "fallidas": 0,
             "actual": "En espera…", "porcentaje": 0.0, "estado": "espera", "avisos": [], "playlist": playlist,
@@ -268,7 +288,11 @@ impl Puente {
             loop {
                 let siguiente = {
                     let mut c = cola.lock().unwrap_or_else(|e| e.into_inner());
-                    let s = if parar.load(Ordering::SeqCst) { None } else { c.0.pop_front() };
+                    let s = if parar.load(Ordering::SeqCst) {
+                        None
+                    } else {
+                        c.0.pop_front()
+                    };
                     if s.is_none() {
                         c.1 = false; // con el candado: una que llegue ahora arranca otro hilo
                     }
@@ -288,7 +312,11 @@ impl Puente {
                         if ev["tipo"] == "archivo" {
                             // Se lee aquí (en el hilo) para no trabar la ventana con ffprobe
                             let b = bib.lock().unwrap_or_else(|e| e.into_inner());
-                            let ok = b.agregar_archivo(Path::new(&texto(&ev, "ruta")), "youtube").ok().flatten().is_some();
+                            let ok = b
+                                .agregar_archivo(Path::new(&texto(&ev, "ruta")), "youtube")
+                                .ok()
+                                .flatten()
+                                .is_some();
                             ev["ok"] = json!(ok);
                         }
                         let _ = hilo.queue(move |o| o.en_evento(n, ev));
@@ -325,7 +353,11 @@ impl Puente {
                     });
                     d["total"] = ev.get("total").cloned().unwrap_or(json!(0));
                     if es_lista {
-                        d["playlist"] = json!(candado().crear_playlist(&texto(d, "nombre"), &texto(d, "url")).unwrap_or(-1));
+                        d["playlist"] = json!(
+                            candado()
+                                .crear_playlist(&texto(d, "nombre"), &texto(d, "url"))
+                                .unwrap_or(-1)
+                        );
                     }
                 }
                 "cancion" => {
@@ -402,7 +434,12 @@ impl Puente {
 
     pub fn parar_descargas(self: Pin<&mut Self>) {
         self.es().parar_descargas.store(true, Ordering::SeqCst);
-        self.es().cola_urls.lock().unwrap_or_else(|e| e.into_inner()).0.clear();
+        self.es()
+            .cola_urls
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .0
+            .clear();
     }
 
     pub fn limpiar_descargas(mut self: Pin<&mut Self>) {
@@ -417,7 +454,13 @@ impl Puente {
 
     pub fn recomendar_para_ti(mut self: Pin<&mut Self>, otras: bool) {
         let mut rng = rand::rng();
-        let h: Vec<Value> = self.es().sesion.get("historial").and_then(|h| h.as_array()).cloned().unwrap_or_default();
+        let h: Vec<Value> = self
+            .es()
+            .sesion
+            .get("historial")
+            .and_then(|h| h.as_array())
+            .cloned()
+            .unwrap_or_default();
         let mut semillas: Vec<Value> = if otras {
             let mut diez: Vec<Value> = h.iter().take(10).cloned().collect();
             diez.shuffle(&mut rng);
@@ -508,7 +551,10 @@ impl Puente {
     /// Una de YouTube Music (de `descargas::buscar`/`radio`) como canción de la cola, que suena sin bajarla.
     pub fn de_la_radio(mut self: Pin<&mut Self>, c: &Value) -> Value {
         let url = texto(c, "url");
-        self.as_mut().em().portadas.insert(url.clone(), texto(c, "portada"));
+        self.as_mut()
+            .em()
+            .portadas
+            .insert(url.clone(), texto(c, "portada"));
         json!({"ruta": url, "id": texto(c, "id"), "titulo": texto(c, "titulo"), "artista": texto(c, "artistas"),
                "album": texto(c, "album"), "duracion": numero(c, "duracion"), "portada": texto(c, "portada"),
                "radio": true})
@@ -523,8 +569,9 @@ impl Puente {
             .collect();
         let mut libres: Vec<&Cancion> = todas.iter().filter(|c| !en_cola.contains(&c.ruta)).collect();
         libres.shuffle(&mut rand::rng());
-        let (mismas, otras): (Vec<&Cancion>, Vec<&Cancion>) =
-            libres.into_iter().partition(|c| artistas.contains(&letras::limpiar_artista(&c.artista).to_lowercase()));
+        let (mismas, otras): (Vec<&Cancion>, Vec<&Cancion>) = libres
+            .into_iter()
+            .partition(|c| artistas.contains(&letras::limpiar_artista(&c.artista).to_lowercase()));
         mismas
             .into_iter()
             .chain(otras)
@@ -535,7 +582,14 @@ impl Puente {
 
     /// Suena la última de la cola: se piden 10 parecidas a ella y a las dos de antes.
     pub fn pedir_radio(mut self: Pin<&mut Self>) {
-        let (cola, i, origen, repetir) = leer(|r| (r.cola(), r.indice(), r.origen().to_string(), r.repetir().to_string()));
+        let (cola, i, origen, repetir) = leer(|r| {
+            (
+                r.cola(),
+                r.indice(),
+                r.origen().to_string(),
+                r.repetir().to_string(),
+            )
+        });
         // La que pediste con «Iniciar radio» sigue aunque la radio sin fin esté apagada
         let a_mano = origen.starts_with("Radio de ");
         let Some(ultima) = cola.last() else { return };
@@ -556,7 +610,9 @@ impl Puente {
         let semillas: Vec<Value> = cola[i.saturating_sub(2)..=i.min(cola.len() - 1)]
             .iter()
             .rev()
-            .map(|c| json!({"id": id_o_ruta(c), "titulo": texto(c, "titulo"), "artista": texto(c, "artista")}))
+            .map(
+                |c| json!({"id": id_o_ruta(c), "titulo": texto(c, "titulo"), "artista": texto(c, "artista")}),
+            )
             .collect();
         let todas = self.bib().canciones("", Orden::Agregada).unwrap_or_default();
         if medida {
@@ -570,9 +626,9 @@ impl Puente {
             return;
         }
         let mut tienes: Vec<Value> = todas.iter().map(semilla).collect();
-        tienes.extend(
-            cola.iter().map(|c| json!({"id": id_o_ruta(c), "titulo": texto(c, "titulo"), "artista": texto(c, "artista")})),
-        );
+        tienes.extend(cola.iter().map(
+            |c| json!({"id": id_o_ruta(c), "titulo": texto(c, "titulo"), "artista": texto(c, "artista")}),
+        ));
         let vuelta = {
             let e = self.as_mut().em();
             e.radio_vuelta += 1;
@@ -591,8 +647,15 @@ impl Puente {
             return;
         }
         let para = std::mem::take(&mut self.as_mut().em().radio_para);
-        let (cola, origen, i, pausado, cancion) =
-            leer(|r| (r.cola(), r.origen().to_string(), r.indice(), r.pausado(), r.cancion()));
+        let (cola, origen, i, pausado, cancion) = leer(|r| {
+            (
+                r.cola(),
+                r.origen().to_string(),
+                r.indice(),
+                r.pausado(),
+                r.cancion(),
+            )
+        });
         if cola.last().map(|c| texto(c, "ruta")) != Some(para)
             || !(origen.starts_with("Radio de ") || Biblioteca::ajustes().booleano("radio", true))
         {
@@ -624,21 +687,33 @@ impl Puente {
             return;
         }
         let titulo = texto(&c, "titulo");
-        let nombre = if titulo.is_empty() { tallo(&ruta) } else { titulo.clone() };
+        let nombre = if titulo.is_empty() {
+            tallo(&ruta)
+        } else {
+            titulo.clone()
+        };
         con_rep(|r| {
             r.tocar(std::slice::from_ref(&c), 0);
             r.poner_origen(&format!("Radio de {nombre}"));
         });
         self.as_mut().em().radio_para.clear();
         self.as_mut().pedir_radio();
-        let t = if titulo.is_empty() { "esta canción".to_string() } else { titulo };
+        let t = if titulo.is_empty() {
+            "esta canción".to_string()
+        } else {
+            titulo
+        };
         self.avisar(&format!("Radio de «{t}»"));
     }
 
     /// La de la radio que suena (o una de la cola), a tu biblioteca.
     pub fn bajar_de_la_radio(mut self: Pin<&mut Self>, ruta: &QString) {
         let ruta = ruta.to_string();
-        let c = leer(|r| r.cola().into_iter().find(|x| texto(x, "ruta") == ruta && verdadero(x.get("radio"))));
+        let c = leer(|r| {
+            r.cola()
+                .into_iter()
+                .find(|x| texto(x, "ruta") == ruta && verdadero(x.get("radio")))
+        });
         let Some(c) = c else { return };
         if self.es().bajando_radio.contains(&ruta) {
             return;
@@ -671,10 +746,16 @@ impl Puente {
         lanzar(
             self.qt_thread(),
             move || {
-                descargas::buscar(&format!("{artista} {titulo}"), "ytmusic", 1, "yt-dlp", &descargas::pedir_json)
-                    .ok()
-                    .and_then(|r| r.first().map(|x| texto(x, "url")))
-                    .unwrap_or_default()
+                descargas::buscar(
+                    &format!("{artista} {titulo}"),
+                    "ytmusic",
+                    1,
+                    "yt-dlp",
+                    &descargas::pedir_json,
+                )
+                .ok()
+                .and_then(|r| r.first().map(|x| texto(x, "url")))
+                .unwrap_or_default()
             },
             move |obj, url| obj.fin_enlace(&como, &url, &t),
         );
@@ -702,10 +783,16 @@ impl Puente {
                         }
                         let t = texto(c, "titulo");
                         let t = if t.is_empty() { tallo(&texto(c, "ruta")) } else { t };
-                        descargas::buscar(&format!("{} {t}", texto(c, "artista")), "ytmusic", 1, "yt-dlp", &descargas::pedir_json)
-                            .ok()
-                            .and_then(|r| r.first().map(|x| texto(x, "id")))
-                            .unwrap_or_default()
+                        descargas::buscar(
+                            &format!("{} {t}", texto(c, "artista")),
+                            "ytmusic",
+                            1,
+                            "yt-dlp",
+                            &descargas::pedir_json,
+                        )
+                        .ok()
+                        .and_then(|r| r.first().map(|x| texto(x, "id")))
+                        .unwrap_or_default()
                     })
                     .collect();
                 descargas::enlaces_playlist(&n2, &ids).join("\n")
@@ -718,7 +805,10 @@ impl Puente {
         if url.is_empty() {
             self.avisar("No encontré esta canción en YouTube Music");
         } else if como == "whatsapp" {
-            abrir(&format!("https://wa.me/?text={}", vortex_player::red::escapar_ruta(&format!("{t} {url}"))));
+            abrir(&format!(
+                "https://wa.me/?text={}",
+                vortex_player::red::escapar_ruta(&format!("{t} {url}"))
+            ));
         } else {
             crate::arranque::ffi::copiar_texto(url);
             let n = url.matches('\n').count();
@@ -740,14 +830,18 @@ impl Puente {
     pub fn armar_mezcla_con(mut self: Pin<&mut Self>, forzar: bool) {
         let hoy = hoy();
         let e = self.es();
-        if e.mezcla_armando || (!forzar && e.mezcla.get("fecha").and_then(|f| f.as_str()) == Some(hoy.as_str())) || e.sin_red {
+        if e.mezcla_armando
+            || (!forzar && e.mezcla.get("fecha").and_then(|f| f.as_str()) == Some(hoy.as_str()))
+            || e.sin_red
+        {
             return;
         }
         let mut rng = rand::rng();
         let (mut tuyas, todas) = {
             let b = self.bib();
             (
-                b.mas_escuchadas(fecha::ahora() - 30.0 * 86400.0, 15).unwrap_or_default(),
+                b.mas_escuchadas(fecha::ahora() - 30.0 * 86400.0, 15)
+                    .unwrap_or_default(),
                 b.canciones("", Orden::Agregada).unwrap_or_default(),
             )
         };
@@ -761,7 +855,10 @@ impl Puente {
             return;
         }
         let diez = &tuyas[..tuyas.len().min(10)];
-        let semillas: Vec<Value> = diez.choose_multiple(&mut rng, 4.min(diez.len())).map(semilla).collect();
+        let semillas: Vec<Value> = diez
+            .choose_multiple(&mut rng, 4.min(diez.len()))
+            .map(semilla)
+            .collect();
         let tienes: Vec<Value> = todas.iter().map(semilla).collect();
         let rutas_tuyas: Vec<String> = tuyas.iter().map(|c| c.ruta.clone()).collect();
         self.as_mut().em().mezcla_armando = true;
@@ -797,23 +894,46 @@ impl Puente {
     }
 
     pub fn canciones_mezcla(mut self: Pin<&mut Self>) -> Vec<Value> {
-        let lista: Vec<Value> = self.es().mezcla.get("canciones").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+        let lista: Vec<Value> = self
+            .es()
+            .mezcla
+            .get("canciones")
+            .and_then(|c| c.as_array())
+            .cloned()
+            .unwrap_or_default();
         let mut salida = Vec::new();
         for c in lista {
             let ruta = texto(&c, "ruta");
             if verdadero(c.get("radio")) {
-                self.as_mut().em().portadas.entry(ruta).or_insert_with(|| texto(&c, "portada"));
+                self.as_mut()
+                    .em()
+                    .portadas
+                    .entry(ruta)
+                    .or_insert_with(|| texto(&c, "portada"));
                 salida.push(c);
             } else if let Some(t) = self.bib().cancion(&ruta).ok().flatten() {
-                salida.push(cancion_valor(&t, self.es().portadas.get(&ruta).map_or("", String::as_str)));
+                salida.push(cancion_valor(
+                    &t,
+                    self.es().portadas.get(&ruta).map_or("", String::as_str),
+                ));
             }
         }
         salida
     }
 
     pub fn poner_mezcla(mut self: Pin<&mut Self>) {
-        let lista = if self.es().mezcla.contains_key("canciones") { self.as_mut().canciones_mezcla() } else { Vec::new() };
-        let fecha_ = self.es().mezcla.get("fecha").and_then(|f| f.as_str()).unwrap_or("").to_string();
+        let lista = if self.es().mezcla.contains_key("canciones") {
+            self.as_mut().canciones_mezcla()
+        } else {
+            Vec::new()
+        };
+        let fecha_ = self
+            .es()
+            .mezcla
+            .get("fecha")
+            .and_then(|f| f.as_str())
+            .unwrap_or("")
+            .to_string();
         let v = json!({
             "fecha": fecha_, "cuantas": lista.len(), "hoy": fecha_ == hoy(),
             "nuevas": lista.iter().filter(|c| verdadero(c.get("radio"))).count(),
@@ -842,12 +962,16 @@ impl Puente {
     /// Una vez al día: los álbumes y singles de este año de tus 5 artistas más escuchados.
     pub fn revisar_novedades_con(self: Pin<&mut Self>, forzar: bool) {
         let hoy = hoy();
-        if (!forzar && self.es().novedades.get("fecha").and_then(|f| f.as_str()) == Some(hoy.as_str())) || self.es().sin_red {
+        if (!forzar && self.es().novedades.get("fecha").and_then(|f| f.as_str()) == Some(hoy.as_str()))
+            || self.es().sin_red
+        {
             return;
         }
         let (artistas, claves) = {
             let b = self.bib();
-            let artistas = b.artistas_mas_escuchados(fecha::ahora() - 60.0 * 86400.0, 5).unwrap_or_default();
+            let artistas = b
+                .artistas_mas_escuchados(fecha::ahora() - 60.0 * 86400.0, 5)
+                .unwrap_or_default();
             let claves: HashSet<String> = b
                 .canciones("", Orden::Agregada)
                 .unwrap_or_default()
@@ -856,7 +980,13 @@ impl Puente {
                 .collect();
             (artistas, claves)
         };
-        let mut ids: Map<String, Value> = self.es().novedades.get("ids").and_then(|i| i.as_object()).cloned().unwrap_or_default();
+        let mut ids: Map<String, Value> = self
+            .es()
+            .novedades
+            .get("ids")
+            .and_then(|i| i.as_object())
+            .cloned()
+            .unwrap_or_default();
         let l = fecha::local(fecha::ahora());
         let desde_anio = i64::from(if l.mes <= 2 { l.anio - 1 } else { l.anio });
         lanzar(
@@ -872,7 +1002,11 @@ impl Puente {
                         continue;
                     }
                     ids.insert(a.clone(), json!(canal));
-                    for x in descargas::lanzamientos(&canal, a, &descargas::pedir_json).ok()?.into_iter().take(8) {
+                    for x in descargas::lanzamientos(&canal, a, &descargas::pedir_json)
+                        .ok()?
+                        .into_iter()
+                        .take(8)
+                    {
                         if x["anio"].as_i64().unwrap_or(0) >= desde_anio
                             && !claves.contains(&descargas::clave(&texto(&x, "titulo"), a))
                         {
@@ -900,7 +1034,11 @@ impl Puente {
             .and_then(|v| v.as_array())
             .map(|v| v.iter().filter_map(|x| x.as_str().map(String::from)).collect())
             .unwrap_or_default();
-        let nuevas: Vec<Value> = lista.iter().filter(|x| !vistos.contains(&texto(x, "id"))).cloned().collect();
+        let nuevas: Vec<Value> = lista
+            .iter()
+            .filter(|x| !vistos.contains(&texto(x, "id")))
+            .cloned()
+            .collect();
         vistos.extend(lista.iter().map(|x| texto(x, "id")));
         let mut vistos: Vec<String> = vistos.into_iter().collect();
         vistos.sort();
@@ -926,7 +1064,14 @@ impl Puente {
             self.as_mut().avisar(&t);
             if hay_programa("notify-send") && !self.es().prueba {
                 let _ = std::process::Command::new("notify-send")
-                    .args(["-a", "Vortex Player", "-i", "vortex-player", "Lo nuevo de tus artistas", &t])
+                    .args([
+                        "-a",
+                        "Vortex Player",
+                        "-i",
+                        "vortex-player",
+                        "Lo nuevo de tus artistas",
+                        &t,
+                    ])
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .spawn();
@@ -950,7 +1095,13 @@ impl Puente {
         );
     }
 
-    fn fin_lanzamiento(mut self: Pin<&mut Self>, como: &str, album: &str, lista: &str, canciones: Vec<Value>) {
+    fn fin_lanzamiento(
+        mut self: Pin<&mut Self>,
+        como: &str,
+        album: &str,
+        lista: &str,
+        canciones: Vec<Value>,
+    ) {
         let x = self
             .es()
             .novedades
@@ -969,7 +1120,11 @@ impl Puente {
             } else {
                 format!("https://music.youtube.com/watch?v={}", texto(primera, "id"))
             };
-            let vid = if varias { String::new() } else { texto(primera, "id") };
+            let vid = if varias {
+                String::new()
+            } else {
+                texto(primera, "id")
+            };
             let nombre = format!("{} · {}", texto(&x, "titulo"), texto(&x, "artista"));
             self.bajar_con(&url, -1, &vid, &nombre);
             return;
@@ -985,7 +1140,11 @@ impl Puente {
             })
             .collect();
         let t = texto(&x, "titulo");
-        let origen = if t.is_empty() { "Lo nuevo de tus artistas".to_string() } else { t };
+        let origen = if t.is_empty() {
+            "Lo nuevo de tus artistas".to_string()
+        } else {
+            t
+        };
         con_rep(|r| {
             r.poner_origen(&origen);
             r.tocar(&cola, 0);
@@ -1015,7 +1174,14 @@ impl Puente {
         lanzar(
             self.qt_thread(),
             move || {
-                letras::de(&rutas::cache().join("letras"), &titulo, &artista, dur, &id_de(&ruta), Some(&letra_youtube))
+                letras::de(
+                    &rutas::cache().join("letras"),
+                    &titulo,
+                    &artista,
+                    dur,
+                    &id_de(&ruta),
+                    Some(&letra_youtube),
+                )
             },
             move |mut obj, r: Result<Option<Letra>, String>| {
                 if vuelta != obj.es().letra_vuelta {
@@ -1071,7 +1237,11 @@ impl Puente {
             let mut con = 0;
             let mut faltan = Vec::new();
             for c in &todas {
-                let titulo = if c.titulo.is_empty() { tallo(&c.ruta) } else { c.titulo.clone() };
+                let titulo = if c.titulo.is_empty() {
+                    tallo(&c.ruta)
+                } else {
+                    c.titulo.clone()
+                };
                 let dur = c.duracion as i64;
                 if letras::guardada(&carpeta, &titulo, &c.artista, dur) {
                     con += 1;

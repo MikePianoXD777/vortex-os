@@ -97,7 +97,10 @@ impl Motor {
         }
         if let Some(d) = &self.discord {
             d.poner(self.sonando(c));
-            if avisos.iter().any(|a| matches!(a, Aviso::Cancion | Aviso::Estado | Aviso::Practica)) {
+            if avisos
+                .iter()
+                .any(|a| matches!(a, Aviso::Cancion | Aviso::Estado | Aviso::Practica))
+            {
                 d.actualizar();
             }
         }
@@ -146,10 +149,15 @@ fn de_mpv(d: DeMpv) {
     match d {
         DeMpv::Conectado => con_rep(|r| r.al_conectar()),
         DeMpv::Evento(v) => con_rep(|r| r.al_evento(&v)),
-        DeMpv::NoArranco => con_rep(|r| r.avisos.push(Aviso::Error("No pude arrancar mpv (¿está instalado?)".into()))),
+        DeMpv::NoArranco => con_rep(|r| {
+            r.avisos
+                .push(Aviso::Error("No pude arrancar mpv (¿está instalado?)".into()))
+        }),
         DeMpv::Murio => {
             con_rep(|r| r.mpv_murio());
-            let Some(rep) = MOTOR.with_borrow(|m| m.rep.clone()) else { return };
+            let Some(rep) = MOTOR.with_borrow(|m| m.rep.clone()) else {
+                return;
+            };
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(500));
                 let h = rep.clone();

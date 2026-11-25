@@ -21,7 +21,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Donde están los QML: VORTEX_PLAYER_DIR (el lanzador la pone), el repo (al compilar desde aquí) y la copia
 /// del paquete vortex-rust.
 fn carpeta_qml() -> Option<PathBuf> {
-    let repo = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../../apps/vortex-player"));
+    let repo = PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../../apps/vortex-player"
+    ));
     std::env::var_os("VORTEX_PLAYER_DIR")
         .filter(|d| !d.is_empty())
         .map(PathBuf::from)
@@ -39,7 +42,10 @@ fn main() {
         println!("{NOMBRE} {VERSION} (Rust)");
         return;
     }
-    let args: Vec<String> = todos.into_iter().filter(|a| !a.starts_with('-') || a == "--seguir").collect();
+    let args: Vec<String> = todos
+        .into_iter()
+        .filter(|a| !a.starts_with('-') || a == "--seguir")
+        .collect();
     let prueba = std::env::var_os("VORTEX_PLAYER_PRUEBA").is_some_and(|v| !v.is_empty());
     // Una sola ventana: si ya hay una abierta (de Rust o de Python), le pasa lo que recibió y sale.
     if !prueba && instancia::avisar_a_la_abierta(&instancia::ruta(), &args) {

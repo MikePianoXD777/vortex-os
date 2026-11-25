@@ -39,7 +39,12 @@ fn suena_termina_se_para_y_reintenta_sin_cliente() {
     av.programa = Some(falso.to_string_lossy().into_owned());
     let hubo = |m: &DeAvance| avisos.lock().unwrap().contains(m);
 
-    av.tocar("recoaaaaaaa", "https://music.youtube.com/watch?v=recoaaaaaaa", 200.0, 80);
+    av.tocar(
+        "recoaaaaaaa",
+        "https://music.youtube.com/watch?v=recoaaaaaaa",
+        200.0,
+        80,
+    );
     assert!(hubo(&DeAvance::Empezo));
     assert_eq!((av.id_actual().as_str(), av.sonando()), ("recoaaaaaaa", false));
     assert!(esperar(|| av.sonando(), 3000));
@@ -51,26 +56,49 @@ fn suena_termina_se_para_y_reintenta_sin_cliente() {
 
     // otra vez, y lo paras
     avisos.lock().unwrap().clear();
-    av.tocar("recoaaaaaaa", "https://music.youtube.com/watch?v=recoaaaaaaa", 60.0, 80);
+    av.tocar(
+        "recoaaaaaaa",
+        "https://music.youtube.com/watch?v=recoaaaaaaa",
+        60.0,
+        80,
+    );
     assert!(esperar(|| av.sonando(), 3000));
     av.parar();
     assert!(esperar(|| hubo(&DeAvance::Termino), 3000));
     assert!(!hubo(&DeAvance::Error("No pude escuchar el avance".into())));
-    assert!(std::fs::read_to_string(&log).unwrap().contains("--start=0 --end=30"));
+    assert!(
+        std::fs::read_to_string(&log)
+            .unwrap()
+            .contains("--start=0 --end=30")
+    );
 
     // el cliente falla: se intenta sin él
     std::fs::write(&falla, "").unwrap();
     std::fs::write(&log, "").unwrap();
     avisos.lock().unwrap().clear();
-    av.tocar("otrooooooo1", "https://music.youtube.com/watch?v=otrooooooo1", 200.0, 80);
+    av.tocar(
+        "otrooooooo1",
+        "https://music.youtube.com/watch?v=otrooooooo1",
+        200.0,
+        80,
+    );
     assert!(esperar(|| av.sonando(), 3000));
-    let intentos: Vec<String> = std::fs::read_to_string(&log).unwrap().lines().map(String::from).collect();
+    let intentos: Vec<String> = std::fs::read_to_string(&log)
+        .unwrap()
+        .lines()
+        .map(String::from)
+        .collect();
     assert_eq!(intentos.len(), 2);
     assert!(intentos[0].contains("visionos") && !intentos[1].contains("visionos"));
 
     // cambiar de avance no suelta tu música en medio (no hay Termino del viejo)
     avisos.lock().unwrap().clear();
-    av.tocar("terceroooo1", "https://music.youtube.com/watch?v=terceroooo1", 200.0, 80);
+    av.tocar(
+        "terceroooo1",
+        "https://music.youtube.com/watch?v=terceroooo1",
+        200.0,
+        80,
+    );
     assert!(!hubo(&DeAvance::Empezo));
     std::thread::sleep(Duration::from_millis(200));
     assert!(!hubo(&DeAvance::Termino));

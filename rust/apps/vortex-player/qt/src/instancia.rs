@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 pub fn ruta() -> PathBuf {
-    let tmp = std::env::var_os("TMPDIR").filter(|t| !t.is_empty()).map_or_else(|| PathBuf::from("/tmp"), PathBuf::from);
+    let tmp = std::env::var_os("TMPDIR")
+        .filter(|t| !t.is_empty())
+        .map_or_else(|| PathBuf::from("/tmp"), PathBuf::from);
     // SAFETY: getuid no falla ni toca memoria.
     #[allow(unsafe_code)]
     let uid = unsafe { libc::getuid() };
@@ -18,7 +20,9 @@ pub fn ruta() -> PathBuf {
 
 /// ¿Había una abierta? Entonces ya le pasó `args` (y se le pidió que se muestre).
 pub fn avisar_a_la_abierta(ruta: &Path, args: &[String]) -> bool {
-    let Ok(mut s) = UnixStream::connect(ruta) else { return false };
+    let Ok(mut s) = UnixStream::connect(ruta) else {
+        return false;
+    };
     let _ = s.set_write_timeout(Some(Duration::from_millis(400)));
     let mut texto = String::from("abrir");
     for a in args {

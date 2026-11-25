@@ -31,7 +31,10 @@ fn ida_y_vuelta_partido_y_bytes() {
     let mut r = r;
     r.extend_from_slice(&datos[datos.len() - 2..]);
     assert_eq!(pd::leer_marcos(&r).0, [(3, json!({"b": 2}))]);
-    assert_eq!(pd::leer_marcos(&pd::marco(1, &json!({"t": "日本語"}))).0[0].1["t"], "日本語");
+    assert_eq!(
+        pd::leer_marcos(&pd::marco(1, &json!({"t": "日本語"}))).0[0].1["t"],
+        "日本語"
+    );
 }
 
 #[test]
@@ -39,13 +42,19 @@ fn actividad_de_youtube_y_propia() {
     let c = json!({"titulo": "Bohemia", "artista": "Queen", "album": "Opera", "ruta": YT});
     let a = pd::actividad(&c, 10.0, 100.0, 1.0, 1000.0);
     assert_eq!(a["type"], 2);
-    assert_eq!((a["details"].as_str(), a["state"].as_str()), (Some("Bohemia"), Some("Queen")));
+    assert_eq!(
+        (a["details"].as_str(), a["state"].as_str()),
+        (Some("Bohemia"), Some("Queen"))
+    );
     assert_eq!(
         a["assets"],
         json!({"large_image": "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg", "large_text": "Opera"})
     );
     assert_eq!(a["timestamps"], json!({"start": 990000, "end": 1090000}));
-    assert_eq!(a["buttons"][0]["url"], "https://music.youtube.com/watch?v=dQw4w9WgXcQ");
+    assert_eq!(
+        a["buttons"][0]["url"],
+        "https://music.youtube.com/watch?v=dQw4w9WgXcQ"
+    );
     assert!(a["buttons"][0]["label"].as_str().unwrap().chars().count() <= 32);
 
     let a = pd::actividad(&json!({"ruta": "/música/mi canción.flac"}), 0.0, 0.0, 1.0, 0.0);
@@ -54,11 +63,21 @@ fn actividad_de_youtube_y_propia() {
     for falta in ["state", "buttons", "timestamps"] {
         assert!(a.get(falta).is_none(), "{falta}");
     }
-    let a = pd::actividad(&json!({"titulo": "x".repeat(300), "artista": "U", "ruta": "/a.flac"}), 0.0, 0.0, 1.0, 0.0);
+    let a = pd::actividad(
+        &json!({"titulo": "x".repeat(300), "artista": "U", "ruta": "/a.flac"}),
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+    );
     assert_eq!(a["details"].as_str().unwrap().len(), 128);
     assert_eq!(a["state"].as_str().unwrap().chars().count(), 2);
     // practicando no lleva tiempo
-    assert!(pd::actividad(&json!({"titulo": "aa", "ruta": YT}), 0.0, 100.0, 0.75, 0.0).get("timestamps").is_none());
+    assert!(
+        pd::actividad(&json!({"titulo": "aa", "ruta": YT}), 0.0, 100.0, 0.75, 0.0)
+            .get("timestamps")
+            .is_none()
+    );
 }
 
 #[test]
@@ -67,7 +86,10 @@ fn misma() {
     let a = pd::actividad(&c, 0.0, 100.0, 1.0, 1000.0);
     assert!(pd::misma(&pd::actividad(&c, 1.0, 100.0, 1.0, 1001.0), Some(&a))); // el tiempo solo avanzó
     assert!(!pd::misma(&pd::actividad(&c, 50.0, 100.0, 1.0, 1001.0), Some(&a))); // un salto
-    assert!(!pd::misma(&pd::actividad(&json!({"titulo": "bb", "ruta": YT}), 0.0, 100.0, 1.0, 1000.0), Some(&a)));
+    assert!(!pd::misma(
+        &pd::actividad(&json!({"titulo": "bb", "ruta": YT}), 0.0, 100.0, 1.0, 1000.0),
+        Some(&a)
+    ));
     assert!(!pd::misma(&pd::actividad(&c, 0.0, 100.0, 0.5, 1000.0), Some(&a)));
     assert!(!pd::misma(&a, None));
 }
@@ -122,7 +144,11 @@ impl DiscordFalso {
                 });
             }
         });
-        Self { visto, saludar, ruta: ruta.to_path_buf() }
+        Self {
+            visto,
+            saludar,
+            ruta: ruta.to_path_buf(),
+        }
     }
 
     fn mandar(&self, op: u32, d: &Value) {
@@ -143,7 +169,11 @@ impl DiscordFalso {
         self.marcos()
             .into_iter()
             .filter(|(op, d)| *op == pd::MARCO && d["cmd"] == "SET_ACTIVITY")
-            .map(|(_, d)| d["args"].get("activity").map(|a| a["details"].as_str().unwrap().to_string()))
+            .map(|(_, d)| {
+                d["args"]
+                    .get("activity")
+                    .map(|a| a["details"].as_str().unwrap().to_string())
+            })
             .collect()
     }
 
@@ -168,7 +198,10 @@ fn t(v: &[Option<&str>]) -> Vec<Option<String>> {
 
 impl Prueba {
     fn nueva(cliente: &str, entre_envios: f64) -> Self {
-        let t = tempfile::Builder::new().prefix("vp-dc-").tempdir_in("/tmp").unwrap();
+        let t = tempfile::Builder::new()
+            .prefix("vp-dc-")
+            .tempdir_in("/tmp")
+            .unwrap();
         let raiz = t.path().to_path_buf();
         let rutas = move || {
             ["", "app/com.discordapp.Discord"]
@@ -186,7 +219,16 @@ impl Prueba {
             pulso: Duration::from_millis(30),
             rutas: Arc::new(rutas),
         });
-        Self { t, p, s: Sonando { duracion: 200.0, velocidad: 1.0, activa: true, ..Sonando::default() } }
+        Self {
+            t,
+            p,
+            s: Sonando {
+                duracion: 200.0,
+                velocidad: 1.0,
+                activa: true,
+                ..Sonando::default()
+            },
+        }
     }
 
     fn discord(&self, sub: &str) -> DiscordFalso {
@@ -212,7 +254,11 @@ fn saluda_manda_y_no_repite() {
     let mut p = Prueba::nueva("123", 0.0);
     let f = p.discord("");
     p.tocar("Uno");
-    assert!(esperar(|| f.titulos() == t(&[Some("Uno")]), 3000), "{:?}", f.marcos());
+    assert!(
+        esperar(|| f.titulos() == t(&[Some("Uno")]), 3000),
+        "{:?}",
+        f.marcos()
+    );
     let m = f.marcos();
     assert_eq!(m[0], (pd::SALUDO, json!({"v": 1, "client_id": "123"})));
     assert_eq!(m[1].1["args"]["pid"], std::process::id());
@@ -227,9 +273,17 @@ fn pausa_cambio_y_salto() {
     p.tocar("Uno");
     assert!(esperar(|| f.titulos() == t(&[Some("Uno")]), 3000));
     p.pausar(true);
-    assert!(esperar(|| f.titulos() == t(&[Some("Uno"), None]), 3000), "{:?}", f.titulos());
+    assert!(
+        esperar(|| f.titulos() == t(&[Some("Uno"), None]), 3000),
+        "{:?}",
+        f.titulos()
+    );
     p.pausar(false);
-    assert!(esperar(|| f.titulos() == t(&[Some("Uno"), None, Some("Uno")]), 3000), "{:?}", f.titulos());
+    assert!(
+        esperar(|| f.titulos() == t(&[Some("Uno"), None, Some("Uno")]), 3000),
+        "{:?}",
+        f.titulos()
+    );
     p.tocar("Dos");
     assert!(esperar(|| f.titulos().last() == Some(&Some("Dos".into())), 3000));
     let n = f.titulos().len();
@@ -271,11 +325,19 @@ fn discord_abre_despues_se_cierra_y_vuelve() {
     p.tocar("Uno");
     esperar(|| false, 80);
     let f = p.discord("");
-    assert!(esperar(|| f.titulos() == t(&[Some("Uno")]), 3000), "{:?}", f.marcos());
+    assert!(
+        esperar(|| f.titulos() == t(&[Some("Uno")]), 3000),
+        "{:?}",
+        f.marcos()
+    );
     f.cerrar();
     esperar(|| false, 80);
     let g = p.discord("");
-    assert!(esperar(|| g.titulos() == t(&[Some("Uno")]), 3000), "{:?}", g.marcos());
+    assert!(
+        esperar(|| g.titulos() == t(&[Some("Uno")]), 3000),
+        "{:?}",
+        g.marcos()
+    );
 }
 
 #[test]
@@ -284,7 +346,11 @@ fn socket_muerto_y_flatpak() {
     std::fs::write(p.t.path().join("discord-ipc-0"), "").unwrap(); // quedó de un Discord que tronó
     let f = p.discord("app/com.discordapp.Discord");
     p.tocar("Uno");
-    assert!(esperar(|| f.titulos() == t(&[Some("Uno")]), 3000), "{:?}", f.marcos());
+    assert!(
+        esperar(|| f.titulos() == t(&[Some("Uno")]), 3000),
+        "{:?}",
+        f.marcos()
+    );
 }
 
 #[test]
@@ -294,8 +360,14 @@ fn ping_error_y_cierre() {
     p.tocar("Uno");
     assert!(esperar(|| f.titulos() == t(&[Some("Uno")]), 3000));
     f.mandar(pd::PING, &json!({"n": 7}));
-    assert!(esperar(|| f.marcos().contains(&(pd::PONG, json!({"n": 7}))), 3000));
-    f.mandar(pd::MARCO, &json!({"evt": "ERROR", "data": {"code": 4000, "message": "de prueba"}}));
+    assert!(esperar(
+        || f.marcos().contains(&(pd::PONG, json!({"n": 7}))),
+        3000
+    ));
+    f.mandar(
+        pd::MARCO,
+        &json!({"evt": "ERROR", "data": {"code": 4000, "message": "de prueba"}}),
+    );
     esperar(|| false, 60);
     assert_eq!(f.conexiones(), 1); // un error no corta
 
@@ -320,7 +392,11 @@ fn respeta_el_limite_de_discord() {
     p.tocar("Dos");
     esperar(|| false, 30);
     p.tocar("Tres");
-    assert!(esperar(|| f.titulos().last() == Some(&Some("Tres".into())), 3000), "{:?}", f.titulos());
+    assert!(
+        esperar(|| f.titulos().last() == Some(&Some("Tres".into())), 3000),
+        "{:?}",
+        f.titulos()
+    );
     assert!(inicio.elapsed() >= Duration::from_millis(200));
     assert!(!f.titulos().contains(&Some("Dos".into()))); // brincada antes de mandarla
 }

@@ -93,7 +93,13 @@ pub fn rutas_socket() -> Vec<String> {
 
 /// Discord pide de 2 a 128 caracteres; con menos o con más rechaza la actividad entera.
 pub fn texto(t: &str) -> String {
-    let mut limpio: String = t.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(128).collect();
+    let mut limpio: String = t
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(128)
+        .collect();
     if limpio.chars().count() == 1 {
         limpio.push('\u{200b}');
     }
@@ -109,8 +115,13 @@ pub fn actividad(c: &Value, posicion: f64, duracion: f64, velocidad: f64, ahora:
     let ruta = campo(c, "ruta");
     let vid = biblioteca::id_de(ruta);
     let tallo = Path::new(ruta).file_stem().and_then(|s| s.to_str()).unwrap_or("");
-    let titulo = [campo(c, "titulo"), tallo, "Vortex Player"].into_iter().find(|t| !t.is_empty()).unwrap_or("");
-    let album = Some(campo(c, "album")).filter(|t| !t.is_empty()).unwrap_or("Vortex Player");
+    let titulo = [campo(c, "titulo"), tallo, "Vortex Player"]
+        .into_iter()
+        .find(|t| !t.is_empty())
+        .unwrap_or("");
+    let album = Some(campo(c, "album"))
+        .filter(|t| !t.is_empty())
+        .unwrap_or("Vortex Player");
     let mut a = json!({
         "type": ESCUCHANDO,
         "details": texto(titulo),
@@ -126,7 +137,8 @@ pub fn actividad(c: &Value, posicion: f64, duracion: f64, velocidad: f64, ahora:
     if duracion > 0.0 && velocidad == 1.0 {
         // practicando más lento, el tiempo de Discord estaría mal
         let inicio = ahora - posicion;
-        a["timestamps"] = json!({"start": (inicio * 1000.0) as i64, "end": ((inicio + duracion) * 1000.0) as i64});
+        a["timestamps"] =
+            json!({"start": (inicio * 1000.0) as i64, "end": ((inicio + duracion) * 1000.0) as i64});
     }
     if !vid.is_empty() {
         a["buttons"] = json!([{"label": "Escuchar en YouTube Music", "url": format!("https://music.youtube.com/watch?v={vid}")}]);
@@ -143,7 +155,11 @@ fn sin_tiempo(a: &Value) -> Map<String, Value> {
 /// Igual canción y sin saltos: el tiempo avanza solo en Discord, no hace falta volver a mandarla.
 pub fn misma(a: &Value, b: Option<&Value>) -> bool {
     let Some(b) = b else { return false };
-    let fin = |v: &Value| v.get("timestamps").and_then(|t| t.get("end")).and_then(Value::as_i64);
+    let fin = |v: &Value| {
+        v.get("timestamps")
+            .and_then(|t| t.get("end"))
+            .and_then(Value::as_i64)
+    };
     match (fin(a), fin(b)) {
         (Some(x), Some(y)) if (x - y).abs() > TOLERANCIA_MS => return false,
         (Some(_), None) | (None, Some(_)) => return false,
@@ -153,7 +169,10 @@ pub fn misma(a: &Value, b: Option<&Value>) -> bool {
 }
 
 fn epoca() -> f64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0)
 }
 
 // --- la conexión -------------------------------------------------------------------------------------------
@@ -211,7 +230,11 @@ pub struct Presencia {
 
 impl Presencia {
     pub fn arrancar(op: Opciones) -> Self {
-        let estado = Arc::new(Mutex::new(Sonando { velocidad: 1.0, activa: true, ..Sonando::default() }));
+        let estado = Arc::new(Mutex::new(Sonando {
+            velocidad: 1.0,
+            activa: true,
+            ..Sonando::default()
+        }));
         let (tx, rx) = mpsc::channel();
         let mut h = Hilo {
             op,
@@ -227,39 +250,41 @@ impl Presencia {
             rebote: None,
             pulso: None,
         };
-        let _ = std::thread::Builder::new().name("vortex-player-discord".into()).spawn(move || {
-            loop {
-                let ahora = Instant::now();
-                let proximo = [h.rebote, h.pulso].into_iter().flatten().min();
-                let m = match proximo {
-                    Some(t) => rx.recv_timeout(t.saturating_duration_since(ahora)),
-                    None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
-                };
-                match m {
-                    Ok(Mensaje::Salir) | Err(RecvTimeoutError::Disconnected) => break,
-                    Ok(Mensaje::Actualizar) => {
-                        if h.rebote.is_none() {
-                            h.rebote = Some(Instant::now() + h.op.espera);
+        let _ = std::thread::Builder::new()
+            .name("vortex-player-discord".into())
+            .spawn(move || {
+                loop {
+                    let ahora = Instant::now();
+                    let proximo = [h.rebote, h.pulso].into_iter().flatten().min();
+                    let m = match proximo {
+                        Some(t) => rx.recv_timeout(t.saturating_duration_since(ahora)),
+                        None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+                    };
+                    match m {
+                        Ok(Mensaje::Salir) | Err(RecvTimeoutError::Disconnected) => break,
+                        Ok(Mensaje::Actualizar) => {
+                            if h.rebote.is_none() {
+                                h.rebote = Some(Instant::now() + h.op.espera);
+                            }
                         }
-                    }
-                    Ok(Mensaje::Marco(g, op, datos)) if g == h.generacion => h.al_marco(op, &datos),
-                    Ok(Mensaje::Desconectado(g)) if g == h.generacion => h.al_desconectar(),
-                    Ok(_) => {}
-                    Err(RecvTimeoutError::Timeout) => {
-                        let ahora = Instant::now();
-                        if h.rebote.is_some_and(|t| t <= ahora) {
-                            h.rebote = None;
-                            h.publicar();
-                        }
-                        if h.pulso.is_some_and(|t| t <= ahora) {
-                            h.pulso = Some(ahora + h.op.pulso);
-                            h.publicar();
+                        Ok(Mensaje::Marco(g, op, datos)) if g == h.generacion => h.al_marco(op, &datos),
+                        Ok(Mensaje::Desconectado(g)) if g == h.generacion => h.al_desconectar(),
+                        Ok(_) => {}
+                        Err(RecvTimeoutError::Timeout) => {
+                            let ahora = Instant::now();
+                            if h.rebote.is_some_and(|t| t <= ahora) {
+                                h.rebote = None;
+                                h.publicar();
+                            }
+                            if h.pulso.is_some_and(|t| t <= ahora) {
+                                h.pulso = Some(ahora + h.op.pulso);
+                                h.publicar();
+                            }
                         }
                     }
                 }
-            }
-            h.cerrar();
-        });
+                h.cerrar();
+            });
         Self { estado, tx }
     }
 
@@ -320,7 +345,11 @@ impl Hilo {
             self.conectar();
             return;
         }
-        let dur = if s.duracion > 0.0 { s.duracion } else { s.cancion.get("duracion").and_then(Value::as_f64).unwrap_or(0.0) };
+        let dur = if s.duracion > 0.0 {
+            s.duracion
+        } else {
+            s.cancion.get("duracion").and_then(Value::as_f64).unwrap_or(0.0)
+        };
         let a = actividad(&s.cancion, s.posicion, dur, s.velocidad, epoca());
         if !misma(&a, self.ultima.as_ref()) {
             self.mandar_actividad(Some(a));
@@ -340,7 +369,10 @@ impl Hilo {
             args["activity"] = a.clone();
         }
         let nonce = format!("{:032x}", rand::random::<u128>());
-        self.escribir(MARCO, &json!({"cmd": "SET_ACTIVITY", "args": args, "nonce": nonce}));
+        self.escribir(
+            MARCO,
+            &json!({"cmd": "SET_ACTIVITY", "args": args, "nonce": nonce}),
+        );
         self.ultima = a;
         self.ultimo_envio = Some(Instant::now());
     }
@@ -364,31 +396,36 @@ impl Hilo {
                 return;
             }
             // un socket que quedó de un Discord que tronó no contesta: se pasa al siguiente
-            let Some(s) = (self.op.rutas)().into_iter().find_map(|r| UnixStream::connect(r).ok()) else {
+            let Some(s) = (self.op.rutas)()
+                .into_iter()
+                .find_map(|r| UnixStream::connect(r).ok())
+            else {
                 return;
             };
             let Ok(mut lector) = s.try_clone() else { return };
             self.generacion += 1;
             let (g, tx) = (self.generacion, self.tx.clone());
-            let _ = std::thread::Builder::new().name("vortex-player-discord-lee".into()).spawn(move || {
-                let (mut resto, mut b) = (Vec::new(), [0u8; 4096]);
-                loop {
-                    match lector.read(&mut b) {
-                        Ok(0) | Err(_) => break,
-                        Ok(n) => {
-                            resto.extend_from_slice(&b[..n]);
-                            let (marcos, sobra) = leer_marcos(&resto);
-                            resto = sobra;
-                            for (op, d) in marcos {
-                                if tx.send(Mensaje::Marco(g, op, d)).is_err() {
-                                    return;
+            let _ = std::thread::Builder::new()
+                .name("vortex-player-discord-lee".into())
+                .spawn(move || {
+                    let (mut resto, mut b) = (Vec::new(), [0u8; 4096]);
+                    loop {
+                        match lector.read(&mut b) {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => {
+                                resto.extend_from_slice(&b[..n]);
+                                let (marcos, sobra) = leer_marcos(&resto);
+                                resto = sobra;
+                                for (op, d) in marcos {
+                                    if tx.send(Mensaje::Marco(g, op, d)).is_err() {
+                                        return;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                let _ = tx.send(Mensaje::Desconectado(g));
-            });
+                    let _ = tx.send(Mensaje::Desconectado(g));
+                });
             self.socket = Some(s);
             self.conectada = true;
             let saludo = json!({"v": 1, "client_id": self.op.cliente});
@@ -400,14 +437,20 @@ impl Hilo {
         if op == PING {
             self.escribir(PONG, datos);
         } else if op == CIERRE {
-            eprintln!("Vortex Player: Discord cerró la conexión: {}", datos.get("message").unwrap_or(&Value::Null));
+            eprintln!(
+                "Vortex Player: Discord cerró la conexión: {}",
+                datos.get("message").unwrap_or(&Value::Null)
+            );
             self.cerrar();
             self.al_desconectar();
         } else if datos.get("evt").and_then(Value::as_str) == Some("READY") {
             self.lista = true;
             self.publicar();
         } else if datos.get("evt").and_then(Value::as_str) == Some("ERROR") {
-            eprintln!("Vortex Player: Discord rechazó la actividad: {}", datos.get("data").unwrap_or(&Value::Null));
+            eprintln!(
+                "Vortex Player: Discord rechazó la actividad: {}",
+                datos.get("data").unwrap_or(&Value::Null)
+            );
         }
     }
 

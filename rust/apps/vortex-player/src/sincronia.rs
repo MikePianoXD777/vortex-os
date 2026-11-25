@@ -33,7 +33,9 @@ pub fn sincronizar(
         None => {
             drive.crear(&nube::texto(&nuevo)).map_err(texto_err)?;
         }
-        Some(f) if !nube::iguales(&nuevo, &remoto) => drive.escribir(f, &nube::texto(&nuevo)).map_err(texto_err)?,
+        Some(f) if !nube::iguales(&nuevo, &remoto) => {
+            drive.escribir(f, &nube::texto(&nuevo)).map_err(texto_err)?
+        }
         Some(_) => {}
     }
     let b = candado();

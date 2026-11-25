@@ -19,7 +19,11 @@ fn raiz_repo() -> PathBuf {
 }
 
 fn hay(p: &str) -> bool {
-    Command::new("sh").args(["-c", &format!("command -v {p}")]).stdout(Stdio::null()).status().is_ok_and(|s| s.success())
+    Command::new("sh")
+        .args(["-c", &format!("command -v {p}")])
+        .stdout(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 #[test]
@@ -29,17 +33,32 @@ fn ventana() {
         return;
     }
     // Corto (en /tmp): el socket de mpv tiene límite de largo.
-    let t = tempfile::Builder::new().prefix("vpr-").tempdir_in("/tmp").unwrap();
+    let t = tempfile::Builder::new()
+        .prefix("vpr-")
+        .tempdir_in("/tmp")
+        .unwrap();
     let d = t.path();
     let disco = d.join("Música").join("disco");
     std::fs::create_dir_all(&disco).unwrap();
     for (nombre, titulo, opciones) in [
-        ("a.flac", "Uno", vec!["-ar", "96000", "-sample_fmt", "s32", "-bits_per_raw_sample", "24"]),
+        (
+            "a.flac",
+            "Uno",
+            vec!["-ar", "96000", "-sample_fmt", "s32", "-bits_per_raw_sample", "24"],
+        ),
         ("b.wav", "Dos", vec!["-c:a", "pcm_s16le"]),
         ("c.opus", "Tres", vec!["-c:a", "libopus"]),
     ] {
         let ok = Command::new("ffmpeg")
-            .args(["-v", "quiet", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=30"])
+            .args([
+                "-v",
+                "quiet",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=30",
+            ])
             .args(&opciones)
             .args(["-metadata", &format!("title={titulo}")])
             .arg(disco.join(nombre))
@@ -50,7 +69,11 @@ fn ventana() {
     // Un equalizer.sh falso: el de verdad cambia el ecualizador y el EasyEffects de quien corre las pruebas.
     let eq = d.join("sin-shell/quickshell/media/equalizer.sh");
     std::fs::create_dir_all(eq.parent().unwrap()).unwrap();
-    std::fs::write(&eq, format!("#!/bin/sh\necho \"$*\" >>\"{}/eq.log\"\n", d.display())).unwrap();
+    std::fs::write(
+        &eq,
+        format!("#!/bin/sh\necho \"$*\" >>\"{}/eq.log\"\n", d.display()),
+    )
+    .unwrap();
     std::fs::set_permissions(&eq, std::fs::Permissions::from_mode(0o755)).unwrap();
 
     let mut ventana = Command::new(env!("CARGO_BIN_EXE_vortex-player-rs"))
@@ -99,7 +122,13 @@ fn ventana() {
     let mut canciones: Vec<String> = serde_json::from_value(d["canciones"].clone()).unwrap();
     canciones.sort();
     assert_eq!(canciones, ["Dos", "Tres", "Uno"]);
-    assert!(d["etiquetas"].as_array().unwrap().contains(&json!("Hi-Res 24/96")), "{d}");
+    assert!(
+        d["etiquetas"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("Hi-Res 24/96")),
+        "{d}"
+    );
     assert_eq!(d["me_gusta"], json!([false, true, true]));
     assert_eq!(d["por_calidad"], json!(["Uno", "Dos", "Tres"]));
     assert_eq!(d["sonando"], "Uno");

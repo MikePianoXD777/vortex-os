@@ -1233,14 +1233,24 @@ impl Biblioteca {
     }
 
     /// Anota una escucha a partir de la canción como la ve la ventana (`{ruta, titulo, artista}`).
-    pub fn anotar_escucha_json(&self, c: &Value, segundos: f64, cuando: Option<f64>) -> Result<(), ErrorBiblioteca> {
+    pub fn anotar_escucha_json(
+        &self,
+        c: &Value,
+        segundos: f64,
+        cuando: Option<f64>,
+    ) -> Result<(), ErrorBiblioteca> {
         let ruta = c.get("ruta").and_then(Value::as_str).unwrap_or_default();
         let titulo = c
             .get("titulo")
             .and_then(Value::as_str)
             .filter(|t| !t.is_empty())
             .map(str::to_string)
-            .unwrap_or_else(|| Path::new(ruta).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default());
+            .unwrap_or_else(|| {
+                Path::new(ruta)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            });
         self.db.execute(
             "INSERT INTO escuchas VALUES (?1, ?2, ?3, ?4, ?5)",
             params![

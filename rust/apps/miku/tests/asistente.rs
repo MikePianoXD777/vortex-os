@@ -900,14 +900,24 @@ fn en_el_chat_mini_no_abre_el_microfono_solo() {
     let dir = tempfile::tempdir().unwrap();
     let f = dir.path().join("mic.raw");
     std::fs::write(&f, vec![0u8; 32000]).unwrap();
-    let b = banco_con_oido(&f, Arranque { chat: true, ..Default::default() });
+    let b = banco_con_oido(
+        &f,
+        Arranque {
+            chat: true,
+            ..Default::default()
+        },
+    );
     b.asistente.iniciar();
     std::thread::sleep(std::time::Duration::from_millis(400));
     assert!(!hay_estado(&b.vistas(), "escuchando"), "{:?}", b.vistas());
     b.asistente.enviar("hola");
     assert!(b.esperar(|_| !b.preguntas.lock().unwrap().is_empty(), 10));
     std::thread::sleep(std::time::Duration::from_millis(400));
-    assert!(!hay_estado(&b.vistas(), "escuchando"), "ni después de contestar: {:?}", b.vistas());
+    assert!(
+        !hay_estado(&b.vistas(), "escuchando"),
+        "ni después de contestar: {:?}",
+        b.vistas()
+    );
     b.asistente.cerrar_todo();
 }
 

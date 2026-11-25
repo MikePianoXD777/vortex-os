@@ -12,14 +12,23 @@ const LRC: &str = "[00:01.00] Uno\n[00:02.50][00:06.00] Coro\n[00:04.2] Dos\n";
 
 #[test]
 fn limpiar_y_leer() {
-    assert_eq!(letras::limpiar("YOASOBI - アイドル (Official Music Video)", "YOASOBI"), "アイドル");
-    assert_eq!(letras::limpiar("Blinding Lights (Official Audio) ft. Nadie", "The Weeknd"), "Blinding Lights");
+    assert_eq!(
+        letras::limpiar("YOASOBI - アイドル (Official Music Video)", "YOASOBI"),
+        "アイドル"
+    );
+    assert_eq!(
+        letras::limpiar("Blinding Lights (Official Audio) ft. Nadie", "The Weeknd"),
+        "Blinding Lights"
+    );
     assert_eq!(letras::limpiar_artista("Ado, Vaundy & otros"), "Ado");
     assert_eq!(letras::limpiar_artista("Aimer - Topic"), "Aimer");
     let lineas = letras::leer_lrc(LRC);
     let v: Vec<(i64, &str)> = lineas.iter().map(|l| (l.ms, l.texto.as_str())).collect();
     assert_eq!(v, [(1000, "Uno"), (2500, "Coro"), (4200, "Dos"), (6000, "Coro")]);
-    let a: Vec<isize> = [0, 800, 2400, 5000, 9000].iter().map(|ms| letras::actual(&lineas, *ms)).collect();
+    let a: Vec<isize> = [0, 800, 2400, 5000, 9000]
+        .iter()
+        .map(|ms| letras::actual(&lineas, *ms))
+        .collect();
     assert_eq!(a, [-1, 0, 1, 2, 3]);
 }
 
@@ -46,8 +55,16 @@ fn de_guarda_y_respaldo() {
         pedidos.borrow_mut().push(url.to_string());
         match &*respuesta.borrow() {
             Err(e) => Err(e.clone()),
-            Ok(None) => Ok(if url.contains("/get?") { None } else { Some(json!([])) }),
-            Ok(Some(r)) => Ok(Some(if url.contains("/get?") { r.clone() } else { json!([r]) })),
+            Ok(None) => Ok(if url.contains("/get?") {
+                None
+            } else {
+                Some(json!([]))
+            }),
+            Ok(Some(r)) => Ok(Some(if url.contains("/get?") {
+                r.clone()
+            } else {
+                json!([r])
+            })),
         }
     };
     let buscar = |t: &str, a: &str, s: i64| letras::buscar_con(&pedir, t, a, s);
@@ -56,11 +73,16 @@ fn de_guarda_y_respaldo() {
     let de = |titulo: &str, artista: &str, s: i64, vid: &str, yt: Option<letras::DeYoutube<'_>>| {
         letras::de_con(&buscar, &d, titulo, artista, s, vid, yt)
     };
-    let l = de("Canción (Official Video)", "Alguien", 200, "", None).unwrap().unwrap();
+    let l = de("Canción (Official Video)", "Alguien", 200, "", None)
+        .unwrap()
+        .unwrap();
     assert!(l.sincronizada);
     assert!(pedidos.borrow()[0].contains("track_name=Canci%C3%B3n"));
     let n = pedidos.borrow().len();
-    assert_eq!(de("Canción (Official Video)", "Alguien", 200, "", None).unwrap(), Some(l)); // sin internet
+    assert_eq!(
+        de("Canción (Official Video)", "Alguien", 200, "", None).unwrap(),
+        Some(l)
+    ); // sin internet
     assert_eq!(pedidos.borrow().len(), n);
     // sin LRCLIB: la de YouTube Music (sin tiempos)
     *respuesta.borrow_mut() = Ok(None);
@@ -77,7 +99,10 @@ fn de_guarda_y_respaldo() {
     *respuesta.borrow_mut() = Err("sin red".into());
     assert!(de("Sin red", "Nadie", 100, "", None).is_err());
     *respuesta.borrow_mut() = Ok(Some(json!({"duration": 100, "plainLyrics": "ya hay"})));
-    assert_eq!(de("Sin red", "Nadie", 100, "", None).unwrap().unwrap().lineas[0].texto, "ya hay");
+    assert_eq!(
+        de("Sin red", "Nadie", 100, "", None).unwrap().unwrap().lineas[0].texto,
+        "ya hay"
+    );
     // el mismo archivo de caché que la de Python
     assert!(letras::guardada(&d, "Nada", "Nadie", 100));
     assert!(!letras::guardada(t.path(), "x", "y", 1));
@@ -86,9 +111,15 @@ fn de_guarda_y_respaldo() {
 #[test]
 fn titulos_y_recomendadas_sin_repetir() {
     let t = letras::titulo_limpio;
-    assert_eq!(t("YOASOBI「アイドル」Official Music Video", "YOASOBI"), "アイドル");
+    assert_eq!(
+        t("YOASOBI「アイドル」Official Music Video", "YOASOBI"),
+        "アイドル"
+    );
     assert_eq!(t("Kick Back - Official Video", "米津玄師"), "Kick Back");
-    assert_eq!(t("Bad Apple!! feat.nomico", "Alstroemeria Records"), "Bad Apple!!");
+    assert_eq!(
+        t("Bad Apple!! feat.nomico", "Alstroemeria Records"),
+        "Bad Apple!!"
+    );
     assert_eq!(t("Song Name | Lyric Video", "X"), "Song Name");
     assert_eq!(t("Video", "X"), "Video"); // no se queda vacío
     assert_eq!(letras::artista_limpio("AdoVEVO"), "Ado");
@@ -111,7 +142,10 @@ fn semana_e_id_de_la_radio() {
     assert_eq!(dia(desde), (2026, 10, 26, 0, 0));
     assert_eq!(dia(hasta), (2026, 11, 2, 0, 0));
     assert_eq!(dia(fecha::semana(1, Some(jueves)).0), (2026, 10, 19, 0, 0));
-    assert_eq!(biblioteca::id_de("https://music.youtube.com/watch?v=ZRtdQ81jPUQ"), "ZRtdQ81jPUQ");
+    assert_eq!(
+        biblioteca::id_de("https://music.youtube.com/watch?v=ZRtdQ81jPUQ"),
+        "ZRtdQ81jPUQ"
+    );
     assert_eq!(biblioteca::id_de("/m/Idol [ZRtdQ81jPUQ].opus"), "ZRtdQ81jPUQ");
     assert_eq!(biblioteca::id_de("/m/otra.flac"), "");
 }
@@ -139,9 +173,19 @@ fn resumen() {
         json!([r["escuchas"], r["minutos"], r["distintas"], r["dias"]]),
         json!([3, 6, 2, 2])
     );
-    let c: Vec<Value> = r["canciones"].as_array().unwrap().iter().map(|c| json!([c["titulo"], c["veces"]])).collect();
+    let c: Vec<Value> = r["canciones"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| json!([c["titulo"], c["veces"]]))
+        .collect();
     assert_eq!(c, [json!(["Idol", 2]), json!(["Racing", 1])]);
-    let a: Vec<Value> = r["artistas"].as_array().unwrap().iter().map(|a| json!([a["artista"], a["minutos"]])).collect();
+    let a: Vec<Value> = r["artistas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| json!([a["artista"], a["minutos"]]))
+        .collect();
     assert_eq!(a, [json!(["YOASOBI", 5]), json!(["Ado", 1])]);
     assert_eq!(b.resumen(hasta, hasta + 1.0, 5).unwrap()["escuchas"], 0);
 }
@@ -153,7 +197,11 @@ fn mas_escuchadas_y_artistas() {
     let b = Biblioteca::abrir(Some(&archivo), "ffprobe").unwrap();
     {
         let db = rusqlite::Connection::open(&archivo).unwrap();
-        for (ruta, titulo, artista) in [("/m/a.opus", "A", "Ado"), ("/m/b.opus", "B", "YOASOBI - Topic"), ("/m/c.opus", "C", "Ado")] {
+        for (ruta, titulo, artista) in [
+            ("/m/a.opus", "A", "Ado"),
+            ("/m/b.opus", "B", "YOASOBI - Topic"),
+            ("/m/c.opus", "C", "Ado"),
+        ] {
             db.execute(
                 "INSERT INTO canciones (ruta, titulo, artista, album, duracion, agregada, mtime) VALUES (?1,?2,?3,'',200,0,0)",
                 rusqlite::params![ruta, titulo, artista],
@@ -169,14 +217,26 @@ fn mas_escuchadas_y_artistas() {
         ("/m/borrada.opus", "X", "Nadie", 5),
     ] {
         for _ in 0..veces {
-            b.anotar_escucha_json(&json!({"ruta": ruta, "titulo": titulo, "artista": artista}), 60.0, Some(ahora))
-                .unwrap();
+            b.anotar_escucha_json(
+                &json!({"ruta": ruta, "titulo": titulo, "artista": artista}),
+                60.0,
+                Some(ahora),
+            )
+            .unwrap();
         }
     }
-    let titulos: Vec<String> = b.mas_escuchadas(ahora - 10.0, 15).unwrap().into_iter().map(|c| c.titulo).collect();
+    let titulos: Vec<String> = b
+        .mas_escuchadas(ahora - 10.0, 15)
+        .unwrap()
+        .into_iter()
+        .map(|c| c.titulo)
+        .collect();
     assert_eq!(titulos, ["B", "A"]); // la borrada no
     assert!(b.mas_escuchadas(ahora + 10.0, 15).unwrap().is_empty());
-    assert_eq!(b.artistas_mas_escuchados(ahora - 10.0, 2).unwrap(), ["Nadie", "YOASOBI"]);
+    assert_eq!(
+        b.artistas_mas_escuchados(ahora - 10.0, 2).unwrap(),
+        ["Nadie", "YOASOBI"]
+    );
 }
 
 #[test]
@@ -198,20 +258,29 @@ fn lanzamientos_de_youtube_music() {
                 item("MPREb_viejo", "Kyougen", "Álbum • 2022"), item("MPREb_nuevo", "Hello", "Single • 2026"),
                 item("MPREb_ep", "Ep", "EP • 2025"), item("VLPLotra", "Una playlist", "Playlist")]}}]}));
         }
-        Ok(json!({"playlistId": "OLAK5uy_abc", "contents": [{"musicResponsiveListItemRenderer": {
+        Ok(
+            json!({"playlistId": "OLAK5uy_abc", "contents": [{"musicResponsiveListItemRenderer": {
             "playlistItemData": {"videoId": "aaaaaaaaaaa"},
-            "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Hello"}]}}}]}}]}))
+            "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer": {"text": {"runs": [{"text": "Hello"}]}}}]}}]}),
+        )
     };
     assert_eq!(descargas::artista_id("Ado", &pedir).unwrap(), "UCado");
     let l = descargas::lanzamientos("UCado", "Ado", &pedir).unwrap();
     let v: Vec<Value> = l.iter().map(|x| json!([x["id"], x["tipo"], x["anio"]])).collect();
     assert_eq!(
         v,
-        [json!(["MPREb_nuevo", "Single", 2026]), json!(["MPREb_ep", "EP", 2025]), json!(["MPREb_viejo", "Álbum", 2022])]
+        [
+            json!(["MPREb_nuevo", "Single", 2026]),
+            json!(["MPREb_ep", "EP", 2025]),
+            json!(["MPREb_viejo", "Álbum", 2022])
+        ]
     );
     assert!(l[0]["portada"].as_str().unwrap().ends_with("=w320-h320-l90"));
     assert_eq!(
         descargas::canciones_de_lanzamiento("MPREb_nuevo", &pedir).unwrap(),
-        ("OLAK5uy_abc".to_string(), vec![json!({"id": "aaaaaaaaaaa", "titulo": "Hello"})])
+        (
+            "OLAK5uy_abc".to_string(),
+            vec![json!({"id": "aaaaaaaaaaa", "titulo": "Hello"})]
+        )
     );
 }

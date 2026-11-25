@@ -49,7 +49,8 @@ impl fmt::Display for ErrorGoogle {
 impl std::error::Error for ErrorGoogle {}
 
 /// (método, url, cuerpo, cabeceras) → (código, respuesta). Se cambia en las pruebas.
-pub type Http = Arc<dyn Fn(&str, &str, Option<&[u8]>, &[(&str, &str)]) -> Result<(u16, Vec<u8>), String> + Send + Sync>;
+pub type Http =
+    Arc<dyn Fn(&str, &str, Option<&[u8]>, &[(&str, &str)]) -> Result<(u16, Vec<u8>), String> + Send + Sync>;
 
 /// El de verdad, con `curl`.
 pub fn http_curl() -> Http {
@@ -69,7 +70,10 @@ pub fn http_curl() -> Http {
 }
 
 fn ahora() -> f64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0)
 }
 
 fn json_de(d: &[u8]) -> Result<Value, ErrorGoogle> {
@@ -114,10 +118,21 @@ impl Cuenta {
     }
 
     pub fn en(carpeta: PathBuf, http: Http) -> Self {
-        Self { http, carpeta, cliente_fijo: None, token: Mutex::new((String::new(), 0.0)) }
+        Self {
+            http,
+            carpeta,
+            cliente_fijo: None,
+            token: Mutex::new((String::new(), 0.0)),
+        }
     }
 
-    fn pedir(&self, metodo: &str, url: &str, cuerpo: Option<&[u8]>, cab: &[(&str, &str)]) -> Result<(u16, Vec<u8>), ErrorGoogle> {
+    fn pedir(
+        &self,
+        metodo: &str,
+        url: &str,
+        cuerpo: Option<&[u8]>,
+        cab: &[(&str, &str)],
+    ) -> Result<(u16, Vec<u8>), ErrorGoogle> {
         (self.http)(metodo, url, cuerpo, cab).map_err(ErrorGoogle::Otro)
     }
 
@@ -133,12 +148,22 @@ impl Cuenta {
             std::env::var(var)
                 .ok()
                 .filter(|v| !v.is_empty())
-                .or_else(|| local.get(k).and_then(Value::as_str).filter(|v| !v.is_empty()).map(String::from))
+                .or_else(|| {
+                    local
+                        .get(k)
+                        .and_then(Value::as_str)
+                        .filter(|v| !v.is_empty())
+                        .map(String::from)
+                })
                 .unwrap_or(base)
         };
         (
             de("VORTEX_PLAYER_GOOGLE_ID", "id", CLIENTE_ID.into()),
-            de("VORTEX_PLAYER_GOOGLE_SECRETO", "secreto", SECRETO_AL_REVES.chars().rev().collect()),
+            de(
+                "VORTEX_PLAYER_GOOGLE_SECRETO",
+                "secreto",
+                SECRETO_AL_REVES.chars().rev().collect(),
+            ),
         )
     }
 
@@ -156,7 +181,11 @@ impl Cuenta {
         std::fs::read(self.archivo())
             .ok()
             .and_then(|d| serde_json::from_slice::<Value>(&d).ok())
-            .filter(|d| d.get("refresh_token").and_then(Value::as_str).is_some_and(|t| !t.is_empty()))
+            .filter(|d| {
+                d.get("refresh_token")
+                    .and_then(Value::as_str)
+                    .is_some_and(|t| !t.is_empty())
+            })
             .unwrap_or_else(|| json!({}))
     }
 
@@ -197,16 +226,30 @@ impl Cuenta {
             ("refresh_token", renovar),
             ("grant_type", "refresh_token"),
         ]);
-        let (estado, d) = self.pedir("POST", TOKEN, Some(cuerpo.as_bytes()), &[("Content-Type", FORMULARIO)])?;
+        let (estado, d) = self.pedir(
+            "POST",
+            TOKEN,
+            Some(cuerpo.as_bytes()),
+            &[("Content-Type", FORMULARIO)],
+        )?;
         if estado == 400 || estado == 401 {
-            return Err(ErrorGoogle::SinPermiso("Google ya no reconoce la sesión: vuelve a iniciarla".into()));
+            return Err(ErrorGoogle::SinPermiso(
+                "Google ya no reconoce la sesión: vuelve a iniciarla".into(),
+            ));
         }
         if estado != 200 {
             return Err(ErrorGoogle::Otro(format!("Google contestó {estado}")));
         }
         let d = json_de(&d)?;
-        let valor = d.get("access_token").and_then(Value::as_str).unwrap_or("").to_string();
-        self.poner_token(&valor, d.get("expires_in").and_then(Value::as_i64).unwrap_or(3600));
+        let valor = d
+            .get("access_token")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        self.poner_token(
+            &valor,
+            d.get("expires_in").and_then(Value::as_i64).unwrap_or(3600),
+        );
         Ok(valor)
     }
 
@@ -215,20 +258,30 @@ impl Cuenta {
     }
 
     pub fn drive(&self, token: &str, archivo: &str) -> Drive<'_> {
-        Drive { cuenta: self, token: token.into(), archivo: archivo.into() }
+        Drive {
+            cuenta: self,
+            token: token.into(),
+            archivo: archivo.into(),
+        }
     }
 
     /// Abre el navegador para elegir la cuenta; regresa {correo, nombre} cuando Google contesta.
     pub fn iniciar_sesion(&self, abrir: &dyn Fn(&str), esperar: Duration) -> Result<Value, ErrorGoogle> {
         if !self.configurada() {
-            return Err(ErrorGoogle::Otro("Esta versión todavía no está registrada con Google".into()));
+            return Err(ErrorGoogle::Otro(
+                "Esta versión todavía no está registrada con Google".into(),
+            ));
         }
         let (cid, secreto) = self.cliente();
         let (verificador, reto) = pkce();
         let estado_esperado = azar(16);
         let srv = TcpListener::bind("127.0.0.1:0").map_err(|e| ErrorGoogle::Otro(e.to_string()))?;
-        let redireccion = format!("http://127.0.0.1:{}", srv.local_addr().map(|a| a.port()).unwrap_or(0));
-        srv.set_nonblocking(true).map_err(|e| ErrorGoogle::Otro(e.to_string()))?;
+        let redireccion = format!(
+            "http://127.0.0.1:{}",
+            srv.local_addr().map(|a| a.port()).unwrap_or(0)
+        );
+        srv.set_nonblocking(true)
+            .map_err(|e| ErrorGoogle::Otro(e.to_string()))?;
         abrir(&format!(
             "{AUTORIZAR}?{}",
             red::formulario(&[
@@ -261,7 +314,12 @@ impl Cuenta {
             ("grant_type", "authorization_code"),
             ("redirect_uri", &redireccion),
         ]);
-        let (estado, d) = self.pedir("POST", TOKEN, Some(cuerpo.as_bytes()), &[("Content-Type", FORMULARIO)])?;
+        let (estado, d) = self.pedir(
+            "POST",
+            TOKEN,
+            Some(cuerpo.as_bytes()),
+            &[("Content-Type", FORMULARIO)],
+        )?;
         if estado != 200 {
             return Err(ErrorGoogle::Otro(format!("Google no dio la sesión ({estado})")));
         }
@@ -270,8 +328,15 @@ impl Cuenta {
         if renovar.is_empty() {
             return Err(ErrorGoogle::Otro("Google no dio una sesión que dure".into()));
         }
-        let acceso = d.get("access_token").and_then(Value::as_str).unwrap_or("").to_string();
-        self.poner_token(&acceso, d.get("expires_in").and_then(Value::as_i64).unwrap_or(3600));
+        let acceso = d
+            .get("access_token")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        self.poner_token(
+            &acceso,
+            d.get("expires_in").and_then(Value::as_i64).unwrap_or(3600),
+        );
         let (nombre, correo) = self.drive(&acceso, ARCHIVO).usuario()?;
         self.guardar(&json!({"refresh_token": renovar, "correo": correo, "nombre": nombre}))?;
         Ok(json!({"correo": correo, "nombre": nombre}))
@@ -281,7 +346,12 @@ impl Cuenta {
         let s = self.sesion();
         if let Some(t) = s.get("refresh_token").and_then(Value::as_str) {
             let cuerpo = red::formulario(&[("token", t)]);
-            let _ = self.pedir("POST", REVOCAR, Some(cuerpo.as_bytes()), &[("Content-Type", FORMULARIO)]); // sin internet: igual se olvida aquí
+            let _ = self.pedir(
+                "POST",
+                REVOCAR,
+                Some(cuerpo.as_bytes()),
+                &[("Content-Type", FORMULARIO)],
+            ); // sin internet: igual se olvida aquí
         }
         self.olvidar_token();
         let _ = std::fs::remove_file(self.archivo());
@@ -289,7 +359,11 @@ impl Cuenta {
 }
 
 /// Espera a que el navegador regrese con `?code=…&state=…` (o `?error=…`) y le contesta con la página.
-fn esperar_respuesta(srv: &TcpListener, estado: &str, esperar: Duration) -> Result<Vec<(String, String)>, ErrorGoogle> {
+fn esperar_respuesta(
+    srv: &TcpListener,
+    estado: &str,
+    esperar: Duration,
+) -> Result<Vec<(String, String)>, ErrorGoogle> {
     let limite = Instant::now() + esperar;
     while Instant::now() < limite {
         let Ok((mut c, _)) = srv.accept() else {
@@ -301,14 +375,23 @@ fn esperar_respuesta(srv: &TcpListener, estado: &str, esperar: Duration) -> Resu
         let mut b = vec![0u8; 8192];
         let n = c.read(&mut b).unwrap_or(0);
         let pedido = String::from_utf8_lossy(&b[..n]).to_string();
-        let ruta = pedido.lines().next().and_then(|l| l.split(' ').nth(1)).unwrap_or("");
+        let ruta = pedido
+            .lines()
+            .next()
+            .and_then(|l| l.split(' ').nth(1))
+            .unwrap_or("");
         let q: Vec<(String, String)> = ruta
             .split_once('?')
             .map(|(_, q)| q)
             .unwrap_or("")
             .split('&')
             .filter_map(|kv| kv.split_once('='))
-            .map(|(k, v)| (crate::descargas::desescapar(k, true), crate::descargas::desescapar(v, true)))
+            .map(|(k, v)| {
+                (
+                    crate::descargas::desescapar(k, true),
+                    crate::descargas::desescapar(v, true),
+                )
+            })
             .collect();
         let tiene = |k: &str| q.iter().any(|(a, _)| a == k);
         if !tiene("code") && !tiene("error") {
@@ -317,9 +400,15 @@ fn esperar_respuesta(srv: &TcpListener, estado: &str, esperar: Duration) -> Resu
         }
         let ok = tiene("code") && q.iter().any(|(a, v)| a == "state" && v == estado);
         let (titulo, texto) = if ok {
-            ("¡Listo!", "Ya puedes cerrar esta pestaña y volver a Vortex Player.")
+            (
+                "¡Listo!",
+                "Ya puedes cerrar esta pestaña y volver a Vortex Player.",
+            )
         } else {
-            ("No se inició sesión", "Vuelve a Vortex Player e inténtalo otra vez.")
+            (
+                "No se inició sesión",
+                "Vuelve a Vortex Player e inténtalo otra vez.",
+            )
         };
         let pagina = PAGINA.replace("{titulo}", titulo).replace("{texto}", texto);
         let _ = c.write_all(
@@ -331,7 +420,9 @@ fn esperar_respuesta(srv: &TcpListener, estado: &str, esperar: Duration) -> Resu
         );
         return Ok(q);
     }
-    Err(ErrorGoogle::Otro("No llegó la respuesta de Google (¿cerraste la pestaña?)".into()))
+    Err(ErrorGoogle::Otro(
+        "No llegó la respuesta de Google (¿cerraste la pestaña?)".into(),
+    ))
 }
 
 /// La carpeta oculta de la app en Drive (o una de mentira en las pruebas).
@@ -351,7 +442,13 @@ pub struct Drive<'a> {
 }
 
 impl Drive<'_> {
-    fn pedir(&self, metodo: &str, url: &str, cuerpo: Option<&[u8]>, tipo: &str) -> Result<Vec<u8>, ErrorGoogle> {
+    fn pedir(
+        &self,
+        metodo: &str,
+        url: &str,
+        cuerpo: Option<&[u8]>,
+        tipo: &str,
+    ) -> Result<Vec<u8>, ErrorGoogle> {
         let aut = format!("Bearer {}", self.token);
         let mut cab = vec![("Authorization", aut.as_str())];
         if !tipo.is_empty() {
@@ -370,7 +467,12 @@ impl Drive<'_> {
 
     /// (nombre, correo).
     pub fn usuario(&self) -> Result<(String, String), ErrorGoogle> {
-        let u = json_de(&self.pedir("GET", &format!("{API}/about?fields=user(displayName,emailAddress)"), None, "")?)?;
+        let u = json_de(&self.pedir(
+            "GET",
+            &format!("{API}/about?fields=user(displayName,emailAddress)"),
+            None,
+            "",
+        )?)?;
         let campo = |k: &str| u["user"].get(k).and_then(Value::as_str).unwrap_or("").to_string();
         Ok((campo("displayName"), campo("emailAddress")))
     }
@@ -385,7 +487,11 @@ impl Carpeta for Drive<'_> {
             None,
             "",
         )?)?;
-        Ok(r["files"].get(0).and_then(|f| f.get("id")).and_then(Value::as_str).map(String::from))
+        Ok(r["files"]
+            .get(0)
+            .and_then(|f| f.get("id"))
+            .and_then(Value::as_str)
+            .map(String::from))
     }
 
     fn leer(&self, fid: &str) -> Result<Vec<u8>, ErrorGoogle> {
@@ -396,7 +502,10 @@ impl Carpeta for Drive<'_> {
         let frontera = format!("vortex{:016x}", rand::random::<u64>());
         let datos = json!({"name": self.archivo, "parents": ["appDataFolder"]});
         // como el json.dumps de Python: con espacio después de «:» y «,»
-        let datos = serde_json::to_string(&datos).unwrap_or_default().replace("\":", "\": ").replace(",\"", ", \"");
+        let datos = serde_json::to_string(&datos)
+            .unwrap_or_default()
+            .replace("\":", "\": ")
+            .replace(",\"", ", \"");
         let cuerpo = format!(
             "--{frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{datos}\r\n--{frontera}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{texto}\r\n--{frontera}--\r\n"
         );

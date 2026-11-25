@@ -25,8 +25,10 @@ use vortex_player::reproductor::monotonico;
 
 fn salida_valor(s: Option<audio::SalidaAudio>) -> Value {
     match s {
-        Some(s) => json!({"nombre": s.nombre, "bluetooth": s.bluetooth, "codec": s.codec, "codecTexto": s.codec_texto,
-                          "hz": s.hz, "tarjeta": s.tarjeta, "ldac": s.ldac}),
+        Some(s) => {
+            json!({"nombre": s.nombre, "bluetooth": s.bluetooth, "codec": s.codec, "codecTexto": s.codec_texto,
+                          "hz": s.hz, "tarjeta": s.tarjeta, "ldac": s.ldac})
+        }
         None => json!({}),
     }
 }
@@ -41,7 +43,10 @@ fn enfocar_en_hyprland() {
         return;
     }
     let ventana = format!("pid:{}", std::process::id());
-    for orden in [format!("hl.dsp.focus({{ window = \"{ventana}\" }})"), format!("focuswindow {ventana}")] {
+    for orden in [
+        format!("hl.dsp.focus({{ window = \"{ventana}\" }})"),
+        format!("focuswindow {ventana}"),
+    ] {
         let ok = Command::new("hyprctl")
             .args(["dispatch", &orden])
             .stdin(Stdio::null())
@@ -186,7 +191,12 @@ impl Puente {
                     c.arg("subscribe");
                     c
                 };
-                let Ok(mut hijo) = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn() else {
+                let Ok(mut hijo) = cmd
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::null())
+                    .spawn()
+                else {
                     return; // sin pactl
                 };
                 if let Some(out) = hijo.stdout.take() {
@@ -234,7 +244,11 @@ impl Puente {
 
     pub fn poner_navegador(self: Pin<&mut Self>, navegador: &QString) {
         let n = navegador.to_string();
-        let n = if crate::puente::NAVEGADORES.contains(&n.as_str()) { n } else { String::new() };
+        let n = if crate::puente::NAVEGADORES.contains(&n.as_str()) {
+            n
+        } else {
+            String::new()
+        };
         guardar_ajuste("navegador_premium", json!(n));
         self.poner_ajustes();
     }
@@ -285,7 +299,10 @@ impl Puente {
     /// {"activo", "hora": "07:00", "playlist": -1 (tu mezcla del día) o el id de una}
     pub fn poner_despertador(self: Pin<&mut Self>, d: &QVariant) {
         let d = de_qml(d);
-        let mut actual = Biblioteca::ajustes().valor("despertador").and_then(|v| v.as_object().cloned()).unwrap_or_default();
+        let mut actual = Biblioteca::ajustes()
+            .valor("despertador")
+            .and_then(|v| v.as_object().cloned())
+            .unwrap_or_default();
         for k in ["activo", "hora", "playlist"] {
             if let Some(v) = d.get(k) {
                 actual.insert(k.into(), v.clone());
@@ -296,7 +313,10 @@ impl Puente {
     }
 
     fn revisar_despertador(mut self: Pin<&mut Self>) {
-        let d = Biblioteca::ajustes().valor("despertador").cloned().unwrap_or(json!({}));
+        let d = Biblioteca::ajustes()
+            .valor("despertador")
+            .cloned()
+            .unwrap_or(json!({}));
         let l = fecha::local(fecha::ahora());
         let ahora = format!("{:02}:{:02}", l.hora, l.minuto);
         let hoy = hoy();
@@ -304,7 +324,11 @@ impl Puente {
             return;
         }
         self.as_mut().em().despertado = hoy;
-        let playlist = if d.get("playlist").is_some() { numero(&d, "playlist") as i32 } else { -1 };
+        let playlist = if d.get("playlist").is_some() {
+            numero(&d, "playlist") as i32
+        } else {
+            -1
+        };
         self.despertar(playlist);
     }
 
@@ -360,9 +384,16 @@ impl Puente {
                 con_rep(|r| r.seguir());
                 continue;
             }
-            let enlace = ["http://", "https://", "spotify:", "music.youtube", "youtu", "open.spotify"]
-                .iter()
-                .any(|p| a.starts_with(p));
+            let enlace = [
+                "http://",
+                "https://",
+                "spotify:",
+                "music.youtube",
+                "youtu",
+                "open.spotify",
+            ]
+            .iter()
+            .any(|p| a.starts_with(p));
             if enlace {
                 self.as_mut().bajar_con(&a, -1, "", "");
             } else if !a.is_empty() {
@@ -375,7 +406,9 @@ impl Puente {
     }
 
     fn escuchar_otras_copias(self: Pin<&mut Self>) {
-        let Some(escucha) = instancia::escuchar(&instancia::ruta()) else { return };
+        let Some(escucha) = instancia::escuchar(&instancia::ruta()) else {
+            return;
+        };
         let hilo = self.qt_thread();
         std::thread::spawn(move || {
             for conexion in escucha.incoming() {
@@ -402,7 +435,9 @@ impl cxx_qt::Initialize for Puente {
         let prueba = self.es().prueba;
 
         self.as_mut().set_presets(variante(&json!(PRESETS)));
-        self.as_mut().set_perfiles(variante(&json!(PERFILES.iter().map(|(n, _)| *n).collect::<Vec<_>>())));
+        self.as_mut().set_perfiles(variante(&json!(
+            PERFILES.iter().map(|(n, _)| *n).collect::<Vec<_>>()
+        )));
         self.as_mut().revisar_eq();
         self.as_mut().poner_eq();
         self.eq_a_mpv();

@@ -3,7 +3,9 @@
 
 use crate::motor::{con_rep, leer};
 use crate::puente::qobject::Puente;
-use crate::puente::{abrir, cancion_valor, guardar_ajuste, guardar_json, id_o_ruta, lanzar, numero, texto, variante};
+use crate::puente::{
+    abrir, cancion_valor, guardar_ajuste, guardar_json, id_o_ruta, lanzar, numero, texto, variante,
+};
 use core::pin::Pin;
 use cxx_qt::Threading;
 use serde_json::{Value, json};
@@ -32,13 +34,17 @@ impl Puente {
         if self.nube_valor("trabajando") == json!(true) {
             return;
         }
-        self.as_mut().poner_nube(json!({"trabajando": true, "texto": "Elige tu cuenta en el navegador…", "error": ""}));
+        self.as_mut().poner_nube(
+            json!({"trabajando": true, "texto": "Elige tu cuenta en el navegador…", "error": ""}),
+        );
         let cuenta = self.es().cuenta.clone();
         lanzar(
             self.qt_thread(),
             move || cuenta.iniciar_sesion(&|url| abrir(url), Duration::from_secs(300)),
             |obj, r| match r {
-                Ok(d) => obj.fin_nube(json!({"sesion": true, "correo": texto(&d, "correo"), "nombre": texto(&d, "nombre")})),
+                Ok(d) => obj.fin_nube(
+                    json!({"sesion": true, "correo": texto(&d, "correo"), "nombre": texto(&d, "nombre")}),
+                ),
                 Err(e) => obj.fin_nube(json!({"sesion": true, "error": e.to_string()})),
             },
         );
@@ -47,7 +53,8 @@ impl Puente {
     pub fn cerrar_sesion_google(mut self: Pin<&mut Self>) {
         let cuenta = self.es().cuenta.clone();
         std::thread::spawn(move || cuenta.cerrar_sesion());
-        self.as_mut().poner_nube(json!({"correo": "", "nombre": "", "texto": "", "ultima": 0.0, "error": ""}));
+        self.as_mut()
+            .poner_nube(json!({"correo": "", "nombre": "", "texto": "", "ultima": 0.0, "error": ""}));
         self.avisar("Sesión cerrada. Tus canciones se quedan en esta PC.");
     }
 
@@ -59,7 +66,8 @@ impl Puente {
             self.as_mut().em().nube_otra_vez = true;
             return;
         }
-        self.as_mut().poner_nube(json!({"trabajando": true, "texto": "Sincronizando con la nube…", "error": ""}));
+        self.as_mut()
+            .poner_nube(json!({"trabajando": true, "texto": "Sincronizando con la nube…", "error": ""}));
         let (cuenta, bib, hilo) = (self.es().cuenta.clone(), self.es().bib.clone(), self.qt_thread());
         lanzar(
             self.qt_thread(),
@@ -73,8 +81,12 @@ impl Puente {
                 for intento in 0..2 {
                     let token = match cuenta.token() {
                         Ok(t) => t,
-                        Err(ErrorGoogle::SinPermiso(e)) => return json!({"ok": false, "error": e, "salir": true}),
-                        Err(e) => return json!({"ok": false, "error": format!("No se pudo sincronizar: {e}")}),
+                        Err(ErrorGoogle::SinPermiso(e)) => {
+                            return json!({"ok": false, "error": e, "salir": true});
+                        }
+                        Err(e) => {
+                            return json!({"ok": false, "error": format!("No se pudo sincronizar: {e}")});
+                        }
                     };
                     let drive = cuenta.drive(&token, ARCHIVO);
                     match sincronia::sincronizar(&bib, &drive, &mut borrar) {
@@ -100,7 +112,9 @@ impl Puente {
                                 return json!({"ok": false, "error": e, "salir": true});
                             }
                         }
-                        Err(e) => return json!({"ok": false, "error": format!("No se pudo sincronizar: {e}")}),
+                        Err(e) => {
+                            return json!({"ok": false, "error": format!("No se pudo sincronizar: {e}")});
+                        }
                     }
                 }
                 json!({"ok": false, "error": SIN_SESION, "salir": true})
@@ -114,18 +128,21 @@ impl Puente {
             // terminó «Iniciar sesión»
             let error = texto(&r, "error");
             if !error.is_empty() {
-                self.as_mut().poner_nube(json!({"trabajando": false, "texto": "", "error": error}));
+                self.as_mut()
+                    .poner_nube(json!({"trabajando": false, "texto": "", "error": error}));
                 return;
             }
             let correo = texto(&r, "correo");
             self.as_mut()
                 .poner_nube(json!({"trabajando": false, "correo": correo, "nombre": texto(&r, "nombre")}));
-            self.as_mut().avisar(&format!("Listo: tu música se sincroniza con {correo}"));
+            self.as_mut()
+                .avisar(&format!("Listo: tu música se sincroniza con {correo}"));
             self.sincronizar();
             return;
         }
         if r["ok"] != json!(true) {
-            self.as_mut().poner_nube(json!({"trabajando": false, "texto": "", "error": texto(&r, "error")}));
+            self.as_mut()
+                .poner_nube(json!({"trabajando": false, "texto": "", "error": texto(&r, "error")}));
             if r["salir"] == json!(true) {
                 self.es().cuenta.cerrar_sesion();
                 self.as_mut().poner_nube(json!({"correo": "", "nombre": ""}));
@@ -152,7 +169,12 @@ impl Puente {
         for c in &nuevas {
             let id = texto(c, "id");
             self.as_mut().em().nube_pendientes.insert(id.clone());
-            self.as_mut().bajar_con(&format!("https://music.youtube.com/watch?v={id}"), -1, &id, &texto(c, "nombre"));
+            self.as_mut().bajar_con(
+                &format!("https://music.youtube.com/watch?v={id}"),
+                -1,
+                &id,
+                &texto(c, "nombre"),
+            );
         }
         let fallidas = self.es().nube_fallidas.len();
         let t = if !nuevas.is_empty() {
@@ -162,7 +184,8 @@ impl Puente {
         } else {
             String::new()
         };
-        self.as_mut().poner_nube(json!({"trabajando": false, "ultima": fecha::ahora(), "texto": t, "error": ""}));
+        self.as_mut()
+            .poner_nube(json!({"trabajando": false, "ultima": fecha::ahora(), "texto": t, "error": ""}));
         self.as_mut().recargar();
         if std::mem::take(&mut self.as_mut().em().nube_otra_vez) {
             self.esperar("nube", 15000, |o| o.sincronizar());
@@ -185,7 +208,10 @@ impl Puente {
     /// Al abrir: la última canción, en pausa, en el segundo donde ibas, con su cola.
     pub fn restaurar(mut self: Pin<&mut Self>) {
         let s = self.es().sesion.get("cola").cloned().unwrap_or(json!({}));
-        let rutas_: Vec<String> = s["rutas"].as_array().map(|l| l.iter().filter_map(|r| r.as_str().map(String::from)).collect()).unwrap_or_default();
+        let rutas_: Vec<String> = s["rutas"]
+            .as_array()
+            .map(|l| l.iter().filter_map(|r| r.as_str().map(String::from)).collect())
+            .unwrap_or_default();
         if texto(&leer(|r| r.cancion()), "ruta").is_empty() && !rutas_.is_empty() {
             let cola: Vec<Value> = {
                 let b = self.bib();
@@ -217,7 +243,10 @@ impl Puente {
             .collect();
         h.insert(0, nueva);
         h.truncate(25);
-        self.as_mut().em().sesion.insert("historial".into(), Value::Array(h));
+        self.as_mut()
+            .em()
+            .sesion
+            .insert("historial".into(), Value::Array(h));
     }
 
     pub fn cambio_cancion(mut self: Pin<&mut Self>) {
@@ -241,7 +270,9 @@ impl Puente {
         if !a.is_empty() {
             return a;
         }
-        let hex: String = (0..12).map(|_| format!("{:x}", rand::random_range(0..16u8))).collect();
+        let hex: String = (0..12)
+            .map(|_| format!("{:x}", rand::random_range(0..16u8)))
+            .collect();
         let a = format!("pc-{hex}");
         guardar_ajuste("aparato", json!(a));
         a
@@ -252,7 +283,8 @@ impl Puente {
     pub fn subir_sonando(mut self: Pin<&mut Self>, esperar: u64) {
         let (c, posicion, pausado) = leer(|r| (r.cancion(), r.posicion(), r.pausado()));
         let vid = id_o_ruta(&c);
-        if self.nube_valor("correo").as_str().unwrap_or("").is_empty() || vid.is_empty() || self.es().sin_red {
+        if self.nube_valor("correo").as_str().unwrap_or("").is_empty() || vid.is_empty() || self.es().sin_red
+        {
             return;
         }
         let clave = (vid.clone(), (posicion as i64) / 10, pausado);
@@ -266,7 +298,15 @@ impl Puente {
             e.sonando_subido = cuando;
         }
         let p = texto(&c, "portada");
-        let portada = if p.is_empty() { self.es().portadas.get(&texto(&c, "ruta")).cloned().unwrap_or_default() } else { p };
+        let portada = if p.is_empty() {
+            self.es()
+                .portadas
+                .get(&texto(&c, "ruta"))
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            p
+        };
         let datos = json!({
             "aparato": self.aparato(), "nombre": "tu PC", "id": vid, "titulo": texto(&c, "titulo"),
             "artista": texto(&c, "artista"), "album": texto(&c, "album"), "duracion": numero(&c, "duracion"),
@@ -399,7 +439,8 @@ impl Puente {
             json!({})
         } else {
             let mut m = d.clone();
-            let minutos = ((fecha::ahora() * 1000.0 - numero(&Value::Object(d.clone()), "cuando")) / 60000.0) as i64;
+            let minutos =
+                ((fecha::ahora() * 1000.0 - numero(&Value::Object(d.clone()), "cuando")) / 60000.0) as i64;
             let hace = if minutos < 1 {
                 "hace un momento".to_string()
             } else if minutos < 60 {
@@ -422,14 +463,20 @@ impl Puente {
             let (semana, pasada) = {
                 let b = self.bib();
                 let (d1, h1) = fecha::semana(1, None);
-                (b.resumen(esta.0, esta.1, 5).unwrap_or(json!({})), b.resumen(d1, h1, 5).unwrap_or(json!({})))
+                (
+                    b.resumen(esta.0, esta.1, 5).unwrap_or(json!({})),
+                    b.resumen(d1, h1, 5).unwrap_or(json!({})),
+                )
             };
             self.as_mut().em().resumen = json!({"semana": semana, "pasada": pasada});
         }
         let visto = Biblioteca::ajustes().numero("resumen_visto", 0.0);
         let mut r = self.es().resumen.clone();
         // el aviso sale una vez por semana, el lunes que abres la app, si la pasada escuchaste algo
-        let escuchas = r.pointer("/pasada/escuchas").and_then(Value::as_f64).unwrap_or(0.0);
+        let escuchas = r
+            .pointer("/pasada/escuchas")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
         r["aviso"] = json!(escuchas > 0.0 && visto < esta.0);
         self.set_resumen(variante(&r));
     }

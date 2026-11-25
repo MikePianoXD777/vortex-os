@@ -52,7 +52,11 @@ fn titulos(v: &[Value]) -> Vec<&str> {
 #[test]
 fn toca_avanza_y_pide_radio_al_final() {
     let mut r = nuevo();
-    let lista = [cancion("a", 200.0), cancion("b", 200.0), json!({"titulo": "sin ruta"})];
+    let lista = [
+        cancion("a", 200.0),
+        cancion("b", 200.0),
+        json!({"titulo": "sin ruta"}),
+    ];
     r.tocar(&lista, 0);
     assert_eq!(cargadas(&mut r), ["/musica/a.mp3"]);
     assert!(r.avisos.contains(&Aviso::QuiereSonar) && r.avisos.contains(&Aviso::Cancion));
@@ -85,7 +89,10 @@ fn repetir_aleatorio_y_anterior() {
     r.alternar_aleatorio();
     assert_eq!(r.cancion()["titulo"], "c2"); // la que suena queda primero
     assert_eq!(r.indice(), 0);
-    let mut orden = titulos(&r.cola()).into_iter().map(String::from).collect::<Vec<_>>();
+    let mut orden = titulos(&r.cola())
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
     orden.sort();
     assert_eq!(orden, ["c0", "c1", "c2", "c3", "c4", "c5"]);
     r.alternar_aleatorio();
@@ -103,7 +110,10 @@ fn repetir_aleatorio_y_anterior() {
 #[test]
 fn la_cola_a_continuacion() {
     let mut r = nuevo();
-    r.tocar(&[cancion("a", 100.0), cancion("b", 100.0), cancion("c", 100.0)], 0);
+    r.tocar(
+        &[cancion("a", 100.0), cancion("b", 100.0), cancion("c", 100.0)],
+        0,
+    );
     r.tocar_despues(&cancion("x", 100.0));
     r.tocar_despues(&cancion("y", 100.0));
     r.agregar_a_cola(&cancion("z", 100.0));
@@ -141,10 +151,14 @@ fn cuenta_lo_escuchado_y_no_los_saltos() {
     }
     r.avisos.clear();
     fin(&mut r);
-    let e: Vec<_> = r.avisos.iter().filter_map(|a| match a {
-        Aviso::Escuchada(c, s) => Some((c["titulo"].clone(), *s)),
-        _ => None,
-    }).collect();
+    let e: Vec<_> = r
+        .avisos
+        .iter()
+        .filter_map(|a| match a {
+            Aviso::Escuchada(c, s) => Some((c["titulo"].clone(), *s)),
+            _ => None,
+        })
+        .collect();
     assert_eq!(e, [(json!("b"), 10.5)]);
 }
 
@@ -156,10 +170,16 @@ fn youtube_reintenta_sin_cliente_y_luego_avisa() {
     let yt = json!({"ruta": "https://music.youtube.com/watch?v=abc", "titulo": "De la radio"});
     r.tocar(&[yt, cancion("b", 100.0)], 0);
     let s = std::mem::take(&mut r.salida);
-    assert_eq!(s[0]["command"][4]["ytdl-raw-options"], "extractor-args=youtube:player_client=visionos");
+    assert_eq!(
+        s[0]["command"][4]["ytdl-raw-options"],
+        "extractor-args=youtube:player_client=visionos"
+    );
     r.al_evento(&json!({"event": "end-file", "reason": "error"}));
     let s = std::mem::take(&mut r.salida);
-    assert_eq!(s[0]["command"], json!(["loadfile", "https://music.youtube.com/watch?v=abc", "replace"]));
+    assert_eq!(
+        s[0]["command"],
+        json!(["loadfile", "https://music.youtube.com/watch?v=abc", "replace"])
+    );
     r.avisos.clear();
     r.al_evento(&json!({"event": "end-file", "reason": "error"}));
     assert_eq!(r.avisos, [Aviso::Error("No se pudo tocar: De la radio".into())]);
@@ -231,7 +251,10 @@ fn practicar_velocidad_y_tramo() {
     assert_eq!((r.ab_a(), r.ab_b()), (-1.0, -1.0));
     r.salida.clear();
     r.al_conectar(); // mpv se volvió a levantar: los filtros otra vez
-    assert_eq!(r.salida, [json!({"command": ["set_property", "af", "equalizer=f=40:g=3,scaletempo2"]})]);
+    assert_eq!(
+        r.salida,
+        [json!({"command": ["set_property", "af", "equalizer=f=40:g=3,scaletempo2"]})]
+    );
 }
 
 #[test]
@@ -276,7 +299,10 @@ fn seguir_donde_te_quedaste() {
     r.poner_origen("Mi playlist");
     let s = r.sesion();
     let sonaba = r.cancion();
-    let orden = titulos(&r.cola()).into_iter().map(String::from).collect::<Vec<_>>();
+    let orden = titulos(&r.cola())
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
 
     let mut otro = nuevo();
     assert!(otro.restaurar(&lista, &s));
@@ -284,7 +310,11 @@ fn seguir_donde_te_quedaste() {
     assert_eq!(titulos(&otro.cola()), orden);
     assert!(otro.pausado() && otro.aleatorio());
     assert_eq!((otro.repetir(), otro.origen()), ("todo", "Mi playlist"));
-    let carga = otro.salida.iter().find(|v| v["command"][0] == "loadfile").unwrap();
+    let carga = otro
+        .salida
+        .iter()
+        .find(|v| v["command"][0] == "loadfile")
+        .unwrap();
     assert_eq!(carga["command"][4]["start"], "42.00");
 
     // si borraste canciones, el orden se rehace y se sigue en la que estaba (o en la primera)
@@ -323,7 +353,11 @@ static UN_MPV: std::sync::Mutex<()> = std::sync::Mutex::new(());
 #[allow(unsafe_code)] // set_var antes de arrancar hilos
 fn de_punta_a_punta_con_mpv() {
     let _turno = UN_MPV.lock().unwrap_or_else(|e| e.into_inner());
-    if std::process::Command::new("mpv").arg("--version").output().is_err() {
+    if std::process::Command::new("mpv")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         eprintln!("falta mpv: se salta");
         return;
     }
@@ -367,7 +401,11 @@ fn de_punta_a_punta_con_mpv() {
 #[allow(unsafe_code)] // set_var antes de arrancar hilos
 fn buscar_lleva_a_mpv_al_punto() {
     let _turno = UN_MPV.lock().unwrap_or_else(|e| e.into_inner());
-    if std::process::Command::new("mpv").arg("--version").output().is_err() {
+    if std::process::Command::new("mpv")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         eprintln!("falta mpv: se salta");
         return;
     }
@@ -394,18 +432,29 @@ fn buscar_lleva_a_mpv_al_punto() {
         }
         hasta(r)
     };
-    assert!(esperar(&mut r, &mut mpv, &|r| r.posicion() > 0.3), "no empezó a sonar");
+    assert!(
+        esperar(&mut r, &mut mpv, &|r| r.posicion() > 0.3),
+        "no empezó a sonar"
+    );
     r.buscar(20.0);
     mpv.despachar(&mut r);
     // Que mpv lo confirme: la posición que reporta pasa de 20 (y no regresa al principio).
     std::thread::sleep(Duration::from_millis(600));
-    assert!(esperar(&mut r, &mut mpv, &|r| r.posicion() >= 20.0 && r.posicion() < 29.0), "sonando: quedó en {}", r.posicion());
+    assert!(
+        esperar(&mut r, &mut mpv, &|r| r.posicion() >= 20.0 && r.posicion() < 29.0),
+        "sonando: quedó en {}",
+        r.posicion()
+    );
     // En pausa también.
     r.pausar();
     mpv.despachar(&mut r);
     r.buscar(5.0);
     mpv.despachar(&mut r);
     std::thread::sleep(Duration::from_millis(600));
-    assert!(esperar(&mut r, &mut mpv, &|r| (r.posicion() - 5.0).abs() < 1.0), "en pausa: quedó en {}", r.posicion());
+    assert!(
+        esperar(&mut r, &mut mpv, &|r| (r.posicion() - 5.0).abs() < 1.0),
+        "en pausa: quedó en {}",
+        r.posicion()
+    );
     mpv.cerrar();
 }

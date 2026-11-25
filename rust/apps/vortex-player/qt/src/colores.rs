@@ -36,7 +36,10 @@ pub struct ColoresRust {
 fn a_qmap(p: &Paleta) -> QMap<QMapPair_QString_QVariant> {
     let mut m = QMap::<QMapPair_QString_QVariant>::default();
     for (k, v) in p {
-        m.insert(QString::from(k.as_str()), QVariant::from(&QString::from(v.as_str())));
+        m.insert(
+            QString::from(k.as_str()),
+            QVariant::from(&QString::from(v.as_str())),
+        );
     }
     m
 }

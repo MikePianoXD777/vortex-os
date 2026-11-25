@@ -6,7 +6,9 @@ use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
-use vortex_player::mpris::{EstadoMpris, Meta, Mpris, NOMBRE, OrdenMpris, RUTA, brinco, metadatos, portada_local};
+use vortex_player::mpris::{
+    EstadoMpris, Meta, Mpris, NOMBRE, OrdenMpris, RUTA, brinco, metadatos, portada_local,
+};
 use zbus::OwnedVariant as OwnedValue;
 
 #[test]
@@ -17,13 +19,25 @@ fn los_metadatos() {
     let d = |k: &str| m.iter().find(|(a, _)| *a == k).map(|(_, v)| v.clone()).unwrap();
     assert!(matches!(d("mpris:trackid"), Meta::Ruta(r) if r.starts_with("/org/vortex/player/cancion/")));
     assert_eq!(d("mpris:length"), Meta::Entero(354_500_000));
-    assert_eq!(d("xesam:artist"), Meta::Lista(vec!["Queen".into(), "David Bowie".into()]));
-    assert_eq!(d("xesam:url"), Meta::Texto("file:///m%C3%BAsica/Bohemia%20%5BdQw4w9WgXcQ%5D.opus".into()));
+    assert_eq!(
+        d("xesam:artist"),
+        Meta::Lista(vec!["Queen".into(), "David Bowie".into()])
+    );
+    assert_eq!(
+        d("xesam:url"),
+        Meta::Texto("file:///m%C3%BAsica/Bohemia%20%5BdQw4w9WgXcQ%5D.opus".into())
+    );
     assert_eq!(d("mpris:artUrl"), Meta::Texto("file:///tmp/p.jpg".into()));
     assert_eq!(metadatos(&c, "")[0], m[0]); // el mismo id para la misma canción
     let sin = metadatos(&json!({"ruta": "/m/mi canción.flac"}), "");
-    assert!(sin.iter().any(|(k, v)| *k == "xesam:title" && *v == Meta::Texto("mi canción".into())));
-    assert!(sin.iter().any(|(k, v)| *k == "xesam:artist" && *v == Meta::Lista(vec![String::new()])));
+    assert!(
+        sin.iter()
+            .any(|(k, v)| *k == "xesam:title" && *v == Meta::Texto("mi canción".into()))
+    );
+    assert!(
+        sin.iter()
+            .any(|(k, v)| *k == "xesam:artist" && *v == Meta::Lista(vec![String::new()]))
+    );
     assert!(!sin.iter().any(|(k, _)| *k == "mpris:artUrl"));
     assert!(metadatos(&json!({}), "").is_empty());
 }
@@ -33,7 +47,12 @@ fn en_un_bus_propio() {
     let t = tempfile::tempdir().unwrap();
     let sock = t.path().join("bus");
     let Ok(mut d) = Command::new("dbus-daemon")
-        .args(["--session", "--nofork", "--print-address=1", &format!("--address=unix:path={}", sock.display())])
+        .args([
+            "--session",
+            "--nofork",
+            "--print-address=1",
+            &format!("--address=unix:path={}", sock.display()),
+        ])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -42,7 +61,9 @@ fn en_un_bus_propio() {
         return;
     };
     let mut dir = String::new();
-    BufReader::new(d.stdout.take().unwrap()).read_line(&mut dir).unwrap();
+    BufReader::new(d.stdout.take().unwrap())
+        .read_line(&mut dir)
+        .unwrap();
     let dir = dir.trim().to_string();
 
     let (tx, rx) = mpsc::channel();
@@ -59,9 +80,17 @@ fn en_un_bus_propio() {
     });
 
     async_io::block_on(async {
-        let c = zbus::connection::Builder::address(dir.as_str()).build().await.unwrap();
-        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player").await.unwrap();
-        assert_eq!(p.get_property::<String>("PlaybackStatus").await.unwrap(), "Playing");
+        let c = zbus::connection::Builder::address(dir.as_str())
+            .build()
+            .await
+            .unwrap();
+        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player")
+            .await
+            .unwrap();
+        assert_eq!(
+            p.get_property::<String>("PlaybackStatus").await.unwrap(),
+            "Playing"
+        );
         assert_eq!(p.get_property::<String>("LoopStatus").await.unwrap(), "Playlist");
         assert_eq!(p.get_property::<f64>("Volume").await.unwrap(), 0.8);
         assert_eq!(p.get_property::<i64>("Position").await.unwrap(), 10_000_000);
@@ -73,11 +102,18 @@ fn en_un_bus_propio() {
         p.set_property("Volume", 0.5f64).await.unwrap();
         p.set_property("Shuffle", true).await.unwrap();
         p.set_property("LoopStatus", "Track").await.unwrap();
-        let r = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2").await.unwrap();
-        assert_eq!(r.get_property::<String>("Identity").await.unwrap(), "Vortex Player");
+        let r = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2")
+            .await
+            .unwrap();
+        assert_eq!(
+            r.get_property::<String>("Identity").await.unwrap(),
+            "Vortex Player"
+        );
         r.call_method("Raise", &()).await.unwrap();
     });
-    let llegaron: Vec<OrdenMpris> = (0..7).filter_map(|_| rx.recv_timeout(Duration::from_secs(3)).ok()).collect();
+    let llegaron: Vec<OrdenMpris> = (0..7)
+        .filter_map(|_| rx.recv_timeout(Duration::from_secs(3)).ok())
+        .collect();
     assert_eq!(
         llegaron,
         [
@@ -186,15 +222,38 @@ fn avisa_que_ya_se_puede_adelantar() {
 #[test]
 fn sabe_cuando_la_posicion_brinco() {
     let c = json!({"ruta": "/m/a.flac"});
-    let en = |p: f64, pausado: bool| EstadoMpris { cancion: c.clone(), posicion: p, pausado, ..EstadoMpris::default() };
-    assert!(!brinco(&en(10.0, false), &en(10.25, false), 0.25), "tocando normal");
-    assert!(!brinco(&en(10.0, false), &en(11.0, false), 0.2), "un segundo de diferencia todavía no");
-    assert!(brinco(&en(7.0, false), &en(151.0, false), 0.25), "se adelantó desde Vortex Player");
+    let en = |p: f64, pausado: bool| EstadoMpris {
+        cancion: c.clone(),
+        posicion: p,
+        pausado,
+        ..EstadoMpris::default()
+    };
+    assert!(
+        !brinco(&en(10.0, false), &en(10.25, false), 0.25),
+        "tocando normal"
+    );
+    assert!(
+        !brinco(&en(10.0, false), &en(11.0, false), 0.2),
+        "un segundo de diferencia todavía no"
+    );
+    assert!(
+        brinco(&en(7.0, false), &en(151.0, false), 0.25),
+        "se adelantó desde Vortex Player"
+    );
     assert!(brinco(&en(90.0, false), &en(3.0, false), 0.25), "regresó");
-    assert!(!brinco(&en(30.0, true), &en(30.0, true), 60.0), "en pausa no avanza");
-    assert!(brinco(&en(30.0, true), &en(95.0, true), 60.0), "en pausa y se movió");
+    assert!(
+        !brinco(&en(30.0, true), &en(30.0, true), 60.0),
+        "en pausa no avanza"
+    );
+    assert!(
+        brinco(&en(30.0, true), &en(95.0, true), 60.0),
+        "en pausa y se movió"
+    );
     let sin = EstadoMpris::default();
-    assert!(!brinco(&en(30.0, false), &sin, 0.2), "sin canción no hay nada que avisar");
+    assert!(
+        !brinco(&en(30.0, false), &sin, 0.2),
+        "sin canción no hay nada que avisar"
+    );
 }
 
 /// Si la canción brinca (se adelantó desde Vortex Player o arrancó donde se había quedado), MPRIS lo avisa con
@@ -219,19 +278,38 @@ fn avisa_cuando_la_cancion_brinca() {
         return;
     };
     let mut dir = String::new();
-    BufReader::new(d.stdout.take().unwrap()).read_line(&mut dir).unwrap();
+    BufReader::new(d.stdout.take().unwrap())
+        .read_line(&mut dir)
+        .unwrap();
     let dir = dir.trim().to_string();
     let (tx, _rx) = mpsc::channel();
     let m = Mpris::arrancar(Some(&dir), tx).expect("se registra en el bus");
     let cancion = json!({"ruta": "/m/a.flac", "titulo": "Uno", "duracion": 164.0});
-    m.poner(EstadoMpris { cancion: cancion.clone(), posicion: 7.0, ..EstadoMpris::default() });
+    m.poner(EstadoMpris {
+        cancion: cancion.clone(),
+        posicion: 7.0,
+        ..EstadoMpris::default()
+    });
 
     async_io::block_on(async {
-        let c = zbus::connection::Builder::address(dir.as_str()).build().await.unwrap();
-        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player").await.unwrap();
+        let c = zbus::connection::Builder::address(dir.as_str())
+            .build()
+            .await
+            .unwrap();
+        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player")
+            .await
+            .unwrap();
         let mut saltos = p.receive_signal("Seeked").await.unwrap();
-        m.poner(EstadoMpris { cancion: cancion.clone(), posicion: 7.2, ..EstadoMpris::default() });
-        m.poner(EstadoMpris { cancion: cancion.clone(), posicion: 151.0, ..EstadoMpris::default() });
+        m.poner(EstadoMpris {
+            cancion: cancion.clone(),
+            posicion: 7.2,
+            ..EstadoMpris::default()
+        });
+        m.poner(EstadoMpris {
+            cancion: cancion.clone(),
+            posicion: 151.0,
+            ..EstadoMpris::default()
+        });
         let llega = async {
             let s = saltos.next().await?;
             s.body().deserialize::<i64>().ok()
@@ -260,7 +338,11 @@ fn busca_la_portada_en_el_disco() {
     std::fs::create_dir_all(&dir).unwrap();
     let cancion = dir.join("Blissful [9tmrPnFBPH4].opus");
     std::fs::write(&cancion, b"x").unwrap();
-    assert_eq!(portada_local(cancion.to_str().unwrap(), &cache), "", "sin imagen, nada");
+    assert_eq!(
+        portada_local(cancion.to_str().unwrap(), &cache),
+        "",
+        "sin imagen, nada"
+    );
     // La de la caché (la que la ventana sacó del archivo).
     std::fs::create_dir_all(&cache).unwrap();
     let hash = vortex_player::cripto::hex(&vortex_player::cripto::sha1(cancion.to_str().unwrap().as_bytes()));
@@ -271,7 +353,10 @@ fn busca_la_portada_en_el_disco() {
     assert!(portada_local(cancion.to_str().unwrap(), &cache).ends_with("/Txmy/cover.jpg"));
     std::fs::write(dir.join("Blissful [9tmrPnFBPH4].jpg"), b"j").unwrap();
     let u = portada_local(cancion.to_str().unwrap(), &cache);
-    assert!(u.starts_with("file:///") && u.ends_with("/Txmy/Blissful%20%5B9tmrPnFBPH4%5D.jpg"), "{u}");
+    assert!(
+        u.starts_with("file:///") && u.ends_with("/Txmy/Blissful%20%5B9tmrPnFBPH4%5D.jpg"),
+        "{u}"
+    );
     // Lo que no es un archivo local, nada.
     assert_eq!(portada_local("https://www.youtube.com/watch?v=x", &cache), "");
     assert_eq!(portada_local("", &cache), "");
@@ -283,7 +368,12 @@ fn los_metadatos_llevan_la_portada_del_disco() {
     let t = tempfile::tempdir().unwrap();
     let sock = t.path().join("bus");
     let Ok(mut d) = Command::new("dbus-daemon")
-        .args(["--session", "--nofork", "--print-address=1", &format!("--address=unix:path={}", sock.display())])
+        .args([
+            "--session",
+            "--nofork",
+            "--print-address=1",
+            &format!("--address=unix:path={}", sock.display()),
+        ])
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
@@ -292,7 +382,9 @@ fn los_metadatos_llevan_la_portada_del_disco() {
         return;
     };
     let mut dir = String::new();
-    BufReader::new(d.stdout.take().unwrap()).read_line(&mut dir).unwrap();
+    BufReader::new(d.stdout.take().unwrap())
+        .read_line(&mut dir)
+        .unwrap();
     let dir = dir.trim().to_string();
     let cancion = t.path().join("Lucent.opus");
     std::fs::write(&cancion, b"x").unwrap();
@@ -304,11 +396,19 @@ fn los_metadatos_llevan_la_portada_del_disco() {
         ..EstadoMpris::default()
     });
     async_io::block_on(async {
-        let c = zbus::connection::Builder::address(dir.as_str()).build().await.unwrap();
-        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player").await.unwrap();
+        let c = zbus::connection::Builder::address(dir.as_str())
+            .build()
+            .await
+            .unwrap();
+        let p = zbus::Proxy::new(&c, NOMBRE, RUTA, "org.mpris.MediaPlayer2.Player")
+            .await
+            .unwrap();
         let meta: std::collections::HashMap<String, OwnedValue> = p.get_property("Metadata").await.unwrap();
         let art = String::try_from(meta["mpris:artUrl"].clone()).unwrap();
-        assert!(art.starts_with("file://") && art.ends_with("/Lucent.jpg"), "{art}");
+        assert!(
+            art.starts_with("file://") && art.ends_with("/Lucent.jpg"),
+            "{art}"
+        );
     });
     drop(m);
     let _ = d.kill();

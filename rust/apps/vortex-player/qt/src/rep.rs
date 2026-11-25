@@ -175,11 +175,24 @@ impl Foto {
         Foto {
             cancion: hay(&Aviso::Cancion).then(|| r.cancion()),
             posicion: hay(&Aviso::Posicion).then(|| (r.posicion(), r.duracion())),
-            estado: hay(&Aviso::Estado)
-                .then(|| (r.pausado(), r.volumen(), r.aleatorio(), r.repetir().to_string(), r.fundido())),
+            estado: hay(&Aviso::Estado).then(|| {
+                (
+                    r.pausado(),
+                    r.volumen(),
+                    r.aleatorio(),
+                    r.repetir().to_string(),
+                    r.fundido(),
+                )
+            }),
             navegar: (r.hay_anterior(), r.hay_siguiente()),
             cola: hay(&Aviso::Cola).then(|| {
-                (r.cola(), r.cola_siguientes(), r.cola_restantes(), r.indice(), r.origen().to_string())
+                (
+                    r.cola(),
+                    r.cola_siguientes(),
+                    r.cola_restantes(),
+                    r.indice(),
+                    r.origen().to_string(),
+                )
             }),
             dormir: hay(&Aviso::Dormir).then(|| (r.dormir_texto(), r.dormir_activo())),
             practica: hay(&Aviso::Practica).then(|| (r.velocidad(), r.ab_a(), r.ab_b())),
@@ -195,7 +208,14 @@ impl Foto {
 
     /// Todo (al arrancar).
     pub fn completa(r: &Reproductor) -> Self {
-        let todos = [Aviso::Cancion, Aviso::Posicion, Aviso::Estado, Aviso::Cola, Aviso::Dormir, Aviso::Practica];
+        let todos = [
+            Aviso::Cancion,
+            Aviso::Posicion,
+            Aviso::Estado,
+            Aviso::Cola,
+            Aviso::Dormir,
+            Aviso::Practica,
+        ];
         Self::de(r, &todos)
     }
 }
@@ -214,8 +234,10 @@ impl qobject::Rep {
             self.as_mut().set_fundido(fundido);
         }
         if let Some((cola, siguientes, restantes, indice, origen)) = f.cola {
-            self.as_mut().set_cola(json_a_variante(&Value::Array(cola).to_string()));
-            self.as_mut().set_cola_siguientes(json_a_variante(&Value::Array(siguientes).to_string()));
+            self.as_mut()
+                .set_cola(json_a_variante(&Value::Array(cola).to_string()));
+            self.as_mut()
+                .set_cola_siguientes(json_a_variante(&Value::Array(siguientes).to_string()));
             self.as_mut().set_cola_restantes(i32_de(restantes));
             self.as_mut().set_indice(i32_de(indice));
             self.as_mut().set_origen(QString::from(origen.as_str()));
