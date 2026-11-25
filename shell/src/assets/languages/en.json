@@ -2611,7 +2611,13 @@
     "loading": "Looking for your games…",
     "search": "Search your games…",
     "empty": "No games yet. Install them with Steam or Heroic (or a Flatpak from the Shop) and they will show up here.",
-    "no_match": "No game matches your search."
+    "no_match": "No game matches your search.",
+    "minutes": "{n} min",
+    "hours": "{n} h",
+    "hours_minutes": "{h} h {m} min",
+    "this_week": "{t} this week",
+    "all_this_week": "all this week",
+    "week_total": "This week you played {t}"
   },
   "htmlwidgets": {
     "title": "HTML widgets",

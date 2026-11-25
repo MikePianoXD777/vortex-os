@@ -90,6 +90,94 @@ Item {
 
     function recargar() {
         if (!lista.running) lista.running = true;
+        if (!partidasProc.running) partidasProc.running = true;
+    }
+
+    // 4.5: cuánto has jugado cada juego, de las partidas que anota vortex-partida (partidas.csv:
+    // fecha,juego,minutos,…). El nombre de la partida es el título de la ventana («Minecraft NeoForge*
+    // 1.21.1»), no el de la biblioteca («Minecraft»): se comparan sin acentos, mayúsculas ni signos, y la
+    // partida cuenta para el juego cuyo nombre es el principio del título (gana el nombre más largo).
+    property var partidas: []
+    Process {
+        id: partidasProc
+        command: ["sh", "-c", "cat \"${XDG_STATE_HOME:-$HOME/.local/state}/vortex/partidas.csv\" 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let res = [];
+                let renglones = (this.text || "").split("\n");
+                for (let i = 1; i < renglones.length; i++) {
+                    let c = renglones[i].split(",");
+                    if (c.length < 3) continue;
+                    let f = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(c[0]);
+                    let min = parseInt(c[2]);
+                    let clave = window.clave(c[1]);
+                    if (!f || !(min > 0) || clave === "") continue;
+                    res.push({ clave: clave, min: min,
+                               cuando: new Date(+f[1], +f[2] - 1, +f[3], +f[4], +f[5]).getTime() });
+                }
+                window.partidas = res;
+            }
+        }
+    }
+
+    // Palabras que no dicen qué juego es («Minecraft Launcher» → minecraft).
+    readonly property var palabrasVacias: ["launcher", "game", "games", "the", "edition", "el", "la", "los", "las", "de"]
+    function clave(nombre) {
+        let t = (nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        return t.split(/[^a-z0-9]+/).filter(w => w !== "" && window.palabrasVacias.indexOf(w) < 0).join("");
+    }
+    // Minecraft se juega desde un lanzador que no se llama «Minecraft».
+    readonly property var lanzadoresMinecraft: ["minecraft", "prism", "prismlauncher", "multimc", "polymc", "atlauncher",
+        "modrinthapp", "modrinth", "sklauncher", "hmcl", "lunarclient", "badlion", "feather", "tlauncher"]
+
+    function lunes() {
+        let d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+        return d.getTime();
+    }
+
+    // id del juego → { total, semana } en minutos; y lo jugado esta semana en total.
+    readonly property var tiempos: {
+        let res = {};
+        let semana = 0;
+        let desde = window.lunes();
+        let juegos = window.todos.map(j => ({ id: j.id, clave: window.clave(j.nombre) })).filter(j => j.clave.length >= 3);
+        for (let i = 0; i < window.partidas.length; i++) {
+            let p = window.partidas[i];
+            let mejor = null;
+            for (let k = 0; k < juegos.length; k++) {
+                let g = juegos[k];
+                let coincide = p.clave.indexOf(g.clave) === 0 || g.clave.indexOf(p.clave) === 0
+                    || (p.clave.indexOf("minecraft") === 0 && window.lanzadoresMinecraft.indexOf(g.clave) >= 0);
+                if (coincide && (!mejor || g.clave.length > mejor.clave.length)) mejor = g;
+            }
+            if (p.cuando >= desde) semana += p.min;
+            if (!mejor) continue;
+            let t = res[mejor.id] || { total: 0, semana: 0 };
+            t.total += p.min;
+            if (p.cuando >= desde) t.semana += p.min;
+            res[mejor.id] = t;
+        }
+        res.__semana = semana;
+        return res;
+    }
+
+    function duracion(min) {
+        if (min < 60) return window.t("minutes", "{n} min").replace("{n}", min);
+        let h = Math.floor(min / 60);
+        let m = min % 60;
+        if (h >= 10 || m === 0) return window.t("hours", "{n} h").replace("{n}", h);
+        return window.t("hours_minutes", "{h} h {m} min").replace("{h}", h).replace("{m}", m);
+    }
+
+    function textoTiempo(id) {
+        let t = window.tiempos[id];
+        if (!t || t.total <= 0) return "";
+        let s = window.duracion(t.total);
+        if (t.semana > 0 && t.semana < t.total) s += " · " + window.t("this_week", "{t} this week").replace("{t}", window.duracion(t.semana));
+        else if (t.semana > 0) s += " · " + window.t("all_this_week", "all this week");
+        return s;
     }
 
     property var exitCallback: null
@@ -205,6 +293,9 @@ Item {
                     Text {
                         text: window.cargado
                             ? (window.todos.length === 1 ? window.t("count_one", "1 game") : window.t("count", "{n} games").replace("{n}", window.todos.length))
+                              + (window.tiempos.__semana > 0
+                                 ? " · " + window.t("week_total", "This week you played {t}").replace("{t}", window.duracion(window.tiempos.__semana))
+                                 : "")
                             : window.t("loading", "Looking for your games…")
                         font.family: ThemeBackend.fontFamily
                         font.pixelSize: window.s(12)
@@ -284,7 +375,7 @@ Item {
 
                 readonly property int columnas: Math.max(1, Math.floor(width / window.s(170)))
                 cellWidth: Math.floor(width / columnas)
-                cellHeight: cellWidth * 1.5 + window.s(34)
+                cellHeight: cellWidth * 1.5 + window.s(52)
 
                 delegate: Item {
                     id: celda
@@ -421,6 +512,22 @@ Item {
                         font.family: ThemeBackend.fontFamily
                         font.pixelSize: window.s(12)
                         color: zona.containsMouse ? ThemeBackend.text : ThemeBackend.subtext1
+                    }
+
+                    // 4.5: cuánto lo has jugado.
+                    Text {
+                        id: tiempoJugado
+                        anchors.top: tarjeta.bottom
+                        anchors.topMargin: window.s(26)
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: tarjeta.width
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideRight
+                        text: window.textoTiempo(celda.j.id)
+                        visible: text !== ""
+                        font.family: ThemeBackend.fontFamily
+                        font.pixelSize: window.s(10)
+                        color: ThemeBackend.overlay1
                     }
                 }
             }

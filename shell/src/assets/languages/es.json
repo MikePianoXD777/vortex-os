@@ -2608,7 +2608,13 @@
     "loading": "Buscando tus juegos…",
     "search": "Buscar un juego…",
     "empty": "Todavía no hay juegos. Instálalos con Steam o Heroic (o un Flatpak de la Tienda) y aparecerán aquí.",
-    "no_match": "Ningún juego coincide con tu búsqueda."
+    "no_match": "Ningún juego coincide con tu búsqueda.",
+    "minutes": "{n} min",
+    "hours": "{n} h",
+    "hours_minutes": "{h} h {m} min",
+    "this_week": "{t} esta semana",
+    "all_this_week": "todo esta semana",
+    "week_total": "Esta semana jugaste {t}"
   },
   "htmlwidgets": {
     "title": "Widgets en HTML",
