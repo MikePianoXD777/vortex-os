@@ -81,7 +81,9 @@ Item {
     }
 
     property real lengthPadding: isVertical ? s(isCompact ? 10 : 12) : s(isCompact ? 12 : 14)
-    property real targetLength: (faceLoader.item ? (isVertical ? faceLoader.item.implicitHeight : faceLoader.item.implicitWidth) : 0) + (lengthPadding * 2)
+    // 4.4: la batería de los audífonos y controles va junto al reloj (solo en la barra horizontal).
+    readonly property real bateriaLength: (!isVertical && bateria.visible) ? bateria.implicitWidth + s(isCompact ? 8 : 10) : 0
+    property real targetLength: (faceLoader.item ? (isVertical ? faceLoader.item.implicitHeight : faceLoader.item.implicitWidth) : 0) + (lengthPadding * 2) + bateriaLength
 
     implicitWidth: isVertical ? (parent ? parent.width : 0) : targetLength
     implicitHeight: isVertical ? targetLength : (parent ? parent.height : 0)
@@ -102,10 +104,22 @@ Item {
         id: faceLoader
         z: 2
         anchors.centerIn: parent
+        anchors.horizontalCenterOffset: -root.bateriaLength / 2
         source: BarModuleRegistry.variantFaceFile("timedate", root.timeStyle)
         onLoaded: {
             if (item) item.widget = root;
         }
+    }
+
+    DispositivosBateria {
+        id: bateria
+        z: 2
+        visible: !root.isVertical && lista.length > 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: faceLoader.right
+        anchors.leftMargin: root.s(root.isCompact ? 8 : 10)
+        tam: root.s(root.isCompact ? 11 : 12)
+        tamIcono: root.s(root.isCompact ? 13 : 14)
     }
 
     Binding {
