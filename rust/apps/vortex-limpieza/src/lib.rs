@@ -232,8 +232,31 @@ pub fn vaciar(lista: &[(PathBuf, PathBuf)]) {
 /// Lo que sobra en Descargas después de usarlo: instaladores, comprimidos y descargas a medias. Fotos,
 /// documentos, música y videos no están: esos los bajaste para quedártelos.
 pub const SOBRAS: &[&str] = &[
-    "exe", "msi", "deb", "rpm", "appimage", "apk", "xapk", "flatpakref", "pkg", "dmg", "iso", "img", "zip",
-    "rar", "7z", "tar", "gz", "tgz", "xz", "zst", "bz2", "jar", "torrent", "part", "crdownload",
+    "exe",
+    "msi",
+    "deb",
+    "rpm",
+    "appimage",
+    "apk",
+    "xapk",
+    "flatpakref",
+    "pkg",
+    "dmg",
+    "iso",
+    "img",
+    "zip",
+    "rar",
+    "7z",
+    "tar",
+    "gz",
+    "tgz",
+    "xz",
+    "zst",
+    "bz2",
+    "jar",
+    "torrent",
+    "part",
+    "crdownload",
 ];
 
 fn es_sobra(p: &Path) -> bool {
@@ -464,7 +487,11 @@ pub fn principal(args: &[String]) -> i32 {
             &format!(
                 "{} {} de hace más de un mes ({}): {}. ¿Los mando a la papelera? De ahí los puedes recuperar.",
                 sobras.len(),
-                if sobras.len() == 1 { "archivo" } else { "instaladores y comprimidos" },
+                if sobras.len() == 1 {
+                    "archivo"
+                } else {
+                    "instaladores y comprimidos"
+                },
                 tamano(peso_sobras),
                 nombres(&sobras, 4)
             ),

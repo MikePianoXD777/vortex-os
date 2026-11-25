@@ -623,7 +623,9 @@ fn compartir_pantalla_calla_las_notificaciones() {
 
     // Si el gestor se apaga mientras se comparte, no deja al shell callado.
     m.hypr.evento(&["screencast>>1,0"]);
-    esperar("compartiendo otra vez", || m.cuenta("qs.log", "compartiendo true") == 2);
+    esperar("compartiendo otra vez", || {
+        m.cuenta("qs.log", "compartiendo true") == 2
+    });
     m.hypr.cerrar();
     esperar("al salir devuelve las notificaciones", || {
         m.cuenta("qs.log", "compartiendo false") == 2

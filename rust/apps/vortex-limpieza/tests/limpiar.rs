@@ -127,7 +127,11 @@ fn la_carpeta_de_descargas() {
     fs::create_dir_all(home.join("Downloads")).unwrap();
     fs::create_dir_all(&config).unwrap();
     assert_eq!(carpeta_descargas(home, &config), Some(home.join("Downloads")));
-    fs::write(config.join("user-dirs.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/Bajadas\"\n").unwrap();
+    fs::write(
+        config.join("user-dirs.dirs"),
+        "XDG_DOWNLOAD_DIR=\"$HOME/Bajadas\"\n",
+    )
+    .unwrap();
     assert_eq!(carpeta_descargas(home, &config), Some(home.join("Bajadas")));
     // Si apunta al home mismo (sin carpeta de descargas), no se toca nada del home.
     fs::write(config.join("user-dirs.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/\"\n").unwrap();

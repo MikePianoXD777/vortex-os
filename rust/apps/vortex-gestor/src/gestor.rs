@@ -1198,10 +1198,18 @@ impl Gestor {
             config::SHELL_QML,
         );
         let estado = if si { "true" } else { "false" };
-        let args: Vec<String> = ["ipc", "-p", &qml, "call", "notificaciones", "compartiendo", estado]
-            .iter()
-            .map(ToString::to_string)
-            .collect();
+        let args: Vec<String> = [
+            "ipc",
+            "-p",
+            &qml,
+            "call",
+            "notificaciones",
+            "compartiendo",
+            estado,
+        ]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
         let qs = self.r.qs.clone();
         self.l.segundo_plano_con_plazo(&qs, &args, Duration::from_secs(5));
     }
@@ -1230,10 +1238,18 @@ impl Gestor {
                 self.r.shell_qml_env.as_deref(),
                 config::SHELL_QML,
             );
-            let args: Vec<String> = ["ipc", "-p", &qml, "call", "notificaciones", "compartiendo", "false"]
-                .iter()
-                .map(ToString::to_string)
-                .collect();
+            let args: Vec<String> = [
+                "ipc",
+                "-p",
+                &qml,
+                "call",
+                "notificaciones",
+                "compartiendo",
+                "false",
+            ]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
             let qs = self.r.qs.clone();
             self.l.ejecutar(&qs, &args, Some(Duration::from_secs(3)));
         }
