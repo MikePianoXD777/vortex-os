@@ -136,6 +136,10 @@
       "focus": {
         "title": "Silenciar mientras te concentras",
         "desc": "Con un editor, un PDF o un video en pantalla completa, las notificaciones esperan en el panel"
+      },
+      "sharing": {
+        "title": "Silenciar mientras compartes pantalla",
+        "desc": "Mientras haces stream o compartes pantalla, las notificaciones esperan en el panel para que nadie las vea"
       }
     },
     "idle": {
@@ -1681,6 +1685,10 @@
       "one": "Mientras te concentrabas llegó 1 notificación",
       "many": "Mientras te concentrabas llegaron %1 notificaciones",
       "where": "Te esperan en el panel de notificaciones."
+    },
+    "sharing": {
+      "one": "Mientras compartías pantalla llegó 1 notificación",
+      "many": "Mientras compartías pantalla llegaron %1 notificaciones"
     }
   },
   "quickactions": {

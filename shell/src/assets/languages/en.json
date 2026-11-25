@@ -136,6 +136,10 @@
       "focus": {
         "title": "Silence while you focus",
         "desc": "With an editor, a PDF or a video in fullscreen, notifications wait in the panel"
+      },
+      "sharing": {
+        "title": "Silence while you share your screen",
+        "desc": "While you stream or share your screen, notifications wait in the panel so nobody sees them"
       }
     },
     "idle": {
@@ -1681,6 +1685,10 @@
       "one": "1 notification arrived while you focused",
       "many": "%1 notifications arrived while you focused",
       "where": "They're waiting in the notification panel."
+    },
+    "sharing": {
+      "one": "1 notification arrived while you shared your screen",
+      "many": "%1 notifications arrived while you shared your screen"
     }
   },
   "quickactions": {

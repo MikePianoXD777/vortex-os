@@ -143,6 +143,8 @@ pub struct Gestor {
     ia_callado: bool,
     disco_ultimo: i64,
     terminando: bool,
+    /// Se está compartiendo la pantalla (4.4): las notificaciones se callan.
+    compartiendo: bool,
 }
 
 impl Gestor {
@@ -199,6 +201,7 @@ impl Gestor {
             ia_callado: false,
             disco_ultimo: 0,
             terminando: false,
+            compartiendo: false,
         }
     }
 
@@ -238,7 +241,7 @@ impl Gestor {
             "inicio={}\npid={}\nfoco_pid={}\nfoco_clase={}\nfoco_cgroup={}\nfoco_nice={}\n\
              apps={}\njuegos={}\nmodo_juego={}\nfondo_pausado={}\n\
              psi={}\npsi_eventos={}\npsi_ultimo={}\npsi_valor={}\nreclamos={}\nshell_soltar={}\navisos_memoria={}\n\
-             modo_ia={}\nia_programa={}\nia_pid={}\nia_cgroup={}\n",
+             modo_ia={}\nia_programa={}\nia_pid={}\nia_cgroup={}\ncompartiendo={}\n",
             self.inicio,
             std::process::id(),
             self.foco_pid,
@@ -260,6 +263,7 @@ impl Gestor {
             self.ia_nombre,
             self.ia_pid,
             self.ia_cg,
+            u8::from(self.compartiendo),
         );
         let _ = std::fs::write(&self.r.estado, t);
     }
@@ -1164,7 +1168,42 @@ impl Gestor {
                 log(&format!("no puedo vigilar la presión de memoria: {motivo}"));
                 self.guardar_estado();
             }
+            Evento::Compartir(si) => self.en_compartir(si),
         }
+    }
+
+    // ------------------------------------------------------------------------------------ compartir
+
+    /// Compartir la pantalla (4.4): mientras haya un stream, una llamada con pantalla o una grabación por el
+    /// portal, el shell no enseña notificaciones (se guardan en el panel y al terminar dice cuántas llegaron).
+    fn en_compartir(&mut self, si: bool) {
+        if si == self.compartiendo {
+            return;
+        }
+        self.compartiendo = si;
+        log(if si {
+            "se empezó a compartir la pantalla: notificaciones calladas"
+        } else {
+            "se dejó de compartir la pantalla: notificaciones de vuelta"
+        });
+        self.avisar_compartir(si);
+        self.guardar_estado();
+    }
+
+    fn avisar_compartir(&mut self, si: bool) {
+        let qml = procesos::shell_qml_activo(
+            &self.r.proc,
+            self.uid,
+            self.r.shell_qml_env.as_deref(),
+            config::SHELL_QML,
+        );
+        let estado = if si { "true" } else { "false" };
+        let args: Vec<String> = ["ipc", "-p", &qml, "call", "notificaciones", "compartiendo", estado]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        let qs = self.r.qs.clone();
+        self.l.segundo_plano_con_plazo(&qs, &args, Duration::from_secs(5));
     }
 
     // ------------------------------------------------------------------------------------ salida
@@ -1181,6 +1220,22 @@ impl Gestor {
         self.quitar_prioridad();
         if !self.juegos.is_empty() {
             self.terminar_juego();
+        }
+        if self.compartiendo {
+            // Que el shell no se quede callado para siempre.
+            self.compartiendo = false;
+            let qml = procesos::shell_qml_activo(
+                &self.r.proc,
+                self.uid,
+                self.r.shell_qml_env.as_deref(),
+                config::SHELL_QML,
+            );
+            let args: Vec<String> = ["ipc", "-p", &qml, "call", "notificaciones", "compartiendo", "false"]
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            let qs = self.r.qs.clone();
+            self.l.ejecutar(&qs, &args, Some(Duration::from_secs(3)));
         }
         // Las apps que siguen abiertas vuelven al peso normal de systemd.
         for cg in self.mis_cg.keys().cloned().collect::<Vec<_>>() {

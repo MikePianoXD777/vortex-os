@@ -53,7 +53,7 @@
 #   cd packaging/vortex-rust && makepkg -si
 pkgname=vortex-rust
 pkgver=0.1.0
-pkgrel=22
+pkgrel=23
 pkgdesc="Programas de Vortexine's OS reescritos en Rust (Bluetooth, gestor de recursos, tareas, USB, enlace, memoria, tirones, Task Manager, Runner, Video, Shop, App Installer, Connect, Shared, Camera, Player, Local AI, Miku, traducir y limpieza)"
 arch=('x86_64')
 url='https://github.com/MikePianoXD777/vortex-os'

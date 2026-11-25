@@ -592,3 +592,40 @@ fn reinicio_recupera_el_modo_juego_propio() {
     });
     assert!(!m.marca("modo-juego").exists());
 }
+
+/// 4.4: al compartir la pantalla (Discord, OBS, el navegador) el shell calla las notificaciones, y al terminar
+/// (o si el gestor se apaga a medias) las devuelve.
+#[test]
+fn compartir_pantalla_calla_las_notificaciones() {
+    let mut m = mundo_base();
+    *m.hypr.clientes.lock().unwrap() =
+        r#"[{"address": "0xaaa1", "class": "kitty", "contentType": "none"}]"#.into();
+    m.hypr.activa(4001, "aaa1", "kitty", "none");
+    m.conf("DEPURAR=1\n");
+    m.iniciar();
+    esperar("kitty enfocada", || m.est("foco_pid=4001"));
+
+    m.hypr.evento(&["screencast>>1,0"]);
+    esperar("se avisa al shell que se comparte", || {
+        m.en_log("qs.log", "call notificaciones compartiendo true")
+    });
+    assert!(m.est("compartiendo=1"), "{}", m.estado());
+    // Repetido no vuelve a llamar al shell.
+    m.hypr.evento(&["screencast>>1,1"]);
+    dormir(300);
+    assert_eq!(m.cuenta("qs.log", "compartiendo true"), 1);
+
+    m.hypr.evento(&["screencast>>0,0"]);
+    esperar("se le devuelven las notificaciones", || {
+        m.en_log("qs.log", "call notificaciones compartiendo false")
+    });
+    assert!(m.est("compartiendo=0"), "{}", m.estado());
+
+    // Si el gestor se apaga mientras se comparte, no deja al shell callado.
+    m.hypr.evento(&["screencast>>1,0"]);
+    esperar("compartiendo otra vez", || m.cuenta("qs.log", "compartiendo true") == 2);
+    m.hypr.cerrar();
+    esperar("al salir devuelve las notificaciones", || {
+        m.cuenta("qs.log", "compartiendo false") == 2
+    });
+}

@@ -33,6 +33,9 @@ pub enum Evento {
     PsiMemoria,
     /// No se puede vigilar la presión.
     PsiNo(String),
+    /// Se empezó (true) o se dejó (false) de compartir la pantalla o una ventana (Discord, OBS, el
+    /// navegador…): Hyprland lo avisa con `screencast>>ESTADO,DUEÑO` (4.4).
+    Compartir(bool),
 }
 
 // ---------------------------------------------------------------- la lectura de los JSON de Hyprland
@@ -311,6 +314,13 @@ impl Oido {
                 self.ultima = "?".into();
             }
             sal.push(Evento::Cierra { dir: dir.to_string() });
+        } else if let Some(r) = l.strip_prefix("screencast>>") {
+            // ESTADO,DUEÑO: 1 = empezó, 0 = terminó (el dueño dice si es un monitor o una ventana).
+            match r.split(',').next() {
+                Some("1") => sal.push(Evento::Compartir(true)),
+                Some("0") => sal.push(Evento::Compartir(false)),
+                _ => {}
+            }
         }
     }
 

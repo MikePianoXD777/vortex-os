@@ -72,6 +72,7 @@ GuideTab {
 
     property bool dnd: notifSettings && notifSettings.dnd !== undefined ? notifSettings.dnd : false
     property bool concentracion: !(notifSettings && notifSettings.concentracion === false)
+    property bool compartir: !(notifSettings && notifSettings.compartir === false)
     property string position: notifSettings && notifSettings.position !== undefined ? notifSettings.position : "top right"
     property int horizontalPosition: {
         if (position !== "custom") {
@@ -170,6 +171,7 @@ GuideTab {
             : notificationsTabRoot.defaultNotificationSettings;
         notificationsTabRoot.dnd = s.dnd !== undefined ? s.dnd : false;
         notificationsTabRoot.concentracion = s.concentracion !== false;
+        notificationsTabRoot.compartir = s.compartir !== false;
         notificationsTabRoot.position = s.position !== undefined ? s.position : "top right";
         if (notificationsTabRoot.position !== "custom") {
             notificationsTabRoot.horizontalPosition = notificationsTabRoot.position.indexOf("left") !== -1 ? presetLeftH : (notificationsTabRoot.position.indexOf("center") !== -1 ? presetCenterH : presetRightH);

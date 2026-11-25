@@ -125,7 +125,17 @@ PanelWindow {
         let n = Config.getSetting("notifications", {});
         return !(n && n.concentracion === false);
     }
+    // 4.4: al compartir la pantalla (Discord, OBS, el navegador) se callan solas, para que nadie vea tus
+    // mensajes en el stream. Lo avisa el gestor por IPC (notificaciones compartiendo true|false) cuando
+    // Hyprland dice que empezó o terminó. Se apaga en Ajustes («compartir»: false).
+    property bool compartiendo: false
+    property bool compartirActivo: {
+        let n = Config.getSetting("notifications", {});
+        return !(n && n.compartir === false);
+    }
+    readonly property bool calladoCompartiendo: compartiendo && compartirActivo && !jugando
     readonly property bool concentrado: {
+        if (calladoCompartiendo) return true;
         if (!concentracionActiva || !isFullscreenActive || jugando) return false;
         let c = String(CurrentFocus.appClass || "").toLowerCase();
         for (let i = 0; i < appsConcentracion.length; i++) {
@@ -143,15 +153,20 @@ PanelWindow {
         }
     }
 
+    property bool eraCompartiendo: false
     onConcentradoChanged: {
         if (concentrado) {
             perdidasConcentrado = 0;
+            eraCompartiendo = calladoCompartiendo;
         } else if (perdidasConcentrado > 0) {
             let n = perdidasConcentrado;
             perdidasConcentrado = 0;
+            let comp = eraCompartiendo;
             Quickshell.execDetached(["notify-send", "-a", "Vortexine's OS", "-i", "notifications",
-                n === 1 ? I18n.t("notifications.focus.one", "1 notification arrived while you focused")
-                        : I18n.t("notifications.focus.many", "%1 notifications arrived while you focused").arg(n),
+                comp ? (n === 1 ? I18n.t("notifications.sharing.one", "1 notification arrived while you shared your screen")
+                                : I18n.t("notifications.sharing.many", "%1 notifications arrived while you shared your screen").arg(n))
+                     : (n === 1 ? I18n.t("notifications.focus.one", "1 notification arrived while you focused")
+                                : I18n.t("notifications.focus.many", "%1 notifications arrived while you focused").arg(n)),
                 I18n.t("notifications.focus.where", "They're waiting in the notification panel.")]);
         }
     }
@@ -161,6 +176,10 @@ PanelWindow {
 
         function jugando(estado: bool): void {
             popupWindow.jugando = estado;
+        }
+
+        function compartiendo(estado: bool): void {
+            popupWindow.compartiendo = estado;
         }
     }
 
@@ -185,6 +204,7 @@ PanelWindow {
             let n = Config.getSetting("notifications", { "dnd": false, "position": "top right" });
             popupWindow.dndEnabled = Boolean(n && n.dnd);
             popupWindow.concentracionActiva = !(n && n.concentracion === false);
+            popupWindow.compartirActivo = !(n && n.compartir === false);
             popupWindow.position = (n && n.position !== undefined) ? n.position : "top right";
             popupWindow.horizontalPosition = (n && n.horizontalPosition !== undefined) ? n.horizontalPosition : 95;
             popupWindow.verticalPosition = (n && n.verticalPosition !== undefined) ? n.verticalPosition : 5;

@@ -51,6 +51,26 @@ SettingsBlob {
 
     SettingsRow {
         rootObj: section.tab.rootObj
+        icon: "󰹑"
+        title: I18n.t("guide.notifications.sharing.title", "Silence while you share your screen")
+        description: I18n.t("guide.notifications.sharing.desc", "While you stream or share your screen, notifications wait in the panel so nobody sees them")
+
+        Toggle {
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+            checked: section.tab.compartir
+            accentColor: ThemeBackend.mauve
+            baseColor: ThemeBackend.surface1
+            handleColor: ThemeBackend.crust
+            handleOffColor: ThemeBackend.text
+            onToggled: function(c) {
+                section.tab.compartir = c;
+                section.tab.updateNotifSetting("compartir", c);
+            }
+        }
+    }
+
+    SettingsRow {
+        rootObj: section.tab.rootObj
         icon: "󰋑"
         title: I18n.t("guide.notifications.empty_graphic.title")
         description: I18n.t("guide.notifications.empty_graphic.desc")
