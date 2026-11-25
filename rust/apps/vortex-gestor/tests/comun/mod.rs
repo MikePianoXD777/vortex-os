@@ -225,6 +225,7 @@ impl Mundo {
             .env("XDG_STATE_HOME", p.join("estado"))
             .env("XDG_CONFIG_HOME", p.join("conf"))
             .env("VORTEX_GESTOR_PROC", &self.proc)
+            .env("VORTEX_GESTOR_DEV", p.join("dev"))
             .env("VORTEX_GESTOR_CGROOT", &self.cgr)
             .env("VORTEX_GESTOR_SCX", p.join("scx"))
             .env("VORTEX_GESTOR_PSI", p.join("psi"))

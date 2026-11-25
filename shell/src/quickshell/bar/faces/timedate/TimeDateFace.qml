@@ -83,7 +83,9 @@ Item {
 
     property real lengthPadding: isVertical ? s(isCompact ? 10 : 12) : s(isCompact ? 12 : 14)
     // 4.4: la batería de los audífonos y controles va junto al reloj (solo en la barra horizontal).
-    readonly property real bateriaLength: (!isVertical && bateria.visible) ? bateria.implicitWidth + s(isCompact ? 8 : 10) : 0
+    // 4.5: y el aviso de micrófono y cámara en uso, después de la batería.
+    readonly property real bateriaLength: ((!isVertical && bateria.visible) ? bateria.implicitWidth + s(isCompact ? 8 : 10) : 0)
+        + ((!isVertical && enUso.visible) ? enUso.implicitWidth + s(isCompact ? 8 : 10) : 0)
     property real targetLength: (faceLoader.item ? (isVertical ? faceLoader.item.implicitHeight : faceLoader.item.implicitWidth) : 0) + (lengthPadding * 2) + bateriaLength
 
     implicitWidth: isVertical ? (parent ? parent.width : 0) : targetLength
@@ -118,6 +120,17 @@ Item {
         visible: !root.isVertical && lista.length > 0
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: faceLoader.right
+        anchors.leftMargin: root.s(root.isCompact ? 8 : 10)
+        tam: root.s(root.isCompact ? 11 : 12)
+        tamIcono: root.s(root.isCompact ? 13 : 14)
+    }
+
+    EnUso {
+        id: enUso
+        z: 3
+        visible: !root.isVertical && (microfono.length > 0 || camara.length > 0)
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: bateria.visible ? bateria.right : faceLoader.right
         anchors.leftMargin: root.s(root.isCompact ? 8 : 10)
         tam: root.s(root.isCompact ? 11 : 12)
         tamIcono: root.s(root.isCompact ? 13 : 14)

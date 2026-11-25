@@ -125,3 +125,27 @@ pub fn hijo_sin_mascara(cmd: &mut std::process::Command) {
         });
     }
 }
+
+/// 4.5: un descriptor de inotify (bloqueante: lo lee un hilo propio que duerme mientras no pase nada).
+pub fn inotify_nuevo() -> io::Result<OwnedFd> {
+    // SAFETY: inotify_init1 solo recibe banderas y devuelve un descriptor nuevo o -1.
+    let fd = unsafe { libc::inotify_init1(libc::IN_CLOEXEC) };
+    if fd < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: el descriptor es nuevo y solo lo tiene este OwnedFd.
+    Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+}
+
+/// Vigila `ruta` con la máscara de inotify; devuelve el «watch descriptor».
+pub fn inotify_vigilar(fd: &impl AsRawFd, ruta: &Path, mascara: u32) -> io::Result<i32> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut c = ruta.as_os_str().as_bytes().to_vec();
+    c.push(0);
+    // SAFETY: la ruta termina en 0 y vive durante la llamada; fd es un inotify abierto.
+    let wd = unsafe { libc::inotify_add_watch(fd.as_raw_fd(), c.as_ptr().cast(), mascara) };
+    if wd < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(wd)
+}

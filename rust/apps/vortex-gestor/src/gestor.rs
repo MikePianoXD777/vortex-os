@@ -1287,6 +1287,8 @@ impl Gestor {
             }
         };
         self.recuperar();
+        // 4.5: el aviso de cámara en uso (un hilo que duerme hasta que alguien abre una cámara).
+        crate::camara::arrancar(self.r.dev.clone(), self.r.proc.clone(), self.r.estado_dir.clone());
         let psi = self.r.psi.clone();
         // Con VORTEX_GESTOR_INYECTAR (solo las pruebas) los avisos llegan por ese FIFO y no se registra el
         // disparador en el archivo: con un archivo falso, escribirlo cambiaría su contenido.

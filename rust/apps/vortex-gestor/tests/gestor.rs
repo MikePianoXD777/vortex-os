@@ -656,3 +656,39 @@ fn anota_las_apps_cerradas_para_reabrirlas() {
         std::fs::read_to_string(&cerradas).is_ok_and(|t| t == "org.gnome.Nautilus\nfirefox\n")
     });
 }
+
+#[test]
+fn avisa_quien_usa_la_camara() {
+    let mut m = mundo_base();
+    let dev = m.p().join("dev");
+    std::fs::create_dir_all(&dev).unwrap();
+    std::fs::write(dev.join("video0"), "").unwrap();
+    m.iniciar();
+    let arch = m.run.join("vortex/camara");
+    esperar("al arrancar, nadie la usa", || {
+        std::fs::read_to_string(&arch).is_ok_and(|t| t.is_empty())
+    });
+    // Discord la abre (un proceso con un descriptor hacia la cámara).
+    let pid = m.proc.join("7001");
+    std::fs::create_dir_all(pid.join("fd")).unwrap();
+    std::fs::write(pid.join("comm"), "Discord\n").unwrap();
+    std::os::unix::fs::symlink(dev.join("video0"), pid.join("fd/20")).unwrap();
+    drop(std::fs::File::open(dev.join("video0")).unwrap());
+    esperar("se anota quién la usa", || {
+        std::fs::read_to_string(&arch).is_ok_and(|t| t == "Discord\n")
+    });
+    // La suelta.
+    std::fs::remove_file(pid.join("fd/20")).unwrap();
+    drop(std::fs::File::open(dev.join("video0")).unwrap());
+    esperar("ya nadie", || {
+        std::fs::read_to_string(&arch).is_ok_and(|t| t.is_empty())
+    });
+    // Una cámara USB nueva también se vigila.
+    std::fs::write(dev.join("video2"), "").unwrap();
+    dormir(1800);
+    std::os::unix::fs::symlink(dev.join("video2"), pid.join("fd/21")).unwrap();
+    drop(std::fs::File::open(dev.join("video2")).unwrap());
+    esperar("la nueva también", || {
+        std::fs::read_to_string(&arch).is_ok_and(|t| t == "Discord\n")
+    });
+}

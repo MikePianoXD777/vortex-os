@@ -151,6 +151,8 @@ impl Ajustes {
 pub struct Rutas {
     pub run: PathBuf,
     pub proc: PathBuf,
+    /// 4.5: donde están las cámaras (/dev/videoN), para el aviso de cámara en uso.
+    pub dev: PathBuf,
     pub cgroot: PathBuf,
     pub scx: PathBuf,
     pub psi: PathBuf,
@@ -214,6 +216,7 @@ impl Rutas {
         let estado_dir = run.join("vortex");
         Rutas {
             proc: var("VORTEX_GESTOR_PROC", "/proc").into(),
+            dev: var("VORTEX_GESTOR_DEV", "/dev").into(),
             cgroot: var("VORTEX_GESTOR_CGROOT", "/sys/fs/cgroup").into(),
             scx: var("VORTEX_GESTOR_SCX", "/sys/kernel/sched_ext/state").into(),
             psi: var("VORTEX_GESTOR_PSI", "/proc/pressure/memory").into(),
