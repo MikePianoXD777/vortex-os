@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import "../../../reusables"
 import "../../../"
 import "../../"
+import "."
 
 Item {
     id: root

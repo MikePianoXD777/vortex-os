@@ -100,7 +100,7 @@ Uso: vortex <comando>
   rendimiento [estado|ultra|alto|medio|bajo]
                                        perfil de rendimiento: menos efectos y memoria para PCs modestas
                                        (también en Ajustes → Pantalla; de fábrica, ultra)
-  daltonismo [estado|protanopia|deuteranopia|tritanopia|grises|no]
+  daltonismo [estado|rojo|verde|azul|grises|no]
                                        filtro de pantalla que corrige los colores para daltonismo
                                        (rojo, verde o azul) o todo en grises (Ajustes → Pantalla)
   diseno [estado|mezcla|anterior]      el diseño nuevo (islas, Obsidian, Inter) o el de antes
@@ -1383,11 +1383,12 @@ SHADERS_PANTALLA=/usr/share/serpantinum/src/assets/shaders/pantalla
 
 cmd_daltonismo() {
   local modo="${1:-estado}" ruta="" ajustes nuevos
+  case "$modo" in rojo) modo=protanopia ;; verde) modo=deuteranopia ;; azul) modo=tritanopia ;; esac
   case "$modo" in
     estado) cat "$DALTONISMO" 2>/dev/null || echo no; return 0 ;;
     protanopia | deuteranopia | tritanopia | grises) ruta="$SHADERS_PANTALLA/daltonismo-$modo.frag" ;;
     no | off | ninguno) modo=no ;;
-    *) aviso "usa: vortex daltonismo [estado|protanopia|deuteranopia|tritanopia|grises|no]"; exit 1 ;;
+    *) aviso "usa: vortex daltonismo [estado|rojo|verde|azul|grises|no]"; exit 1 ;;
   esac
   [[ -z "$ruta" || -f "$ruta" ]] || { aviso "falta $ruta (corre «vortex actualizar»)"; exit 1; }
   mkdir -p "$CONF"
