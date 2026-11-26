@@ -5,7 +5,8 @@
 //!   vortex-mascota estado       dice si está y cuál aspecto usa
 //!   vortex-mascota usar RUTA    copia un paquete como el tuyo: de tiras (animations.json +
 //!                               spritesheets_128/) o Shimeji (shime1.png…); también un .zip
-//!   vortex-mascota original     vuelve al diseño original
+//!   vortex-mascota miku         vuelve a Miku, la de fábrica (sprites de Mike y Ameyali)
+//!   vortex-mascota original     usa el diseño original de antes
 //!   vortex-mascota hoja A.png   saca los cuadros del aspecto que se usa a un PNG
 //!
 //! La ventana es una capa de Wayland (wlr-layer-shell, capa «top»: arriba de las ventanas, abajo de
@@ -118,7 +119,7 @@ fn main() -> ExitCode {
                 None => println!("apagada, aspecto: {}", a.nombre),
             }
             if let Some(e) = error {
-                println!("tu paquete no se pudo leer ({e}): se usa la original");
+                println!("tu paquete no se pudo leer ({e}): se usa la de fábrica");
             }
             ExitCode::SUCCESS
         }
@@ -132,8 +133,22 @@ fn main() -> ExitCode {
             }
         },
         Some("original") => {
-            let _ = std::fs::remove_dir_all(aspecto::carpeta());
+            // La marca va dentro de la carpeta propia: así «usar» (que la reemplaza) la quita sola.
+            let c = aspecto::carpeta();
+            let _ = std::fs::remove_dir_all(&c);
+            if let Err(e) =
+                std::fs::create_dir_all(&c).and_then(|()| std::fs::write(c.join(aspecto::MARCA_ORIGINAL), ""))
+            {
+                eprintln!("No pude guardar la elección en {}: {e}", c.display());
+                return ExitCode::FAILURE;
+            }
             println!("Listo: vuelve el diseño original.");
+            reiniciar_si_corre();
+            ExitCode::SUCCESS
+        }
+        Some("miku") => {
+            let _ = std::fs::remove_dir_all(aspecto::carpeta());
+            println!("Listo: vuelve Miku, la compañera de fábrica.");
             reiniciar_si_corre();
             ExitCode::SUCCESS
         }
@@ -155,7 +170,9 @@ fn main() -> ExitCode {
             }
         }
         Some(otro) => {
-            eprintln!("vortex-mascota: no conozco «{otro}» (iniciar, apagar, estado, usar, original, hoja)");
+            eprintln!(
+                "vortex-mascota: no conozco «{otro}» (iniciar, apagar, estado, usar, miku, original, hoja)"
+            );
             ExitCode::from(2)
         }
     }
@@ -419,7 +436,7 @@ fn correr() -> Result<(), String> {
 
     let (aspecto, error) = aspecto::cargar(ESCALA_ORIGINAL);
     if let Some(e) = error {
-        eprintln!("vortex-mascota: tu paquete no se pudo leer ({e}); uso la original");
+        eprintln!("vortex-mascota: tu paquete no se pudo leer ({e}); uso la de fábrica");
     }
     let (ancho, arriba, abajo) = aspecto.tamano_maximo();
     let w = ancho.max(lienzo::ANCHO_MINIMO);

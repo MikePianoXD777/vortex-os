@@ -1,0 +1,8 @@
+Compañera de escritorio «Miku»: sprites hechos por Mike (MikePianoXD777) y Ameyali.
+
+Es la compañera de fábrica de Vortexine's OS (vortex-mascota). Son 32 × 32 pixeles por cuadro,
+guardados al 4× (spritesheets_128/), con sus animaciones en animations.json.
+
+El personaje es Miku Nakano, de «Gotōbun no Hanayome» (The Quintessential Quintuplets),
+© Negi Haruba / Kodansha. Es fan art hecho a mano y sin fines de lucro: Vortexine's OS es gratis
+y estos sprites no se venden ni se usan para vender nada.

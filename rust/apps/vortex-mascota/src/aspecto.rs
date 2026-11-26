@@ -572,17 +572,37 @@ pub fn carpeta() -> PathBuf {
     datos.join("vortex/mascota")
 }
 
-/// La propia si hay una que sirva; si no (o si falla al leerla), la original.
+/// La compañera de fábrica (4.5.1): la Miku de Mike y Ameyali, que trae el paquete vortex-rust.
+pub fn fabrica() -> PathBuf {
+    std::env::var_os("VORTEX_MASCOTA_FABRICA")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/usr/share/vortex/mascota/miku"))
+}
+
+/// La marca de «vortex mascota original»: dentro de la carpeta propia, así «usar» la borra sola.
+pub const MARCA_ORIGINAL: &str = "usar-original";
+
+/// La propia si hay una que sirva; si no, la Miku de fábrica; si tampoco (o con «original»), la original.
 pub fn cargar(escala_original: f32) -> (Aspecto, Option<String>) {
-    let c = carpeta();
-    let propia = match Aspecto::tiras(&c) {
-        Ok(None) => Aspecto::shimeji(&c),
+    cargar_de(&carpeta(), &fabrica(), escala_original)
+}
+
+pub fn cargar_de(propia: &Path, fabrica: &Path, escala_original: f32) -> (Aspecto, Option<String>) {
+    if propia.join(MARCA_ORIGINAL).exists() {
+        return (Aspecto::original(escala_original), None);
+    }
+    let leida = match Aspecto::tiras(propia) {
+        Ok(None) => Aspecto::shimeji(propia),
         otro => otro,
     };
-    match propia {
-        Ok(Some(a)) => (a, None),
-        Ok(None) => (Aspecto::original(escala_original), None),
-        Err(e) => (Aspecto::original(escala_original), Some(e)),
+    let error = match leida {
+        Ok(Some(a)) => return (a, None),
+        Ok(None) => None,
+        Err(e) => Some(e),
+    };
+    match Aspecto::tiras(fabrica) {
+        Ok(Some(a)) => (a, error),
+        _ => (Aspecto::original(escala_original), error),
     }
 }
 
@@ -651,6 +671,25 @@ mod pruebas {
             a.cuadro(Anim::Caminando, 0.0, 1).px,
             a.cuadro(Anim::Caminando, 0.2, 1).px
         );
+    }
+
+    #[test]
+    fn de_fabrica_sale_miku() {
+        let miku = Path::new(env!("CARGO_MANIFEST_DIR")).join("miku");
+        let t = std::env::temp_dir().join(format!("vortex-mascota-fabrica-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&t);
+        // Sin paquete propio: la Miku de fábrica, con sus animaciones de ocio.
+        let (a, e) = cargar_de(&t, &miku, 3.0);
+        assert_eq!((a.nombre.as_str(), e), ("miku", None));
+        assert!(a.ocios > 0);
+        // Con «vortex mascota original»: la original.
+        std::fs::create_dir_all(&t).unwrap();
+        std::fs::write(t.join(MARCA_ORIGINAL), "").unwrap();
+        assert_eq!(cargar_de(&t, &miku, 3.0).0.nombre, "original");
+        // Sin la de fábrica instalada: la original.
+        std::fs::remove_file(t.join(MARCA_ORIGINAL)).unwrap();
+        assert_eq!(cargar_de(&t, &t.join("nada"), 3.0).0.nombre, "original");
+        let _ = std::fs::remove_dir_all(&t);
     }
 
     #[test]

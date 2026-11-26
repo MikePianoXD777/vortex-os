@@ -64,7 +64,7 @@ Uso: vortex <comando>
   fondo [ARCHIVO]                      pone un fondo (y los colores del sistema salen de él)
   fondo-agregar [ARCHIVO...]           copia videos (mp4, mov, mkv, webm, avi…) o imágenes a tus fondos
                                        y pone el primero; sin archivos, los eliges en una ventana
-  mascota [on|off|voz on|off|usar CARPETA|original]
+  mascota [on|off|voz on|off|usar CARPETA|miku|original]
                                        la compañera de escritorio: camina por tu pantalla, se sube a las
                                        ventanas y se esconde cuando juegas («usar»: tu propio paquete Shimeji)
   fondos-auto [estado|ya]              fondos que cambian solos (cada cuánto: Ajustes → Tema); «ya» pone otro
@@ -377,8 +377,8 @@ cmd_mascota() {
         estado) if [[ -e "$CONF/mascota-callada" ]]; then echo "callada"; else echo "habla"; fi ;;
         *) aviso "uso: vortex mascota voz [on|off|estado]"; exit 1 ;;
       esac ;;
-    usar | original | estado | hoja) exec vortex-mascota "$@" ;;
-    *) aviso "uso: vortex mascota [on|off|alternar|estado|voz on|off|usar CARPETA|ARCHIVO.zip|original]"; exit 1 ;;
+    usar | miku | original | estado | hoja) exec vortex-mascota "$@" ;;
+    *) aviso "uso: vortex mascota [on|off|alternar|estado|voz on|off|usar CARPETA|ARCHIVO.zip|miku|original]"; exit 1 ;;
   esac
 }
 

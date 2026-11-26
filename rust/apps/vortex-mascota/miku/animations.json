@@ -1,0 +1,521 @@
+{
+  "frame_size_native": [
+    32,
+    32
+  ],
+  "frame_size_x4": [
+    128,
+    128
+  ],
+  "anchor": "pies en la fila inferior",
+  "nota": "walk_side, run_side y point miran a la derecha: voltea horizontal para la izquierda",
+  "animations": {
+    "idle": {
+      "frames": 4,
+      "durations_ms": [
+        280,
+        280,
+        280,
+        280
+      ],
+      "loop": true,
+      "desc": "respira"
+    },
+    "blink": {
+      "frames": 4,
+      "durations_ms": [
+        1600,
+        60,
+        100,
+        60
+      ],
+      "loop": true,
+      "desc": "parpadeo"
+    },
+    "look_around": {
+      "frames": 6,
+      "durations_ms": [
+        380,
+        380,
+        380,
+        380,
+        380,
+        380
+      ],
+      "loop": true,
+      "desc": "mira a los lados"
+    },
+    "walk_side": {
+      "frames": 6,
+      "durations_ms": [
+        140,
+        140,
+        140,
+        140,
+        140,
+        140
+      ],
+      "loop": true,
+      "desc": "caminar de perfil (mira a la derecha; voltea para izquierda)"
+    },
+    "run_side": {
+      "frames": 4,
+      "durations_ms": [
+        90,
+        90,
+        90,
+        90
+      ],
+      "loop": true,
+      "desc": "correr de perfil"
+    },
+    "walk_front": {
+      "frames": 4,
+      "durations_ms": [
+        160,
+        160,
+        160,
+        160
+      ],
+      "loop": true,
+      "desc": "caminar de frente"
+    },
+    "jump": {
+      "frames": 5,
+      "durations_ms": [
+        140,
+        110,
+        160,
+        110,
+        160
+      ],
+      "loop": false,
+      "desc": "saltar y aterrizar"
+    },
+    "fall": {
+      "frames": 2,
+      "durations_ms": [
+        110,
+        110
+      ],
+      "loop": true,
+      "desc": "cayendo"
+    },
+    "drag": {
+      "frames": 2,
+      "durations_ms": [
+        200,
+        200
+      ],
+      "loop": true,
+      "desc": "arrastrada con el mouse"
+    },
+    "tumble": {
+      "frames": 4,
+      "durations_ms": [
+        90,
+        90,
+        90,
+        90
+      ],
+      "loop": true,
+      "desc": "lanzada, girando"
+    },
+    "climb": {
+      "frames": 2,
+      "durations_ms": [
+        200,
+        200
+      ],
+      "loop": true,
+      "desc": "trepar pared"
+    },
+    "hang": {
+      "frames": 2,
+      "durations_ms": [
+        320,
+        320
+      ],
+      "loop": true,
+      "desc": "colgada del techo/ventana"
+    },
+    "peek": {
+      "frames": 5,
+      "durations_ms": [
+        300,
+        500,
+        500,
+        600,
+        300
+      ],
+      "loop": true,
+      "desc": "se asoma desde abajo"
+    },
+    "sit": {
+      "frames": 3,
+      "durations_ms": [
+        600,
+        600,
+        500
+      ],
+      "loop": true,
+      "desc": "sentada"
+    },
+    "sit_swing": {
+      "frames": 2,
+      "durations_ms": [
+        300,
+        300
+      ],
+      "loop": true,
+      "desc": "sentada moviendo pies"
+    },
+    "sleep_stand": {
+      "frames": 4,
+      "durations_ms": [
+        450,
+        450,
+        450,
+        450
+      ],
+      "loop": true,
+      "desc": "dormida de pie"
+    },
+    "sleep_sit": {
+      "frames": 4,
+      "durations_ms": [
+        450,
+        450,
+        450,
+        450
+      ],
+      "loop": true,
+      "desc": "dormida sentada"
+    },
+    "sleep_lie": {
+      "frames": 4,
+      "durations_ms": [
+        500,
+        500,
+        500,
+        500
+      ],
+      "loop": true,
+      "desc": "dormida acostada"
+    },
+    "stretch": {
+      "frames": 5,
+      "durations_ms": [
+        300,
+        400,
+        400,
+        300,
+        400
+      ],
+      "loop": false,
+      "desc": "estirarse / despertar"
+    },
+    "wave": {
+      "frames": 4,
+      "durations_ms": [
+        180,
+        180,
+        180,
+        180
+      ],
+      "loop": true,
+      "desc": "saludar"
+    },
+    "wave_both": {
+      "frames": 2,
+      "durations_ms": [
+        180,
+        180
+      ],
+      "loop": true,
+      "desc": "saludar con ambas manos"
+    },
+    "cheer": {
+      "frames": 4,
+      "durations_ms": [
+        170,
+        170,
+        170,
+        170
+      ],
+      "loop": true,
+      "desc": "festejar con confeti"
+    },
+    "laugh": {
+      "frames": 4,
+      "durations_ms": [
+        120,
+        120,
+        120,
+        120
+      ],
+      "loop": true,
+      "desc": "carcajada"
+    },
+    "love": {
+      "frames": 4,
+      "durations_ms": [
+        240,
+        240,
+        240,
+        240
+      ],
+      "loop": true,
+      "desc": "enamorada"
+    },
+    "shy": {
+      "frames": 3,
+      "durations_ms": [
+        350,
+        350,
+        350
+      ],
+      "loop": true,
+      "desc": "penosa"
+    },
+    "sad": {
+      "frames": 2,
+      "durations_ms": [
+        600,
+        600
+      ],
+      "loop": true,
+      "desc": "triste"
+    },
+    "cry": {
+      "frames": 4,
+      "durations_ms": [
+        160,
+        160,
+        160,
+        160
+      ],
+      "loop": true,
+      "desc": "llorando"
+    },
+    "angry": {
+      "frames": 4,
+      "durations_ms": [
+        160,
+        160,
+        160,
+        160
+      ],
+      "loop": true,
+      "desc": "enojada"
+    },
+    "surprised": {
+      "frames": 2,
+      "durations_ms": [
+        150,
+        700
+      ],
+      "loop": false,
+      "desc": "sorpresa (!)"
+    },
+    "confused": {
+      "frames": 2,
+      "durations_ms": [
+        500,
+        500
+      ],
+      "loop": true,
+      "desc": "confundida (?)"
+    },
+    "think": {
+      "frames": 4,
+      "durations_ms": [
+        400,
+        400,
+        400,
+        400
+      ],
+      "loop": true,
+      "desc": "pensando"
+    },
+    "dizzy": {
+      "frames": 4,
+      "durations_ms": [
+        140,
+        140,
+        140,
+        140
+      ],
+      "loop": true,
+      "desc": "mareada"
+    },
+    "nervous": {
+      "frames": 4,
+      "durations_ms": [
+        220,
+        220,
+        220,
+        220
+      ],
+      "loop": true,
+      "desc": "nerviosa"
+    },
+    "sing": {
+      "frames": 4,
+      "durations_ms": [
+        260,
+        260,
+        260,
+        260
+      ],
+      "loop": true,
+      "desc": "cantando"
+    },
+    "dance": {
+      "frames": 4,
+      "durations_ms": [
+        200,
+        200,
+        200,
+        200
+      ],
+      "loop": true,
+      "desc": "bailando"
+    },
+    "clap": {
+      "frames": 2,
+      "durations_ms": [
+        130,
+        130
+      ],
+      "loop": true,
+      "desc": "aplaudir"
+    },
+    "shake_no": {
+      "frames": 4,
+      "durations_ms": [
+        120,
+        120,
+        120,
+        120
+      ],
+      "loop": true,
+      "desc": "negar"
+    },
+    "nod": {
+      "frames": 2,
+      "durations_ms": [
+        220,
+        220
+      ],
+      "loop": true,
+      "desc": "asentir"
+    },
+    "point": {
+      "frames": 2,
+      "durations_ms": [
+        300,
+        300
+      ],
+      "loop": true,
+      "desc": "señalar (voltea para izquierda)"
+    },
+    "headpat": {
+      "frames": 4,
+      "durations_ms": [
+        220,
+        220,
+        220,
+        220
+      ],
+      "loop": true,
+      "desc": "caricia al hacer click"
+    },
+    "wink": {
+      "frames": 2,
+      "durations_ms": [
+        700,
+        300
+      ],
+      "loop": true,
+      "desc": "guiño"
+    },
+    "bored": {
+      "frames": 4,
+      "durations_ms": [
+        240,
+        240,
+        240,
+        240
+      ],
+      "loop": true,
+      "desc": "aburrida, golpea el pie"
+    },
+    "faint": {
+      "frames": 4,
+      "durations_ms": [
+        200,
+        300,
+        300,
+        300
+      ],
+      "loop": true,
+      "desc": "se desmaya"
+    },
+    "gaming": {
+      "frames": 4,
+      "durations_ms": [
+        140,
+        140,
+        140,
+        140
+      ],
+      "loop": true,
+      "desc": "jugando con control"
+    },
+    "coffee": {
+      "frames": 5,
+      "durations_ms": [
+        400,
+        600,
+        600,
+        300,
+        300
+      ],
+      "loop": true,
+      "desc": "tomando café"
+    },
+    "read": {
+      "frames": 3,
+      "durations_ms": [
+        800,
+        800,
+        120
+      ],
+      "loop": true,
+      "desc": "leyendo"
+    },
+    "phone": {
+      "frames": 4,
+      "durations_ms": [
+        450,
+        450,
+        450,
+        450
+      ],
+      "loop": true,
+      "desc": "viendo el celular"
+    },
+    "typing": {
+      "frames": 4,
+      "durations_ms": [
+        110,
+        110,
+        110,
+        110
+      ],
+      "loop": true,
+      "desc": "tecleando en laptop"
+    }
+  }
+}
