@@ -11,7 +11,7 @@ cosas al azar.
 ## Lo que necesitas
 
 - **Una PC o laptop** con al menos **4 GB de RAM** (mejor 8 GB) y **30 GB libres** en el disco.
-- **Una USB de 8 GB o más.** Se borra todo lo que tenga: saca antes lo que quieras guardar.
+- **Una USB de 16 GB o más.** Se borra todo lo que tenga: saca antes lo que quieras guardar.
 - **Internet.** La primera vez, mejor con cable o con un Wi-Fi que jale bien.
 - **Una hora** sin prisa, con la laptop conectada a la corriente.
 
@@ -36,34 +36,36 @@ partidas guardadas**. Con la opción **A** todo lo del disco se borra y **no se 
 ## Paso 2. Baja Vortexine's OS
 
 Vortexine's OS viene en un archivo llamado **ISO**. GitHub no deja subir archivos tan grandes, así que viene en
-**3 pedazos** que luego juntas en uno.
+**5 pedazos** que luego juntas en uno.
 
-1. Entra a: <https://github.com/MikePianoXD777/vortex-os/releases/tag/v1.6.3>
-2. Baja hasta donde dice **Assets** y da clic en estos 3 archivos para bajarlos (cada uno pesa 1.4 GB):
-   - `vortexines-os-1.6.3.iso.parte0`
-   - `vortexines-os-1.6.3.iso.parte1`
-   - `vortexines-os-1.6.3.iso.parte2`
+1. Entra a: <https://github.com/MikePianoXD777/vortex-os/releases/tag/v4.5.2>
+2. Baja hasta donde dice **Assets** y da clic en estos 5 archivos para bajarlos (cada uno pesa casi 2 GB; el último, menos):
+   - `vortexines-os-4.5.2.iso.parte0`
+   - `vortexines-os-4.5.2.iso.parte1`
+   - `vortexines-os-4.5.2.iso.parte2`
+   - `vortexines-os-4.5.2.iso.parte3`
+   - `vortexines-os-4.5.2.iso.parte4`
 
-   Espera a que **terminen los 3**. Quedan en tu carpeta **Descargas**.
+   Espera a que **terminen los 5**. Quedan en tu carpeta **Descargas**.
 
-   > La USB trae la versión 1.6.3, pero no te preocupes: al terminar de instalar se pone sola en la más nueva
-   > (paso 7).
+   > Si cuando instales ya salió una versión más nueva, no te preocupes: al terminar de instalar se pone sola
+   > en la más nueva (paso 7).
 
-3. **Junta los 3 pedazos:**
+3. **Junta los 5 pedazos:**
    1. Abre la carpeta **Descargas** (en el Explorador de archivos, la carpeta amarilla de la barra de abajo).
    2. Da clic **arriba, en la barra donde dice «Descargas»**. Se pone azul. Borra lo que dice, escribe **cmd** y
       presiona **Enter**. Se abre una ventana negra.
    3. Copia este comando completo, pégalo en la ventana negra con **clic derecho** y presiona **Enter**:
 
       ```
-      copy /b vortexines-os-1.6.3.iso.parte0 + vortexines-os-1.6.3.iso.parte1 + vortexines-os-1.6.3.iso.parte2 vortexines-os-1.6.3.iso
+      copy /b vortexines-os-4.5.2.iso.parte0 + vortexines-os-4.5.2.iso.parte1 + vortexines-os-4.5.2.iso.parte2 + vortexines-os-4.5.2.iso.parte3 + vortexines-os-4.5.2.iso.parte4 vortexines-os-4.5.2.iso
       ```
 
-   4. Espera hasta que diga **«1 archivos copiados»**. En Descargas aparece **`vortexines-os-1.6.3.iso`** (unos
-      4.3 GB). Ese es el bueno; los 3 pedazos ya los puedes borrar.
+   4. Espera hasta que diga **«1 archivos copiados»**. En Descargas aparece **`vortexines-os-4.5.2.iso`** (unos
+      8.6 GB). Ese es el bueno; los 5 pedazos ya los puedes borrar.
 
-   > Si dice «El sistema no puede encontrar el archivo especificado», alguno de los 3 no terminó de bajarse o
-   > quedó con otro nombre, por ejemplo `parte0 (1)`. Revisa que estén los 3, con el nombre exacto.
+   > Si dice «El sistema no puede encontrar el archivo especificado», alguno de los 5 no terminó de bajarse o
+   > quedó con otro nombre, por ejemplo `parte0 (1)`. Revisa que estén los 5, con el nombre exacto.
 
 ## Paso 3. Haz la USB
 
@@ -71,7 +73,7 @@ Vortexine's OS viene en un archivo llamado **ISO**. GitHub no deja subir archivo
 2. Entra a <https://rufus.ie>, baja **Rufus** (sirve el que dice «Portable») y ábrelo. Si Windows pregunta si
    quieres que haga cambios, di **Sí**. Si pregunta por actualizaciones de Rufus, di **No**.
 3. En **Dispositivo**, elige tu USB. Fíjate en el tamaño: que sea la USB y no otro disco.
-4. En **Elección de arranque**, da clic en **SELECCIONAR** y elige `vortexines-os-1.6.3.iso` de tu carpeta
+4. En **Elección de arranque**, da clic en **SELECCIONAR** y elige `vortexines-os-4.5.2.iso` de tu carpeta
    Descargas.
 5. Lo demás no lo toques. Da clic en **EMPEZAR**.
 6. Si sale una ventana que dice «Imagen ISOHybrid detectada», elige **«Escribir en modo Imagen DD»** → **OK**.
@@ -124,7 +126,7 @@ Con la USB conectada:
    **ñ** y los acentos salgan bien → **Siguiente**.
 4. **Particiones:**
    1. Arriba, en **«Seleccionar dispositivo de almacenamiento»**, elige el **disco de la PC**, no la USB. Guíate
-      por el tamaño: la USB es la chica (8, 16 o 32 GB).
+      por el tamaño: la USB es la chica (16, 32 o 64 GB).
    2. Elige **«Borrar disco»**.
    3. **No marques «Cifrar sistema»**, a menos que quieras escribir una contraseña extra cada vez que prendas.
    4. **Siguiente.**
