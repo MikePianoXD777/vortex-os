@@ -1714,9 +1714,21 @@ PAQUETES_NUEVOS=(
   ydotool grim # 4.0: Miku hace clic por ti (con tu permiso) y enseña el punto en un recorte
   plymouth # 4.0: la animación de arranque (logo de Vortexine's sobre negro)
 )
+# ¿Hay gráficos Intel? (vendor 0x8086 en algún nodo de render; VORTEX_DRM para las pruebas)
+hay_intel() {
+  local v
+  for v in "${VORTEX_DRM:-/sys/class/drm}"/renderD*/device/vendor; do
+    [[ -r "$v" && "$(<"$v")" == 0x8086 ]] && return 0
+  done
+  return 1
+}
 paquetes_nuevos() {
   local p faltan=()
   for p in "${PAQUETES_NUEVOS[@]}"; do pacman -Q "$p" >/dev/null 2>&1 || faltan+=("$p"); done
+  # 4.5.2: con gráficos Intel, su driver de video iHD (intel-media-driver). La ISO 1.6.3 no lo traía y libva
+  # caía en el viejo i965, que en un Celeron tronó el kernel al poner un fondo JPEG (reporte de un amigo).
+  # Con iHD instalado libva lo usa solo, y en las Intel muy viejas, que iHD no soporta, sigue con i965.
+  if hay_intel && ! pacman -Q intel-media-driver >/dev/null 2>&1; then faltan+=(intel-media-driver); fi
   ((${#faltan[@]})) || return 0
   sudo pacman -S --needed --noconfirm "${faltan[@]}" ||
     aviso "no pude instalar ${faltan[*]} (a mano: sudo pacman -S ${faltan[*]})"

@@ -194,6 +194,21 @@ wallpaper_decoder() {
     echo none
 }
 
+# «si» cuando la primera GPU de render es Intel y no está su driver de video iHD (intel-media-driver).
+intel_sin_ihd() {
+    local drm="${1:-/sys/class/drm}" dri="${2:-/usr/lib/dri}" node
+    for node in "$drm"/renderD*; do
+        [ -r "$node/device/vendor" ] || continue
+        if [ "$(cat "$node/device/vendor")" = "0x8086" ] && [ ! -e "$dri/iHD_drv_video.so" ]; then
+            echo si
+        else
+            echo no
+        fi
+        return
+    done
+    echo no
+}
+
 # 4.2: si quickshell muere con la pantalla bloqueada (queda la marca «locked»), se vuelve a abrir para que
 # retome el bloqueo (Lock.qml lo hace al arrancar) en vez de dejar la pantalla roja de Hyprland
 # («lockscreen app died»). Hasta 5 veces en 2 minutos, para no quedarse en un ciclo si truena al arrancar.
@@ -306,6 +321,10 @@ if [ "$COMMAND" == "start" ]; then
     # full clocks (~+8 W measured on a 1080p loop). Users can still override the variable.
     if [ -d /proc/driver/nvidia ]; then
         export QT_FFMPEG_DECODING_HW_DEVICE_TYPES="${QT_FFMPEG_DECODING_HW_DEVICE_TYPES-$(wallpaper_decoder)}"
+    elif [ "$(intel_sin_ihd)" = si ]; then
+        # 4.5.2: Intel sin su driver iHD: libva caería en el viejo i965, que en algunos Celeron tumba el
+        # kernel. Los fondos de video se decodifican en el procesador hasta que «vortex actualizar» lo instale.
+        export QT_FFMPEG_DECODING_HW_DEVICE_TYPES="${QT_FFMPEG_DECODING_HW_DEVICE_TYPES-none}"
     fi
     lanzar_quickshell
 fi
