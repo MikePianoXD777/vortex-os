@@ -214,9 +214,14 @@ mod pruebas_candado {
             std::process::id().to_string()
         );
         drop(a);
-        assert!(
-            super::candado(&r).is_some(),
-            "al soltarlo se puede tomar otra vez"
-        );
+        // Otra prueba que abre un proceso en ese momento hereda el archivo entre su fork y su exec (y con él
+        // el candado) por un instante: con la máquina cargada (al armar la ISO) se notaba. Se espera hasta 2 s.
+        let otra_vez = (0..100).find_map(|_| {
+            super::candado(&r).or_else(|| {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                None
+            })
+        });
+        assert!(otra_vez.is_some(), "al soltarlo se puede tomar otra vez");
     }
 }
