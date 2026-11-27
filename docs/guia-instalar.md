@@ -12,6 +12,7 @@ cosas al azar.
 
 - **Una PC o laptop** con al menos **4 GB de RAM** (mejor 8 GB) y **30 GB libres** en el disco.
 - **Una USB de 16 GB o más.** Se borra todo lo que tenga: saca antes lo que quieras guardar.
+  ¿No tienes USB? Instálalo con esta guía: [Instalar junto a Windows sin USB](guia-sin-usb.md).
 - **Internet.** La primera vez, mejor con cable o con un Wi-Fi que jale bien.
 - **Una hora** sin prisa, con la laptop conectada a la corriente.
 

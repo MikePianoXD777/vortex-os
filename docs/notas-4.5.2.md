@@ -12,6 +12,12 @@ instalaciones viejas les faltaba el driver de video moderno de Intel (iHD) y el 
 - Mientras no lo tengas, los fondos de video se decodifican con el procesador, sin tocar el driver viejo.
 - La ISO nueva ya lo trae de fábrica.
 
+## ISO nueva
+
+Hay ISO nueva de la 4.5.2 (5 partes, USB de 16 GB): [guía de instalación](guia-instalar.md).
+
+**¿No tienes USB?** Instálalo con esta guía: [Instalar junto a Windows sin USB](guia-sin-usb.md).
+
 ## Para actualizar
 
 ```
