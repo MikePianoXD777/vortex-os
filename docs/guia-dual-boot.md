@@ -16,8 +16,8 @@ Necesitas:
 
 ---
 
-> **¿Prefieres apagar Secure Boot?** También funciona, y así no sale ninguna pantalla azul
-> (MokManager): sáltate esos pasos. Antes de apagarlo:
+> **Apagar Secure Boot: obligatorio con la ISO 4.5.2** (no viene firmada). Con la 1.6.3 es opcional:
+> también funciona, y así no sale ninguna pantalla azul (MokManager): sáltate esos pasos. Antes de apagarlo:
 >
 > 1. Si Windows tiene **BitLocker**, ve a «Administrar BitLocker» → **«Suspender la protección»**.
 >    Si no, al apagar Secure Boot Windows pedirá la clave de recuperación.
@@ -66,14 +66,16 @@ Necesitas:
    - Si no sale esa opción: apaga la PC y al prenderla presiona varias veces la tecla del **menú
      de arranque**. Suele ser **F12** (Lenovo, Dell, Acer), **F8** (ASUS), **F11** (MSI) o **Esc**
      (HP, y luego F9). Ahí eliges la USB.
-3. **Secure Boot.** Si tu PC lo tiene activo (con Windows 11 casi siempre), la primera vez sale una
-   **pantalla azul en inglés (MokManager)**. Es normal y es una sola vez:
+3. **Secure Boot.** **Con la ISO 4.5.2 tienes que apagarlo** (no viene firmada): haz lo del recuadro
+   «¿Prefieres apagar Secure Boot?» de arriba, con lo de BitLocker primero. **Con la 1.6.3**, si tu PC lo
+   tiene activo (con Windows 11 casi siempre), la primera vez sale una **pantalla azul en inglés
+   (MokManager)**. Es normal y es una sola vez:
    1. Si dice «Verification failed», presiona **Enter**.
    2. Elige **Enroll key from disk** (con las flechas y Enter).
    3. Elige el disco que dice **ARCHISO_EFI**, luego la carpeta **EFI** y luego **vortexines.cer**.
    4. **Continue** → **Yes** → **Reboot**.
    5. Vuelve a elegir la USB en el menú de arranque (paso 2).
-   No hace falta entrar a la BIOS ni apagar Secure Boot.
+   Con la 1.6.3 no hace falta entrar a la BIOS ni apagar Secure Boot.
 4. Entra el escritorio de Vortexine's OS y se abre solo el **instalador**.
 
 ## 4. El instalador

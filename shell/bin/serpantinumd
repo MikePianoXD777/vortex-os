@@ -194,12 +194,29 @@ wallpaper_decoder() {
     echo none
 }
 
-# «si» cuando la primera GPU de render es Intel y no está su driver de video iHD (intel-media-driver).
+# «si» cuando el modelo de gráfica Intel (su id de PCI) es anterior a Broadwell o es un Atom de la misma
+# generación (Braswell/Cherry Trail: Celeron N30xx, Pentium N3700/N3710…). iHD no los soporta: con él
+# instalado, libva igual cae en el viejo i965.
+intel_viejo_para_ihd() {
+    local id=$(( ${1:-0} ))
+    if (( id < 0x1600 )) ||                       # Ironlake, Sandy Bridge, Ivy Bridge, Haswell, Bay Trail
+        (( id >= 0x2000 && id <= 0x2fff )) ||     # Braswell/Cherry Trail (0x22b0-0x22b3) y chipsets viejos
+        (( id >= 0x3500 && id <= 0x35ff )) ||     # i830/i855
+        (( id == 0xa001 || id == 0xa011 )); then  # Pineview
+        echo si
+    else
+        echo no
+    fi
+}
+
+# «si» cuando la primera GPU de render es Intel y no tiene un driver de video iHD que funcione: porque
+# falta intel-media-driver (4.5.2) o porque su gráfica es demasiado vieja para iHD (4.5.3).
 intel_sin_ihd() {
     local drm="${1:-/sys/class/drm}" dri="${2:-/usr/lib/dri}" node
     for node in "$drm"/renderD*; do
         [ -r "$node/device/vendor" ] || continue
-        if [ "$(cat "$node/device/vendor")" = "0x8086" ] && [ ! -e "$dri/iHD_drv_video.so" ]; then
+        if [ "$(cat "$node/device/vendor")" = "0x8086" ] && { [ ! -e "$dri/iHD_drv_video.so" ] ||
+            [ "$(intel_viejo_para_ihd "$(cat "$node/device/device" 2>/dev/null)")" = si ]; }; then
             echo si
         else
             echo no
@@ -324,6 +341,7 @@ if [ "$COMMAND" == "start" ]; then
     elif [ "$(intel_sin_ihd)" = si ]; then
         # 4.5.2: Intel sin su driver iHD: libva caería en el viejo i965, que en algunos Celeron tumba el
         # kernel. Los fondos de video se decodifican en el procesador hasta que «vortex actualizar» lo instale.
+        # 4.5.3: también en las Intel que iHD no soporta (Braswell y anteriores), aunque esté instalado.
         export QT_FFMPEG_DECODING_HW_DEVICE_TYPES="${QT_FFMPEG_DECODING_HW_DEVICE_TYPES-none}"
     fi
     lanzar_quickshell

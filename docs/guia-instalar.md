@@ -13,6 +13,7 @@ cosas al azar.
 - **Una PC o laptop** con al menos **4 GB de RAM** (mejor 8 GB) y **30 GB libres** en el disco.
 - **Una USB de 16 GB o más.** Se borra todo lo que tenga: saca antes lo que quieras guardar.
   ¿No tienes USB? Instálalo con esta guía: [Instalar junto a Windows sin USB](guia-sin-usb.md).
+  ¿Solo tienes una de **8 GB**? Usa la ISO anterior, la **1.6.3** (pesa 4.3 GB): mira el recuadro del paso 2.
 - **Internet.** La primera vez, mejor con cable o con un Wi-Fi que jale bien.
 - **Una hora** sin prisa, con la laptop conectada a la corriente.
 
@@ -68,6 +69,17 @@ Vortexine's OS viene en un archivo llamado **ISO**. GitHub no deja subir archivo
    > Si dice «El sistema no puede encontrar el archivo especificado», alguno de los 5 no terminó de bajarse o
    > quedó con otro nombre, por ejemplo `parte0 (1)`. Revisa que estén los 5, con el nombre exacto.
 
+> **¿Tu USB es de 8 GB?** La 4.5.2 no cabe. Baja la **1.6.3** de
+> <https://github.com/MikePianoXD777/vortex-os/releases/tag/v1.6.3>: son **3 pedazos**
+> (`vortexines-os-1.6.3.iso.parte0`, `parte1` y `parte2`) y se juntan igual, con este comando:
+>
+> ```
+> copy /b vortexines-os-1.6.3.iso.parte0 + vortexines-os-1.6.3.iso.parte1 + vortexines-os-1.6.3.iso.parte2 vortexines-os-1.6.3.iso
+> ```
+>
+> En el paso 3 eliges `vortexines-os-1.6.3.iso`. Al terminar de instalar, el paso 7 la pone en la versión más
+> nueva, así que quedas igual que con la 4.5.2.
+
 ## Paso 3. Haz la USB
 
 1. Conecta la USB.
@@ -85,6 +97,20 @@ Vortexine's OS viene en un archivo llamado **ISO**. GitHub no deja subir archivo
 > [la guía junto a Windows](guia-dual-boot.md#1-en-windows-preparar): le hace espacio a Vortexine's OS en tu disco.
 
 ## Paso 4. Prende la PC desde la USB
+
+**Antes, apaga Secure Boot** (solo con la ISO 4.5.2; la 1.6.3 sí viene firmada y no hace falta):
+
+1. **Si elegiste B (junto a Windows) y Windows tiene BitLocker:** antes, en Windows, busca «Administrar
+   BitLocker» → **«Suspender la protección»**. Si no, al apagar Secure Boot Windows te pedirá la clave de
+   recuperación.
+2. Apaga la PC. Préndela presionando **muchas veces seguidas** la tecla de la BIOS: **Supr (Del)** o **F2** (en
+   HP, **Esc** y luego **F10**).
+3. Busca **Secure Boot**: suele estar en **Boot** o en **Security** (en ASUS: **Boot → Secure Boot → OS Type** →
+   «Other OS»).
+4. Ponlo en **Disabled**, guarda con **F10** y confirma con **Yes** / **OK**.
+
+> Si en Windows abres **Información del sistema** (`msinfo32`) y dice «Estado de arranque seguro: **Desactivado**»,
+> ya está apagado y te saltas esto.
 
 Con la USB conectada:
 
@@ -104,7 +130,8 @@ Con la USB conectada:
    | HP | **Esc** y luego **F9** |
    | Otra o PC armada | prueba **F12**, **F11**, **F8** o **Esc** |
 
-3. **Si sale una pantalla azul en inglés (se llama MokManager):** es normal y sale **una sola vez**. Muévete
+3. **Solo con la 1.6.3 y Secure Boot prendido: si sale una pantalla azul en inglés (se llama MokManager)**, es
+   normal y sale **una sola vez**. Muévete
    con las **flechas** y elige con **Enter**:
    1. Si dice «Verification failed», presiona **Enter**.
    2. **Enroll key from disk**.
@@ -142,7 +169,8 @@ Con la USB conectada:
 
 ## Paso 6. La primera vez que prende
 
-- **Si sale otra vez la pantalla azul en inglés (MokManager):** es para tu PC y también es **una sola vez**:
+- **Solo con la 1.6.3 y Secure Boot prendido: si sale otra vez la pantalla azul en inglés (MokManager)**, es para
+  tu PC y también es **una sola vez**:
   1. **Enroll MOK** → **Continue** → **Yes**.
   2. Te pide una contraseña: escribe **1234** y **Enter**.
   3. **Reboot**.
@@ -179,8 +207,10 @@ Desde ahí, cada vez que salga **«Hay actualizaciones»**, das clic en **Actual
   PC de escritorio, uno de atrás).
 - **La PC prende directo en Windows:** no le diste a tiempo a la tecla. Apágala y presiónala muchas veces desde
   que la prendes (tabla del paso 4).
-- **«El sistema no puede encontrar el archivo» al juntar los pedazos:** revisa el paso 2. Tienen que estar los 3
-  completos y con el nombre exacto.
+- **«El sistema no puede encontrar el archivo» al juntar los pedazos:** revisa el paso 2. Tienen que estar todos
+  (5 de la 4.5.2, 3 de la 1.6.3) completos y con el nombre exacto.
+- **Con la 4.5.2 la PC no arranca desde la USB o sale un error de «Secure Boot» / «Security violation»:** Secure
+  Boot sigue prendido. Apágalo (inicio del paso 4).
 - **Windows pide una «clave de recuperación de BitLocker»** (si elegiste B): es la llave de tu disco. Está en
   <https://account.microsoft.com/devices/recoverykey>, con la cuenta Microsoft de esa PC.
 - **No te acuerdas de qué opción elegir en el instalador:** no le des a **Instalar**. Mientras no le des, no se
